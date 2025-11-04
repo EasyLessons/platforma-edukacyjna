@@ -1,38 +1,10 @@
-/**
- * ============================================================================
- * PLIK: src/app/tablica/whiteboard/rendering.ts
- * ============================================================================
- * 
- * IMPORTUJE Z:
- * - ./types (DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ViewportTransform)
- * - ./viewport (transformPoint)
- * - ./utils (clampLineWidth, clampFontSize, evaluateExpression)
- * 
- * EKSPORTUJE:
- * - drawPath (function) - renderuje ścieżkę (pen tool)
- * - drawShape (function) - renderuje kształty (rectangle, circle, triangle, line, arrow)
- * - drawText (function) - renderuje tekst
- * - drawFunction (function) - renderuje wykres funkcji matematycznej
- * - drawElement (function) - dispatcher - wybiera odpowiednią funkcję rysującą
- * 
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (główna pętla renderowania)
- * 
- * PRZEZNACZENIE:
- * Moduł renderowania elementów na canvas:
- * - Rysowanie wszystkich typów elementów (path, shape, text, function)
- * - Transformacje world → screen przy użyciu viewport
- * - Clamp dla rozmiaru linii i czcionek przy zoomie
- * - Obsługa wyrażeń matematycznych dla wykresów funkcji
- * ============================================================================
- */
-
 import {
   DrawingElement,
   DrawingPath,
   Shape,
   TextElement,
   FunctionPlot,
+  ImageElement,
   ViewportTransform
 } from './types';
 import { transformPoint } from './viewport';
@@ -52,7 +24,7 @@ export function drawPath(
   if (path.points.length < 2) return;
   
   ctx.strokeStyle = path.color;
-  ctx.lineWidth = clampLineWidth(path.width, viewport.scale); // ✅ CLAMP!
+  ctx.lineWidth = clampLineWidth(path.width, viewport.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
@@ -84,7 +56,7 @@ export function drawShape(
   
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
-  ctx.lineWidth = clampLineWidth(shape.strokeWidth, viewport.scale); // ✅ CLAMP!
+  ctx.lineWidth = clampLineWidth(shape.strokeWidth, viewport.scale);
   
   switch (shape.shapeType) {
     case 'rectangle':
@@ -157,7 +129,7 @@ export function drawShape(
 }
 
 /**
- * Rysuje tekst (text)
+ * Rysuje tekst (text) - NOWY: z obsługą bounding box i rich text
  * WAŻNE: Używa clamp dla fontSize!
  */
 export function drawText(
@@ -168,16 +140,77 @@ export function drawText(
   canvasHeight: number
 ): void {
   const pos = transformPoint({ x: textEl.x, y: textEl.y }, viewport, canvasWidth, canvasHeight);
+  
+  // 🆕 Font styling
+  const fontWeight = textEl.fontWeight || 'normal';
+  const fontStyle = textEl.fontStyle || 'normal';
+  const fontFamily = textEl.fontFamily || 'Arial, sans-serif';
+  const fontSize = clampFontSize(textEl.fontSize, viewport.scale);
+  
   ctx.fillStyle = textEl.color;
-  ctx.font = `${clampFontSize(textEl.fontSize, viewport.scale)}px Arial`; // ✅ CLAMP!
+  ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.textBaseline = 'top';
   
-  const lines = textEl.text.split('\n');
-  const lineHeight = clampFontSize(textEl.fontSize, viewport.scale) * 1.2;
+  // 🆕 Text alignment
+  const textAlign = textEl.textAlign || 'left';
+  ctx.textAlign = textAlign;
   
-  lines.forEach((line, i) => {
-    ctx.fillText(line, pos.x, pos.y + i * lineHeight);
-  });
+  const lines = textEl.text.split('\n');
+  const lineHeight = fontSize * 1.4;
+  
+  // 🆕 Calculate X offset based on alignment and width
+  let xOffset = 0;
+  if (textEl.width) {
+    const boxWidth = textEl.width * viewport.scale * 100;
+    if (textAlign === 'center') {
+      xOffset = boxWidth / 2;
+    } else if (textAlign === 'right') {
+      xOffset = boxWidth;
+    }
+  }
+  
+  // 🆕 Text wrapping jeśli jest width
+  if (textEl.width) {
+    const maxWidth = textEl.width * viewport.scale * 100;
+    let currentY = pos.y;
+    
+    lines.forEach((line) => {
+      const words = line.split(' ');
+      let currentLine = '';
+      
+      words.forEach((word, i) => {
+        const testLine = currentLine + (currentLine ? ' ' : '') + word;
+        const metrics = ctx.measureText(testLine);
+        
+        if (metrics.width > maxWidth && currentLine) {
+          ctx.fillText(currentLine, pos.x + xOffset, currentY);
+          currentLine = word;
+          currentY += lineHeight;
+        } else {
+          currentLine = testLine;
+        }
+      });
+      
+      if (currentLine) {
+        ctx.fillText(currentLine, pos.x + xOffset, currentY);
+        currentY += lineHeight;
+      }
+    });
+  } else {
+    // Bez width - rysuj normalnie
+    lines.forEach((line, i) => {
+      ctx.fillText(line, pos.x + xOffset, pos.y + i * lineHeight);
+    });
+  }
+  
+  // 🆕 DEBUG: rysuj bounding box (opcjonalnie - zakomentuj w produkcji)
+  // if (textEl.width && textEl.height) {
+  //   const boxWidth = textEl.width * viewport.scale * 100;
+  //   const boxHeight = textEl.height * viewport.scale * 100;
+  //   ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
+  //   ctx.lineWidth = 1;
+  //   ctx.strokeRect(pos.x, pos.y, boxWidth, boxHeight);
+  // }
 }
 
 /**
@@ -192,13 +225,13 @@ export function drawFunction(
   canvasHeight: number
 ): void {
   ctx.strokeStyle = func.color;
-  ctx.lineWidth = clampLineWidth(func.strokeWidth, viewport.scale); // ✅ CLAMP!
+  ctx.lineWidth = clampLineWidth(func.strokeWidth, viewport.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
   
   let started = false;
-  const step = 0.02 / viewport.scale; // Dynamiczny step
+  const step = 0.02 / viewport.scale;
   
   for (let worldX = -func.xRange; worldX <= func.xRange; worldX += step) {
     try {
@@ -226,6 +259,41 @@ export function drawFunction(
 }
 
 /**
+ * 🆕 Rysuje obrazek (image) - przyszłość
+ */
+export function drawImage(
+  ctx: CanvasRenderingContext2D,
+  img: ImageElement,
+  viewport: ViewportTransform,
+  canvasWidth: number,
+  canvasHeight: number,
+  loadedImages: Map<string, HTMLImageElement>
+): void {
+  const topLeft = transformPoint({ x: img.x, y: img.y }, viewport, canvasWidth, canvasHeight);
+  const bottomRight = transformPoint(
+    { x: img.x + img.width, y: img.y + img.height },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
+  
+  const screenWidth = bottomRight.x - topLeft.x;
+  const screenHeight = bottomRight.y - topLeft.y;
+  
+  const htmlImg = loadedImages.get(img.id);
+  if (htmlImg && htmlImg.complete) {
+    ctx.drawImage(htmlImg, topLeft.x, topLeft.y, screenWidth, screenHeight);
+  } else {
+    // Placeholder while loading
+    ctx.fillStyle = '#f0f0f0';
+    ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  }
+}
+
+/**
  * Rysuje pojedynczy element (dispatcher)
  * Wybiera odpowiednią funkcję w zależności od typu
  */
@@ -234,7 +302,8 @@ export function drawElement(
   element: DrawingElement,
   viewport: ViewportTransform,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  loadedImages?: Map<string, HTMLImageElement>
 ): void {
   if (element.type === 'path') {
     drawPath(ctx, element, viewport, canvasWidth, canvasHeight);
@@ -244,5 +313,7 @@ export function drawElement(
     drawText(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'function') {
     drawFunction(ctx, element, viewport, canvasWidth, canvasHeight);
+  } else if (element.type === 'image' && loadedImages) {
+    drawImage(ctx, element, viewport, canvasWidth, canvasHeight, loadedImages);
   }
 }

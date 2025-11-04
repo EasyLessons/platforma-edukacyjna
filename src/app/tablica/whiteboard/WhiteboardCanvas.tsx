@@ -1,35 +1,10 @@
-/**
- * ============================================================================
- * PLIK: src/app/tablica/whiteboard/WhiteboardCanvas.tsx
- * ============================================================================
- * 
- * IMPORTUJE Z:
- * - react (useState, useRef, useEffect, useCallback)
- * - ../toolbar/Toolbar (Toolbar, Tool, ShapeType, ZoomControls)
- * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
- * - ./viewport (transformPoint, inverseTransformPoint, panViewportWithMouse, panViewportWithWheel, zoomViewport, constrainViewport)
- * - ./Grid (drawGrid)
- * - ./rendering (drawElement)
- * 
- * EKSPORTUJE:
- * - WhiteboardCanvas (named) - główny komponent canvas tablicy
- * - WhiteboardCanvas (default) - eksport domyślny
- * 
- * UŻYWANE PRZEZ:
- * - page.tsx (strona /tablica)
- * 
- * PRZEZNACZENIE:
- * Główny komponent tablicy interaktywnej. Zarządza canvas, viewport (pan/zoom),
- * narzędziami rysowania (pen, shape, text, function), zaznaczaniem elementów,
- * historią (undo/redo), oraz obsługą myszy/touchpada. Integruje wszystkie
- * moduły whiteboard w jedną spójną aplikację.
- * ============================================================================
- */
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Toolbar, { Tool, ShapeType, ZoomControls } from '../toolbar/Toolbar';
+import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
+import { ZoomControls } from '../toolbar/ZoomControls';
+import { TextTool } from '../toolbar/TextTool';
+import { SelectTool } from '../toolbar/SelectTool';
 
 // Import wszystkich modułów
 import {
@@ -61,7 +36,6 @@ interface WhiteboardCanvasProps {
 export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -84,44 +58,88 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [currentElement, setCurrentElement] = useState<DrawingElement | null>(null);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   
-  // Selection state
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionStart, setSelectionStart] = useState<Point | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<Point | null>(null);
-  
-  // Text editing state
-  const [isEditingText, setIsEditingText] = useState(false);
-  const [textPosition, setTextPosition] = useState<Point | null>(null);
-  const [textBoxSize, setTextBoxSize] = useState<{ width: number; height: number } | null>(null);
-  const [textDraft, setTextDraft] = useState('');
-  const [pendingTextId, setPendingTextId] = useState<string | null>(null);
-  
-  // History state
+  // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  
-  // Drag state
-  const [isDraggingElement, setIsDraggingElement] = useState(false);
-  const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
-  const [draggedElementsStart, setDraggedElementsStart] = useState<Map<string, DrawingElement>>(new Map());
-  
-  // Resize state
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
-  const [resizeOriginalElement, setResizeOriginalElement] = useState<DrawingElement | null>(null);
   
   const redrawCanvasRef = useRef<() => void>(() => {});
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
   const saveToHistoryRef = useRef<(els: DrawingElement[]) => void>(() => {});
+  const historyRef = useRef(history);
+  const historyIndexRef = useRef(historyIndex);
+  const selectedElementIdsRef = useRef(selectedElementIds);
   
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  useEffect(() => {
+    historyIndexRef.current = historyIndex;
+  }, [historyIndex]);
+
+  useEffect(() => {
+    selectedElementIdsRef.current = selectedElementIds;
+  }, [selectedElementIds]);
+
+  // ========================================
+  // 🆕 KEYBOARD SHORTCUTS
+  // ========================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z - Undo
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        const currentIndex = historyIndexRef.current;
+        const currentHistory = historyRef.current;
+        
+        if (currentIndex > 0) {
+          const newIndex = currentIndex - 1;
+          setHistoryIndex(newIndex);
+          setElements(currentHistory[newIndex]);
+          setSelectedElementIds(new Set());
+        }
+      }
+      
+      // Ctrl+Y lub Ctrl+Shift+Z - Redo
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        const currentIndex = historyIndexRef.current;
+        const currentHistory = historyRef.current;
+        
+        if (currentIndex < currentHistory.length - 1) {
+          const newIndex = currentIndex + 1;
+          setHistoryIndex(newIndex);
+          setElements(currentHistory[newIndex]);
+          setSelectedElementIds(new Set());
+        }
+      }
+      
+      // Delete - usuń wybrane elementy
+      if (e.key === 'Delete') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        const currentElements = elementsRef.current;
+        
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          const newElements = currentElements.filter(el => !currentSelectedIds.has(el.id));
+          setElements(newElements);
+          saveToHistoryRef.current(newElements);
+          setSelectedElementIds(new Set());
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []); // Pusta tablica zależności - używamy ref-ów
 
   // Canvas setup
   useEffect(() => {
@@ -185,7 +203,9 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     if (!canvas) return;
     
     const handleWheel = (e: WheelEvent) => {
-      if (isEditingText) return;
+      // Jeśli aktywny TextTool lub SelectTool - nie scrolluj
+      if (tool === 'text' || tool === 'select') return;
+      
       e.preventDefault();
       
       const rect = canvas.getBoundingClientRect();
@@ -195,11 +215,9 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       const height = rect.height;
       
       if (e.ctrlKey) {
-        // PINCH ZOOM (dwa palce: do siebie/od siebie)
         const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // SCROLL/PAN (dwa palce: w lewo/prawo/góra/dół)
         const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
@@ -207,7 +225,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [viewport, isEditingText]);
+  }, [viewport, tool]);
 
   // Redraw canvas
   const redrawCanvas = useCallback(() => {
@@ -223,32 +241,17 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     // Clear
     ctx.clearRect(0, 0, width, height);
     
-    // Draw grid (z modułu Grid.tsx)
+    // Draw grid
     drawGrid(ctx, viewport, width, height);
     
-    // Draw all elements (z modułu rendering.ts)
+    // Draw all elements
     elements.forEach(element => drawElement(ctx, element, viewport, width, height));
     
     // Draw current element
     if (currentElement) {
       drawElement(ctx, currentElement, viewport, width, height);
     }
-    
-    // Draw selection box
-    if (isSelecting && selectionStart && selectionEnd) {
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      
-      const selWidth = selectionEnd.x - selectionStart.x;
-      const selHeight = selectionEnd.y - selectionStart.y;
-      
-      ctx.fillRect(selectionStart.x, selectionStart.y, selWidth, selHeight);
-      ctx.strokeRect(selectionStart.x, selectionStart.y, selWidth, selHeight);
-      ctx.setLineDash([]);
-    }
-  }, [elements, currentElement, viewport, isSelecting, selectionStart, selectionEnd]);
+  }, [elements, currentElement, viewport]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -258,13 +261,18 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // History
+  // History - POPRAWIONE: używa funkcyjnej formy setState bez zależności
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newElements);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
+    setHistoryIndex(prevIndex => {
+      setHistory(prevHistory => {
+        // Obetnij historię do obecnego indeksu i dodaj nowy stan
+        const newHistory = prevHistory.slice(0, prevIndex + 1);
+        newHistory.push(newElements);
+        return newHistory;
+      });
+      return prevIndex + 1;
+    });
+  }, []);
 
   useEffect(() => {
     saveToHistoryRef.current = saveToHistory;
@@ -276,7 +284,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setHistoryIndex(newIndex);
       setElements(history[newIndex]);
       setSelectedElementIds(new Set());
-      setSelectedElementId(null);
     }
   }, [historyIndex, history]);
 
@@ -286,7 +293,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setHistoryIndex(newIndex);
       setElements(history[newIndex]);
       setSelectedElementIds(new Set());
-      setSelectedElementId(null);
     }
   }, [historyIndex, history]);
 
@@ -294,12 +300,76 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     setElements([]);
     saveToHistory([]);
     setSelectedElementIds(new Set());
-    setSelectedElementId(null);
   }, [saveToHistory]);
 
-  // Mouse handlers
+  // ========================================
+  // 🆕 CALLBACKI DLA TEXTTOOL
+  // ========================================
+  const handleTextCreate = useCallback((text: TextElement) => {
+    const newElements = [...elements, text];
+    setElements(newElements);
+    saveToHistory(newElements);
+    setTool('select'); // Po utworzeniu tekstu przełącz na select
+  }, [elements, saveToHistory]);
+
+  const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  const handleTextDelete = useCallback((id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA SELECTTOOL
+  // ========================================
+  const handleSelectionChange = useCallback((ids: Set<string>) => {
+    setSelectedElementIds(ids);
+  }, []);
+
+  const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    // Nie zapisujemy do historii przy każdym ruchu - tylko przy mouseUp
+  }, [elements]);
+
+  const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
+    const newElements = elements.map(el => {
+      const update = updates.get(el.id);
+      return update ? { ...el, ...update } as DrawingElement : el;
+    });
+    setElements(newElements);
+  }, [elements]);
+
+  // Zapisz do historii po zakończeniu dragowania/resizowania
+  const handleSelectionFinish = useCallback(() => {
+    saveToHistory(elements);
+  }, [elements, saveToHistory]);
+
+  // Funkcja usuwania wybranych elementów (dostępna z klawiatury Delete)
+  const deleteSelectedElements = useCallback(() => {
+    if (selectedElementIds.size === 0) return;
+    
+    const newElements = elements.filter(el => !selectedElementIds.has(el.id));
+    setElements(newElements);
+    saveToHistory(newElements);
+    setSelectedElementIds(new Set());
+  }, [elements, selectedElementIds, saveToHistory]);
+
+  // ========================================
+  // STARE MOUSE HANDLERS (tylko dla pen/shape/function)
+  // ========================================
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isEditingText) return;
+    // Jeśli aktywny TextTool lub SelectTool - ignoruj stare handlery
+    if (tool === 'text' || tool === 'select') return;
     
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -314,22 +384,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     if (tool === 'pan' || e.button === 1 || (e.button === 0 && e.ctrlKey)) {
       setIsPanning(true);
       setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (tool === 'select') {
-      setIsSelecting(true);
-      setSelectionStart({ x: screenX, y: screenY });
-      setSelectionEnd({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (tool === 'text') {
-      setIsEditingText(true);
-      setTextPosition({ x: screenX, y: screenY });
-      setTextBoxSize({ width: 300, height: 100 });
-      setTextDraft('');
-      setPendingTextId(Date.now().toString());
       return;
     }
 
@@ -362,6 +416,9 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Jeśli aktywny TextTool lub SelectTool - ignoruj
+    if (tool === 'text' || tool === 'select') return;
+    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -375,15 +432,9 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       const dx = screenX - lastPanPoint.x;
       const dy = screenY - lastPanPoint.y;
       
-      // Pan z myszką (z modułu viewport.ts)
       const newViewport = panViewportWithMouse(viewport, dx, dy);
       setViewport(constrainViewport(newViewport));
       setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (isSelecting && selectionStart) {
-      setSelectionEnd({ x: screenX, y: screenY });
       return;
     }
 
@@ -406,16 +457,12 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   };
 
   const handleMouseUp = () => {
+    // Jeśli aktywny TextTool lub SelectTool - ignoruj
+    if (tool === 'text' || tool === 'select') return;
+    
     if (isPanning) {
       setIsPanning(false);
       setLastPanPoint(null);
-      return;
-    }
-
-    if (isSelecting) {
-      setIsSelecting(false);
-      setSelectionStart(null);
-      setSelectionEnd(null);
       return;
     }
 
@@ -426,40 +473,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setCurrentElement(null);
       setIsDrawing(false);
     }
-  };
-
-  const finishTextInput = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !textPosition) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-    
-    if (textDraft.trim() && pendingTextId) {
-      const worldPos = inverseTransformPoint(textPosition, viewport, width, height);
-      
-      const newText: TextElement = {
-        id: pendingTextId,
-        type: 'text',
-        x: worldPos.x,
-        y: worldPos.y,
-        text: textDraft.trim(),
-        fontSize: fontSize,
-        color: color
-      };
-      
-      const newElements = [...elements, newText];
-      setElements(newElements);
-      saveToHistory(newElements);
-    }
-    
-    setIsEditingText(false);
-    setTextPosition(null);
-    setTextBoxSize(null);
-    setTextDraft('');
-    setPendingTextId(null);
-    setTool('select');
   };
 
   // Zoom functions
@@ -578,6 +591,8 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   
   // Touch events handlers
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (tool === 'text' || tool === 'select') return;
+    
     e.preventDefault();
     if (e.touches.length === 1) {
       const touch = e.touches[0];
@@ -598,6 +613,8 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   };
   
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (tool === 'text' || tool === 'select') return;
+    
     e.preventDefault();
     if (e.touches.length === 1) {
       const touch = e.touches[0];
@@ -613,9 +630,21 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   };
   
   const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (tool === 'text' || tool === 'select') return;
+    
     e.preventDefault();
     handleMouseUp();
   };
+
+  // Get canvas dimensions for tools
+  const getCanvasDimensions = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { width: 0, height: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
+  };
+
+  const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
   
   return (
     <div className={`relative w-full h-full bg-white ${className}`}>
@@ -649,6 +678,33 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
           onResetView={resetView}
         />
         
+        {/* 🆕 TEXTTOOL - aktywny gdy tool === 'text' */}
+        {tool === 'text' && canvasWidth > 0 && (
+          <TextTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onTextCreate={handleTextCreate}
+            onTextUpdate={handleTextUpdate}
+            onTextDelete={handleTextDelete}
+          />
+        )}
+
+        {/* 🆕 SELECTTOOL - aktywny gdy tool === 'select' */}
+        {tool === 'select' && canvasWidth > 0 && (
+          <SelectTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements}
+            selectedIds={selectedElementIds}
+            onSelectionChange={handleSelectionChange}
+            onElementUpdate={handleElementUpdate}
+            onElementsUpdate={handleElementsUpdate}
+            onOperationFinish={handleSelectionFinish}
+          />
+        )}
+        
         <canvas
           ref={canvasRef}
           onMouseDown={handleMouseDown}
@@ -664,45 +720,13 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
             cursor: 
               tool === 'pan' || isPanning ? 'grab' : 
               tool === 'select' ? 'default' : 
-              tool === 'text' ? 'text' :
+              tool === 'text' ? 'crosshair' :
               'crosshair',
             willChange: 'auto',
-            imageRendering: 'crisp-edges'
+            imageRendering: 'crisp-edges',
+            pointerEvents: tool === 'text' || tool === 'select' ? 'none' : 'auto' // ⚠️ WAŻNE!
           }}
         />
-        
-        {isEditingText && textPosition && textBoxSize && (
-          <textarea
-            ref={textInputRef}
-            value={textDraft}
-            onChange={(e) => setTextDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                finishTextInput();
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                finishTextInput();
-              }
-            }}
-            onBlur={finishTextInput}
-            placeholder=""
-            className="absolute z-50 px-2 py-1 outline-none border-2 border-blue-500 bg-white/90 resize-none overflow-hidden"
-            style={{
-              left: `${textPosition.x}px`,
-              top: `${textPosition.y}px`,
-              width: `${textBoxSize.width}px`,
-              height: `${textBoxSize.height}px`,
-              fontSize: `${fontSize}px`,
-              color: color,
-              lineHeight: '1.2',
-              fontFamily: 'Arial, sans-serif',
-              whiteSpace: 'pre-wrap',
-              boxSizing: 'border-box'
-            }}
-            autoFocus
-          />
-        )}
       </div>
     </div>
   );

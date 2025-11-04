@@ -1,33 +1,3 @@
-/**
- * ============================================================================
- * PLIK: src/app/tablica/whiteboard/types.ts
- * ============================================================================
- * 
- * IMPORTUJE Z:
- * - (brak zewnętrznych importów)
- * 
- * EKSPORTUJE:
- * - Point (interface) - punkt w przestrzeni 2D
- * - ViewportTransform (interface) - transformacja viewport (x, y, scale)
- * - DrawingPath (interface) - ścieżka rysowana piórem
- * - Shape (interface) - kształty geometryczne (prostokąt, koło, trójkąt, linia, strzałka)
- * - TextElement (interface) - element tekstowy
- * - FunctionPlot (interface) - wykres funkcji matematycznej
- * - DrawingElement (type) - union wszystkich typów elementów
- * 
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (główny canvas)
- * - rendering.ts (renderowanie elementów)
- * - viewport.ts (transformacje współrzędnych)
- * - utils.ts (pomocnicze funkcje)
- * - Grid.tsx (rysowanie siatki)
- * 
- * PRZEZNACZENIE:
- * Definicje TypeScript dla wszystkich struktur danych używanych w tablicy.
- * Centralizuje typy dla elementów rysunkowych, viewport i współrzędnych.
- * ============================================================================
- */
-
 export interface Point {
   x: number;
   y: number;
@@ -65,9 +35,15 @@ export interface TextElement {
   type: 'text';
   x: number;
   y: number;
+  width?: number; // 🆕 Szerokość bounding box
+  height?: number; // 🆕 Wysokość bounding box
   text: string;
   fontSize: number;
   color: string;
+  fontFamily?: string; // 🆕 Domyślnie: 'Arial, sans-serif'
+  fontWeight?: 'normal' | 'bold'; // 🆕 Pogrubienie
+  fontStyle?: 'normal' | 'italic'; // 🆕 Kursywa
+  textAlign?: 'left' | 'center' | 'right'; // 🆕 Wyrównanie
 }
 
 export interface FunctionPlot {
@@ -80,4 +56,16 @@ export interface FunctionPlot {
   yRange: number;
 }
 
-export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot;
+// 🆕 Nowy typ dla obrazków (przyszłość)
+export interface ImageElement {
+  id: string;
+  type: 'image';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string; // URL lub base64
+  alt?: string;
+}
+
+export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement;
