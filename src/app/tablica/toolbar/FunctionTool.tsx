@@ -45,6 +45,8 @@ interface FunctionToolProps {
   color: string;
   lineWidth: number;
   onFunctionCreate: (func: FunctionPlot) => void;
+  onColorChange: (color: string) => void;
+  onLineWidthChange: (width: number) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
 }
 
@@ -55,6 +57,8 @@ export function FunctionTool({
   color,
   lineWidth,
   onFunctionCreate,
+  onColorChange,
+  onLineWidthChange,
   onViewportChange,
 }: FunctionToolProps) {
   const [expression, setExpression] = useState('');
@@ -261,28 +265,29 @@ export function FunctionTool({
           </div>
         </div>
 
-        {/* Kolor i grubość */}
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Kolor:</label>
-            <div className="flex items-center gap-2">
-              <div
-                className="w-8 h-8 rounded border border-gray-300"
-                style={{ backgroundColor: color }}
-              />
-              <span className="text-xs text-gray-700 font-mono">{color}</span>
-            </div>
+        {/* Kolor i grubość - edytowalne jak w Pen/Shape */}
+        <div className="flex flex-wrap items-center gap-3 mb-2">
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-medium text-gray-600">Kolor:</label>
+            <input
+              type="color"
+              value={color}
+              onChange={(e) => onColorChange(e.target.value)}
+              className="w-10 h-10 rounded border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+            />
           </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Grubość: {lineWidth}px
-            </label>
-            <div className="h-8 flex items-center">
-              <div
-                className="h-1 rounded-full bg-gray-800"
-                style={{ height: `${lineWidth}px`, width: '100%' }}
-              />
-            </div>
+
+          <div className="flex items-center gap-2 min-w-[140px]">
+            <label className="text-xs font-medium text-gray-600">Grubość:</label>
+            <input
+              type="range"
+              min="1"
+              max="8"
+              value={lineWidth}
+              onChange={(e) => onLineWidthChange(Number(e.target.value))}
+              className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+            />
+            <span className="text-xs text-gray-700 font-semibold w-8 text-right">{lineWidth}px</span>
           </div>
         </div>
 

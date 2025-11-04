@@ -660,6 +660,8 @@ useEffect(() => {
             color={color}
             lineWidth={lineWidth}
             onFunctionCreate={handleFunctionCreate}
+            onColorChange={handleColorChange}
+            onLineWidthChange={handleLineWidthChange}
             onViewportChange={handleViewportChange}
           />
         )}
