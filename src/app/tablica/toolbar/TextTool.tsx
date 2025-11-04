@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Type, Bold, Italic, AlignLeft, AlignCenter, AlignRight, Trash2 } from 'lucide-react';
+import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Point, ViewportTransform, TextElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint } from '../whiteboard/viewport';
 
@@ -20,7 +20,6 @@ interface TextDraft {
   screenEnd: Point;
   worldStart: Point;
   worldEnd: Point;
-  text: string;
   fontSize: number;
   color: string;
   fontFamily: string;
@@ -42,9 +41,13 @@ export function TextTool({
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<HTMLDivElement>(null);
 
   // Start dragging to create text box
   const handleMouseDown = (e: React.MouseEvent) => {
+    // Jeśli już edytujemy - ignoruj
+    if (isEditing) return;
+    
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -54,7 +57,6 @@ export function TextTool({
       screenEnd: screenPoint,
       worldStart: worldPoint,
       worldEnd: worldPoint,
-      text: '',
       fontSize: 24,
       color: '#000000',
       fontFamily: 'Arial, sans-serif',
@@ -93,12 +95,15 @@ export function TextTool({
 
     // Minimum size: 100x50
     if (width < 100 || height < 50) {
-      // Too small - show default size
       setTextDraft({
         ...textDraft,
         screenEnd: {
           x: textDraft.screenStart.x + 300,
           y: textDraft.screenStart.y + 100,
+        },
+        worldEnd: {
+          x: textDraft.worldStart.x + 3,
+          y: textDraft.worldStart.y + 1,
         },
       });
     }
@@ -107,13 +112,13 @@ export function TextTool({
     setEditingText('');
   };
 
-  // Save text element
-  const handleSaveText = () => {
-    if (!textDraft || !editingText.trim()) {
-      // Cancel if no text
-      setTextDraft(null);
-      setIsEditing(false);
-      setEditingText('');
+  // Save text element (automatyczne)
+  const handleSave = () => {
+    if (!textDraft) return;
+
+    // Jeśli pusty tekst - po prostu anuluj (nie zapisuj)
+    if (!editingText.trim()) {
+      handleCancel();
       return;
     }
 
@@ -149,7 +154,29 @@ export function TextTool({
     setTextDraft(null);
     setIsEditing(false);
     setEditingText('');
+    setIsDragging(false);
   };
+
+  // Kliknięcie poza edytorem = automatycznie zapisz
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
+        handleSave();
+      }
+    };
+
+    // Dodaj listener po małym delay (żeby nie trigger od razu)
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isEditing, textDraft, editingText]);
 
   // Auto-focus textarea
   useEffect(() => {
@@ -161,15 +188,18 @@ export function TextTool({
   return (
     <div
       className="absolute inset-0 pointer-events-none"
-      style={{ cursor: 'crosshair' }}
+      style={{ cursor: isEditing ? 'default' : 'crosshair' }}
     >
-      {/* Invisible overlay for mouse events */}
-      <div
-        className="absolute inset-0 pointer-events-auto"
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-      />
+      {/* Overlay dla mouse events */}
+      {!isEditing && (
+        <div
+          className="absolute inset-0 pointer-events-auto"
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+        />
+      )}
+
       {/* Dragging box preview */}
       {isDragging && textDraft && (
         <div
@@ -183,10 +213,11 @@ export function TextTool({
         />
       )}
 
-      {/* Text editor */}
+      {/* EDYTOR TEKSTOWY */}
       {isEditing && textDraft && (
         <div
-          className="absolute"
+          ref={editorRef}
+          className="absolute pointer-events-auto"
           style={{
             left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
             top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
@@ -294,17 +325,6 @@ export function TextTool({
             >
               <AlignRight className="w-4 h-4" />
             </button>
-
-            <div className="w-px h-6 bg-gray-200 mx-1" />
-
-            {/* Cancel */}
-            <button
-              onClick={handleCancel}
-              className="p-1.5 rounded text-red-600 hover:bg-red-50 transition-colors"
-              title="Anuluj"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Textarea */}
@@ -312,20 +332,13 @@ export function TextTool({
             ref={textareaRef}
             value={editingText}
             onChange={(e) => setEditingText(e.target.value)}
-            onBlur={handleSaveText}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
                 handleCancel();
               }
-              // Enter = nowa linia (Shift+Enter też)
-              // Ctrl+Enter = zapisz
-              if (e.key === 'Enter' && e.ctrlKey) {
-                e.preventDefault();
-                handleSaveText();
-              }
             }}
-            placeholder="Wpisz tekst... (Ctrl+Enter aby zapisać)"
+            placeholder="Wpisz tekst... (kliknij poza aby zapisać)"
             className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-white/95 resize-none outline-none"
             style={{
               fontSize: `${textDraft.fontSize}px`,
@@ -340,10 +353,11 @@ export function TextTool({
 
           {/* Hint */}
           <div className="absolute -bottom-8 left-0 text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm">
-            Ctrl+Enter = Zapisz | Escape = Anuluj
+            Kliknij poza aby zapisać | Escape = Anuluj
           </div>
         </div>
       )}
     </div>
   );
 }
+
