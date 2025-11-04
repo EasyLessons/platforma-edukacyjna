@@ -9,8 +9,11 @@
  * - ../toolbar/ZoomControls (ZoomControls)
  * - ../toolbar/TextTool (TextTool)
  * - ../toolbar/SelectTool (SelectTool)
+ * - ../toolbar/PenTool (PenTool)
+ * - ../toolbar/ShapeTool (ShapeTool)
+ * - ../toolbar/FunctionTool (FunctionTool)
  * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
- * - ./viewport (transformPoint, inverseTransformPoint, panViewportWithMouse, panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport)
  * - ./Grid (drawGrid)
  * - ./rendering (drawElement)
  * 
@@ -22,23 +25,28 @@
  * 
  * ⚠️ ZALEŻNOŚCI - TO JEST GŁÓWNY HUB PROJEKTU:
  * - types.ts - definiuje wszystkie typy elementów
- * - viewport.ts - transformacje i zoom/pan (wheel events dla pen/shape)
+ * - viewport.ts - transformacje i zoom/pan (wheel events dla kontenera)
  * - rendering.ts - renderowanie elementów na canvas
  * - Grid.tsx - renderowanie siatki kartezjańskiej
  * - Toolbar.tsx - UI narzędzi
+ * - PenTool.tsx - logika rysowania piórem (aktywny gdy tool='pen')
+ * - ShapeTool.tsx - logika wstawiania kształtów (aktywny gdy tool='shape')
+ * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
  * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
  * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
  * 
  * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
- * - Canvas ma pointerEvents: 'none' gdy tool='select' lub 'text'
- * - SelectTool i TextTool obsługują własne wheel events (overlay)
- * - Pen/Shape używają canvas native wheel listener (lines 200-230)
- * - handleViewportChange synchronizuje viewport między narzędziami
+ * - Canvas ma pointerEvents: 'none' - wszystkie narzędzia mają swoje overlaye
+ * - Kontener obsługuje wheel events (backup dla gdy żadne narzędzie nie jest aktywne)
+ * - Każde narzędzie obsługuje własne wheel events przez onViewportChange
  * 
  * ⚠️ KLUCZOWE CALLBACKI:
- * - handleTextCreate/Update/Delete - zarządzanie tekstami
- * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem
- * - handleViewportChange - synchronizacja viewport (SelectTool/TextTool)
+ * - handlePathCreate - tworzenie ścieżek (PenTool)
+ * - handleShapeCreate - tworzenie kształtów (ShapeTool)
+ * - handleFunctionCreate - tworzenie funkcji (FunctionTool)
+ * - handleTextCreate/Update/Delete - zarządzanie tekstami (TextTool)
+ * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem (SelectTool)
+ * - handleViewportChange - synchronizacja viewport między narzędziami
  * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
  * 
  * ⚠️ KEYBOARD SHORTCUTS:
@@ -48,7 +56,8 @@
  * 
  * PRZEZNACZENIE:
  * Główny komponent tablicy - zarządza viewport, elements, historią,
- * koordinuje narzędzia (pen/shape/text/select), renderuje canvas.
+ * koordynuje narzędzia (pen/shape/text/select/function), renderuje canvas.
+ * Każde narzędzie jest teraz osobnym komponentem z własną logiką.
  * ============================================================================
  */
 
@@ -57,8 +66,10 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
 import { ZoomControls } from '../toolbar/ZoomControls';
-import { TextTool } from '../toolbar/TextTool'; // 🔄 Będzie używał nowej wersji
+import { TextTool } from '../toolbar/TextTool';
 import { SelectTool } from '../toolbar/SelectTool';
+import { PenTool } from '../toolbar/PenTool';
+import { ShapeTool } from '../toolbar/ShapeTool';
 
 // Import wszystkich modułów
 import {
@@ -72,9 +83,6 @@ import {
 } from './types';
 
 import {
-  transformPoint,
-  inverseTransformPoint,
-  panViewportWithMouse,
   panViewportWithWheel,
   zoomViewport,
   constrainViewport
@@ -97,11 +105,8 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     y: 0,
     scale: 1
   });
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   
   // Drawing state
-  const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>('select');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [color, setColor] = useState('#000000');
@@ -111,7 +116,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
-  const [currentElement, setCurrentElement] = useState<DrawingElement | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
   
@@ -298,12 +302,7 @@ useEffect(() => {
     
     // Draw all elements
     elements.forEach(element => drawElement(ctx, element, viewport, width, height));
-    
-    // Draw current element
-    if (currentElement) {
-      drawElement(ctx, currentElement, viewport, width, height);
-    }
-  }, [elements, currentElement, viewport]);
+  }, [elements, viewport]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -366,6 +365,50 @@ useEffect(() => {
     saveToHistory([]);
     setSelectedElementIds(new Set());
   }, [saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA PENTOOL
+  // ========================================
+  const handlePathCreate = useCallback((path: DrawingPath) => {
+    const newElements = [...elements, path];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA SHAPETOOL
+  // ========================================
+  const handleShapeCreate = useCallback((shape: Shape) => {
+    const newElements = [...elements, shape];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA FUNCTIONTOOL - funkcja w properties
+  // ========================================
+  const handleFunctionCreate = useCallback((func: FunctionPlot) => {
+    const newElements = [...elements, func];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  const handleGenerateFunction = useCallback((expression: string) => {
+    const xRange = 50;
+    const yRange = 50;
+    
+    const newFunction: FunctionPlot = {
+      id: Date.now().toString(),
+      type: 'function',
+      expression,
+      color,
+      strokeWidth: lineWidth,
+      xRange,
+      yRange
+    };
+    
+    handleFunctionCreate(newFunction);
+  }, [color, lineWidth, handleFunctionCreate]);
 
   // ========================================
   // 🆕 CALLBACKI DLA TEXTTOOL
@@ -445,117 +488,6 @@ useEffect(() => {
     setSelectedElementIds(new Set());
   }, [elements, selectedElementIds, saveToHistory]);
 
-  // ========================================
-  // STARE MOUSE HANDLERS (tylko dla pen/shape/function)
-  // ========================================
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Jeśli aktywny TextTool lub SelectTool - ignoruj stare handlery
-    if (tool === 'text' || tool === 'select') return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const width = rect.width;
-    const height = rect.height;
-    const worldPoint = inverseTransformPoint({ x: screenX, y: screenY }, viewport, width, height);
-
-    if (tool === 'pan' || e.button === 1 || (e.button === 0 && e.ctrlKey)) {
-      setIsPanning(true);
-      setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    setIsDrawing(true);
-
-    if (tool === 'pen') {
-      const newPath: DrawingPath = {
-        id: Date.now().toString(),
-        type: 'path',
-        points: [worldPoint],
-        color,
-        width: lineWidth
-      };
-      setCurrentElement(newPath);
-    } else if (tool === 'shape') {
-      const newShape: Shape = {
-        id: Date.now().toString(),
-        type: 'shape',
-        shapeType: selectedShape,
-        startX: worldPoint.x,
-        startY: worldPoint.y,
-        endX: worldPoint.x,
-        endY: worldPoint.y,
-        color,
-        strokeWidth: lineWidth,
-        fill: fillShape
-      };
-      setCurrentElement(newShape);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Jeśli aktywny TextTool lub SelectTool - ignoruj
-    if (tool === 'text' || tool === 'select') return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const width = rect.width;
-    const height = rect.height;
-
-    if (isPanning && lastPanPoint) {
-      const dx = screenX - lastPanPoint.x;
-      const dy = screenY - lastPanPoint.y;
-      
-      const newViewport = panViewportWithMouse(viewport, dx, dy);
-      setViewport(constrainViewport(newViewport));
-      setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (!isDrawing || !currentElement) return;
-
-    const worldPoint = inverseTransformPoint({ x: screenX, y: screenY }, viewport, width, height);
-
-    if (currentElement.type === 'path') {
-      setCurrentElement({
-        ...currentElement,
-        points: [...currentElement.points, worldPoint]
-      });
-    } else if (currentElement.type === 'shape') {
-      setCurrentElement({
-        ...currentElement,
-        endX: worldPoint.x,
-        endY: worldPoint.y
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    // Jeśli aktywny TextTool lub SelectTool - ignoruj
-    if (tool === 'text' || tool === 'select') return;
-    
-    if (isPanning) {
-      setIsPanning(false);
-      setLastPanPoint(null);
-      return;
-    }
-
-    if (isDrawing && currentElement) {
-      const newElements = [...elements, currentElement];
-      setElements(newElements);
-      saveToHistory(newElements);
-      setCurrentElement(null);
-      setIsDrawing(false);
-    }
-  };
-
   // Zoom functions
   const zoomInRef = useRef(() => {
     setViewport(prev => {
@@ -619,103 +551,8 @@ useEffect(() => {
     handleFillShapeChangeRef.current(fill);
   }, []);
   
-  const handleGenerateFunctionRef = useRef((expression: string) => {
-    const xRange = 50;
-    const yRange = 50;
-    
-    const newFunction: FunctionPlot = {
-      id: Date.now().toString(),
-      type: 'function',
-      expression,
-      color,
-      strokeWidth: lineWidth,
-      xRange,
-      yRange
-    };
-    
-    const currentElements = elementsRef.current;
-    const newElements = [...currentElements, newFunction];
-    setElements(newElements);
-    saveToHistoryRef.current(newElements);
-    setTool('select');
-  });
-  
-  useEffect(() => {
-    handleGenerateFunctionRef.current = (expression: string) => {
-      const xRange = 50;
-      const yRange = 50;
-      
-      const newFunction: FunctionPlot = {
-        id: Date.now().toString(),
-        type: 'function',
-        expression,
-        color,
-        strokeWidth: lineWidth,
-        xRange,
-        yRange
-      };
-      
-      const currentElements = elementsRef.current;
-      const newElements = [...currentElements, newFunction];
-      setElements(newElements);
-      saveToHistoryRef.current(newElements);
-      setTool('select');
-    };
-  }, [color, lineWidth]);
-  
-  const handleGenerateFunction = useCallback((expression: string) => {
-    handleGenerateFunctionRef.current(expression);
-  }, []);
-  
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
-  
-  // Touch events handlers
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (tool === 'text' || tool === 'select') return;
-    
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        button: 0,
-        ctrlKey: false,
-        metaKey: false,
-        preventDefault: () => {}
-      } as unknown as React.MouseEvent<HTMLCanvasElement>;
-      
-      handleMouseDown(mouseEvent);
-    }
-  };
-  
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (tool === 'text' || tool === 'select') return;
-    
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        button: 0,
-        preventDefault: () => {}
-      } as unknown as React.MouseEvent<HTMLCanvasElement>;
-      
-      handleMouseMove(mouseEvent);
-    }
-  };
-  
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (tool === 'text' || tool === 'select') return;
-    
-    e.preventDefault();
-    handleMouseUp();
-  };
 
   // Get canvas dimensions for tools
   const getCanvasDimensions = () => {
@@ -791,27 +628,48 @@ useEffect(() => {
             onViewportChange={handleViewportChange}
           />
         )}
+
+        {/* 🆕 PENTOOL - aktywny gdy tool === 'pen' */}
+        {tool === 'pen' && canvasWidth > 0 && (
+          <PenTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onPathCreate={handlePathCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 SHAPETOOL - aktywny gdy tool === 'shape' */}
+        {tool === 'shape' && canvasWidth > 0 && (
+          <ShapeTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            selectedShape={selectedShape}
+            color={color}
+            lineWidth={lineWidth}
+            fillShape={fillShape}
+            onShapeCreate={handleShapeCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
         
         <canvas
           ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 w-full h-full"
           style={{
             cursor: 
-              tool === 'pan' || isPanning ? 'grab' : 
+              tool === 'pan' ? 'grab' : 
               tool === 'select' ? 'default' : 
               tool === 'text' ? 'crosshair' :
               'crosshair',
             willChange: 'auto',
             imageRendering: 'crisp-edges',
-            pointerEvents: tool === 'text' || tool === 'select' ? 'none' : 'auto' // ⚠️ WAŻNE!
+            pointerEvents: 'none' // ⚠️ WAŻNE! Wszystkie narzędzia mają swoje overlaye
           }}
         />
       </div>
@@ -820,10 +678,6 @@ useEffect(() => {
 }
 
 export default WhiteboardCanvas;
-
-// 'use client';
-
-// import React, { useState, useRef, useEffect, useCallback } from 'react';
 // import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
 // import { ZoomControls } from '../toolbar/ZoomControls';
 // import { TextTool } from '../toolbar/TextTool';

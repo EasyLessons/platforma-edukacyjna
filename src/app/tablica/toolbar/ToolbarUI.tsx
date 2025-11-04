@@ -29,7 +29,7 @@
 import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
-  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, ChevronDown, Menu, X
+  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -183,75 +183,12 @@ export function ToolbarUI({
             onClick={() => onToolChange('text')}
             title="Tekst (T)"
           />
-
-          {/* Shape dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => onToolChange('shape')}
-              className={`
-                relative p-1.5 rounded transition-colors group flex items-center gap-1
-                ${tool === 'shape' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'}
-              `}
-              title="Kształty (S)"
-            >
-              {React.createElement(getShapeIcon(), { className: 'w-4 h-4' })}
-              <ChevronDown className="w-3 h-3" />
-              <span className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-                Kształty (S)
-              </span>
-            </button>
-
-            {tool === 'shape' && (
-              <div className="absolute top-full mt-1 left-0 bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex gap-1 z-50">
-                <button
-                  onClick={() => onShapeChange('rectangle')}
-                  className={`p-1.5 rounded transition-all ${
-                    selectedShape === 'rectangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Prostokąt"
-                >
-                  <Square className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onShapeChange('circle')}
-                  className={`p-1.5 rounded transition-all ${
-                    selectedShape === 'circle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Koło"
-                >
-                  <Circle className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onShapeChange('triangle')}
-                  className={`p-1.5 rounded transition-all ${
-                    selectedShape === 'triangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Trójkąt"
-                >
-                  <Triangle className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onShapeChange('line')}
-                  className={`p-1.5 rounded transition-all ${
-                    selectedShape === 'line' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Linia"
-                >
-                  <Minus className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => onShapeChange('arrow')}
-                  className={`p-1.5 rounded transition-all ${
-                    selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  title="Strzałka"
-                >
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-
+          <ToolButton
+            icon={getShapeIcon()}
+            active={tool === 'shape'}
+            onClick={() => onToolChange('shape')}
+            title="Kształty (S)"
+          />
           <ToolButton
             icon={TrendingUp}
             active={tool === 'function'}
@@ -492,6 +429,58 @@ export function ToolbarUI({
             {/* SHAPE */}
             {tool === 'shape' && (
               <>
+                {/* Wybór kształtu */}
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-gray-600">Kształt:</label>
+                  <div className="flex gap-1 bg-gray-100 rounded p-1">
+                    <button
+                      onClick={() => onShapeChange('rectangle')}
+                      className={`p-1.5 rounded transition-all ${
+                        selectedShape === 'rectangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Prostokąt"
+                    >
+                      <Square className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onShapeChange('circle')}
+                      className={`p-1.5 rounded transition-all ${
+                        selectedShape === 'circle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Koło"
+                    >
+                      <Circle className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onShapeChange('triangle')}
+                      className={`p-1.5 rounded transition-all ${
+                        selectedShape === 'triangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Trójkąt"
+                    >
+                      <Triangle className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onShapeChange('line')}
+                      className={`p-1.5 rounded transition-all ${
+                        selectedShape === 'line' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Linia"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onShapeChange('arrow')}
+                      className={`p-1.5 rounded transition-all ${
+                        selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title="Strzałka"
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex items-center gap-2">
                   <label className="text-xs font-medium text-gray-600">Kolor:</label>
                   <input
