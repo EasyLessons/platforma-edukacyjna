@@ -50,4 +50,3 @@ class RegisterResponse(BaseModel):
     """Response po rejestracji"""
     user: UserResponse
     message: str
-    verification_code: str | None = None  # Opcjonalny (DEV MODE)
