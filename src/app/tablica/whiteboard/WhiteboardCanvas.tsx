@@ -1,3 +1,31 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/WhiteboardCanvas.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useRef, useEffect, useCallback)
+ * - ../toolbar/Toolbar (Toolbar, Tool, ShapeType, ZoomControls)
+ * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
+ * - ./viewport (transformPoint, inverseTransformPoint, panViewportWithMouse, panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ./Grid (drawGrid)
+ * - ./rendering (drawElement)
+ * 
+ * EKSPORTUJE:
+ * - WhiteboardCanvas (named) - główny komponent canvas tablicy
+ * - WhiteboardCanvas (default) - eksport domyślny
+ * 
+ * UŻYWANE PRZEZ:
+ * - page.tsx (strona /tablica)
+ * 
+ * PRZEZNACZENIE:
+ * Główny komponent tablicy interaktywnej. Zarządza canvas, viewport (pan/zoom),
+ * narzędziami rysowania (pen, shape, text, function), zaznaczaniem elementów,
+ * historią (undo/redo), oraz obsługą myszy/touchpada. Integruje wszystkie
+ * moduły whiteboard w jedną spójną aplikację.
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';

@@ -1,3 +1,32 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/rendering.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ViewportTransform)
+ * - ./viewport (transformPoint)
+ * - ./utils (clampLineWidth, clampFontSize, evaluateExpression)
+ * 
+ * EKSPORTUJE:
+ * - drawPath (function) - renderuje ścieżkę (pen tool)
+ * - drawShape (function) - renderuje kształty (rectangle, circle, triangle, line, arrow)
+ * - drawText (function) - renderuje tekst
+ * - drawFunction (function) - renderuje wykres funkcji matematycznej
+ * - drawElement (function) - dispatcher - wybiera odpowiednią funkcję rysującą
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główna pętla renderowania)
+ * 
+ * PRZEZNACZENIE:
+ * Moduł renderowania elementów na canvas:
+ * - Rysowanie wszystkich typów elementów (path, shape, text, function)
+ * - Transformacje world → screen przy użyciu viewport
+ * - Clamp dla rozmiaru linii i czcionek przy zoomie
+ * - Obsługa wyrażeń matematycznych dla wykresów funkcji
+ * ============================================================================
+ */
+
 import {
   DrawingElement,
   DrawingPath,

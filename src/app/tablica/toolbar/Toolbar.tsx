@@ -1,3 +1,29 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/Toolbar.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, memo)
+ * - lucide-react (ikony narzędzi)
+ * 
+ * EKSPORTUJE:
+ * - Tool (type) - typy narzędzi: select | pan | pen | text | shape | function
+ * - ShapeType (type) - typy kształtów: rectangle | circle | triangle | line | arrow
+ * - Toolbar (default, memoized) - komponent paska narzędzi
+ * - ZoomControls (named, memoized) - kontrolki zoom/pan
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główny canvas tablicy)
+ * 
+ * PRZEZNACZENIE:
+ * Pasek narzędzi (toolbar) i kontrolki zoom dla tablicy interaktywnej.
+ * Obsługuje wybór narzędzi (zaznacz, rysuj, tekst, kształty, funkcje),
+ * konfigurację właściwości (kolor, grubość, czcionka), historię (undo/redo),
+ * oraz responsywność (desktop: poziomy pasek, mobile: modal z menu).
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { useState, memo } from 'react';

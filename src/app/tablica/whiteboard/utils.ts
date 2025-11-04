@@ -1,3 +1,28 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/utils.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (Point, ViewportTransform, DrawingElement)
+ * 
+ * EKSPORTUJE:
+ * - clampLineWidth (function) - ogranicza szerokość linii (0.5-20px)
+ * - clampFontSize (function) - ogranicza rozmiar czcionki (10-200px)
+ * - evaluateExpression (function) - evaluator wyrażeń matematycznych
+ * - isOutsideViewport (function) - sprawdza czy element poza viewport (TODO)
+ * 
+ * UŻYWANE PRZEZ:
+ * - rendering.ts (clamp dla renderowania)
+ * 
+ * PRZEZNACZENIE:
+ * Funkcje pomocnicze dla tablicy:
+ * - Clamp dla rozmiaru linii/czcionek ze skalowaniem viewport
+ * - Parser wyrażeń matematycznych (sin, cos, tan, ^, pi, e itp.)
+ * - Culling elementów poza viewport (placeholder)
+ * ============================================================================
+ */
+
 import { Point, ViewportTransform, DrawingElement } from './types';
 
 /**

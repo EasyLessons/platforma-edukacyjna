@@ -1,3 +1,22 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/page.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - next/navigation (useRouter)
+ * - next/dynamic (dynamic import)
+ * - ./whiteboard/WhiteboardCanvas (główny komponent tablicy)
+ * 
+ * EKSPORTUJE:
+ * - Tablica (default) - główna strona tablicy interaktywnej
+ * 
+ * PRZEZNACZENIE:
+ * Strona Next.js dla routy /tablica. Renderuje pełnoekranową tablicę
+ * z przyciskiem powrotu do dashboardu. Używa dynamic import dla WhiteboardCanvas
+ * z wyłączonym SSR (client-side only).
+ * ============================================================================
+ */
 
 'use client';
 
