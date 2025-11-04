@@ -197,7 +197,7 @@ export function PenTool({
   };
 
   return (
-    <div className="absolute inset-0" style={{ cursor: 'crosshair' }}>
+    <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
       {/* Debug info */}
       {isDrawing && currentPath && (
         <div className="absolute top-4 left-4 bg-black/70 text-white text-xs p-2 rounded pointer-events-none z-50">
@@ -207,7 +207,7 @@ export function PenTool({
       
       {/* Overlay dla mouse events */}
       <div
-        className="absolute inset-0 pointer-events-auto"
+        className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}

@@ -542,7 +542,7 @@ export function SelectTool({
       <>
         {/* Selection rectangle */}
         <div
-          className="absolute border-2 border-blue-500 pointer-events-none"
+          className="absolute border-2 z-40 border-blue-500 pointer-events-none"
           style={{
             left: topLeft.x,
             top: topLeft.y,
@@ -564,7 +564,7 @@ export function SelectTool({
         ].map(({ pos, x, y }) => (
           <div
             key={pos}
-            className="absolute bg-white border-2 border-blue-500 rounded-full cursor-pointer"
+            className="absolute bg-white z-40 border-2 border-blue-500 rounded-full cursor-pointer"
             style={{
               left: x - handleSize / 2,
               top: y - handleSize / 2,
@@ -587,12 +587,12 @@ export function SelectTool({
 
   return (
     <div
-      className="absolute inset-0"
+      className="absolute inset-0 z-20"
       style={{ cursor: 'default' }}
     >
       {/* Invisible overlay for mouse events */}
       <div
-        className="absolute inset-0 pointer-events-auto"
+        className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -603,7 +603,7 @@ export function SelectTool({
       {/* Active selection box */}
       {isSelecting && selectionStart && selectionEnd && (
         <div
-          className="absolute border-2 border-dashed border-blue-500 bg-blue-50/20 pointer-events-none"
+          className="absolute border-2 z-40 border-dashed border-blue-500 bg-blue-50/20 pointer-events-none"
           style={{
             left: Math.min(selectionStart.x, selectionEnd.x),
             top: Math.min(selectionStart.y, selectionEnd.y),

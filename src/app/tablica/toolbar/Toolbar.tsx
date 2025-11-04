@@ -92,7 +92,7 @@ function Toolbar({
   };
 
   return (
-    <div className="absolute top-20 left-4 z-10 pointer-events-auto flex flex-col items-start gap-2">
+    <div className="absolute top-20 left-4 z-50 pointer-events-auto flex flex-col items-start gap-2">
       <ToolbarUI
         tool={tool}
         selectedShape={selectedShape}

@@ -36,7 +36,7 @@ const ZoomControlsComponent = ({
   onResetView: () => void;
 }) => {
   return (
-    <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 z-10 pointer-events-auto">
+    <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 z-50 pointer-events-auto">
       <div className="flex items-center gap-1 p-1.5">
         <button
           onClick={onResetView}

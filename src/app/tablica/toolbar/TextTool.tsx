@@ -313,13 +313,13 @@ export function TextTool({
 
   return (
     <div
-      className="absolute inset-0"
+      className="absolute inset-0 z-20"
       style={{ cursor: isEditing ? 'default' : 'crosshair' }}
     >
       {/* Overlay dla mouse events */}
       {!isEditing && (
         <div
-          className="absolute inset-0 pointer-events-auto"
+          className="absolute inset-0 pointer-events-auto z-30"
           style={{ touchAction: 'none' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
@@ -331,7 +331,7 @@ export function TextTool({
       {/* Dragging box preview */}
       {isDragging && textDraft && (
         <div
-          className="absolute border-2 border-dashed border-blue-500 bg-blue-50/20 pointer-events-none"
+          className="absolute border-2 border-dashed z-40 border-blue-500 bg-blue-50/20 pointer-events-none"
           style={{
             left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
             top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
@@ -345,7 +345,7 @@ export function TextTool({
       {isEditing && textDraft && (
         <div
           ref={editorRef}
-          className="absolute pointer-events-auto"
+          className="absolute pointer-events-auto z-50"
           style={{
             left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
             top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
@@ -488,4 +488,3 @@ export function TextTool({
     </div>
   );
 }
-

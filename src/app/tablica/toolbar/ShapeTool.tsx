@@ -276,7 +276,7 @@ export function ShapeTool({
 
     return (
       <svg
-        className="absolute inset-0 pointer-events-none"
+        className="absolute inset-0 pointer-events-none z-40"
         style={{ width: canvasWidth, height: canvasHeight }}
       >
         {shapeElement}
@@ -285,10 +285,10 @@ export function ShapeTool({
   };
 
   return (
-    <div className="absolute inset-0" style={{ cursor: 'crosshair' }}>
+    <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
       {/* Overlay dla mouse events */}
       <div
-        className="absolute inset-0 pointer-events-auto"
+        className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
