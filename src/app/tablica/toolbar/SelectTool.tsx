@@ -13,7 +13,8 @@ interface SelectToolProps {
   onSelectionChange: (ids: Set<string>) => void;
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
-  onOperationFinish?: () => void; // 🆕 Callback po zakończeniu drag/resize
+  onOperationFinish?: () => void; // Callback po zakończeniu drag/resize
+  onTextEdit?: (id: string) => void; // 🆕 Callback do edycji tekstu (double-click)
 }
 
 type ResizeHandle =
@@ -43,7 +44,8 @@ export function SelectTool({
   onSelectionChange,
   onElementUpdate,
   onElementsUpdate,
-  onOperationFinish, // 🆕
+  onOperationFinish,
+  onTextEdit, // 🆕
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -193,6 +195,25 @@ export function SelectTool({
     if (isNear(screenPoint, midLeft)) return 'w';
 
     return null;
+  };
+
+  // 🆕 Double-click handler - otwiera edytor tekstu
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    if (!onTextEdit) return;
+    
+    const screenPoint = { x: e.clientX, y: e.clientY };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+    // Znajdź kliknięty element
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      
+      // Sprawdź tylko teksty
+      if (el.type === 'text' && isPointInElement(worldPoint, el)) {
+        onTextEdit(el.id);
+        return;
+      }
+    }
   };
 
   // Mouse down handler
@@ -523,6 +544,7 @@ export function SelectTool({
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
+        onDoubleClick={handleDoubleClick}
       />
       {/* Active selection box */}
       {isSelecting && selectionStart && selectionEnd && (

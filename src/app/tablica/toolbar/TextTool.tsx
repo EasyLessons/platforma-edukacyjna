@@ -9,9 +9,12 @@ interface TextToolProps {
   viewport: ViewportTransform;
   canvasWidth: number;
   canvasHeight: number;
+  elements: TextElement[]; // 🆕 Lista wszystkich tekstów
+  editingTextId: string | null; // 🆕 ID tekstu do edycji (z double-click)
   onTextCreate: (text: TextElement) => void;
   onTextUpdate: (id: string, updates: Partial<TextElement>) => void;
   onTextDelete: (id: string) => void;
+  onEditingComplete?: () => void; // 🆕 Callback po zakończeniu edycji
 }
 
 interface TextDraft {
@@ -32,16 +35,57 @@ export function TextTool({
   viewport,
   canvasWidth,
   canvasHeight,
+  elements,
+  editingTextId,
   onTextCreate,
   onTextUpdate,
   onTextDelete,
+  onEditingComplete,
 }: TextToolProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingText, setEditingText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null); // 🆕 ID edytowanego tekstu
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
+  useEffect(() => {
+    if (editingTextId) {
+      const textToEdit = elements.find(el => el.id === editingTextId);
+      if (textToEdit) {
+        // Przygotuj draft z istniejącego tekstu
+        const topLeft = transformPoint(
+          { x: textToEdit.x, y: textToEdit.y },
+          viewport,
+          canvasWidth,
+          canvasHeight
+        );
+        
+        const width = (textToEdit.width || 3) * viewport.scale * 100;
+        const height = (textToEdit.height || 1) * viewport.scale * 100;
+        
+        setTextDraft({
+          id: textToEdit.id,
+          screenStart: topLeft,
+          screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
+          worldStart: { x: textToEdit.x, y: textToEdit.y },
+          worldEnd: { x: textToEdit.x + (textToEdit.width || 3), y: textToEdit.y + (textToEdit.height || 1) },
+          fontSize: textToEdit.fontSize,
+          color: textToEdit.color,
+          fontFamily: textToEdit.fontFamily || 'Arial, sans-serif',
+          fontWeight: textToEdit.fontWeight || 'normal',
+          fontStyle: textToEdit.fontStyle || 'normal',
+          textAlign: textToEdit.textAlign || 'left',
+        });
+        
+        setEditingText(textToEdit.text);
+        setEditingId(textToEdit.id);
+        setIsEditing(true);
+      }
+    }
+  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight]);
 
   // Start dragging to create text box
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -112,12 +156,16 @@ export function TextTool({
     setEditingText('');
   };
 
-  // Save text element (automatyczne)
+  // Save text element (automatyczne - tworzy nowy LUB aktualizuje istniejący)
   const handleSave = () => {
     if (!textDraft) return;
 
     // Jeśli pusty tekst - po prostu anuluj (nie zapisuj)
     if (!editingText.trim()) {
+      // Jeśli edytujemy istniejący tekst i go wyczyszczono - usuń go
+      if (editingId) {
+        onTextDelete(editingId);
+      }
       handleCancel();
       return;
     }
@@ -125,9 +173,7 @@ export function TextTool({
     const width = Math.abs(textDraft.worldEnd.x - textDraft.worldStart.x);
     const height = Math.abs(textDraft.worldEnd.y - textDraft.worldStart.y);
 
-    const newText: TextElement = {
-      id: textDraft.id,
-      type: 'text',
+    const textData: Partial<TextElement> = {
       x: Math.min(textDraft.worldStart.x, textDraft.worldEnd.x),
       y: Math.min(textDraft.worldStart.y, textDraft.worldEnd.y),
       width: width,
@@ -141,12 +187,25 @@ export function TextTool({
       textAlign: textDraft.textAlign,
     };
 
-    onTextCreate(newText);
+    if (editingId) {
+      // 🆕 Aktualizuj istniejący tekst
+      onTextUpdate(editingId, textData);
+    } else {
+      // Utwórz nowy tekst
+      const newText: TextElement = {
+        id: textDraft.id,
+        type: 'text',
+        ...textData,
+      } as TextElement;
+      onTextCreate(newText);
+    }
 
     // Reset
     setTextDraft(null);
     setIsEditing(false);
     setEditingText('');
+    setEditingId(null);
+    onEditingComplete?.(); // 🆕 Powiadom że edycja zakończona
   };
 
   // Cancel text creation
@@ -154,7 +213,9 @@ export function TextTool({
     setTextDraft(null);
     setIsEditing(false);
     setEditingText('');
+    setEditingId(null);
     setIsDragging(false);
+    onEditingComplete?.(); // 🆕 Powiadom że edycja zakończona
   };
 
   // Kliknięcie poza edytorem = automatycznie zapisz

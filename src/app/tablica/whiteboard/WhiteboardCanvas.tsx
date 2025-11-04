@@ -59,6 +59,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [currentElement, setCurrentElement] = useState<DrawingElement | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
+  const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
   
   // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
@@ -338,6 +339,17 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     setElements(newElements);
     saveToHistory(newElements);
   }, [elements, saveToHistory]);
+
+  // 🆕 Handler do edycji tekstu (double-click w SelectTool)
+  const handleTextEdit = useCallback((id: string) => {
+    setEditingTextId(id);
+    setTool('text'); // Przełącz na narzędzie text
+  }, []);
+
+  // 🆕 Handler do zakończenia edycji tekstu
+  const handleEditingComplete = useCallback(() => {
+    setEditingTextId(null);
+  }, []);
 
   // ========================================
   // 🆕 CALLBACKI DLA SELECTTOOL
@@ -697,9 +709,12 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
             viewport={viewport}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
+            elements={elements.filter(el => el.type === 'text') as TextElement[]}
+            editingTextId={editingTextId}
             onTextCreate={handleTextCreate}
             onTextUpdate={handleTextUpdate}
             onTextDelete={handleTextDelete}
+            onEditingComplete={handleEditingComplete}
           />
         )}
 
@@ -715,6 +730,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
             onElementUpdate={handleElementUpdate}
             onElementsUpdate={handleElementsUpdate}
             onOperationFinish={handleSelectionFinish}
+            onTextEdit={handleTextEdit}
           />
         )}
         
