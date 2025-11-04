@@ -428,6 +428,7 @@ useEffect(() => {
   // 🆕 Handler do zakończenia edycji tekstu
   const handleEditingComplete = useCallback(() => {
     setEditingTextId(null);
+    setTool('select'); // 🆕 Automatyczne przełączenie na narzędzie zaznaczania po zapisaniu tekstu
   }, []);
 
   // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)

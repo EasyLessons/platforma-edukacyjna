@@ -362,7 +362,7 @@ export function TextTool({
               onChange={(e) =>
                 setTextDraft({ ...textDraft, fontSize: Number(e.target.value) })
               }
-              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm"
+              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-black"
               min="8"
               max="120"
             />
@@ -466,8 +466,8 @@ export function TextTool({
                 handleCancel();
               }
             }}
-            placeholder="Wpisz tekst... (kliknij poza aby zapisać)"
-            className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-white/95 resize-none outline-none"
+            placeholder="Wpisz tekst..."
+            className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none"
             style={{
               fontSize: `${textDraft.fontSize}px`,
               color: textDraft.color,
@@ -478,11 +478,6 @@ export function TextTool({
               lineHeight: '1.4',
             }}
           />
-
-          {/* Hint */}
-          <div className="absolute -bottom-8 left-0 text-xs text-gray-500 bg-white px-2 py-1 rounded shadow-sm">
-            Kliknij poza aby zapisać | Escape = Anuluj
-          </div>
         </div>
       )}
     </div>
