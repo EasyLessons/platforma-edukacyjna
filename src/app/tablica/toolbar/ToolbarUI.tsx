@@ -1,3 +1,29 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/ToolbarUI.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react
+ * - lucide-react (ikony)
+ * - ./Toolbar (Tool, ShapeType)
+ * 
+ * EKSPORTUJE:
+ * - ToolbarUI (component) - UI toolbara z narzędziami i ustawieniami
+ * 
+ * UŻYWANE PRZEZ:
+ * - Toolbar.tsx (kontener logiki)
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - Toolbar.tsx - musi dostarczyć Tool i ShapeType
+ * - Zmiana Tool/ShapeType wymaga synchronizacji z Toolbar.tsx
+ * 
+ * PRZEZNACZENIE:
+ * Prezentacja UI toolbara - przyciski narzędzi, kolory, grubość linii,
+ * rozmiar czcionki, undo/redo, clear. Responsywny (mobile + desktop).
+ * ============================================================================
+ */
+
 'use client';
 
 import React from 'react';

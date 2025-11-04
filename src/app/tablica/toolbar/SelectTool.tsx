@@ -1,8 +1,40 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/SelectTool.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useCallback)
+ * - ../whiteboard/types (Point, ViewportTransform, DrawingElement)
+ * - ../whiteboard/viewport (transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
+ * 
+ * EKSPORTUJE:
+ * - SelectTool (component) - narzędzie zaznaczania/przesuwania/skalowania
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (aktywne gdy tool === 'select')
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - types.ts - używa DrawingElement (zmiana typów wymaga aktualizacji)
+ * - viewport.ts - używa funkcji transformacji i zoom/pan
+ * - WhiteboardCanvas.tsx - dostarcza callback'i: onSelectionChange, onElementUpdate, etc.
+ * 
+ * ⚠️ WAŻNE - WHEEL EVENTS:
+ * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
+ * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
+ * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
+ * 
+ * PRZEZNACZENIE:
+ * Zaznaczanie elementów (klik/box), przeciąganie, skalowanie (uchwyty).
+ * Double-click na tekst otwiera edytor (onTextEdit).
+ * ============================================================================
+ */
+
 'use client';
 
 import { useState, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
-import { transformPoint, inverseTransformPoint } from '../whiteboard/viewport';
+import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -15,6 +47,7 @@ interface SelectToolProps {
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
   onOperationFinish?: () => void; // Callback po zakończeniu drag/resize
   onTextEdit?: (id: string) => void; // 🆕 Callback do edycji tekstu (double-click)
+  onViewportChange?: (viewport: ViewportTransform) => void; // 🆕 Do obsługi wheel
 }
 
 type ResizeHandle =
@@ -46,6 +79,7 @@ export function SelectTool({
   onElementsUpdate,
   onOperationFinish,
   onTextEdit, // 🆕
+  onViewportChange, // 🆕
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -63,6 +97,24 @@ export function SelectTool({
   const [resizeOriginalElements, setResizeOriginalElements] = useState<
     Map<string, DrawingElement>
   >(new Map());
+
+  // 🆕 Handler dla wheel event - obsługuje zoom i pan bezpośrednio
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!onViewportChange) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.ctrlKey) {
+      // Zoom
+      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+      onViewportChange(constrainViewport(newViewport));
+    } else {
+      // Pan
+      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+      onViewportChange(constrainViewport(newViewport));
+    }
+  };
 
   // Calculate bounding box for selected elements
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
@@ -535,16 +587,18 @@ export function SelectTool({
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0"
       style={{ cursor: 'default' }}
     >
       {/* Invisible overlay for mouse events */}
       <div
         className="absolute inset-0 pointer-events-auto"
+        style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
+        onWheel={handleWheel}
       />
       {/* Active selection box */}
       {isSelecting && selectionStart && selectionEnd && (

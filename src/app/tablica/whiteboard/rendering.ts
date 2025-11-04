@@ -1,3 +1,35 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/rendering.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ImageElement, ViewportTransform)
+ * - ./viewport (transformPoint)
+ * - ./utils (clampLineWidth, clampFontSize, evaluateExpression)
+ * 
+ * EKSPORTUJE:
+ * - drawPath (function) - rysuje ścieżkę piórem
+ * - drawShape (function) - rysuje kształty geometryczne
+ * - drawText (function) - rysuje elementy tekstowe
+ * - drawFunction (function) - rysuje wykresy funkcji
+ * - drawImage (function) - rysuje obrazy
+ * - drawElement (function) - GŁÓWNA funkcja - deleguje do powyższych
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główna pętla renderowania)
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - types.ts - zmiana interfejsów wymaga aktualizacji funkcji draw
+ * - viewport.ts - używa transformPoint do konwersji współrzędnych
+ * - utils.ts - używa clamp i evaluateExpression
+ * 
+ * PRZEZNACZENIE:
+ * Główny moduł renderowania wszystkich elementów na canvas.
+ * Konwertuje współrzędne świata na ekran i rysuje z transformacjami viewport.
+ * ============================================================================
+ */
+
 import {
   DrawingElement,
   DrawingPath,

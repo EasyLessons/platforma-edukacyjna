@@ -1,9 +1,47 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/TextTool.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useRef, useEffect)
+ * - lucide-react (ikony: Bold, Italic, AlignLeft, AlignCenter, AlignRight)
+ * - ../whiteboard/types (Point, ViewportTransform, TextElement)
+ * - ../whiteboard/viewport (transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
+ * 
+ * EKSPORTUJE:
+ * - TextTool (component) - narzędzie tworzenia/edycji tekstów
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (aktywne gdy tool === 'text')
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - types.ts - używa TextElement (zmiana interfejsu wymaga aktualizacji)
+ * - viewport.ts - używa funkcji transformacji i zoom/pan
+ * - WhiteboardCanvas.tsx - dostarcza callback'i: onTextCreate, onTextUpdate, onTextDelete
+ * 
+ * ⚠️ WAŻNE - WHEEL EVENTS:
+ * - Blokuje wheel gdy isEditing (scrollowanie w textarea)
+ * - Obsługuje wheel gdy przeciąga ramkę (zoom/pan)
+ * - touchAction: 'none' blokuje domyślny zoom przeglądarki
+ * 
+ * ⚠️ EDYCJA TEKSTU:
+ * - editingTextId (z props) - ID tekstu do edycji (z double-click w SelectTool)
+ * - Automatyczne zapisywanie przy kliknięciu poza edytor
+ * - ESC anuluje edycję
+ * 
+ * PRZEZNACZENIE:
+ * Tworzenie nowych tekstów (drag box → edytor) i edycja istniejących.
+ * Mini toolbar z formatowaniem: rozmiar, kolor, bold, italic, wyrównanie.
+ * ============================================================================
+ */
+
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Point, ViewportTransform, TextElement } from '../whiteboard/types';
-import { transformPoint, inverseTransformPoint } from '../whiteboard/viewport';
+import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 
 interface TextToolProps {
   viewport: ViewportTransform;
@@ -15,6 +53,7 @@ interface TextToolProps {
   onTextUpdate: (id: string, updates: Partial<TextElement>) => void;
   onTextDelete: (id: string) => void;
   onEditingComplete?: () => void; // 🆕 Callback po zakończeniu edycji
+  onViewportChange?: (viewport: ViewportTransform) => void; // 🆕 Do obsługi wheel
 }
 
 interface TextDraft {
@@ -41,6 +80,7 @@ export function TextTool({
   onTextUpdate,
   onTextDelete,
   onEditingComplete,
+  onViewportChange, // 🆕
 }: TextToolProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
@@ -49,6 +89,31 @@ export function TextTool({
   const [editingId, setEditingId] = useState<string | null>(null); // 🆕 ID edytowanego tekstu
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  // 🆕 Handler dla wheel event - blokuje TYLKO gdy aktywnie edytujemy
+  const handleWheel = (e: React.WheelEvent) => {
+    if (isEditing) {
+      // Gdy edytujemy tekst - zablokuj zoom/pan (chcemy scrollować w textarea)
+      e.stopPropagation();
+      return;
+    }
+    
+    // Gdy tylko przeciągamy ramkę - obsłuż zoom/pan
+    if (!onViewportChange) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.ctrlKey) {
+      // Zoom
+      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+      onViewportChange(constrainViewport(newViewport));
+    } else {
+      // Pan
+      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+      onViewportChange(constrainViewport(newViewport));
+    }
+  };
 
   // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
   useEffect(() => {
@@ -248,16 +313,18 @@ export function TextTool({
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none"
+      className="absolute inset-0"
       style={{ cursor: isEditing ? 'default' : 'crosshair' }}
     >
       {/* Overlay dla mouse events */}
       {!isEditing && (
         <div
           className="absolute inset-0 pointer-events-auto"
+          style={{ touchAction: 'none' }}
           onMouseDown={handleMouseDown}
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
+          onWheel={handleWheel}
         />
       )}
 

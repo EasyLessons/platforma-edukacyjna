@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/types.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z: (brak - plik podstawowy)
+ * 
+ * EKSPORTUJE:
+ * - Point (interface) - współrzędne x, y
+ * - ViewportTransform (interface) - stan widoku: x, y, scale
+ * - DrawingPath (interface) - ścieżka rysowana piórem
+ * - Shape (interface) - kształt geometryczny
+ * - TextElement (interface) - element tekstowy
+ * - FunctionPlot (interface) - wykres funkcji matematycznej
+ * - ImageElement (interface) - obraz/zdjęcie
+ * - DrawingElement (type) - union wszystkich typów elementów
+ * 
+ * UŻYWANE PRZEZ:
+ * ⚠️ BARDZO WAŻNE - używane przez WSZYSTKIE pliki w /tablica!
+ * - WhiteboardCanvas.tsx (główny komponent)
+ * - viewport.ts (transformacje)
+ * - rendering.ts (renderowanie)
+ * - Grid.tsx (siatka)
+ * - utils.ts (pomocnicze)
+ * - SelectTool.tsx (zaznaczanie)
+ * - TextTool.tsx (tekst)
+ * - selection.ts (logika zaznaczania)
+ * 
+ * ⚠️ UWAGA: Zmiana tutaj wpływa na CAŁY projekt tablicy!
+ * Sprawdzaj wszystkie pliki po modyfikacji!
+ * ============================================================================
+ */
+
 export interface Point {
   x: number;
   y: number;

@@ -1,3 +1,57 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/WhiteboardCanvas.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useRef, useEffect, useCallback)
+ * - ../toolbar/Toolbar (Toolbar, Tool, ShapeType)
+ * - ../toolbar/ZoomControls (ZoomControls)
+ * - ../toolbar/TextTool (TextTool)
+ * - ../toolbar/SelectTool (SelectTool)
+ * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
+ * - ./viewport (transformPoint, inverseTransformPoint, panViewportWithMouse, panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ./Grid (drawGrid)
+ * - ./rendering (drawElement)
+ * 
+ * EKSPORTUJE:
+ * - WhiteboardCanvas (component, default) - główny komponent tablicy interaktywnej
+ * 
+ * UŻYWANE PRZEZ:
+ * - ../page.tsx (strona /tablica)
+ * 
+ * ⚠️ ZALEŻNOŚCI - TO JEST GŁÓWNY HUB PROJEKTU:
+ * - types.ts - definiuje wszystkie typy elementów
+ * - viewport.ts - transformacje i zoom/pan (wheel events dla pen/shape)
+ * - rendering.ts - renderowanie elementów na canvas
+ * - Grid.tsx - renderowanie siatki kartezjańskiej
+ * - Toolbar.tsx - UI narzędzi
+ * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
+ * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
+ * 
+ * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
+ * - Canvas ma pointerEvents: 'none' gdy tool='select' lub 'text'
+ * - SelectTool i TextTool obsługują własne wheel events (overlay)
+ * - Pen/Shape używają canvas native wheel listener (lines 200-230)
+ * - handleViewportChange synchronizuje viewport między narzędziami
+ * 
+ * ⚠️ KLUCZOWE CALLBACKI:
+ * - handleTextCreate/Update/Delete - zarządzanie tekstami
+ * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem
+ * - handleViewportChange - synchronizacja viewport (SelectTool/TextTool)
+ * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
+ * 
+ * ⚠️ KEYBOARD SHORTCUTS:
+ * - Ctrl+Z: Undo
+ * - Ctrl+Y / Ctrl+Shift+Z: Redo
+ * - Delete: Usuń zaznaczone elementy
+ * 
+ * PRZEZNACZENIE:
+ * Główny komponent tablicy - zarządza viewport, elements, historią,
+ * koordinuje narzędzia (pen/shape/text/select), renderuje canvas.
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -204,9 +258,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     if (!canvas) return;
     
     const handleWheel = (e: WheelEvent) => {
-      // Jeśli aktywny TextTool lub SelectTool - nie scrolluj
-      if (tool === 'text' || tool === 'select') return;
-      
       e.preventDefault();
       
       const rect = canvas.getBoundingClientRect();
@@ -226,7 +277,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [viewport, tool]);
+  }, [viewport]);
 
   // Redraw canvas
   const redrawCanvas = useCallback(() => {
@@ -349,6 +400,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // 🆕 Handler do zakończenia edycji tekstu
   const handleEditingComplete = useCallback(() => {
     setEditingTextId(null);
+  }, []);
+
+  // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)
+  const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
+    setViewport(newViewport);
   }, []);
 
   // ========================================
@@ -715,6 +771,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
             onTextUpdate={handleTextUpdate}
             onTextDelete={handleTextDelete}
             onEditingComplete={handleEditingComplete}
+            onViewportChange={handleViewportChange}
           />
         )}
 
@@ -731,6 +788,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
             onElementsUpdate={handleElementsUpdate}
             onOperationFinish={handleSelectionFinish}
             onTextEdit={handleTextEdit}
+            onViewportChange={handleViewportChange}
           />
         )}
         

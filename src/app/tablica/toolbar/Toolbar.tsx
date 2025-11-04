@@ -1,3 +1,34 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/Toolbar.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, memo)
+ * - ./ToolbarUI (komponent UI toolbara)
+ * - ./ZoomControls (opcjonalnie - obecnie NIE używane w tym komponencie)
+ * 
+ * EKSPORTUJE:
+ * - Tool (type) - 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function'
+ * - ShapeType (type) - 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow'
+ * - Toolbar (component, default) - główny kontener toolbara
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główny komponent)
+ * 
+ * UŻYWA:
+ * - ToolbarUI.tsx (renderowanie UI)
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - Zmiana Tool lub ShapeType wpływa na WhiteboardCanvas, SelectTool, ToolbarUI
+ * - ToolbarUI.tsx musi mieć zgodne propsy
+ * 
+ * PRZEZNACZENIE:
+ * Kontener zarządzający stanem toolbara (narzędzia, funkcje matematyczne).
+ * Deleguje renderowanie do ToolbarUI, zarządza popup funkcji matematycznych.
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { useState, memo } from 'react';

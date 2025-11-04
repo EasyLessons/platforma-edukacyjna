@@ -1,3 +1,24 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/ZoomControls.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (memo)
+ * - lucide-react (ikony: Home, ZoomIn, ZoomOut)
+ * 
+ * EKSPORTUJE:
+ * - ZoomControls (component) - UI kontroli zoom (lewy dolny róg)
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główny komponent)
+ * 
+ * PRZEZNACZENIE:
+ * Przyciski zoom in/out i reset widoku (Home).
+ * Wyświetla aktualną skalę w %.
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { memo } from 'react';
