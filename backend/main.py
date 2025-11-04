@@ -20,7 +20,7 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:8000",
         "https://platforma-edukacyjna-one.vercel.app",
-        "https://*.vercel.app",
+        "https://*lesson.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
