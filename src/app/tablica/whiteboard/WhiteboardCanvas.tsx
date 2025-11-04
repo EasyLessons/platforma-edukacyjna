@@ -302,9 +302,13 @@ useEffect(() => {
     // Draw grid
     drawGrid(ctx, viewport, width, height);
     
-    // Draw all elements
-    elements.forEach(element => drawElement(ctx, element, viewport, width, height));
-  }, [elements, viewport]);
+    // Draw all elements (pomijamy element który jest aktualnie edytowany)
+    elements.forEach(element => {
+      // Nie rysuj elementu który jest aktualnie edytowany w TextTool
+      if (element.id === editingTextId) return;
+      drawElement(ctx, element, viewport, width, height);
+    });
+  }, [elements, viewport, editingTextId]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
