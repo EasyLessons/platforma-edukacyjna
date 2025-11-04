@@ -35,6 +35,7 @@
 import { useState, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { TextMiniToolbar } from './TextMiniToolbar';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -44,6 +45,7 @@ interface SelectToolProps {
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
+  onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void; // 🆕 Dla formatowania
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
   onOperationFinish?: () => void; // Callback po zakończeniu drag/resize
   onTextEdit?: (id: string) => void; // 🆕 Callback do edycji tekstu (double-click)
@@ -76,6 +78,7 @@ export function SelectTool({
   selectedIds,
   onSelectionChange,
   onElementUpdate,
+  onElementUpdateWithHistory, // 🆕
   onElementsUpdate,
   onOperationFinish,
   onTextEdit, // 🆕
@@ -520,6 +523,42 @@ export function SelectTool({
     setResizeOriginalElements(new Map());
   };
 
+  // 🆕 Render mini toolbar for selected text
+  const renderTextToolbar = () => {
+    // Tylko gdy zaznaczony jest dokładnie 1 element typu text
+    if (selectedIds.size !== 1 || !onElementUpdateWithHistory) return null;
+    
+    const selectedId = Array.from(selectedIds)[0];
+    const selectedElement = elements.find(el => el.id === selectedId);
+    
+    if (!selectedElement || selectedElement.type !== 'text') return null;
+    
+    const textElement = selectedElement;
+    
+    // Pozycja toolbara nad zaznaczonym tekstem
+    const topLeft = transformPoint(
+      { x: textElement.x, y: textElement.y },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
+    
+    return (
+      <TextMiniToolbar
+        style={{
+          fontSize: textElement.fontSize,
+          color: textElement.color,
+          fontWeight: textElement.fontWeight || 'normal',
+          fontStyle: textElement.fontStyle || 'normal',
+          textAlign: textElement.textAlign || 'left',
+        }}
+        onChange={(updates) => onElementUpdateWithHistory(selectedId, updates)}
+        position={topLeft}
+        className="pointer-events-auto"
+      />
+    );
+  };
+
   // Render selection box
   const renderSelectionBox = () => {
     const bbox = getSelectionBoundingBox();
@@ -612,6 +651,9 @@ export function SelectTool({
           }}
         />
       )}
+
+      {/* 🆕 Mini toolbar for selected text */}
+      {renderTextToolbar()}
 
       {/* Selection bounding box + handles */}
       {renderSelectionBox()}

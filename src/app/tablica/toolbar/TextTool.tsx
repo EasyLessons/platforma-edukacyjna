@@ -42,6 +42,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Point, ViewportTransform, TextElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { TextMiniToolbar } from './TextMiniToolbar';
 
 interface TextToolProps {
   viewport: ViewportTransform;
@@ -116,7 +117,7 @@ export function TextTool({
   };
 
   // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
-  // + Update pozycji i rozmiaru przy zmianie viewport (zoom/pan)
+  // Pozycja i rozmiar aktualizują się gdy viewport się zmienia
   useEffect(() => {
     if (editingTextId) {
       const textToEdit = elements.find(el => el.id === editingTextId);
@@ -375,105 +376,17 @@ export function TextTool({
           }}
         >
           {/* Mini Toolbar */}
-          <div className="absolute -top-12 left-0 bg-white rounded-lg shadow-lg border border-gray-200 flex items-center gap-1 p-1 z-50">
-            {/* Font size */}
-            <input
-              type="number"
-              value={textDraft.fontSize}
-              onChange={(e) =>
-                setTextDraft({ ...textDraft, fontSize: Number(e.target.value) })
-              }
-              className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-black"
-              min="8"
-              max="120"
+          <div className="absolute -top-12 left-0 z-50">
+            <TextMiniToolbar
+              style={{
+                fontSize: textDraft.fontSize,
+                color: textDraft.color,
+                fontWeight: textDraft.fontWeight,
+                fontStyle: textDraft.fontStyle,
+                textAlign: textDraft.textAlign,
+              }}
+              onChange={(updates) => setTextDraft({ ...textDraft, ...updates })}
             />
-
-            {/* Color */}
-            <input
-              type="color"
-              value={textDraft.color}
-              onChange={(e) => setTextDraft({ ...textDraft, color: e.target.value })}
-              className="w-8 h-8 rounded border border-gray-300 cursor-pointer"
-            />
-
-            <div className="w-px h-6 bg-gray-200 mx-1" />
-
-            {/* Bold */}
-            <button
-              onClick={() =>
-                setTextDraft({
-                  ...textDraft,
-                  fontWeight: textDraft.fontWeight === 'bold' ? 'normal' : 'bold',
-                })
-              }
-              className={`p-1.5 rounded transition-colors ${
-                textDraft.fontWeight === 'bold'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              title="Pogrubienie"
-            >
-              <Bold className="w-4 h-4" />
-            </button>
-
-            {/* Italic */}
-            <button
-              onClick={() =>
-                setTextDraft({
-                  ...textDraft,
-                  fontStyle: textDraft.fontStyle === 'italic' ? 'normal' : 'italic',
-                })
-              }
-              className={`p-1.5 rounded transition-colors ${
-                textDraft.fontStyle === 'italic'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              title="Kursywa"
-            >
-              <Italic className="w-4 h-4" />
-            </button>
-
-            <div className="w-px h-6 bg-gray-200 mx-1" />
-
-            {/* Align Left */}
-            <button
-              onClick={() => setTextDraft({ ...textDraft, textAlign: 'left' })}
-              className={`p-1.5 rounded transition-colors ${
-                textDraft.textAlign === 'left'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              title="Do lewej"
-            >
-              <AlignLeft className="w-4 h-4" />
-            </button>
-
-            {/* Align Center */}
-            <button
-              onClick={() => setTextDraft({ ...textDraft, textAlign: 'center' })}
-              className={`p-1.5 rounded transition-colors ${
-                textDraft.textAlign === 'center'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              title="Wyśrodkuj"
-            >
-              <AlignCenter className="w-4 h-4" />
-            </button>
-
-            {/* Align Right */}
-            <button
-              onClick={() => setTextDraft({ ...textDraft, textAlign: 'right' })}
-              className={`p-1.5 rounded transition-colors ${
-                textDraft.textAlign === 'right'
-                  ? 'bg-blue-500 text-white'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-              title="Do prawej"
-            >
-              <AlignRight className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Textarea */}
@@ -490,7 +403,7 @@ export function TextTool({
             placeholder="Wpisz tekst..."
             className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none"
             style={{
-              fontSize: `${textDraft.fontSize * viewport.scale}px`,
+              fontSize: `${textDraft.fontSize * viewport.scale}px`, // 🔥 Skaluj czcionkę z viewport
               color: textDraft.color,
               fontFamily: textDraft.fontFamily,
               fontWeight: textDraft.fontWeight,

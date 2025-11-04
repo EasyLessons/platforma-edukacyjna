@@ -161,12 +161,44 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // ========================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // 🔥 WAŻNE: Jeśli event pochodzi z input/textarea, ignoruj go całkowicie
+      // (pozwól input obsłużyć swoje własne eventy)
+      const target = e.target as HTMLElement;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
+        return; // Wyjdź natychmiast - input/textarea obsługuje to sam
+      }
+      
       // ESC - powrót do SelectTool
       if (e.key === 'Escape') {
         e.preventDefault();
         setTool('select');
         setSelectedElementIds(new Set());
         setEditingTextId(null);
+      }
+      
+      // 🆕 Typing on selected text - enter edit mode and replace text
+      // Tylko gdy: tool='select', zaznaczony dokładnie 1 element typu text, normalny znak
+      if (
+        tool === 'select' &&
+        selectedElementIds.size === 1 &&
+        e.key.length === 1 && // Pojedynczy znak (a-z, 0-9, spacja, etc.)
+        !e.ctrlKey && !e.metaKey && !e.altKey // Bez modyfikatorów (Ctrl, Cmd, Alt)
+      ) {
+        const selectedId = Array.from(selectedElementIds)[0];
+        const selectedElement = elementsRef.current.find(el => el.id === selectedId);
+        
+        if (selectedElement && selectedElement.type === 'text') {
+          e.preventDefault();
+          // Wejdź w tryb edycji i zastąp tekst wpisanym znakiem
+          setEditingTextId(selectedId);
+          setTool('text');
+          
+          // Wyczyść tekst i dodaj pierwszy znak (to zostanie obsłużone przez TextTool)
+          const newElements = elementsRef.current.map(el =>
+            el.id === selectedId ? { ...el, text: e.key } as DrawingElement : el
+          );
+          setElements(newElements);
+        }
       }
       
       // Ctrl+Z - Undo
@@ -214,7 +246,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [tool, selectedElementIds]); // ✅ Dependencies dla keyboard shortcuts
 
   // Canvas setup
   useEffect(() => {
@@ -469,6 +501,15 @@ useEffect(() => {
     // Nie zapisujemy do historii przy każdym ruchu - tylko przy mouseUp
   }, [elements]);
 
+  // 🆕 Handler dla aktualizacji z natychmiastowym zapisem (np. formatowanie tekstu)
+  const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    saveToHistory(newElements); // ✅ Zapisz do historii od razu
+  }, [elements, saveToHistory]);
+
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
     const newElements = elements.map(el => {
       const update = updates.get(el.id);
@@ -628,7 +669,7 @@ useEffect(() => {
       window.removeEventListener('mouseup', handleMouseUp, { capture: true });
       document.body.style.cursor = '';
     };
-  }, []); // Pusta tablica - używamy viewportRef
+  }, []); // Pusta tablica - używamy refs
   
   return (
     <div className={`relative w-full h-full bg-white ${className}`}>
@@ -687,6 +728,7 @@ useEffect(() => {
             selectedIds={selectedElementIds}
             onSelectionChange={handleSelectionChange}
             onElementUpdate={handleElementUpdate}
+            onElementUpdateWithHistory={handleElementUpdateWithHistory}
             onElementsUpdate={handleElementsUpdate}
             onOperationFinish={handleSelectionFinish}
             onTextEdit={handleTextEdit}
