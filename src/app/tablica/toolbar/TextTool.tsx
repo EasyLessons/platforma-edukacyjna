@@ -116,11 +116,12 @@ export function TextTool({
   };
 
   // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
+  // + Update pozycji i rozmiaru przy zmianie viewport (zoom/pan)
   useEffect(() => {
     if (editingTextId) {
       const textToEdit = elements.find(el => el.id === editingTextId);
       if (textToEdit) {
-        // Przygotuj draft z istniejącego tekstu
+        // Przelicz pozycję ekranową z współrzędnych świata
         const topLeft = transformPoint(
           { x: textToEdit.x, y: textToEdit.y },
           viewport,
@@ -149,8 +150,28 @@ export function TextTool({
         setEditingId(textToEdit.id);
         setIsEditing(true);
       }
+    } else if (isEditing && textDraft && editingId) {
+      // Jeśli edytujemy istniejący tekst i viewport się zmienił - zaktualizuj pozycję
+      const textToEdit = elements.find(el => el.id === editingId);
+      if (textToEdit) {
+        const topLeft = transformPoint(
+          { x: textToEdit.x, y: textToEdit.y },
+          viewport,
+          canvasWidth,
+          canvasHeight
+        );
+        
+        const width = (textToEdit.width || 3) * viewport.scale * 100;
+        const height = (textToEdit.height || 1) * viewport.scale * 100;
+        
+        setTextDraft(prev => prev ? {
+          ...prev,
+          screenStart: topLeft,
+          screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
+        } : null);
+      }
     }
-  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight]);
+  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing, editingId]);
 
   // Start dragging to create text box
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -469,7 +490,7 @@ export function TextTool({
             placeholder="Wpisz tekst..."
             className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none"
             style={{
-              fontSize: `${textDraft.fontSize}px`,
+              fontSize: `${textDraft.fontSize * viewport.scale}px`,
               color: textDraft.color,
               fontFamily: textDraft.fontFamily,
               fontWeight: textDraft.fontWeight,

@@ -86,6 +86,7 @@ import {
 
 import {
   panViewportWithWheel,
+  panViewportWithMouse,
   zoomViewport,
   constrainViewport
 } from './viewport';
@@ -133,6 +134,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const historyRef = useRef(history);
   const historyIndexRef = useRef(historyIndex);
   const selectedElementIdsRef = useRef(selectedElementIds);
+  const viewportRef = useRef(viewport);
+  
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
   
   useEffect(() => {
     elementsRef.current = elements;
@@ -155,6 +161,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // ========================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // ESC - powrót do SelectTool
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setTool('select');
+        setSelectedElementIds(new Set());
+        setEditingTextId(null);
+      }
+      
       // Ctrl+Z - Undo
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
@@ -553,6 +567,68 @@ useEffect(() => {
   };
 
   const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
+  
+  // ========================================
+  // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
+  // ========================================
+  useEffect(() => {
+    let isPanning = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Middle button (button 1)
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        isPanning = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        document.body.style.cursor = 'grabbing';
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
+      
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      
+      lastX = e.clientX;
+      lastY = e.clientY;
+      
+      const currentViewport = viewportRef.current;
+      
+      // Pan viewport - bez minusa, żeby kierunek był naturalny
+      const newViewport = panViewportWithMouse(currentViewport, dx, dy);
+      
+      setViewport(constrainViewport(newViewport));
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        isPanning = false;
+        document.body.style.cursor = '';
+      }
+    };
+
+    // Capture phase = true - przechwytuj eventy PRZED innymi narzędziami
+    window.addEventListener('mousedown', handleMouseDown, { capture: true });
+    window.addEventListener('mousemove', handleMouseMove, { capture: true });
+    window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, { capture: true });
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+      document.body.style.cursor = '';
+    };
+  }, []); // Pusta tablica - używamy viewportRef
   
   return (
     <div className={`relative w-full h-full bg-white ${className}`}>

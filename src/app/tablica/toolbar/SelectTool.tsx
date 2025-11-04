@@ -564,7 +564,7 @@ export function SelectTool({
         ].map(({ pos, x, y }) => (
           <div
             key={pos}
-            className="absolute bg-white z-40 border-2 border-blue-500 rounded-full cursor-pointer"
+            className="absolute bg-white z-50 border-2 border-blue-500 rounded-full pointer-events-auto"
             style={{
               left: x - handleSize / 2,
               top: y - handleSize / 2,
