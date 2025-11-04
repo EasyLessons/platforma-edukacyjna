@@ -132,11 +132,6 @@ const handleRegister = async (e: React.FormEvent) => {
     console.log("✅ Użytkownik zarejestrowany! ID:", response.user.id);
     console.log("📧 Kod wysłany na email:", formData.email);
     
-    // 🚧 DEV MODE - pokaż kod jeśli jest w response
-    if ((response as any).verification_code) {
-      alert(`🔑 KOD WERYFIKACYJNY: ${(response as any).verification_code}\n\nSkopiuj ten kod!`);
-    }
-
     // Redirect do weryfikacji
     router.push(`/weryfikacja?userId=${response.user.id}&email=${encodeURIComponent(formData.email)}`);
 
