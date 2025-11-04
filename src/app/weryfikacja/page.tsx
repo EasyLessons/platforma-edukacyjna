@@ -176,10 +176,6 @@ function VerificationContent() {
       const data = await resendVerificationCode(parseInt(userId!));
       setResendMessage("✅ Nowy kod wysłany na email!");
 
-      // 🚧 DEV MODE - pokaż kod jeśli jest
-      if ((data as any).verification_code) {
-        alert(`🔑 NOWY KOD: ${(data as any).verification_code}`);
-      }
       setResendCooldown(60); // 60 sekund cooldown
       console.log("📧 Kod ponownie wysłany");
 

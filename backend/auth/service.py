@@ -83,7 +83,6 @@ class AuthService:
         return {
             "user": new_user,
             "message": "Użytkownik zarejestrowany. Sprawdź email.",
-            "verification_code": verification_code  # DEV MODE
         }
     
     async def verify_email(self, verify_data: VerifyEmail) -> dict:
@@ -193,7 +192,6 @@ class AuthService:
         
         return {
             "message": "Nowy kod wysłany",
-            "verification_code": verification_code  # DEV MODE
         }
     
     async def check_user(self, email: str) -> dict:
