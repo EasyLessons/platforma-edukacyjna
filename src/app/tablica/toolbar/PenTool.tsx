@@ -33,7 +33,7 @@
 
 import { useState } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
-import { inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 
 interface PenToolProps {
   viewport: ViewportTransform;
@@ -152,8 +152,7 @@ export function PenTool({
     // Jeśli jest tylko jeden punkt, narysuj małe kółko
     if (currentPath.points.length === 1) {
       const p = currentPath.points[0];
-      const screenX = (p.x - viewport.x) * viewport.scale + canvasWidth / 2;
-      const screenY = (p.y - viewport.y) * viewport.scale + canvasHeight / 2;
+      const screenPoint = transformPoint(p, viewport, canvasWidth, canvasHeight);
       
       return (
         <svg
@@ -161,9 +160,9 @@ export function PenTool({
           style={{ width: canvasWidth, height: canvasHeight }}
         >
           <circle
-            cx={screenX}
-            cy={screenY}
-            r={currentPath.width * viewport.scale / 2}
+            cx={screenPoint.x}
+            cy={screenPoint.y}
+            r={currentPath.width * viewport.scale}
             fill={currentPath.color}
           />
         </svg>
@@ -173,9 +172,8 @@ export function PenTool({
     // Transformuj punkty ze współrzędnych świata na ekran
     const pathData = currentPath.points
       .map((p, i) => {
-        const screenX = (p.x - viewport.x) * viewport.scale + canvasWidth / 2;
-        const screenY = (p.y - viewport.y) * viewport.scale + canvasHeight / 2;
-        return i === 0 ? `M ${screenX} ${screenY}` : `L ${screenX} ${screenY}`;
+        const screenPoint = transformPoint(p, viewport, canvasWidth, canvasHeight);
+        return i === 0 ? `M ${screenPoint.x} ${screenPoint.y}` : `L ${screenPoint.x} ${screenPoint.y}`;
       })
       .join(' ');
 
@@ -187,7 +185,7 @@ export function PenTool({
         <path
           d={pathData}
           stroke={currentPath.color}
-          strokeWidth={currentPath.width * viewport.scale}
+          strokeWidth={currentPath.width * viewport.scale }
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
