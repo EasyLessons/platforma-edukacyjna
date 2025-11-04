@@ -80,7 +80,9 @@ const comparisonFeatures = [
 
 export default function PricingSection() {
   return (
-    <section className="relative bg-[#f5f3ef] overflow-hidden py-20 px-4">
+    <section
+    id="pricing" 
+    className="relative bg-[#f5f3ef] overflow-hidden py-20 px-4">
       
       {/* SIATKA KROPEK W TLE */}
       <div 

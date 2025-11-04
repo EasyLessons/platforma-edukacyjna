@@ -28,7 +28,7 @@ const Header = () => {
             
             {/* Link Ceny */}
             <Link 
-              href="/pricing" 
+              href="#pricing" 
               className="text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200"
             >
               Ceny
@@ -49,14 +49,14 @@ const Header = () => {
             </Link>
 
             {/* Ikonka Dashboard */}
-            <Link href="/dashboard">
+            {/* <Link href="/dashboard">
               <button 
                 className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
                 aria-label="Dashboard"
               >
                 <LayoutDashboard className="w-6 h-6" />
               </button>
-            </Link>
+            </Link> */}
 
           </div>
         </div>
