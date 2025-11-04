@@ -253,31 +253,31 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   }, []);
   
   // Wheel/Touchpad handling
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+useEffect(() => {
+  const container = containerRef.current; // ✅ CONTAINER zamiast canvas!
+  if (!container) return;
+  
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
     
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const width = rect.width;
-      const height = rect.height;
-      
-      if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
-      }
-    };
+    const rect = container.getBoundingClientRect(); // ← container.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const width = rect.width;
+    const height = rect.height;
     
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [viewport]);
+    if (e.ctrlKey) {
+      const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
+      setViewport(constrainViewport(newViewport));
+    } else {
+      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+      setViewport(constrainViewport(newViewport));
+    }
+  };
+  
+  container.addEventListener('wheel', handleWheel, { passive: false });
+  return () => container.removeEventListener('wheel', handleWheel);
+}, [viewport]);
 
   // Redraw canvas
   const redrawCanvas = useCallback(() => {
