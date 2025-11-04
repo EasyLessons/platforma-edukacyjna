@@ -13,14 +13,21 @@ setup_logging(log_level="INFO")
 # Aplikacja
 app = FastAPI(title="Education Platform API")
 
-# CORS
+# CORS - ZAKTUALIZOWANE DLA TWOICH DOMEN
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
+        # Development (localhost)
         "http://localhost:3000",
         "http://localhost:8000",
-        "https://platforma-edukacyjna-one.vercel.app",
-        "https://*lesson.app",
+        
+        # Production - Vercel domains
+        "https://platforma-edukacyjna-five.vercel.app",  # ← TWOJA GŁÓWNA DOMENA VERCEL
+        "https://platforma-edukacyjna-one.vercel.app",   # ← Stara/dodatkowa (możesz usunąć jeśli nie używasz)
+        
+        # Production - Custom domain
+        "https://easylesson.app",                         # ← TWOJA CUSTOM DOMAIN
+        "https://www.easylesson.app",                     # ← Z www (dla pewności)
     ],
     allow_credentials=True,
     allow_methods=["*"],
