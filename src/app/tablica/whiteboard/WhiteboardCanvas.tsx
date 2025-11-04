@@ -261,16 +261,29 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // History - POPRAWIONE: używa funkcyjnej formy setState bez zależności
+  // History - POPRAWIONE: limit 50 stanów, nie obcina historii przy nowym stanie
+  const MAX_HISTORY_SIZE = 50;
+  
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
     setHistoryIndex(prevIndex => {
       setHistory(prevHistory => {
-        // Obetnij historię do obecnego indeksu i dodaj nowy stan
+        // Gdy dodajemy nowy stan w środku historii, obcinamy przyszłość
         const newHistory = prevHistory.slice(0, prevIndex + 1);
         newHistory.push(newElements);
+        
+        // Ogranicz historię do ostatnich MAX_HISTORY_SIZE stanów
+        if (newHistory.length > MAX_HISTORY_SIZE) {
+          const trimmed = newHistory.slice(newHistory.length - MAX_HISTORY_SIZE);
+          // Zwróć przycięta historię i przesuń indeks
+          setHistoryIndex(trimmed.length - 1);
+          return trimmed;
+        }
+        
         return newHistory;
       });
-      return prevIndex + 1;
+      
+      // Zwróć nowy indeks (ostatni element w historii)
+      return Math.min(prevIndex + 1, MAX_HISTORY_SIZE - 1);
     });
   }, []);
 
