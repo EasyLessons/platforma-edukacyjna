@@ -70,6 +70,8 @@ import { TextTool } from '../toolbar/TextTool';
 import { SelectTool } from '../toolbar/SelectTool';
 import { PenTool } from '../toolbar/PenTool';
 import { ShapeTool } from '../toolbar/ShapeTool';
+import { PanTool } from '../toolbar/PanTool';
+import { FunctionTool } from '../toolbar/FunctionTool';
 
 // Import wszystkich modułów
 import {
@@ -393,23 +395,6 @@ useEffect(() => {
     saveToHistory(newElements);
   }, [elements, saveToHistory]);
 
-  const handleGenerateFunction = useCallback((expression: string) => {
-    const xRange = 50;
-    const yRange = 50;
-    
-    const newFunction: FunctionPlot = {
-      id: Date.now().toString(),
-      type: 'function',
-      expression,
-      color,
-      strokeWidth: lineWidth,
-      xRange,
-      yRange
-    };
-    
-    handleFunctionCreate(newFunction);
-  }, [color, lineWidth, handleFunctionCreate]);
-
   // ========================================
   // 🆕 CALLBACKI DLA TEXTTOOL
   // ========================================
@@ -584,7 +569,6 @@ useEffect(() => {
           onRedo={redo}
           onClear={clearCanvas}
           onResetView={resetView}
-          onGenerateFunction={handleGenerateFunction}
           canUndo={canUndo}
           canRedo={canRedo}
         />
@@ -653,6 +637,29 @@ useEffect(() => {
             lineWidth={lineWidth}
             fillShape={fillShape}
             onShapeCreate={handleShapeCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 PANTOOL - aktywny gdy tool === 'pan' */}
+        {tool === 'pan' && canvasWidth > 0 && (
+          <PanTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 FUNCTIONTOOL - aktywny gdy tool === 'function' */}
+        {tool === 'function' && canvasWidth > 0 && (
+          <FunctionTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onFunctionCreate={handleFunctionCreate}
             onViewportChange={handleViewportChange}
           />
         )}

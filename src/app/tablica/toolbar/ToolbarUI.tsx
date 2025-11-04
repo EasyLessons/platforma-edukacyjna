@@ -44,9 +44,6 @@ interface ToolbarUIProps {
   fontSize: number;
   fillShape: boolean;
   
-  // Function state
-  functionExpression: string;
-  
   // History state
   canUndo: boolean;
   canRedo: boolean;
@@ -58,8 +55,6 @@ interface ToolbarUIProps {
   onLineWidthChange: (width: number) => void;
   onFontSizeChange: (size: number) => void;
   onFillShapeChange: (fill: boolean) => void;
-  onFunctionExpressionChange: (expr: string) => void;
-  onGenerateFunction: () => void;
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
@@ -108,7 +103,6 @@ export function ToolbarUI({
   lineWidth,
   fontSize,
   fillShape,
-  functionExpression,
   canUndo,
   canRedo,
   onToolChange,
@@ -117,8 +111,6 @@ export function ToolbarUI({
   onLineWidthChange,
   onFontSizeChange,
   onFillShapeChange,
-  onFunctionExpressionChange,
-  onGenerateFunction,
   onUndo,
   onRedo,
   onClear,
@@ -140,7 +132,8 @@ export function ToolbarUI({
     }
   };
 
-  const hasProperties = tool !== 'select' && tool !== 'pan';
+  // 🆕 FunctionTool ma własny panel, więc nie pokazuj properties
+  const hasProperties = tool !== 'select' && tool !== 'pan' && tool !== 'function';
 
   return (
     <>
@@ -543,57 +536,7 @@ export function ToolbarUI({
               </>
             )}
 
-            {/* FUNCTION */}
-            {tool === 'function' && (
-              <>
-                <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-gray-600">Kolor:</label>
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    className="w-10 h-10 rounded border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
-                  />
-                </div>
-
-                <div className="flex items-center gap-2 min-w-[120px]">
-                  <label className="text-xs font-medium text-gray-600">Grubość:</label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="8"
-                    value={lineWidth}
-                    onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                  />
-                  <span className="text-xs text-gray-700 font-semibold w-8 text-right">{lineWidth}px</span>
-                </div>
-
-                <div className="flex items-center gap-2 flex-1">
-                  <label className="text-xs font-medium text-gray-600">f(x) =</label>
-                  <input
-                    type="text"
-                    value={functionExpression}
-                    onChange={(e) => onFunctionExpressionChange(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && functionExpression.trim()) {
-                        onGenerateFunction();
-                      }
-                    }}
-                    placeholder="np. sin(x)"
-                    className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:border-blue-500 focus:ring-1 focus:ring-blue-200 focus:outline-none font-mono transition-all"
-                    style={{ maxWidth: '200px', minWidth: '120px' }}
-                  />
-                  <button
-                    onClick={onGenerateFunction}
-                    disabled={!functionExpression.trim()}
-                    className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
-                  >
-                    Rysuj
-                  </button>
-                </div>
-              </>
-            )}
+            {/* 🔴 FUNCTION - usunięte z toolbara, FunctionTool ma własny panel */}
           </div>
         </div>
       )}

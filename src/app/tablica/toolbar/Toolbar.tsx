@@ -55,7 +55,6 @@ interface ToolbarProps {
   onRedo: () => void;
   onClear: () => void;
   onResetView: () => void;
-  onGenerateFunction?: (expression: string) => void;
   canUndo: boolean;
   canRedo: boolean;
 }
@@ -77,19 +76,13 @@ function Toolbar({
   onRedo,
   onClear,
   onResetView,
-  onGenerateFunction,
   canUndo,
   canRedo,
 }: ToolbarProps) {
-  const [functionExpression, setFunctionExpression] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const handleGenerateFunction = () => {
-    if (functionExpression.trim()) {
-      onGenerateFunction?.(functionExpression);
-      setFunctionExpression('');
-    }
-  };
+  // 🔴 USUNIĘTE - handleGenerateFunction i functionExpression nie są już potrzebne
+  // FunctionTool sam tworzy funkcje i ma własny input
 
   return (
     <div className="absolute top-20 left-4 z-50 pointer-events-auto flex flex-col items-start gap-2">
@@ -100,7 +93,6 @@ function Toolbar({
         lineWidth={lineWidth}
         fontSize={fontSize}
         fillShape={fillShape}
-        functionExpression={functionExpression}
         canUndo={canUndo}
         canRedo={canRedo}
         onToolChange={setTool}
@@ -109,8 +101,6 @@ function Toolbar({
         onLineWidthChange={setLineWidth}
         onFontSizeChange={setFontSize}
         onFillShapeChange={setFillShape}
-        onFunctionExpressionChange={setFunctionExpression}
-        onGenerateFunction={handleGenerateFunction}
         onUndo={onUndo}
         onRedo={onRedo}
         onClear={onClear}
