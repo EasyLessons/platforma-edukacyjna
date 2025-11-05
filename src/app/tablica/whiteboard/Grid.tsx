@@ -1,3 +1,28 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/Grid.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (ViewportTransform)
+ * - ./viewport (transformPoint)
+ * 
+ * EKSPORTUJE:
+ * - drawGrid (function) - renderuje siatkę kartezjańską z osiami
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (renderowane jako tło przed elementami)
+ * 
+ * PRZEZNACZENIE:
+ * Moduł rysowania siatki kartezjańskiej:
+ * - Siatka co 0.5 jednostki (50px przy scale=1)
+ * - Podziałka co 1 jednostkę (100px = 2 kratki)
+ * - Osie X (czerwona, pozioma) i Y (niebieska, pionowa)
+ * - Punkt początku (0,0) z oznaczeniem
+ * - Dynamiczne dostosowanie do viewport (pan/zoom)
+ * ============================================================================
+ */
+
 'use client';
 
 import { ViewportTransform } from './types';

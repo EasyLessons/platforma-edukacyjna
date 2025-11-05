@@ -1,7 +1,77 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/WhiteboardCanvas.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useRef, useEffect, useCallback)
+ * - ../toolbar/Toolbar (Toolbar, Tool, ShapeType)
+ * - ../toolbar/ZoomControls (ZoomControls)
+ * - ../toolbar/TextTool (TextTool)
+ * - ../toolbar/SelectTool (SelectTool)
+ * - ../toolbar/PenTool (PenTool)
+ * - ../toolbar/ShapeTool (ShapeTool)
+ * - ../toolbar/FunctionTool (FunctionTool)
+ * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
+ * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ./Grid (drawGrid)
+ * - ./rendering (drawElement)
+ * 
+ * EKSPORTUJE:
+ * - WhiteboardCanvas (component, default) - główny komponent tablicy interaktywnej
+ * 
+ * UŻYWANE PRZEZ:
+ * - ../page.tsx (strona /tablica)
+ * 
+ * ⚠️ ZALEŻNOŚCI - TO JEST GŁÓWNY HUB PROJEKTU:
+ * - types.ts - definiuje wszystkie typy elementów
+ * - viewport.ts - transformacje i zoom/pan (wheel events dla kontenera)
+ * - rendering.ts - renderowanie elementów na canvas
+ * - Grid.tsx - renderowanie siatki kartezjańskiej
+ * - Toolbar.tsx - UI narzędzi
+ * - PenTool.tsx - logika rysowania piórem (aktywny gdy tool='pen')
+ * - ShapeTool.tsx - logika wstawiania kształtów (aktywny gdy tool='shape')
+ * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
+ * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
+ * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
+ * 
+ * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
+ * - Canvas ma pointerEvents: 'none' - wszystkie narzędzia mają swoje overlaye
+ * - Kontener obsługuje wheel events (backup dla gdy żadne narzędzie nie jest aktywne)
+ * - Każde narzędzie obsługuje własne wheel events przez onViewportChange
+ * 
+ * ⚠️ KLUCZOWE CALLBACKI:
+ * - handlePathCreate - tworzenie ścieżek (PenTool)
+ * - handleShapeCreate - tworzenie kształtów (ShapeTool)
+ * - handleFunctionCreate - tworzenie funkcji (FunctionTool)
+ * - handleTextCreate/Update/Delete - zarządzanie tekstami (TextTool)
+ * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem (SelectTool)
+ * - handleViewportChange - synchronizacja viewport między narzędziami
+ * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
+ * 
+ * ⚠️ KEYBOARD SHORTCUTS:
+ * - Ctrl+Z: Undo
+ * - Ctrl+Y / Ctrl+Shift+Z: Redo
+ * - Delete: Usuń zaznaczone elementy
+ * 
+ * PRZEZNACZENIE:
+ * Główny komponent tablicy - zarządza viewport, elements, historią,
+ * koordynuje narzędzia (pen/shape/text/select/function), renderuje canvas.
+ * Każde narzędzie jest teraz osobnym komponentem z własną logiką.
+ * ============================================================================
+ */
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import Toolbar, { Tool, ShapeType, ZoomControls } from '../toolbar/Toolbar';
+import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
+import { ZoomControls } from '../toolbar/ZoomControls';
+import { TextTool } from '../toolbar/TextTool';
+import { SelectTool } from '../toolbar/SelectTool';
+import { PenTool } from '../toolbar/PenTool';
+import { ShapeTool } from '../toolbar/ShapeTool';
+import { PanTool } from '../toolbar/PanTool';
+import { FunctionTool } from '../toolbar/FunctionTool';
 
 // Import wszystkich modułów
 import {
@@ -15,10 +85,8 @@ import {
 } from './types';
 
 import {
-  transformPoint,
-  inverseTransformPoint,
-  panViewportWithMouse,
   panViewportWithWheel,
+  panViewportWithMouse,
   zoomViewport,
   constrainViewport
 } from './viewport';
@@ -33,7 +101,6 @@ interface WhiteboardCanvasProps {
 export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const textInputRef = useRef<HTMLTextAreaElement>(null);
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -41,11 +108,8 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     y: 0,
     scale: 1
   });
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastPanPoint, setLastPanPoint] = useState<Point | null>(null);
   
   // Drawing state
-  const [isDrawing, setIsDrawing] = useState(false);
   const [tool, setTool] = useState<Tool>('select');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [color, setColor] = useState('#000000');
@@ -55,45 +119,144 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
-  const [currentElement, setCurrentElement] = useState<DrawingElement | null>(null);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
+  const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
+  const [debugMode, setDebugMode] = useState(false); // 🔍 Debug mode for text sizing
   
-  // Selection state
-  const [isSelecting, setIsSelecting] = useState(false);
-  const [selectionStart, setSelectionStart] = useState<Point | null>(null);
-  const [selectionEnd, setSelectionEnd] = useState<Point | null>(null);
-  
-  // Text editing state
-  const [isEditingText, setIsEditingText] = useState(false);
-  const [textPosition, setTextPosition] = useState<Point | null>(null);
-  const [textBoxSize, setTextBoxSize] = useState<{ width: number; height: number } | null>(null);
-  const [textDraft, setTextDraft] = useState('');
-  const [pendingTextId, setPendingTextId] = useState<string | null>(null);
-  
-  // History state
+  // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  
-  // Drag state
-  const [isDraggingElement, setIsDraggingElement] = useState(false);
-  const [dragStartPoint, setDragStartPoint] = useState<Point | null>(null);
-  const [draggedElementsStart, setDraggedElementsStart] = useState<Map<string, DrawingElement>>(new Map());
-  
-  // Resize state
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeHandle, setResizeHandle] = useState<string | null>(null);
-  const [resizeOriginalElement, setResizeOriginalElement] = useState<DrawingElement | null>(null);
   
   const redrawCanvasRef = useRef<() => void>(() => {});
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
   const saveToHistoryRef = useRef<(els: DrawingElement[]) => void>(() => {});
+  const historyRef = useRef(history);
+  const historyIndexRef = useRef(historyIndex);
+  const selectedElementIdsRef = useRef(selectedElementIds);
+  const viewportRef = useRef(viewport);
+  
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
   
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
+
+  useEffect(() => {
+    historyIndexRef.current = historyIndex;
+  }, [historyIndex]);
+
+  useEffect(() => {
+    selectedElementIdsRef.current = selectedElementIds;
+  }, [selectedElementIds]);
+
+  // ========================================
+  // 🆕 KEYBOARD SHORTCUTS
+  // ========================================
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // 🔥 WAŻNE: Jeśli event pochodzi z input/textarea, ignoruj go całkowicie
+      // (pozwól input obsłużyć swoje własne eventy)
+      const target = e.target as HTMLElement;
+      if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
+        return; // Wyjdź natychmiast - input/textarea obsługuje to sam
+      }
+      
+      // ESC - powrót do SelectTool
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setTool('select');
+        setSelectedElementIds(new Set());
+        setEditingTextId(null);
+      }
+      
+      // 🆕 Typing on selected text - enter edit mode and replace text
+      // Tylko gdy: tool='select', zaznaczony dokładnie 1 element typu text, normalny znak
+      if (
+        tool === 'select' &&
+        selectedElementIds.size === 1 &&
+        e.key.length === 1 && // Pojedynczy znak (a-z, 0-9, spacja, etc.)
+        !e.ctrlKey && !e.metaKey && !e.altKey // Bez modyfikatorów (Ctrl, Cmd, Alt)
+      ) {
+        const selectedId = Array.from(selectedElementIds)[0];
+        const selectedElement = elementsRef.current.find(el => el.id === selectedId);
+        
+        if (selectedElement && selectedElement.type === 'text') {
+          e.preventDefault();
+          // Wejdź w tryb edycji i zastąp tekst wpisanym znakiem
+          setEditingTextId(selectedId);
+          setTool('text');
+          
+          // Wyczyść tekst i dodaj pierwszy znak (to zostanie obsłużone przez TextTool)
+          const newElements = elementsRef.current.map(el =>
+            el.id === selectedId ? { ...el, text: e.key } as DrawingElement : el
+          );
+          setElements(newElements);
+        }
+      }
+      
+      // Ctrl+Z - Undo
+      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        const currentIndex = historyIndexRef.current;
+        const currentHistory = historyRef.current;
+        
+        if (currentIndex > 0) {
+          const newIndex = currentIndex - 1;
+          setHistoryIndex(newIndex);
+          setElements(currentHistory[newIndex]);
+          setSelectedElementIds(new Set());
+        }
+      }
+      
+      // Ctrl+Y lub Ctrl+Shift+Z - Redo
+      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+        e.preventDefault();
+        const currentIndex = historyIndexRef.current;
+        const currentHistory = historyRef.current;
+        
+        if (currentIndex < currentHistory.length - 1) {
+          const newIndex = currentIndex + 1;
+          setHistoryIndex(newIndex);
+          setElements(currentHistory[newIndex]);
+          setSelectedElementIds(new Set());
+        }
+      }
+      
+      // Delete - usuń wybrane elementy
+      if (e.key === 'Delete') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        const currentElements = elementsRef.current;
+        
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          const newElements = currentElements.filter(el => !currentSelectedIds.has(el.id));
+          setElements(newElements);
+          saveToHistoryRef.current(newElements);
+          setSelectedElementIds(new Set());
+        }
+      }
+      
+      // 🔍 D key - Toggle debug mode
+      if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setDebugMode(prev => {
+          console.log('🔍 Debug mode:', !prev ? 'ON' : 'OFF');
+          return !prev;
+        });
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tool, selectedElementIds]); // ✅ Dependencies dla keyboard shortcuts
 
   // Canvas setup
   useEffect(() => {
@@ -152,36 +315,51 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   }, []);
   
   // Wheel/Touchpad handling
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+useEffect(() => {
+  const container = containerRef.current; // ✅ CONTAINER zamiast canvas!
+  if (!container) return;
+  
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
     
-    const handleWheel = (e: WheelEvent) => {
-      if (isEditingText) return;
-      e.preventDefault();
-      
-      const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const width = rect.width;
-      const height = rect.height;
-      
-      if (e.ctrlKey) {
-        // PINCH ZOOM (dwa palce: do siebie/od siebie)
-        const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
-      } else {
-        // SCROLL/PAN (dwa palce: w lewo/prawo/góra/dół)
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
-      }
-    };
+    const rect = container.getBoundingClientRect(); // ← container.getBoundingClientRect()
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const width = rect.width;
+    const height = rect.height;
     
-    canvas.addEventListener('wheel', handleWheel, { passive: false });
-    return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [viewport, isEditingText]);
+    if (e.ctrlKey) {
+      const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
+      setViewport(constrainViewport(newViewport));
+    } else {
+      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+      setViewport(constrainViewport(newViewport));
+    }
+  };
+  
+  container.addEventListener('wheel', handleWheel, { passive: false });
+  return () => container.removeEventListener('wheel', handleWheel);
+}, [viewport]);
 
   // Redraw canvas
+  // 🔍 Auto-expand text boxes when text doesn't fit
+  const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
+    setElements(prevElements => {
+      const updated = prevElements.map(el => {
+        if (el.id === elementId && el.type === 'text') {
+          const currentHeight = el.height || 0;
+          // Only expand, never shrink automatically
+          if (newHeight > currentHeight) {
+            console.log(`📏 Auto-expanding ${elementId}: ${currentHeight.toFixed(2)} → ${newHeight.toFixed(2)}`);
+            return { ...el, height: newHeight };
+          }
+        }
+        return el;
+      });
+      return updated;
+    });
+  }, []);
+
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -195,32 +373,16 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     // Clear
     ctx.clearRect(0, 0, width, height);
     
-    // Draw grid (z modułu Grid.tsx)
+    // Draw grid
     drawGrid(ctx, viewport, width, height);
     
-    // Draw all elements (z modułu rendering.ts)
-    elements.forEach(element => drawElement(ctx, element, viewport, width, height));
-    
-    // Draw current element
-    if (currentElement) {
-      drawElement(ctx, currentElement, viewport, width, height);
-    }
-    
-    // Draw selection box
-    if (isSelecting && selectionStart && selectionEnd) {
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.8)';
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([5, 5]);
-      
-      const selWidth = selectionEnd.x - selectionStart.x;
-      const selHeight = selectionEnd.y - selectionStart.y;
-      
-      ctx.fillRect(selectionStart.x, selectionStart.y, selWidth, selHeight);
-      ctx.strokeRect(selectionStart.x, selectionStart.y, selWidth, selHeight);
-      ctx.setLineDash([]);
-    }
-  }, [elements, currentElement, viewport, isSelecting, selectionStart, selectionEnd]);
+    // Draw all elements (pomijamy element który jest aktualnie edytowany)
+    elements.forEach(element => {
+      // Nie rysuj elementu który jest aktualnie edytowany w TextTool
+      if (element.id === editingTextId) return;
+      drawElement(ctx, element, viewport, width, height, undefined, debugMode, handleAutoExpand);
+    });
+  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -230,13 +392,31 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // History
+  // History - POPRAWIONE: limit 50 stanów, nie obcina historii przy nowym stanie
+  const MAX_HISTORY_SIZE = 50;
+  
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
-    const newHistory = history.slice(0, historyIndex + 1);
-    newHistory.push(newElements);
-    setHistory(newHistory);
-    setHistoryIndex(newHistory.length - 1);
-  }, [history, historyIndex]);
+    setHistoryIndex(prevIndex => {
+      setHistory(prevHistory => {
+        // Gdy dodajemy nowy stan w środku historii, obcinamy przyszłość
+        const newHistory = prevHistory.slice(0, prevIndex + 1);
+        newHistory.push(newElements);
+        
+        // Ogranicz historię do ostatnich MAX_HISTORY_SIZE stanów
+        if (newHistory.length > MAX_HISTORY_SIZE) {
+          const trimmed = newHistory.slice(newHistory.length - MAX_HISTORY_SIZE);
+          // Zwróć przycięta historię i przesuń indeks
+          setHistoryIndex(trimmed.length - 1);
+          return trimmed;
+        }
+        
+        return newHistory;
+      });
+      
+      // Zwróć nowy indeks (ostatni element w historii)
+      return Math.min(prevIndex + 1, MAX_HISTORY_SIZE - 1);
+    });
+  }, []);
 
   useEffect(() => {
     saveToHistoryRef.current = saveToHistory;
@@ -248,7 +428,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setHistoryIndex(newIndex);
       setElements(history[newIndex]);
       setSelectedElementIds(new Set());
-      setSelectedElementId(null);
     }
   }, [historyIndex, history]);
 
@@ -258,7 +437,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setHistoryIndex(newIndex);
       setElements(history[newIndex]);
       setSelectedElementIds(new Set());
-      setSelectedElementId(null);
     }
   }, [historyIndex, history]);
 
@@ -266,173 +444,122 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     setElements([]);
     saveToHistory([]);
     setSelectedElementIds(new Set());
-    setSelectedElementId(null);
   }, [saveToHistory]);
 
-  // Mouse handlers
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (isEditingText) return;
+  // ========================================
+  // 🆕 CALLBACKI DLA PENTOOL
+  // ========================================
+  const handlePathCreate = useCallback((path: DrawingPath) => {
+    const newElements = [...elements, path];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA SHAPETOOL
+  // ========================================
+  const handleShapeCreate = useCallback((shape: Shape) => {
+    const newElements = [...elements, shape];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA FUNCTIONTOOL - funkcja w properties
+  // ========================================
+  const handleFunctionCreate = useCallback((func: FunctionPlot) => {
+    const newElements = [...elements, func];
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA TEXTTOOL
+  // ========================================
+  const handleTextCreate = useCallback((text: TextElement) => {
+    const newElements = [...elements, text];
+    setElements(newElements);
+    saveToHistory(newElements);
+    // NIE przełączaj automatycznie na select - użytkownik może chcieć dodać więcej tekstów
+  }, [elements, saveToHistory]);
+
+  const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  const handleTextDelete = useCallback((id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // 🆕 Handler do edycji tekstu (double-click w SelectTool)
+  const handleTextEdit = useCallback((id: string) => {
+    setEditingTextId(id);
+    setTool('text'); // Przełącz na narzędzie text
+  }, []);
+
+  // 🆕 Handler do zakończenia edycji tekstu
+  const handleEditingComplete = useCallback(() => {
+    setEditingTextId(null);
+    setTool('select'); // 🆕 Automatyczne przełączenie na narzędzie zaznaczania po zapisaniu tekstu
+  }, []);
+
+  // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)
+  const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
+    setViewport(newViewport);
+  }, []);
+
+  // ========================================
+  // 🆕 CALLBACKI DLA SELECTTOOL
+  // ========================================
+  const handleSelectionChange = useCallback((ids: Set<string>) => {
+    setSelectedElementIds(ids);
+  }, []);
+
+  const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    // Nie zapisujemy do historii przy każdym ruchu - tylko przy mouseUp
+  }, [elements]);
+
+  // 🆕 Handler dla aktualizacji z natychmiastowym zapisem (np. formatowanie tekstu)
+  const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    const newElements = elements.map(el => 
+      el.id === id ? { ...el, ...updates } as DrawingElement : el
+    );
+    setElements(newElements);
+    saveToHistory(newElements); // ✅ Zapisz do historii od razu
+  }, [elements, saveToHistory]);
+
+  const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
+    const newElements = elements.map(el => {
+      const update = updates.get(el.id);
+      return update ? { ...el, ...update } as DrawingElement : el;
+    });
+    setElements(newElements);
+  }, [elements]);
+
+  // Zapisz do historii po zakończeniu dragowania/resizowania
+  const handleSelectionFinish = useCallback(() => {
+    saveToHistory(elements);
+  }, [elements, saveToHistory]);
+
+  // Funkcja usuwania wybranych elementów (dostępna z klawiatury Delete)
+  const deleteSelectedElements = useCallback(() => {
+    if (selectedElementIds.size === 0) return;
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const width = rect.width;
-    const height = rect.height;
-    const worldPoint = inverseTransformPoint({ x: screenX, y: screenY }, viewport, width, height);
-
-    if (tool === 'pan' || e.button === 1 || (e.button === 0 && e.ctrlKey)) {
-      setIsPanning(true);
-      setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (tool === 'select') {
-      setIsSelecting(true);
-      setSelectionStart({ x: screenX, y: screenY });
-      setSelectionEnd({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (tool === 'text') {
-      setIsEditingText(true);
-      setTextPosition({ x: screenX, y: screenY });
-      setTextBoxSize({ width: 300, height: 100 });
-      setTextDraft('');
-      setPendingTextId(Date.now().toString());
-      return;
-    }
-
-    setIsDrawing(true);
-
-    if (tool === 'pen') {
-      const newPath: DrawingPath = {
-        id: Date.now().toString(),
-        type: 'path',
-        points: [worldPoint],
-        color,
-        width: lineWidth
-      };
-      setCurrentElement(newPath);
-    } else if (tool === 'shape') {
-      const newShape: Shape = {
-        id: Date.now().toString(),
-        type: 'shape',
-        shapeType: selectedShape,
-        startX: worldPoint.x,
-        startY: worldPoint.y,
-        endX: worldPoint.x,
-        endY: worldPoint.y,
-        color,
-        strokeWidth: lineWidth,
-        fill: fillShape
-      };
-      setCurrentElement(newShape);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const screenX = e.clientX - rect.left;
-    const screenY = e.clientY - rect.top;
-    const width = rect.width;
-    const height = rect.height;
-
-    if (isPanning && lastPanPoint) {
-      const dx = screenX - lastPanPoint.x;
-      const dy = screenY - lastPanPoint.y;
-      
-      // Pan z myszką (z modułu viewport.ts)
-      const newViewport = panViewportWithMouse(viewport, dx, dy);
-      setViewport(constrainViewport(newViewport));
-      setLastPanPoint({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (isSelecting && selectionStart) {
-      setSelectionEnd({ x: screenX, y: screenY });
-      return;
-    }
-
-    if (!isDrawing || !currentElement) return;
-
-    const worldPoint = inverseTransformPoint({ x: screenX, y: screenY }, viewport, width, height);
-
-    if (currentElement.type === 'path') {
-      setCurrentElement({
-        ...currentElement,
-        points: [...currentElement.points, worldPoint]
-      });
-    } else if (currentElement.type === 'shape') {
-      setCurrentElement({
-        ...currentElement,
-        endX: worldPoint.x,
-        endY: worldPoint.y
-      });
-    }
-  };
-
-  const handleMouseUp = () => {
-    if (isPanning) {
-      setIsPanning(false);
-      setLastPanPoint(null);
-      return;
-    }
-
-    if (isSelecting) {
-      setIsSelecting(false);
-      setSelectionStart(null);
-      setSelectionEnd(null);
-      return;
-    }
-
-    if (isDrawing && currentElement) {
-      const newElements = [...elements, currentElement];
-      setElements(newElements);
-      saveToHistory(newElements);
-      setCurrentElement(null);
-      setIsDrawing(false);
-    }
-  };
-
-  const finishTextInput = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || !textPosition) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-    
-    if (textDraft.trim() && pendingTextId) {
-      const worldPos = inverseTransformPoint(textPosition, viewport, width, height);
-      
-      const newText: TextElement = {
-        id: pendingTextId,
-        type: 'text',
-        x: worldPos.x,
-        y: worldPos.y,
-        text: textDraft.trim(),
-        fontSize: fontSize,
-        color: color
-      };
-      
-      const newElements = [...elements, newText];
-      setElements(newElements);
-      saveToHistory(newElements);
-    }
-    
-    setIsEditingText(false);
-    setTextPosition(null);
-    setTextBoxSize(null);
-    setTextDraft('');
-    setPendingTextId(null);
-    setTool('select');
-  };
+    const newElements = elements.filter(el => !selectedElementIds.has(el.id));
+    setElements(newElements);
+    saveToHistory(newElements);
+    setSelectedElementIds(new Set());
+  }, [elements, selectedElementIds, saveToHistory]);
 
   // Zoom functions
   const zoomInRef = useRef(() => {
@@ -497,97 +624,80 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     handleFillShapeChangeRef.current(fill);
   }, []);
   
-  const handleGenerateFunctionRef = useRef((expression: string) => {
-    const xRange = 50;
-    const yRange = 50;
-    
-    const newFunction: FunctionPlot = {
-      id: Date.now().toString(),
-      type: 'function',
-      expression,
-      color,
-      strokeWidth: lineWidth,
-      xRange,
-      yRange
-    };
-    
-    const currentElements = elementsRef.current;
-    const newElements = [...currentElements, newFunction];
-    setElements(newElements);
-    saveToHistoryRef.current(newElements);
-    setTool('select');
-  });
-  
-  useEffect(() => {
-    handleGenerateFunctionRef.current = (expression: string) => {
-      const xRange = 50;
-      const yRange = 50;
-      
-      const newFunction: FunctionPlot = {
-        id: Date.now().toString(),
-        type: 'function',
-        expression,
-        color,
-        strokeWidth: lineWidth,
-        xRange,
-        yRange
-      };
-      
-      const currentElements = elementsRef.current;
-      const newElements = [...currentElements, newFunction];
-      setElements(newElements);
-      saveToHistoryRef.current(newElements);
-      setTool('select');
-    };
-  }, [color, lineWidth]);
-  
-  const handleGenerateFunction = useCallback((expression: string) => {
-    handleGenerateFunctionRef.current(expression);
-  }, []);
-  
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
-  
-  // Touch events handlers
-  const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        button: 0,
-        ctrlKey: false,
-        metaKey: false,
-        preventDefault: () => {}
-      } as unknown as React.MouseEvent<HTMLCanvasElement>;
-      
-      handleMouseDown(mouseEvent);
-    }
+
+  // Get canvas dimensions for tools
+  const getCanvasDimensions = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { width: 0, height: 0 };
+    const rect = canvas.getBoundingClientRect();
+    return { width: rect.width, height: rect.height };
   };
+
+  const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
   
-  const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-        button: 0,
-        preventDefault: () => {}
-      } as unknown as React.MouseEvent<HTMLCanvasElement>;
+  // ========================================
+  // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
+  // ========================================
+  useEffect(() => {
+    let isPanning = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      // Middle button (button 1)
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        isPanning = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        document.body.style.cursor = 'grabbing';
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
       
-      handleMouseMove(mouseEvent);
-    }
-  };
-  
-  const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    handleMouseUp();
-  };
+      e.preventDefault();
+      e.stopPropagation();
+      
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      
+      lastX = e.clientX;
+      lastY = e.clientY;
+      
+      const currentViewport = viewportRef.current;
+      
+      // Pan viewport - bez minusa, żeby kierunek był naturalny
+      const newViewport = panViewportWithMouse(currentViewport, dx, dy);
+      
+      setViewport(constrainViewport(newViewport));
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        isPanning = false;
+        document.body.style.cursor = '';
+      }
+    };
+
+    // Capture phase = true - przechwytuj eventy PRZED innymi narzędziami
+    window.addEventListener('mousedown', handleMouseDown, { capture: true });
+    window.addEventListener('mousemove', handleMouseMove, { capture: true });
+    window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, { capture: true });
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+      document.body.style.cursor = '';
+    };
+  }, []); // Pusta tablica - używamy refs
   
   return (
     <div className={`relative w-full h-full bg-white ${className}`}>
@@ -609,7 +719,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
           onRedo={redo}
           onClear={clearCanvas}
           onResetView={resetView}
-          onGenerateFunction={handleGenerateFunction}
           canUndo={canUndo}
           canRedo={canRedo}
         />
@@ -621,60 +730,108 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
           onResetView={resetView}
         />
         
+        {/* 🆕 TEXTTOOL - aktywny gdy tool === 'text' */}
+        {tool === 'text' && canvasWidth > 0 && (
+          <TextTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements.filter(el => el.type === 'text') as TextElement[]}
+            editingTextId={editingTextId}
+            onTextCreate={handleTextCreate}
+            onTextUpdate={handleTextUpdate}
+            onTextDelete={handleTextDelete}
+            onEditingComplete={handleEditingComplete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 SELECTTOOL - aktywny gdy tool === 'select' */}
+        {tool === 'select' && canvasWidth > 0 && (
+          <SelectTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements}
+            selectedIds={selectedElementIds}
+            onSelectionChange={handleSelectionChange}
+            onElementUpdate={handleElementUpdate}
+            onElementUpdateWithHistory={handleElementUpdateWithHistory}
+            onElementsUpdate={handleElementsUpdate}
+            onOperationFinish={handleSelectionFinish}
+            onTextEdit={handleTextEdit}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 PENTOOL - aktywny gdy tool === 'pen' */}
+        {tool === 'pen' && canvasWidth > 0 && (
+          <PenTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onPathCreate={handlePathCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 SHAPETOOL - aktywny gdy tool === 'shape' */}
+        {tool === 'shape' && canvasWidth > 0 && (
+          <ShapeTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            selectedShape={selectedShape}
+            color={color}
+            lineWidth={lineWidth}
+            fillShape={fillShape}
+            onShapeCreate={handleShapeCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 PANTOOL - aktywny gdy tool === 'pan' */}
+        {tool === 'pan' && canvasWidth > 0 && (
+          <PanTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 FUNCTIONTOOL - aktywny gdy tool === 'function' */}
+        {tool === 'function' && canvasWidth > 0 && (
+          <FunctionTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onFunctionCreate={handleFunctionCreate}
+            onColorChange={handleColorChange}
+            onLineWidthChange={handleLineWidthChange}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+        
         <canvas
           ref={canvasRef}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 w-full h-full"
           style={{
             cursor: 
-              tool === 'pan' || isPanning ? 'grab' : 
+              tool === 'pan' ? 'grab' : 
               tool === 'select' ? 'default' : 
-              tool === 'text' ? 'text' :
+              tool === 'text' ? 'crosshair' :
               'crosshair',
             willChange: 'auto',
-            imageRendering: 'crisp-edges'
+            imageRendering: 'crisp-edges',
+            pointerEvents: 'none' // ⚠️ WAŻNE! Wszystkie narzędzia mają swoje overlaye
           }}
         />
-        
-        {isEditingText && textPosition && textBoxSize && (
-          <textarea
-            ref={textInputRef}
-            value={textDraft}
-            onChange={(e) => setTextDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                finishTextInput();
-              } else if (e.key === 'Escape') {
-                e.preventDefault();
-                finishTextInput();
-              }
-            }}
-            onBlur={finishTextInput}
-            placeholder=""
-            className="absolute z-50 px-2 py-1 outline-none border-2 border-blue-500 bg-white/90 resize-none overflow-hidden"
-            style={{
-              left: `${textPosition.x}px`,
-              top: `${textPosition.y}px`,
-              width: `${textBoxSize.width}px`,
-              height: `${textBoxSize.height}px`,
-              fontSize: `${fontSize}px`,
-              color: color,
-              lineHeight: '1.2',
-              fontFamily: 'Arial, sans-serif',
-              whiteSpace: 'pre-wrap',
-              boxSizing: 'border-box'
-            }}
-            autoFocus
-          />
-        )}
       </div>
     </div>
   );

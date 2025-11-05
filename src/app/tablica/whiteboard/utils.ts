@@ -1,4 +1,30 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/utils.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (Point, ViewportTransform, DrawingElement)
+ * 
+ * EKSPORTUJE:
+ * - clampLineWidth (function) - ogranicza szerokość linii (0.5-20px)
+ * - clampFontSize (function) - ogranicza rozmiar czcionki (10-200px)
+ * - evaluateExpression (function) - evaluator wyrażeń matematycznych
+ * - isOutsideViewport (function) - sprawdza czy element poza viewport (TODO)
+ * 
+ * UŻYWANE PRZEZ:
+ * - rendering.ts (clamp dla renderowania)
+ * 
+ * PRZEZNACZENIE:
+ * Funkcje pomocnicze dla tablicy:
+ * - Clamp dla rozmiaru linii/czcionek ze skalowaniem viewport
+ * - Parser wyrażeń matematycznych (sin, cos, tan, ^, pi, e itp.)
+ * - Culling elementów poza viewport (placeholder)
+ * ============================================================================
+ */
+
 import { Point, ViewportTransform, DrawingElement } from './types';
+import { evaluate } from 'mathjs';
 
 /**
  * Clamp lineWidth: min 0.5px, max 20px
@@ -19,28 +45,18 @@ export function clampFontSize(size: number, scale: number): number {
 }
 
 /**
- * Math expression evaluator
- * Zamienia sin, cos, tan, ^, pi, e na odpowiedniki JavaScript
+ * Math expression evaluator using math.js
+ * Obsługuje zaawansowane funkcje: sqrt(), cbrt(), log(), sin(), cos(), tan(),
+ * abs(), ceil(), floor(), exp(), ^, pi, e i wiele innych
  */
 export function evaluateExpression(expr: string, x: number): number {
-  let processed = expr
-    .replace(/\^/g, '**')
-    .replace(/(\d)([a-z])/gi, '$1*$2')
-    .replace(/\)(\d)/g, ')*$1')
-    .replace(/(\d)\(/g, '$1*(');
-
-  const functions = ['sin', 'cos', 'tan', 'sqrt', 'abs', 'log', 'ln', 'exp', 'floor', 'ceil', 'round'];
-  functions.forEach(fn => {
-    const regex = new RegExp(`\\b${fn}\\b`, 'g');
-    processed = processed.replace(regex, `Math.${fn}`);
-  });
-
-  processed = processed.replace(/\bpi\b/g, 'Math.PI');
-  processed = processed.replace(/\be\b/g, 'Math.E');
-
   try {
-    const func = new Function('x', `return ${processed}`);
-    const result = func(x);
+    // math.js wspiera:
+    // - operatory: +, -, *, /, ^, %
+    // - funkcje: sqrt, cbrt, sin, cos, tan, asin, acos, atan, log, log10, exp, abs, ceil, floor, round
+    // - stałe: pi, e
+    // - automatyczne mnożenie: 2x = 2*x, 3(x+1) = 3*(x+1)
+    const result = evaluate(expr, { x });
     
     if (typeof result !== 'number' || !isFinite(result)) {
       throw new Error('Invalid result');

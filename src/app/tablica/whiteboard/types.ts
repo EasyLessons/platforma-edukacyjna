@@ -1,3 +1,36 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/types.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z: (brak - plik podstawowy)
+ * 
+ * EKSPORTUJE:
+ * - Point (interface) - współrzędne x, y
+ * - ViewportTransform (interface) - stan widoku: x, y, scale
+ * - DrawingPath (interface) - ścieżka rysowana piórem
+ * - Shape (interface) - kształt geometryczny
+ * - TextElement (interface) - element tekstowy
+ * - FunctionPlot (interface) - wykres funkcji matematycznej
+ * - ImageElement (interface) - obraz/zdjęcie
+ * - DrawingElement (type) - union wszystkich typów elementów
+ * 
+ * UŻYWANE PRZEZ:
+ * ⚠️ BARDZO WAŻNE - używane przez WSZYSTKIE pliki w /tablica!
+ * - WhiteboardCanvas.tsx (główny komponent)
+ * - viewport.ts (transformacje)
+ * - rendering.ts (renderowanie)
+ * - Grid.tsx (siatka)
+ * - utils.ts (pomocnicze)
+ * - SelectTool.tsx (zaznaczanie)
+ * - TextTool.tsx (tekst)
+ * - selection.ts (logika zaznaczania)
+ * 
+ * ⚠️ UWAGA: Zmiana tutaj wpływa na CAŁY projekt tablicy!
+ * Sprawdzaj wszystkie pliki po modyfikacji!
+ * ============================================================================
+ */
+
 export interface Point {
   x: number;
   y: number;
@@ -35,9 +68,15 @@ export interface TextElement {
   type: 'text';
   x: number;
   y: number;
+  width?: number; // 🆕 Szerokość bounding box
+  height?: number; // 🆕 Wysokość bounding box
   text: string;
   fontSize: number;
   color: string;
+  fontFamily?: string; // 🆕 Domyślnie: 'Arial, sans-serif'
+  fontWeight?: 'normal' | 'bold'; // 🆕 Pogrubienie
+  fontStyle?: 'normal' | 'italic'; // 🆕 Kursywa
+  textAlign?: 'left' | 'center' | 'right'; // 🆕 Wyrównanie
 }
 
 export interface FunctionPlot {
@@ -50,4 +89,16 @@ export interface FunctionPlot {
   yRange: number;
 }
 
-export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot;
+// 🆕 Nowy typ dla obrazków (przyszłość)
+export interface ImageElement {
+  id: string;
+  type: 'image';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string; // URL lub base64
+  alt?: string;
+}
+
+export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement;

@@ -1,3 +1,33 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/whiteboard/viewport.ts
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - ./types (Point, ViewportTransform)
+ * 
+ * EKSPORTUJE:
+ * - transformPoint (function) - world coords → screen coords
+ * - inverseTransformPoint (function) - screen coords → world coords
+ * - panViewportWithMouse (function) - przesuwanie myszką
+ * - panViewportWithWheel (function) - przesuwanie touchpadem (2 palce)
+ * - zoomViewport (function) - zoom pinch (2 palce do/od siebie)
+ * - constrainViewport (function) - ograniczenia viewport (obecnie brak)
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (obsługa myszy/touchpada)
+ * - rendering.ts (transformacje przy renderowaniu)
+ * - Grid.tsx (transformacje siatki)
+ * 
+ * PRZEZNACZENIE:
+ * Moduł transformacji współrzędnych i viewport management:
+ * - Konwersja między współrzędnymi świata i ekranu
+ * - Pan (przesuwanie) myszką i touchpadem
+ * - Zoom z zachowaniem punktu pod kursorem
+ * - Skala: 100px = 1 jednostka matematyczna (2 kratki = 1 jednostka)
+ * ============================================================================
+ */
+
 import { Point, ViewportTransform } from './types';
 
 /**
