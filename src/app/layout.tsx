@@ -26,7 +26,8 @@ export default function RootLayout({
   const pathname = usePathname();
   
   // Ścieżki gdzie ukrywamy publiczny Header i pokazujemy AuthHeader
-  const authPaths = ['/dashboard', '/tablica', '/profile', '/settings'];
+  const authPaths = ['/dashboard', '/profile', '/settings', '/'];
+  
   const isAuthPage = authPaths.some(path => pathname?.startsWith(path));
   
   return (
@@ -41,10 +42,14 @@ export default function RootLayout({
         {/* DWA RÓŻNE HEADERY - w zależności czy zalogowany */}
         {isAuthPage ? (
           // Header dla ZALOGOWANYCH (Dashboard, Tablica, Profil)
+          <>
+          <Ad />
           <AuthHeader />
+          </>
         ) : (
           // Header dla NIEZALOGOWANYCH (Strona główna, Ceny, Login)
           <>
+          
             <Ad />
             <Header />
           </>
@@ -52,7 +57,7 @@ export default function RootLayout({
         
         {/* Główna zawartość strony */}
         {/* Dodaj padding-top gdy jest AuthHeader (64px wysokości) */}
-        <main className={isAuthPage ? "" : "min-h-screen"} style={isAuthPage ? { paddingTop: '64px' } : {}}>
+        <main className={isAuthPage ? "" : "min-h-screen"} style={isAuthPage ? { paddingTop: '0px' } : {}}>
           {children}
         </main>
         

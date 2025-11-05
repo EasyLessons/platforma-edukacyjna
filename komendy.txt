@@ -10,3 +10,5 @@ uvicorn main:app --reload z glownego lub z /backend
 # Instalacja zależności, uruchomienie serwera developerskiego
 npm install
 npm run dev
+
+# alembic push do tabli zeby w oddzilencyh plikach robić tableki
