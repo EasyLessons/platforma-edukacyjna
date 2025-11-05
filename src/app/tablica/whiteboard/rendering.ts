@@ -190,21 +190,28 @@ export function drawText(
   const lines = textEl.text.split('\n');
   const lineHeight = fontSize * 1.4;
   
-  // 🆕 Calculate X offset based on alignment and width
-  let xOffset = 0;
+  // Padding (matching textarea px-3 py-2 = 12px 8px)
+  const paddingX = 12; // 12px horizontal padding (px-3 = 0.75rem = 12px)
+  const paddingY = 8;  // 8px vertical padding (py-2 = 0.5rem = 8px)
+  
+  // 🆕 Calculate X position based on alignment and width
+  let textX = pos.x + paddingX;
   if (textEl.width) {
     const boxWidth = textEl.width * viewport.scale * 100;
+    const contentWidth = boxWidth - (paddingX * 2); // Subtract padding from both sides
+    
     if (textAlign === 'center') {
-      xOffset = boxWidth / 2;
+      textX = pos.x + paddingX + contentWidth / 2;
     } else if (textAlign === 'right') {
-      xOffset = boxWidth;
+      textX = pos.x + paddingX + contentWidth;
     }
   }
   
   // 🆕 Text wrapping jeśli jest width
   if (textEl.width) {
-    const maxWidth = textEl.width * viewport.scale * 100;
-    let currentY = pos.y;
+    const boxWidth = textEl.width * viewport.scale * 100;
+    const maxWidth = boxWidth - (paddingX * 2); // Subtract padding from both sides
+    let currentY = pos.y + paddingY;
     
     lines.forEach((line) => {
       const words = line.split(' ');
@@ -215,34 +222,84 @@ export function drawText(
         const metrics = ctx.measureText(testLine);
         
         if (metrics.width > maxWidth && currentLine) {
-          ctx.fillText(currentLine, pos.x + xOffset, currentY);
+          // Current line is full, render it
+          ctx.fillText(currentLine, textX, currentY);
           currentLine = word;
           currentY += lineHeight;
+          
+          // Check if single word is too long (character-based wrapping)
+          while (ctx.measureText(currentLine).width > maxWidth) {
+            // Find how many characters fit
+            let fitLength = 0;
+            for (let j = 1; j <= currentLine.length; j++) {
+              if (ctx.measureText(currentLine.substring(0, j)).width <= maxWidth) {
+                fitLength = j;
+              } else {
+                break;
+              }
+            }
+            
+            if (fitLength === 0) fitLength = 1; // At least one character
+            
+            // Render the part that fits
+            ctx.fillText(currentLine.substring(0, fitLength), textX, currentY);
+            currentLine = currentLine.substring(fitLength);
+            currentY += lineHeight;
+          }
         } else {
           currentLine = testLine;
         }
       });
       
+      // Render remaining line (with character wrapping if needed)
+      while (currentLine && ctx.measureText(currentLine).width > maxWidth) {
+        let fitLength = 0;
+        for (let j = 1; j <= currentLine.length; j++) {
+          if (ctx.measureText(currentLine.substring(0, j)).width <= maxWidth) {
+            fitLength = j;
+          } else {
+            break;
+          }
+        }
+        
+        if (fitLength === 0) fitLength = 1;
+        
+        ctx.fillText(currentLine.substring(0, fitLength), textX, currentY);
+        currentLine = currentLine.substring(fitLength);
+        currentY += lineHeight;
+      }
+      
       if (currentLine) {
-        ctx.fillText(currentLine, pos.x + xOffset, currentY);
+        ctx.fillText(currentLine, textX, currentY);
         currentY += lineHeight;
       }
     });
   } else {
     // Bez width - rysuj normalnie
     lines.forEach((line, i) => {
-      ctx.fillText(line, pos.x + xOffset, pos.y + i * lineHeight);
+      ctx.fillText(line, textX, pos.y + paddingY + i * lineHeight);
     });
   }
   
-  // 🆕 DEBUG: rysuj bounding box (opcjonalnie - zakomentuj w produkcji)
-  // if (textEl.width && textEl.height) {
-  //   const boxWidth = textEl.width * viewport.scale * 100;
-  //   const boxHeight = textEl.height * viewport.scale * 100;
-  //   ctx.strokeStyle = 'rgba(255, 0, 0, 0.3)';
-  //   ctx.lineWidth = 1;
-  //   ctx.strokeRect(pos.x, pos.y, boxWidth, boxHeight);
-  // }
+  // 🆕 DEBUG: rysuj bounding box
+  if (textEl.width && textEl.height) {
+    const boxWidth = textEl.width * viewport.scale * 100;
+    const boxHeight = textEl.height * viewport.scale * 100;
+    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(pos.x, pos.y, boxWidth, boxHeight);
+  }
+  
+  // DEBUG: console log dla sprawdzenia
+  if (textEl.width) {
+    console.log('Text element:', {
+      id: textEl.id,
+      width: textEl.width,
+      height: textEl.height,
+      text: textEl.text.substring(0, 50),
+      hasWidth: !!textEl.width
+    });
+  }
 }
 
 /**
