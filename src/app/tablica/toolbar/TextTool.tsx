@@ -91,6 +91,51 @@ export function TextTool({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
+  // 🆕 Auto-resize textarea height based on content
+  useEffect(() => {
+    if (!isEditing || !textareaRef.current || !editorRef.current || !textDraft) return;
+    
+    const textarea = textareaRef.current;
+    const editor = editorRef.current;
+    
+    // Reset height to recalculate
+    textarea.style.height = 'auto';
+    
+    // Get scroll height (content height)
+    const scrollHeight = textarea.scrollHeight;
+    const currentHeight = Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y);
+    
+    // If content is taller than current box, expand
+    if (scrollHeight > currentHeight) {
+      // Calculate new height in world coordinates
+      const newHeightWorld = scrollHeight / (viewport.scale * 100);
+      const newScreenHeight = scrollHeight;
+      
+      // Update textDraft with new height
+      setTextDraft(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          screenEnd: {
+            ...prev.screenEnd,
+            y: prev.screenStart.y + newScreenHeight
+          },
+          worldEnd: {
+            ...prev.worldEnd,
+            y: prev.worldStart.y + newHeightWorld
+          }
+        };
+      });
+      
+      // Update editor div height
+      editor.style.height = `${newScreenHeight}px`;
+      textarea.style.height = `${newScreenHeight}px`;
+    } else {
+      // Keep current height
+      textarea.style.height = `${currentHeight}px`;
+    }
+  }, [editingText, isEditing, textDraft, viewport.scale]);
+
   // 🆕 Handler dla wheel event - blokuje TYLKO gdy aktywnie edytujemy
   const handleWheel = (e: React.WheelEvent) => {
     if (isEditing) {
@@ -401,7 +446,7 @@ export function TextTool({
               }
             }}
             placeholder="Wpisz tekst..."
-            className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none"
+            className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none overflow-hidden"
             style={{
               fontSize: `${textDraft.fontSize * viewport.scale}px`, // 🔥 Skaluj czcionkę z viewport
               color: textDraft.color,

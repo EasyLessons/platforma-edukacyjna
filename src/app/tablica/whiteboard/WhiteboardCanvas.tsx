@@ -121,6 +121,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
+  const [debugMode, setDebugMode] = useState(false); // 🔍 Debug mode for text sizing
   
   // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
@@ -242,6 +243,15 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
           setSelectedElementIds(new Set());
         }
       }
+      
+      // 🔍 D key - Toggle debug mode
+      if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setDebugMode(prev => {
+          console.log('🔍 Debug mode:', !prev ? 'ON' : 'OFF');
+          return !prev;
+        });
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
@@ -332,6 +342,24 @@ useEffect(() => {
 }, [viewport]);
 
   // Redraw canvas
+  // 🔍 Auto-expand text boxes when text doesn't fit
+  const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
+    setElements(prevElements => {
+      const updated = prevElements.map(el => {
+        if (el.id === elementId && el.type === 'text') {
+          const currentHeight = el.height || 0;
+          // Only expand, never shrink automatically
+          if (newHeight > currentHeight) {
+            console.log(`📏 Auto-expanding ${elementId}: ${currentHeight.toFixed(2)} → ${newHeight.toFixed(2)}`);
+            return { ...el, height: newHeight };
+          }
+        }
+        return el;
+      });
+      return updated;
+    });
+  }, []);
+
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -352,9 +380,9 @@ useEffect(() => {
     elements.forEach(element => {
       // Nie rysuj elementu który jest aktualnie edytowany w TextTool
       if (element.id === editingTextId) return;
-      drawElement(ctx, element, viewport, width, height);
+      drawElement(ctx, element, viewport, width, height, undefined, debugMode, handleAutoExpand);
     });
-  }, [elements, viewport, editingTextId]);
+  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;

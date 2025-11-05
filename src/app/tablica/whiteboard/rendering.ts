@@ -161,16 +161,84 @@ export function drawShape(
 }
 
 /**
+ * Oblicza wymaganą wysokość dla tekstu z wrappingiem
+ * Zwraca liczbę linii potrzebną do zmieszczenia tekstu
+ */
+function calculateRequiredTextLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number
+): number {
+  const lines = text.split('\n');
+  let totalLines = 0;
+
+  lines.forEach((line) => {
+    const words = line.split(' ');
+    let currentLine = '';
+    
+    words.forEach((word) => {
+      const testLine = currentLine + (currentLine ? ' ' : '') + word;
+      const metrics = ctx.measureText(testLine);
+      
+      if (metrics.width > maxWidth && currentLine) {
+        totalLines++;
+        currentLine = word;
+        
+        // Check if single word needs character wrapping
+        while (ctx.measureText(currentLine).width > maxWidth) {
+          let fitLength = 0;
+          for (let j = 1; j <= currentLine.length; j++) {
+            if (ctx.measureText(currentLine.substring(0, j)).width <= maxWidth) {
+              fitLength = j;
+            } else {
+              break;
+            }
+          }
+          if (fitLength === 0) fitLength = 1;
+          totalLines++;
+          currentLine = currentLine.substring(fitLength);
+        }
+      } else {
+        currentLine = testLine;
+      }
+    });
+    
+    // Handle remaining line with character wrapping if needed
+    while (currentLine && ctx.measureText(currentLine).width > maxWidth) {
+      let fitLength = 0;
+      for (let j = 1; j <= currentLine.length; j++) {
+        if (ctx.measureText(currentLine.substring(0, j)).width <= maxWidth) {
+          fitLength = j;
+        } else {
+          break;
+        }
+      }
+      if (fitLength === 0) fitLength = 1;
+      totalLines++;
+      currentLine = currentLine.substring(fitLength);
+    }
+    
+    if (currentLine) {
+      totalLines++;
+    }
+  });
+
+  return totalLines;
+}
+
+/**
  * Rysuje tekst (text) - NOWY: z obsługą bounding box i rich text
  * WAŻNE: Używa clamp dla fontSize!
+ * Zwraca obiekt z informacją o wymaganej wysokości
  */
 export function drawText(
   ctx: CanvasRenderingContext2D,
   textEl: TextElement,
   viewport: ViewportTransform,
   canvasWidth: number,
-  canvasHeight: number
-): void {
+  canvasHeight: number,
+  debug: boolean = false
+): { requiredHeight?: number } {
   const pos = transformPoint({ x: textEl.x, y: textEl.y }, viewport, canvasWidth, canvasHeight);
   
   // 🆕 Font styling
@@ -211,6 +279,25 @@ export function drawText(
   if (textEl.width) {
     const boxWidth = textEl.width * viewport.scale * 100;
     const maxWidth = boxWidth - (paddingX * 2); // Subtract padding from both sides
+    
+    // Calculate required lines
+    const requiredLines = calculateRequiredTextLines(ctx, textEl.text, maxWidth);
+    const requiredHeight = (requiredLines * lineHeight + paddingY * 2) / (viewport.scale * 100);
+    const currentHeight = textEl.height || 0;
+    
+    // Debug info
+    if (debug) {
+      console.log('📏 Text sizing:', {
+        id: textEl.id,
+        requiredLines,
+        requiredHeight: requiredHeight.toFixed(2),
+        currentHeight: currentHeight.toFixed(2),
+        needsExpand: requiredHeight > currentHeight,
+        width: textEl.width.toFixed(2),
+        text: textEl.text.substring(0, 30) + '...'
+      });
+    }
+    
     let currentY = pos.y + paddingY;
     
     lines.forEach((line) => {
@@ -281,25 +368,46 @@ export function drawText(
     });
   }
   
-  // 🆕 DEBUG: rysuj bounding box
-  if (textEl.width && textEl.height) {
+  // 🔍 DEBUG MODE: Visual feedback
+  if (debug && textEl.width && textEl.height) {
     const boxWidth = textEl.width * viewport.scale * 100;
     const boxHeight = textEl.height * viewport.scale * 100;
-    ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+    const maxWidth = boxWidth - (paddingX * 2);
+    
+    // Calculate required height
+    const requiredLines = calculateRequiredTextLines(ctx, textEl.text, maxWidth);
+    const requiredHeightPx = requiredLines * lineHeight + paddingY * 2;
+    
+    // Draw current box (blue)
+    ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.strokeRect(pos.x, pos.y, boxWidth, boxHeight);
+    
+    // Draw required box (red if needs expand, green if ok)
+    const needsExpand = requiredHeightPx > boxHeight;
+    ctx.strokeStyle = needsExpand ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 255, 0, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(pos.x, pos.y, boxWidth, requiredHeightPx);
+    ctx.setLineDash([]);
+    
+    // Draw label
+    ctx.fillStyle = needsExpand ? 'rgba(255, 0, 0, 0.9)' : 'rgba(0, 255, 0, 0.9)';
+    ctx.font = '12px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(
+      `Lines: ${requiredLines} | Current: ${boxHeight.toFixed(0)}px | Need: ${requiredHeightPx.toFixed(0)}px`,
+      pos.x,
+      pos.y - 20
+    );
+    
+    // Return required height for auto-expand
+    if (needsExpand) {
+      return { requiredHeight: requiredHeightPx / (viewport.scale * 100) };
+    }
   }
   
-  // DEBUG: console log dla sprawdzenia
-  if (textEl.width) {
-    console.log('Text element:', {
-      id: textEl.id,
-      width: textEl.width,
-      height: textEl.height,
-      text: textEl.text.substring(0, 50),
-      hasWidth: !!textEl.width
-    });
-  }
+  return {};
 }
 
 /**
@@ -392,14 +500,21 @@ export function drawElement(
   viewport: ViewportTransform,
   canvasWidth: number,
   canvasHeight: number,
-  loadedImages?: Map<string, HTMLImageElement>
+  loadedImages?: Map<string, HTMLImageElement>,
+  debug?: boolean,
+  onAutoExpand?: (elementId: string, newHeight: number) => void
 ): void {
   if (element.type === 'path') {
     drawPath(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'shape') {
     drawShape(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'text') {
-    drawText(ctx, element, viewport, canvasWidth, canvasHeight);
+    const result = drawText(ctx, element, viewport, canvasWidth, canvasHeight, debug);
+    
+    // Auto-expand if needed
+    if (result.requiredHeight && onAutoExpand) {
+      onAutoExpand(element.id, result.requiredHeight);
+    }
   } else if (element.type === 'function') {
     drawFunction(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'image' && loadedImages) {
