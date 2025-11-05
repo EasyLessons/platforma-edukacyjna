@@ -4,13 +4,17 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
+// 🔥 POPRAWIONA ŚCIEŻKA - idź 1 poziom wyżej, potem do context
+import { useAuth } from '../context/AuthContext'; // ✅ POPRAWNA ŚCIEŻKA!
 
 export default function AuthHeader() {
   const router = useRouter();
+  const { logout, user } = useAuth();
 
   const handleLogout = () => {
-    // TODO: Dodaj prawdziwą logikę wylogowania
-    console.log('Wylogowano');
+    console.log('🚪 Wylogowywanie...');
+    logout();
+    console.log('✅ Wylogowano!');
     router.push('/');
   };
 
@@ -19,7 +23,6 @@ export default function AuthHeader() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           
-          {/* Logo po lewej */}
           <div className="flex items-center">
             <Link href="/dashboard" className="flex items-center">
               <Image
@@ -33,10 +36,14 @@ export default function AuthHeader() {
             </Link>
           </div>
 
-          {/* Menu po prawej */}
           <div className="flex items-center gap-4">
             
-            {/* Link Ceny */}
+            {user && (
+              <span className="text-gray-600 text-sm">
+                Witaj, <strong>{user.username}</strong>!
+              </span>
+            )}
+            
             <Link 
               href="#pricing" 
               className="text-gray-700 hover:text-gray-900 font-medium transition-colors duration-200"
@@ -44,14 +51,12 @@ export default function AuthHeader() {
               Ceny
             </Link>
 
-            {/* Przycisk Panel */}
             <Link href="/dashboard">
               <button className="px-4 py-2 text-gray-700 font-medium hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200">
                 Panel
               </button>
             </Link>
 
-            {/* Przycisk Wyloguj (zielony, wyróżniony) */}
             <button 
               onClick={handleLogout}
               className="px-5 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
