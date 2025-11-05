@@ -1,5 +1,6 @@
 "use client";
 import { loginUser, saveToken, saveUser } from "@/auth_api/api";
+import { useAuth } from "../context/AuthContext";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
@@ -7,6 +8,7 @@ import Link from "next/link";
 
 export default function Login() {
   const router = useRouter();
+  const { login } = useAuth();
 
   // State management
   const [formData, setFormData] = useState({
@@ -71,66 +73,74 @@ export default function Login() {
 // Handle login - NAPRAWIONE
 // WAŻNE: api.ts SAMO zapisuje token i user - NIE róbmy tego tutaj!
 const handleLogin = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  setIsLoading(true);
-  setGeneralError("");
+    setIsLoading(true);
+    setGeneralError("");
 
-  try {
-    // Wywołanie API logowania
-    // ✅ loginUser() z api.ts automatycznie zapisze token i user
-    const response = await loginUser({
-      login: formData.email, // może być email LUB username
-      password: formData.password,
-    });
-
-    // ❌ STARY KOD (ZŁY) - Podwójny zapis!
-    saveToken(response.access_token);
-    saveUser(response.user);
-
-    // ✅ NOWY KOD (DOBRY) - api.ts już to zrobił
-    console.log("✅ Zalogowano pomyślnie! User:", response.user.username);
-    
-    // Przekierowanie do dashboard
-    router.push("/dashboard");
-
-  } catch (error: any) {
-    setIsLoading(false);
-    
-    // Obsługa różnych błędów z backendu
-    if (error.message.includes("niezweryfikowane")) {
-      // Konto istnieje ale niezweryfikowane
-      console.log("⚠️ Konto niezweryfikowane - wysyłam nowy kod...");
+    try {
+      console.log("🔐 Próba logowania...");
       
-      try {
-        // Sprawdź użytkownika i wyślij nowy kod
-        const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/check-user`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email }),
-        });
-        
-        const checkData = await checkResponse.json();
+      // Krok 1: Wywołaj API logowania
+      const response = await loginUser({
+        login: formData.email,
+        password: formData.password,
+      });
 
-        if (!checkData.verified && checkData.user_id) {
-          // Redirect do weryfikacji
-          console.log("📧 Nowy kod wysłany, redirect do weryfikacji");
-          router.push(`/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`);
-        } else {
-          setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email.");
+      console.log("✅ Odpowiedź z API:", response);
+
+      // 🔥 Krok 2: Użyj funkcji login() z AuthContext
+      // To automatycznie:
+      // - Zapisze token do localStorage
+      // - Zapisze user do localStorage
+      // - Zmieni isLoggedIn na true
+      // - Layout się zaktualizuje!
+      login(response.access_token, response.user);
+
+      console.log("✅ Login z Context wywołany! isLoggedIn powinien być true");
+
+      // Krok 3: Przekieruj do dashboard
+      router.push("/dashboard");
+
+    } catch (error: any) {
+      setIsLoading(false);
+      
+      console.error("❌ Błąd logowania:", error);
+
+      // Obsługa błędów z backendu
+      if (error.message.includes("niezweryfikowane")) {
+        console.log("⚠️ Konto niezweryfikowane - wysyłam nowy kod...");
+        
+        try {
+          const checkResponse = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/check-user`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: formData.email }),
+            }
+          );
+          
+          const checkData = await checkResponse.json();
+
+          if (!checkData.verified && checkData.user_id) {
+            console.log("📧 Redirect do weryfikacji");
+            router.push(
+              `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
+            );
+          } else {
+            setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email.");
+          }
+        } catch (checkError) {
+          setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email lub zarejestruj się ponownie.");
         }
-      } catch (checkError) {
-        setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email lub zarejestruj się ponownie.");
+      } else {
+        setGeneralError(error.message || "Błędny email lub hasło");
       }
-    } else {
-      setGeneralError(error.message || "Błędny email lub hasło");
     }
-    
-    console.error("❌ Błąd logowania:", error);
-  }
-};
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-200 via-green-300 to-emerald-400 p-5">
