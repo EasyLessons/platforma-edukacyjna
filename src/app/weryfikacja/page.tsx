@@ -144,14 +144,10 @@ function VerificationContent() {
         code: finalCode,
       });
 
-      // Zapisz token i użytkownika
-      saveToken(response.access_token);
-      saveUser(response.user);
-
-      console.log("✅ Email zweryfikowany! Redirect do dashboard...");
+      console.log("✅ Email zweryfikowany!");
       
       // Redirect do dashboard
-      router.push("/dashboard");
+      router.push("/login");
 
     } catch (error: any) {
       setIsLoading(false);

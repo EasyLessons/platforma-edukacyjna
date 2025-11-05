@@ -26,7 +26,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-from backend.auth.models import Base  # Import twoich modeli
+from backend.core.models import Base  # Import twoich modeli
 from backend.core.config import get_settings  # Import konfiguracji
 
 # Alembic Config object

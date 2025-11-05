@@ -1,5 +1,5 @@
 "use client";
-import { registerUser, verifyEmail, resendVerificationCode, saveToken, saveUser } from "@/auth_api/api";
+import { registerUser } from "@/auth_api/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail, User, X } from "lucide-react";

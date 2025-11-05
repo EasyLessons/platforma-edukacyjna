@@ -1,5 +1,5 @@
 "use client";
-import { loginUser } from "@/auth_api/api"; // ← Usunąłem saveToken, saveUser - api.ts robi to za nas!
+import { loginUser, saveToken, saveUser } from "@/auth_api/api";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
@@ -87,8 +87,8 @@ const handleLogin = async (e: React.FormEvent) => {
     });
 
     // ❌ STARY KOD (ZŁY) - Podwójny zapis!
-    // saveToken(response.access_token); ← USUŃ TO!
-    // saveUser(response.user);          ← USUŃ TO!
+    saveToken(response.access_token);
+    saveUser(response.user);
 
     // ✅ NOWY KOD (DOBRY) - api.ts już to zrobił
     console.log("✅ Zalogowano pomyślnie! User:", response.user.username);

@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from core.logging import get_logger
 from core.config import get_settings
 
-from .models import User
+from ..core.models import User
 from .schemas import RegisterUser, LoginData, VerifyEmail
 from .utils import (
     hash_password, verify_password, create_access_token,
