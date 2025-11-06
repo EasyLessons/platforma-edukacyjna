@@ -8,6 +8,7 @@ import Footer from "./layout/Footer";
 import AuthHeader from "./layout/AuthHeader";
 // 🔥 DODAJ TE IMPORTY!
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { usePathname } from 'next/navigation';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,6 +24,8 @@ const geistMono = Geist_Mono({
 function LayoutContent({ children }: { children: React.ReactNode }) {
   // 🔥 Pobierz PRAWDZIWY stan logowania z Context
   const { isLoggedIn, loading } = useAuth();
+  const pathname = usePathname();
+  const isHomepage = pathname === '/';
   
   // Pokaż loader podczas sprawdzania
   if (loading) {
@@ -35,28 +38,20 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   
   return (
     <>
-      {/* 🔥 TERAZ sprawdzamy PRAWDZIWE logowanie! */}
-      {isLoggedIn ? (
-        // Zalogowany → AuthHeader
+      
+      {isHomepage && (
         <>
           <Ad />
-          <AuthHeader />
-        </>
-      ) : (
-        // NIE zalogowany → Header
-        <>
-          <Ad />
-          <Header />
+          {isLoggedIn ? <AuthHeader /> : <Header />}
         </>
       )}
       
-      {/* Główna zawartość */}
       <main className={isLoggedIn ? "" : "min-h-screen"}>
         {children}
       </main>
       
-      {/* Footer tylko dla niezalogowanych */}
-      {!isLoggedIn && <Footer />}
+      {/* Footer tylko na homepage dla niezalogowanych */}
+      {isHomepage && !isLoggedIn && <Footer />}
     </>
   );
 }
