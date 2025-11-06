@@ -30,6 +30,7 @@ ENV/
 out/
 node_modules/
 .turbo/
+yarn.lock
 
 # Vercel
 .vercel

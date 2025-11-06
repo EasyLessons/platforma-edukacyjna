@@ -1,8 +1,8 @@
-"""Initial migration - create users table
+"""fix ambiguous foreign keys
 
-Revision ID: 6d54d8b4cc9d
-Revises: 
-Create Date: 2025-10-29 22:50:13.742059
+Revision ID: 3f8c4518e89f
+Revises: fdc1f49035d9
+Create Date: 2025-11-06 17:12:02.553138
 
 """
 from typing import Sequence, Union
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '6d54d8b4cc9d'
-down_revision: Union[str, Sequence[str], None] = None
+revision: str = '3f8c4518e89f'
+down_revision: Union[str, Sequence[str], None] = 'fdc1f49035d9'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
