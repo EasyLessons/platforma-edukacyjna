@@ -4,41 +4,48 @@
  * ============================================================================
  * 
  * IMPORTUJE Z:
- * - react (useState, useRef, useCallback)
- * - lucide-react (ikony: Upload, X, ImageIcon)
+ * - react (useState, useRef, useCallback, useEffect)
+ * - lucide-react (ikony: Upload, Clipboard, X, ImageIcon)
  * - ../whiteboard/types (Point, ViewportTransform, ImageElement)
- * - ../whiteboard/viewport (inverseTransformPoint)
+ * - ../whiteboard/viewport (inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
  * 
  * EKSPORTUJE:
- * - ImageTool (component) - globalny handler wstawiania obrazów
+ * - ImageTool (component) - narzędzie wstawiania obrazów
  * 
  * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (zawsze aktywny w tle)
+ * - WhiteboardCanvas.tsx (aktywne gdy tool === 'image')
  * 
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - używa ImageElement
- * - viewport.ts - używa funkcji transformacji
+ * - viewport.ts - używa funkcji transformacji i zoom/pan
  * - WhiteboardCanvas.tsx - dostarcza callback: onImageCreate
  * 
- * PRZEZNACZENIE:
- * Globalny handler wstawiania obrazów - działa zawsze w tle, niezależnie od aktywnego narzędzia.
- * Obsługuje:
- * 1. Drag & drop pliku z eksploratora
- * 2. Ctrl+V (obsługiwane w WhiteboardCanvas globalnie)
- * 3. Upload pliku (przycisk w panelu - zawsze widoczny)
+ * ⚠️ WAŻNE - WHEEL EVENTS:
+ * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
+ * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
+ * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
  * 
- * NIE blokuje innych narzędzi - nie ma overlay'a, nie przejmuje kontroli.
+ * ⚠️ NOWA FUNKCJONALNOŚĆ - GLOBALNE WKLEJANIE:
+ * - Ctrl+V i Drag&Drop działają ZAWSZE (obsługiwane przez WhiteboardCanvas)
+ * - ImageTool zapewnia dodatkowe opcje: przyciski UI, interaktywne pozycjonowanie
+ * - Użytkownik może wklejać obrazy bez przełączania na tool='image'
+ * 
+ * PRZEZNACZENIE:
+ * Narzędzie do precyzyjnego wstawiania obrazów z dodatkowymi opcjami:
+ * 1. Przyciski wklejania ze schowka i uploadu
+ * 2. Interaktywne rysowanie ramki obrazu
+ * 3. Drag & drop z eksploratora (gdy aktywne)
+ * 
  * Konwersja obrazu do base64 i kompresja jeśli > 500KB.
- * Panel umieszczony w prawym dolnym rogu - zawsze dostępny.
  * ============================================================================
  */
 
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import { Upload, Clipboard, X, ImageIcon } from 'lucide-react';
 import { Point, ViewportTransform, ImageElement } from '../whiteboard/types';
-import { inverseTransformPoint } from '../whiteboard/viewport';
+import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 
 interface ImageToolProps {
   viewport: ViewportTransform;
@@ -48,37 +55,47 @@ interface ImageToolProps {
   onViewportChange?: (viewport: ViewportTransform) => void;
 }
 
+interface ImageDraft {
+  id: string;
+  screenStart: Point;
+  screenEnd: Point;
+  worldStart: Point;
+  worldEnd: Point;
+  imageData: string | null; // base64
+  originalWidth: number;
+  originalHeight: number;
+}
+
 export function ImageTool({
   viewport,
   canvasWidth,
   canvasHeight,
   onImageCreate,
+  onViewportChange,
 }: ImageToolProps) {
+  const [isDragging, setIsDragging] = useState(false);
+  const [imageDraft, setImageDraft] = useState<ImageDraft | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 🔒 Zapobiegaj domyślnemu zachowaniu przeglądarki dla drag & drop
-  useEffect(() => {
-    const preventDefaults = (e: DragEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      console.log('🔒 Zablokowano domyślne zachowanie drag/drop');
-    };
-
-    // Blokuj domyślne zachowanie dla całego dokumentu - NIE PASSIVE!
-    window.addEventListener('dragover', preventDefaults, { passive: false });
-    window.addEventListener('drop', preventDefaults, { passive: false });
-
-    console.log('✅ ImageTool: Zainstalowano globalne handlery drag & drop');
-
-    return () => {
-      window.removeEventListener('dragover', preventDefaults);
-      window.removeEventListener('drop', preventDefaults);
-      console.log('❌ ImageTool: Odinstalowano globalne handlery drag & drop');
-    };
-  }, []);
+  // 🆕 Handler dla wheel event - obsługuje zoom i pan
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!onViewportChange) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (e.ctrlKey) {
+      // Zoom
+      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+      onViewportChange(constrainViewport(newViewport));
+    } else {
+      // Pan
+      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+      onViewportChange(constrainViewport(newViewport));
+    }
+  };
 
   // 🖼️ Konwersja File/Blob do base64 z kompresją
   const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
@@ -131,6 +148,62 @@ export function ImageTool({
     });
   }, []);
 
+  // 📋 Wklej ze schowka (Clipboard API)
+  const handlePasteFromClipboard = useCallback(async () => {
+    setError(null);
+    setIsProcessing(true);
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      
+      for (const item of clipboardItems) {
+        // Szukamy obrazu w schowku
+        const imageTypes = item.types.filter(type => type.startsWith('image/'));
+        
+        if (imageTypes.length > 0) {
+          const blob = await item.getType(imageTypes[0]);
+          const { data, width, height } = await fileToBase64(blob);
+          
+          // Ustaw draft z obrazem - pozycja środek ekranu
+          const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+          
+          // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+          const aspectRatio = height / width;
+          const worldWidth = 3;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          setImageDraft({
+            id: Date.now().toString(),
+            screenStart: centerScreen,
+            screenEnd: {
+              x: centerScreen.x + worldWidth * viewport.scale * 100,
+              y: centerScreen.y + worldHeight * viewport.scale * 100,
+            },
+            worldStart: centerWorld,
+            worldEnd: {
+              x: centerWorld.x + worldWidth,
+              y: centerWorld.y + worldHeight,
+            },
+            imageData: data,
+            originalWidth: width,
+            originalHeight: height,
+          });
+          
+          setIsProcessing(false);
+          return;
+        }
+      }
+      
+      setError('Brak obrazu w schowku');
+    } catch (err) {
+      console.error('Clipboard paste error:', err);
+      setError('Błąd dostępu do schowka. Użyj Ctrl+V lub wybierz plik.');
+    } finally {
+      setIsProcessing(false);
+    }
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64]);
+
   // 📂 Upload pliku
   const handleFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -142,7 +215,7 @@ export function ImageTool({
     try {
       const { data, width, height } = await fileToBase64(file);
       
-      // Ustaw obraz w środku widoku
+      // Ustaw draft z obrazem - pozycja środek ekranu
       const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
       const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
       
@@ -151,18 +224,22 @@ export function ImageTool({
       const worldWidth = 3;
       const worldHeight = worldWidth * aspectRatio;
       
-      const newImage: ImageElement = {
+      setImageDraft({
         id: Date.now().toString(),
-        type: 'image',
-        x: centerWorld.x - worldWidth / 2,
-        y: centerWorld.y - worldHeight / 2,
-        width: worldWidth,
-        height: worldHeight,
-        src: data,
-        alt: 'Uploaded image',
-      };
-
-      onImageCreate(newImage);
+        screenStart: centerScreen,
+        screenEnd: {
+          x: centerScreen.x + worldWidth * viewport.scale * 100,
+          y: centerScreen.y + worldHeight * viewport.scale * 100,
+        },
+        worldStart: centerWorld,
+        worldEnd: {
+          x: centerWorld.x + worldWidth,
+          y: centerWorld.y + worldHeight,
+        },
+        imageData: data,
+        originalWidth: width,
+        originalHeight: height,
+      });
     } catch (err) {
       console.error('File upload error:', err);
       setError('Błąd wczytywania pliku. Wybierz plik obrazu.');
@@ -174,194 +251,284 @@ export function ImageTool({
     if (e.target) {
       e.target.value = '';
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, onImageCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64]);
 
   // 🎯 Drag & Drop z eksploratora
   const handleDrop = useCallback(async (e: React.DragEvent) => {
-    console.log('🎯 handleDrop wywołany!', e);
-    
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
-
-    console.log('📦 Files w dataTransfer:', e.dataTransfer.files);
-    console.log('📦 Items w dataTransfer:', e.dataTransfer.items);
 
     const file = e.dataTransfer.files?.[0];
-    
-    if (!file) {
-      console.log('❌ Brak pliku!');
-      setError('Nie znaleziono pliku');
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-    
-    console.log('📄 Znaleziono plik:', file.name, 'typ:', file.type);
-    
-    if (!file.type.startsWith('image/')) {
-      console.log('❌ To nie jest obraz!');
+    if (!file || !file.type.startsWith('image/')) {
       setError('Upuść plik obrazu (PNG, JPEG, etc.)');
-      setTimeout(() => setError(null), 3000);
       return;
     }
 
     setError(null);
     setIsProcessing(true);
-    console.log('⏳ Rozpoczynam przetwarzanie obrazu...');
 
     try {
       const { data, width, height } = await fileToBase64(file);
-      console.log('✅ Obraz przekonwertowany:', width, 'x', height);
       
       // Pozycja gdzie upuszczono
       const dropScreen = { x: e.clientX, y: e.clientY };
       const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
-      
-      console.log('📍 Pozycja drop - screen:', dropScreen, 'world:', dropWorld);
       
       // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
       const aspectRatio = height / width;
       const worldWidth = 3;
       const worldHeight = worldWidth * aspectRatio;
       
-      const newImage: ImageElement = {
+      setImageDraft({
         id: Date.now().toString(),
-        type: 'image',
-        x: dropWorld.x - worldWidth / 2,
-        y: dropWorld.y - worldHeight / 2,
-        width: worldWidth,
-        height: worldHeight,
-        src: data,
-        alt: 'Dropped image',
-      };
-
-      console.log('🖼️ Tworzę nowy element obrazu:', newImage);
-      onImageCreate(newImage);
-      console.log('✅ Obraz dodany do tablicy!');
+        screenStart: dropScreen,
+        screenEnd: {
+          x: dropScreen.x + worldWidth * viewport.scale * 100,
+          y: dropScreen.y + worldHeight * viewport.scale * 100,
+        },
+        worldStart: dropWorld,
+        worldEnd: {
+          x: dropWorld.x + worldWidth,
+          y: dropWorld.y + worldHeight,
+        },
+        imageData: data,
+        originalWidth: width,
+        originalHeight: height,
+      });
     } catch (err) {
-      console.error('❌ Drop error:', err);
+      console.error('Drop error:', err);
       setError('Błąd wczytywania pliku.');
-      setTimeout(() => setError(null), 3000);
     } finally {
       setIsProcessing(false);
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, onImageCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    console.log('📋 handleDragOver wywołany');
     e.preventDefault();
     e.stopPropagation();
-    
-    // Sprawdź czy to plik obrazu
-    const hasImage = Array.from(e.dataTransfer.types).some(type => 
-      type === 'Files' || type.startsWith('image/')
-    );
-    
-    console.log('📋 DataTransfer types:', e.dataTransfer.types, 'hasImage:', hasImage);
-    
-    if (hasImage) {
-      setIsDragOver(true);
-      console.log('✅ Ustawiono isDragOver = true');
-    }
   }, []);
 
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    console.log('👋 handleDragLeave wywołany');
-    e.preventDefault();
-    e.stopPropagation();
-    
-    // Sprawdź czy faktycznie opuszczamy obszar (nie poruszamy się między child elementami)
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    if (
-      e.clientX <= rect.left ||
-      e.clientX >= rect.right ||
-      e.clientY <= rect.top ||
-      e.clientY >= rect.bottom
-    ) {
-      setIsDragOver(false);
-      console.log('❌ Ustawiono isDragOver = false (opuszczono obszar)');
-    } else {
-      console.log('⚠️ Pozostajemy w obszarze (ruch między child elementami)');
-    }
-  }, []);
+  // ⌨️ Keyboard - Ctrl+V wkleja ze schowka
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault();
+        handlePasteFromClipboard();
+      }
+      
+      // ESC - anuluj draft
+      if (e.key === 'Escape' && imageDraft) {
+        setImageDraft(null);
+        setError(null);
+      }
+    };
 
-  return (
-    <>
-      {/* Globalny overlay dla drag & drop - musi być pointer-events: auto żeby łapać drag eventy! */}
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handlePasteFromClipboard, imageDraft]);
+
+  // Mouse down - rozpocznij drag box (jeśli mamy już obraz)
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Jeśli już mamy draft z obrazem - zapisz go
+    if (imageDraft && imageDraft.imageData) {
+      handleSave();
+      return;
+    }
+
+    // Inaczej - rozpocznij rysowanie nowego box
+    const screenPoint = { x: e.clientX, y: e.clientY };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+    const newDraft: ImageDraft = {
+      id: Date.now().toString(),
+      screenStart: screenPoint,
+      screenEnd: screenPoint,
+      worldStart: worldPoint,
+      worldEnd: worldPoint,
+      imageData: null,
+      originalWidth: 0,
+      originalHeight: 0,
+    };
+
+    setImageDraft(newDraft);
+    setIsDragging(true);
+  };
+
+  // Mouse move - aktualizuj rozmiar box
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !imageDraft) return;
+
+    const screenPoint = { x: e.clientX, y: e.clientY };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+    setImageDraft({
+      ...imageDraft,
+      screenEnd: screenPoint,
+      worldEnd: worldPoint,
+    });
+  };
+
+  // Mouse up - zakończ rysowanie box
+  const handleMouseUp = () => {
+    if (!isDragging) return;
+
+    setIsDragging(false);
+
+    // Jeśli box za mały - wyczyść
+    if (imageDraft) {
+      const width = Math.abs(imageDraft.screenEnd.x - imageDraft.screenStart.x);
+      const height = Math.abs(imageDraft.screenEnd.y - imageDraft.screenStart.y);
+
+      if (width < 50 || height < 50) {
+        setImageDraft(null);
+        return;
+      }
+    }
+  };
+
+  // Zapisz obraz na tablicy
+  const handleSave = () => {
+    if (!imageDraft || !imageDraft.imageData) return;
+
+    const width = Math.abs(imageDraft.worldEnd.x - imageDraft.worldStart.x);
+    const height = Math.abs(imageDraft.worldEnd.y - imageDraft.worldStart.y);
+
+    const newImage: ImageElement = {
+      id: imageDraft.id,
+      type: 'image',
+      x: Math.min(imageDraft.worldStart.x, imageDraft.worldEnd.x),
+      y: Math.min(imageDraft.worldStart.y, imageDraft.worldEnd.y),
+      width: width,
+      height: height,
+      src: imageDraft.imageData,
+      alt: 'Uploaded image',
+    };
+
+    onImageCreate(newImage);
+
+    // Reset
+    setImageDraft(null);
+    setError(null);
+  };
+
+  // Anuluj draft
+  const handleCancel = () => {
+    setImageDraft(null);
+    setError(null);
+  };
+
+  // Render preview
+  const renderPreview = () => {
+    if (!imageDraft) return null;
+
+    const left = Math.min(imageDraft.screenStart.x, imageDraft.screenEnd.x);
+    const top = Math.min(imageDraft.screenStart.y, imageDraft.screenEnd.y);
+    const width = Math.abs(imageDraft.screenEnd.x - imageDraft.screenStart.x);
+    const height = Math.abs(imageDraft.screenEnd.y - imageDraft.screenStart.y);
+
+    return (
       <div
-        className="absolute inset-0 z-10"
-        onDragEnter={(e) => {
-          console.log('🚪 onDragEnter - wejście do obszaru overlay!');
-          e.preventDefault();
-          e.stopPropagation();
-          setIsDragOver(true);
-        }}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        style={{ 
-          pointerEvents: 'auto', // MUSI BYĆ auto żeby łapać drag eventy!
-          background: 'transparent'
+        className="absolute z-40 pointer-events-none"
+        style={{
+          left,
+          top,
+          width,
+          height,
         }}
       >
-        {/* Komunikat gdy przeciągamy */}
-        {isDragOver && (
-          <div className="absolute inset-0 bg-blue-500/10 border-4 border-dashed border-blue-500 flex items-center justify-center pointer-events-none">
-            <div className="bg-white rounded-lg shadow-xl p-6 flex flex-col items-center gap-3">
-              <ImageIcon className="w-12 h-12 text-blue-500" />
-              <p className="text-lg font-semibold text-gray-800">Upuść obraz tutaj</p>
-            </div>
-          </div>
+        {imageDraft.imageData ? (
+          // Pokazuj obraz
+          <img
+            src={imageDraft.imageData}
+            alt="Preview"
+            className="w-full h-full object-cover border-2 border-blue-500 rounded"
+            style={{ opacity: 0.8 }}
+          />
+        ) : (
+          // Pokazuj box
+          <div className="w-full h-full border-2 border-dashed border-blue-500 bg-blue-50/20 rounded" />
         )}
       </div>
+    );
+  };
 
-      {/* Floating button - prawy dolny róg */}
-      <div className="absolute bottom-4 right-4 z-50 pointer-events-auto flex flex-col items-end gap-2">
-        {/* Status messages */}
-        {(isProcessing || error) && (
-          <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 max-w-xs">
-            {isProcessing && (
-              <div className="text-sm text-blue-600 font-medium flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                Przetwarzanie obrazu...
-              </div>
-            )}
+  return (
+    <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
+      {/* Floating toolbar */}
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 pointer-events-auto">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handlePasteFromClipboard}
+            disabled={isProcessing}
+            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Wklej obraz ze schowka (Ctrl+V)"
+          >
+            <Clipboard className="w-5 h-5" />
+            <span className="text-sm font-medium">Wklej (Ctrl+V)</span>
+          </button>
 
-            {error && (
-              <div className="text-sm text-red-600 font-medium flex items-center gap-2">
-                <X className="w-4 h-4" />
-                {error}
-              </div>
-            )}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Wybierz plik z dysku"
+          >
+            <Upload className="w-5 h-5" />
+            <span className="text-sm font-medium">Wybierz plik</span>
+          </button>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+
+          <div className="w-px h-8 bg-gray-300" />
+
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <ImageIcon className="w-4 h-4" />
+            <span>lub przeciągnij obraz</span>
           </div>
-        )}
-
-        {/* Upload button */}
-        <button
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isProcessing}
-          className="flex items-center gap-2 px-4 py-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed group"
-          title="Dodaj obraz (lub przeciągnij plik / Ctrl+V)"
-        >
-          <ImageIcon className="w-5 h-5" />
-          <span className="text-sm font-medium hidden md:inline">Dodaj obraz</span>
-        </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={handleFileSelect}
-          className="hidden"
-        />
-
-        {/* Hint */}
-        <div className="hidden md:block bg-white rounded-lg shadow-md border border-gray-200 px-3 py-2">
-          <p className="text-xs text-gray-600 text-center">
-            Przeciągnij obraz lub <strong>Ctrl+V</strong>
-          </p>
         </div>
+
+        {/* Status messages */}
+        {isProcessing && (
+          <div className="mt-2 text-sm text-blue-600 font-medium">
+            Przetwarzanie obrazu...
+          </div>
+        )}
+
+        {error && (
+          <div className="mt-2 text-sm text-red-600 font-medium flex items-center gap-2">
+            <X className="w-4 h-4" />
+            {error}
+          </div>
+        )}
+
+        {imageDraft && imageDraft.imageData && (
+          <div className="mt-2 text-sm text-green-600 font-medium">
+            ✓ Obraz załadowany. Kliknij aby umieścić na tablicy lub przeciągnij rozmiar.
+          </div>
+        )}
       </div>
-    </>
+
+      {/* Overlay dla mouse events */}
+      <div
+        className="absolute inset-0 pointer-events-auto z-30"
+        style={{ touchAction: 'none' }}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+        onWheel={handleWheel}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+      />
+
+      {/* Preview */}
+      {renderPreview()}
+    </div>
   );
 }

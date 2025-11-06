@@ -12,8 +12,9 @@
  * - ../toolbar/PenTool (PenTool)
  * - ../toolbar/ShapeTool (ShapeTool)
  * - ../toolbar/FunctionTool (FunctionTool)
- * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
- * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ../toolbar/ImageTool (ImageTool)
+ * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ImageElement)
+ * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport, inverseTransformPoint)
  * - ./Grid (drawGrid)
  * - ./rendering (drawElement)
  * 
@@ -32,42 +33,44 @@
  * - PenTool.tsx - logika rysowania piórem (aktywny gdy tool='pen')
  * - ShapeTool.tsx - logika wstawiania kształtów (aktywny gdy tool='shape')
  * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
+ * - ImageTool.tsx - logika wstawiania obrazów (aktywny gdy tool='image')
  * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
  * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
- * - ImageTool.tsx - globalny handler drag & drop (aktywny ZAWSZE w tle)
  * 
  * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
  * - Canvas ma pointerEvents: 'none' - wszystkie narzędzia mają swoje overlaye
  * - Kontener obsługuje wheel events (backup dla gdy żadne narzędzie nie jest aktywne)
  * - Każde narzędzie obsługuje własne wheel events przez onViewportChange
  * 
+ * ⚠️ GLOBALNE FUNKCJE OBRAZÓW:
+ * - Ctrl+V (wklejanie ze schowka) działa ZAWSZE, niezależnie od aktywnego narzędzia
+ * - Drag & Drop obrazów działa ZAWSZE na głównym kontenerze
+ * - ImageTool zapewnia dodatkowe opcje gdy tool='image'
+ * 
  * ⚠️ KLUCZOWE CALLBACKI:
  * - handlePathCreate - tworzenie ścieżek (PenTool)
  * - handleShapeCreate - tworzenie kształtów (ShapeTool)
  * - handleFunctionCreate - tworzenie funkcji (FunctionTool)
+ * - handleImageCreate - tworzenie obrazów (ImageTool + globalne)
  * - handleTextCreate/Update/Delete - zarządzanie tekstami (TextTool)
  * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem (SelectTool)
  * - handleViewportChange - synchronizacja viewport między narzędziami
  * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
+ * - handleGlobalPasteImage - globalne wklejanie obrazów (Ctrl+V)
+ * - handleGlobalDropImage - globalne drag&drop obrazów
  * 
  * ⚠️ KEYBOARD SHORTCUTS:
+ * - Ctrl+V: Wklej obraz ze schowka (globalne - działa zawsze)
  * - Ctrl+Z: Undo
  * - Ctrl+Y / Ctrl+Shift+Z: Redo
  * - Delete: Usuń zaznaczone elementy
- * - Ctrl+V: Wklej obraz ze schowka (globalny - wstawia w środku widoku)
- * - ESC: Powrót do narzędzia Select
- * - D: Toggle debug mode
- * 
- * ⚠️ OBRAZY - GLOBALNY HANDLER:
- * - ImageTool działa ZAWSZE w tle (nie wymaga aktywacji narzędzia)
- * - Ctrl+V wkleja obraz w środku widoku
- * - Drag & drop wstawia obraz w miejscu upuszczenia
- * - Przycisk w prawym dolnym rogu do uploadu plików
+ * - ESC: Powrót do SelectTool
  * 
  * PRZEZNACZENIE:
  * Główny komponent tablicy - zarządza viewport, elements, historią,
- * koordynuje narzędzia (pen/shape/text/select/function), renderuje canvas.
+ * koordynuje narzędzia (pen/shape/text/select/function/image), renderuje canvas.
  * Każde narzędzie jest teraz osobnym komponentem z własną logiką.
+ * Obsługuje globalne wklejanie i drag&drop obrazów niezależnie od aktywnego narzędzia.
  * ============================================================================
  */
 
@@ -141,7 +144,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   
+  // 🖼️ State dla wklejania/dropowania obrazów (globalne)
+  const [imageProcessing, setImageProcessing] = useState(false);
+  
   const redrawCanvasRef = useRef<() => void>(() => {});
+  const handleGlobalPasteImageRef = useRef<() => void>(() => {});
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
@@ -175,115 +182,19 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // 🆕 KEYBOARD SHORTCUTS
   // ========================================
   useEffect(() => {
-    const handleKeyDown = async (e: KeyboardEvent) => {
-      console.log('⌨️ KeyDown event:', e.key, 'Ctrl:', e.ctrlKey, 'Target:', (e.target as HTMLElement)?.tagName);
-      
+    const handleKeyDown = (e: KeyboardEvent) => {
       // 🔥 WAŻNE: Jeśli event pochodzi z input/textarea, ignoruj go całkowicie
       // (pozwól input obsłużyć swoje własne eventy)
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
-        console.log('⚠️ Event z input/textarea - ignoruję');
         return; // Wyjdź natychmiast - input/textarea obsługuje to sam
       }
       
-      // 📋 Ctrl+V - Globalny handler wstawiania obrazu ze schowka
+      // 🖼️ Ctrl+V - wklej obraz ze schowka (globalne - działa zawsze)
       if (e.ctrlKey && e.key === 'v') {
-        console.log('🖼️ Ctrl+V wykryty! Rozpoczynam proces wklejania...');
         e.preventDefault();
-        
-        console.log('🖼️ Ctrl+V - próba wklejenia obrazu ze schowka');
-        
-        try {
-          console.log('📋 Próba odczytu schowka...');
-          const clipboardItems = await navigator.clipboard.read();
-          console.log('📋 Odczytano items ze schowka:', clipboardItems.length);
-          
-          for (const item of clipboardItems) {
-            console.log('📋 Item types:', item.types);
-            
-            // Szukamy obrazu w schowku
-            const imageTypes = item.types.filter(type => type.startsWith('image/'));
-            console.log('🖼️ Image types:', imageTypes);
-            
-            if (imageTypes.length > 0) {
-              console.log('✅ Znaleziono obraz w schowku, typ:', imageTypes[0]);
-              
-              const blob = await item.getType(imageTypes[0]);
-              console.log('📦 Blob otrzymany:', blob.size, 'bytes, type:', blob.type);
-              
-              // Konwersja do base64
-              const reader = new FileReader();
-              reader.onload = (event) => {
-                console.log('📖 FileReader zakończył czytanie');
-                const dataUrl = event.target!.result as string;
-                console.log('📊 Data URL length:', dataUrl.length);
-                
-                const img = new Image();
-                img.onload = () => {
-                  console.log('🖼️ Image załadowany:', img.width, 'x', img.height);
-                  
-                  const canvas = canvasRef.current;
-                  if (!canvas) {
-                    console.log('❌ Brak canvas ref!');
-                    return;
-                  }
-                  
-                  // Oblicz pozycję wstawienia (środek widoku)
-                  const rect = canvas.getBoundingClientRect();
-                  const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
-                  const centerWorld = inverseTransformPoint(
-                    centerScreen, 
-                    viewportRef.current, 
-                    rect.width, 
-                    rect.height
-                  );
-                  
-                  // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
-                  const aspectRatio = img.height / img.width;
-                  const worldWidth = 3;
-                  const worldHeight = worldWidth * aspectRatio;
-                  
-                  // Dodaj obraz do tablicy
-                  const newImage: ImageElement = {
-                    id: Date.now().toString(),
-                    type: 'image',
-                    x: centerWorld.x - worldWidth / 2, // Wyśrodkuj
-                    y: centerWorld.y - worldHeight / 2,
-                    width: worldWidth,
-                    height: worldHeight,
-                    src: dataUrl, // Użyj dataUrl zamiast event.target!.result
-                    alt: 'Pasted image',
-                  };
-                  
-                  console.log('✅ Obraz wklejony:', newImage);
-                  
-                  const newElements = [...elementsRef.current, newImage];
-                  setElements(newElements);
-                  saveToHistoryRef.current(newElements);
-                };
-                
-                img.onerror = (err) => {
-                  console.error('❌ Błąd ładowania obrazu:', err);
-                };
-                
-                // WAŻNE: ustawiamy src PRZED onload
-                img.src = dataUrl;
-              };
-              
-              reader.onerror = (err) => {
-                console.error('❌ Błąd czytania pliku:', err);
-              };
-              
-              reader.readAsDataURL(blob);
-              
-              return; // Znaleziono i przetworzono obraz
-            }
-          }
-          
-          console.log('⚠️ Brak obrazu w schowku');
-        } catch (err) {
-          console.error('❌ Clipboard paste error:', err);
-        }
+        handleGlobalPasteImageRef.current();
+        return;
       }
       
       // ESC - powrót do SelectTool
@@ -371,12 +282,8 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       }
     };
 
-    console.log('✅ WhiteboardCanvas: Instaluję keyboard handler (Ctrl+V)');
     window.addEventListener('keydown', handleKeyDown);
-    return () => {
-      console.log('❌ WhiteboardCanvas: Odinstalowyuję keyboard handler');
-      window.removeEventListener('keydown', handleKeyDown);
-    };
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tool, selectedElementIds]); // ✅ Dependencies dla keyboard shortcuts
 
   // Canvas setup
@@ -634,28 +541,20 @@ useEffect(() => {
   // 🖼️ CALLBACKI DLA IMAGETOOL
   // ========================================
   const handleImageCreate = useCallback((image: ImageElement) => {
-    console.log('🎨 handleImageCreate wywołany:', image);
-    
     const newElements = [...elements, image];
     setElements(newElements);
     saveToHistory(newElements);
     
-    console.log('💾 Elements zaktualizowany, nowa długość:', newElements.length);
-    
     // Preload obrazu do cache
     if (image.src) {
-      console.log('🖼️ Rozpoczynam preload obrazu, src length:', image.src.length);
       const img = new Image();
+      img.src = image.src;
       img.onload = () => {
-        console.log('✅ Obraz załadowany do cache:', image.id, img.width, 'x', img.height);
         setLoadedImages(prev => new Map(prev).set(image.id, img));
       };
-      img.onerror = (err) => {
-        console.error('❌ Failed to load image:', image.id, err);
+      img.onerror = () => {
+        console.error('Failed to load image:', image.id);
       };
-      img.src = image.src;
-    } else {
-      console.log('⚠️ Brak src w obrazie!');
     }
   }, [elements, saveToHistory]);
 
@@ -788,6 +687,157 @@ useEffect(() => {
   const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
   
   // ========================================
+  // 🖼️ GLOBALNE CALLBACKI DLA OBRAZÓW (działają zawsze, niezależnie od narzędzia)
+  // ========================================
+  
+  // 🖼️ Konwersja File/Blob do base64 z kompresją
+  const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Cannot get canvas context'));
+            return;
+          }
+
+          let width = img.width;
+          let height = img.height;
+
+          // 🔥 Kompresja jeśli obraz jest za duży (>1000px lub rozmiar >500KB)
+          const MAX_DIMENSION = 1000;
+          const maxSize = Math.max(width, height);
+          
+          if (maxSize > MAX_DIMENSION || file.size > 500000) {
+            const scale = MAX_DIMENSION / maxSize;
+            width = Math.floor(width * scale);
+            height = Math.floor(height * scale);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Konwersja do base64 (JPEG dla lepszej kompresji)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          
+          resolve({ 
+            data: dataUrl, 
+            width: img.width,
+            height: img.height 
+          });
+        };
+        
+        img.onerror = () => reject(new Error('Cannot load image'));
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('Cannot read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  // 🖼️ Globalne wklejanie obrazu ze schowka (Ctrl+V) - działa zawsze
+  const handleGlobalPasteImage = useCallback(async () => {
+    setImageProcessing(true);
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      
+      for (const item of clipboardItems) {
+        const imageTypes = item.types.filter(type => type.startsWith('image/'));
+        
+        if (imageTypes.length > 0) {
+          const blob = await item.getType(imageTypes[0]);
+          const { data, width, height } = await fileToBase64(blob);
+          
+          // Wstaw obraz w centrum widoku
+          const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+          
+          // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+          const aspectRatio = height / width;
+          const worldWidth = 3;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: Date.now().toString(),
+            type: 'image',
+            x: centerWorld.x - worldWidth / 2,
+            y: centerWorld.y - worldHeight / 2,
+            width: worldWidth,
+            height: worldHeight,
+            src: data,
+            alt: 'Pasted image',
+          };
+
+          handleImageCreate(newImage);
+          setImageProcessing(false);
+          return;
+        }
+      }
+      
+      console.log('No image in clipboard');
+    } catch (err) {
+      console.error('Clipboard paste error:', err);
+    } finally {
+      setImageProcessing(false);
+    }
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+
+  // 🖼️ Globalny drag & drop obrazu - działa zawsze
+  const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      return;
+    }
+
+    setImageProcessing(true);
+
+    try {
+      const { data, width, height } = await fileToBase64(file);
+      
+      // Pozycja gdzie upuszczono
+      const dropScreen = { x: e.clientX, y: e.clientY };
+      const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+      
+      // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+      const aspectRatio = height / width;
+      const worldWidth = 3;
+      const worldHeight = worldWidth * aspectRatio;
+      
+      const newImage: ImageElement = {
+        id: Date.now().toString(),
+        type: 'image',
+        x: dropWorld.x - worldWidth / 2,
+        y: dropWorld.y - worldHeight / 2,
+        width: worldWidth,
+        height: worldHeight,
+        src: data,
+        alt: 'Dropped image',
+      };
+
+      handleImageCreate(newImage);
+    } catch (err) {
+      console.error('Drop error:', err);
+    } finally {
+      setImageProcessing(false);
+    }
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+  
+  // Zaktualizuj ref dla handleGlobalPasteImage
+  useEffect(() => {
+    handleGlobalPasteImageRef.current = handleGlobalPasteImage;
+  }, [handleGlobalPasteImage]);
+  
+  // ========================================
   // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
   // ========================================
   useEffect(() => {
@@ -850,7 +900,14 @@ useEffect(() => {
   }, []); // Pusta tablica - używamy refs
   
   return (
-    <div className={`relative w-full h-full bg-white ${className}`}>
+    <div 
+      className={`relative w-full h-full bg-white ${className}`}
+      onDrop={handleGlobalDropImage}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       <div ref={containerRef} className="absolute inset-0 overflow-hidden">
         <Toolbar
           tool={tool}
@@ -967,13 +1024,14 @@ useEffect(() => {
           />
         )}
 
-        {/* 🖼️ IMAGETOOL - zawsze aktywny w tle (drag & drop + button) */}
-        {canvasWidth > 0 && (
+        {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
+        {tool === 'image' && canvasWidth > 0 && (
           <ImageTool
             viewport={viewport}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onImageCreate={handleImageCreate}
+            onViewportChange={handleViewportChange}
           />
         )}
         
@@ -992,6 +1050,16 @@ useEffect(() => {
             pointerEvents: 'none' // ⚠️ WAŻNE! Wszystkie narzędzia mają swoje overlaye
           }}
         />
+        
+        {/* 🖼️ Wskaźnik ładowania podczas przetwarzania obrazu */}
+        {imageProcessing && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="text-sm text-gray-700">Przetwarzanie obrazu...</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
