@@ -149,6 +149,11 @@ export function SelectTool({
         minY = Math.min(minY, el.y);
         maxX = Math.max(maxX, el.x + (el.width || 3));
         maxY = Math.max(maxY, el.y + (el.height || 1));
+      } else if (el.type === 'image') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.width);
+        maxY = Math.max(maxY, el.y + el.height);
       }
     });
 
@@ -182,6 +187,13 @@ export function SelectTool({
         worldPoint.x <= element.x + width &&
         worldPoint.y >= element.y &&
         worldPoint.y <= element.y + height
+      );
+    } else if (element.type === 'image') {
+      return (
+        worldPoint.x >= element.x &&
+        worldPoint.x <= element.x + element.width &&
+        worldPoint.y >= element.y &&
+        worldPoint.y <= element.y + element.height
       );
     } else if (element.type === 'path') {
       // Simple bounding box check for paths
@@ -402,6 +414,18 @@ export function SelectTool({
             width: newWidth,
             height: newHeight,
           });
+        } else if (originalEl.type === 'image') {
+          const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+          const newY = pivotY + (originalEl.y - pivotY) * scaleY;
+          const newWidth = originalEl.width * scaleX;
+          const newHeight = originalEl.height * scaleY;
+
+          updates.set(id, {
+            x: newX,
+            y: newY,
+            width: newWidth,
+            height: newHeight,
+          });
         } else if (originalEl.type === 'path') {
           const newPoints = originalEl.points.map((p: Point) => ({
             x: pivotX + (p.x - pivotX) * scaleX,
@@ -438,6 +462,11 @@ export function SelectTool({
             endY: originalEl.endY + dy,
           });
         } else if (originalEl.type === 'text') {
+          updates.set(id, {
+            x: originalEl.x + dx,
+            y: originalEl.y + dy,
+          });
+        } else if (originalEl.type === 'image') {
           updates.set(id, {
             x: originalEl.x + dx,
             y: originalEl.y + dy,
@@ -482,6 +511,13 @@ export function SelectTool({
         } else if (el.type === 'text') {
           const elMaxX = el.x + (el.width || 3);
           const elMaxY = el.y + (el.height || 1);
+
+          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+            newSelection.add(el.id);
+          }
+        } else if (el.type === 'image') {
+          const elMaxX = el.x + el.width;
+          const elMaxY = el.y + el.height;
 
           if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
             newSelection.add(el.id);

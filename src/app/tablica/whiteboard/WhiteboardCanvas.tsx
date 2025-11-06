@@ -72,6 +72,7 @@ import { PenTool } from '../toolbar/PenTool';
 import { ShapeTool } from '../toolbar/ShapeTool';
 import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
+import { ImageTool } from '../toolbar/ImageTool';
 
 // Import wszystkich modułów
 import {
@@ -81,7 +82,8 @@ import {
   DrawingPath,
   Shape,
   TextElement,
-  FunctionPlot
+  FunctionPlot,
+  ImageElement
 } from './types';
 
 import {
@@ -122,6 +124,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
   const [debugMode, setDebugMode] = useState(false); // 🔍 Debug mode for text sizing
+  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map()); // 🖼️ Cache dla obrazów
   
   // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
@@ -380,9 +383,9 @@ useEffect(() => {
     elements.forEach(element => {
       // Nie rysuj elementu który jest aktualnie edytowany w TextTool
       if (element.id === editingTextId) return;
-      drawElement(ctx, element, viewport, width, height, undefined, debugMode, handleAutoExpand);
+      drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
     });
-  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand]);
+  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand, loadedImages]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -508,6 +511,27 @@ useEffect(() => {
     setEditingTextId(null);
     setTool('select'); // 🆕 Automatyczne przełączenie na narzędzie zaznaczania po zapisaniu tekstu
   }, []);
+
+  // ========================================
+  // 🖼️ CALLBACKI DLA IMAGETOOL
+  // ========================================
+  const handleImageCreate = useCallback((image: ImageElement) => {
+    const newElements = [...elements, image];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    // Preload obrazu do cache
+    if (image.src) {
+      const img = new Image();
+      img.src = image.src;
+      img.onload = () => {
+        setLoadedImages(prev => new Map(prev).set(image.id, img));
+      };
+      img.onerror = () => {
+        console.error('Failed to load image:', image.id);
+      };
+    }
+  }, [elements, saveToHistory]);
 
   // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
@@ -813,6 +837,17 @@ useEffect(() => {
             onFunctionCreate={handleFunctionCreate}
             onColorChange={handleColorChange}
             onLineWidthChange={handleLineWidthChange}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
+        {tool === 'image' && canvasWidth > 0 && (
+          <ImageTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onImageCreate={handleImageCreate}
             onViewportChange={handleViewportChange}
           />
         )}
