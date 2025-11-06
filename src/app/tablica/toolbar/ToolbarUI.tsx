@@ -29,7 +29,7 @@
 import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
-  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon
+  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -188,12 +188,6 @@ export function ToolbarUI({
             onClick={() => onToolChange('function')}
             title="Funkcja (F)"
           />
-          <ToolButton
-            icon={ImageIcon}
-            active={tool === 'image'}
-            onClick={() => onToolChange('image')}
-            title="Obraz (I)"
-          />
 
           <Divider />
 
@@ -299,19 +293,6 @@ export function ToolbarUI({
                 >
                   <TrendingUp className="w-5 h-5" />
                   <span className="text-xs font-medium">Funkcja</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('image');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'image' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <ImageIcon className="w-5 h-5" />
-                  <span className="text-xs font-medium">Obraz</span>
                 </button>
               </div>
 

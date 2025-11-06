@@ -34,6 +34,7 @@
  * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
  * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
  * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
+ * - ImageTool.tsx - globalny handler drag & drop (aktywny ZAWSZE w tle)
  * 
  * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
  * - Canvas ma pointerEvents: 'none' - wszystkie narzędzia mają swoje overlaye
@@ -53,6 +54,15 @@
  * - Ctrl+Z: Undo
  * - Ctrl+Y / Ctrl+Shift+Z: Redo
  * - Delete: Usuń zaznaczone elementy
+ * - Ctrl+V: Wklej obraz ze schowka (globalny - wstawia w środku widoku)
+ * - ESC: Powrót do narzędzia Select
+ * - D: Toggle debug mode
+ * 
+ * ⚠️ OBRAZY - GLOBALNY HANDLER:
+ * - ImageTool działa ZAWSZE w tle (nie wymaga aktywacji narzędzia)
+ * - Ctrl+V wkleja obraz w środku widoku
+ * - Drag & drop wstawia obraz w miejscu upuszczenia
+ * - Przycisk w prawym dolnym rogu do uploadu plików
  * 
  * PRZEZNACZENIE:
  * Główny komponent tablicy - zarządza viewport, elements, historią,
@@ -90,7 +100,8 @@ import {
   panViewportWithWheel,
   panViewportWithMouse,
   zoomViewport,
-  constrainViewport
+  constrainViewport,
+  inverseTransformPoint
 } from './viewport';
 
 import { drawGrid } from './Grid';
@@ -164,12 +175,115 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // 🆕 KEYBOARD SHORTCUTS
   // ========================================
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
+    const handleKeyDown = async (e: KeyboardEvent) => {
+      console.log('⌨️ KeyDown event:', e.key, 'Ctrl:', e.ctrlKey, 'Target:', (e.target as HTMLElement)?.tagName);
+      
       // 🔥 WAŻNE: Jeśli event pochodzi z input/textarea, ignoruj go całkowicie
       // (pozwól input obsłużyć swoje własne eventy)
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
+        console.log('⚠️ Event z input/textarea - ignoruję');
         return; // Wyjdź natychmiast - input/textarea obsługuje to sam
+      }
+      
+      // 📋 Ctrl+V - Globalny handler wstawiania obrazu ze schowka
+      if (e.ctrlKey && e.key === 'v') {
+        console.log('🖼️ Ctrl+V wykryty! Rozpoczynam proces wklejania...');
+        e.preventDefault();
+        
+        console.log('🖼️ Ctrl+V - próba wklejenia obrazu ze schowka');
+        
+        try {
+          console.log('📋 Próba odczytu schowka...');
+          const clipboardItems = await navigator.clipboard.read();
+          console.log('📋 Odczytano items ze schowka:', clipboardItems.length);
+          
+          for (const item of clipboardItems) {
+            console.log('📋 Item types:', item.types);
+            
+            // Szukamy obrazu w schowku
+            const imageTypes = item.types.filter(type => type.startsWith('image/'));
+            console.log('🖼️ Image types:', imageTypes);
+            
+            if (imageTypes.length > 0) {
+              console.log('✅ Znaleziono obraz w schowku, typ:', imageTypes[0]);
+              
+              const blob = await item.getType(imageTypes[0]);
+              console.log('📦 Blob otrzymany:', blob.size, 'bytes, type:', blob.type);
+              
+              // Konwersja do base64
+              const reader = new FileReader();
+              reader.onload = (event) => {
+                console.log('📖 FileReader zakończył czytanie');
+                const dataUrl = event.target!.result as string;
+                console.log('📊 Data URL length:', dataUrl.length);
+                
+                const img = new Image();
+                img.onload = () => {
+                  console.log('🖼️ Image załadowany:', img.width, 'x', img.height);
+                  
+                  const canvas = canvasRef.current;
+                  if (!canvas) {
+                    console.log('❌ Brak canvas ref!');
+                    return;
+                  }
+                  
+                  // Oblicz pozycję wstawienia (środek widoku)
+                  const rect = canvas.getBoundingClientRect();
+                  const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
+                  const centerWorld = inverseTransformPoint(
+                    centerScreen, 
+                    viewportRef.current, 
+                    rect.width, 
+                    rect.height
+                  );
+                  
+                  // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+                  const aspectRatio = img.height / img.width;
+                  const worldWidth = 3;
+                  const worldHeight = worldWidth * aspectRatio;
+                  
+                  // Dodaj obraz do tablicy
+                  const newImage: ImageElement = {
+                    id: Date.now().toString(),
+                    type: 'image',
+                    x: centerWorld.x - worldWidth / 2, // Wyśrodkuj
+                    y: centerWorld.y - worldHeight / 2,
+                    width: worldWidth,
+                    height: worldHeight,
+                    src: dataUrl, // Użyj dataUrl zamiast event.target!.result
+                    alt: 'Pasted image',
+                  };
+                  
+                  console.log('✅ Obraz wklejony:', newImage);
+                  
+                  const newElements = [...elementsRef.current, newImage];
+                  setElements(newElements);
+                  saveToHistoryRef.current(newElements);
+                };
+                
+                img.onerror = (err) => {
+                  console.error('❌ Błąd ładowania obrazu:', err);
+                };
+                
+                // WAŻNE: ustawiamy src PRZED onload
+                img.src = dataUrl;
+              };
+              
+              reader.onerror = (err) => {
+                console.error('❌ Błąd czytania pliku:', err);
+              };
+              
+              reader.readAsDataURL(blob);
+              
+              return; // Znaleziono i przetworzono obraz
+            }
+          }
+          
+          console.log('⚠️ Brak obrazu w schowku');
+        } catch (err) {
+          console.error('❌ Clipboard paste error:', err);
+        }
       }
       
       // ESC - powrót do SelectTool
@@ -257,8 +371,12 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       }
     };
 
+    console.log('✅ WhiteboardCanvas: Instaluję keyboard handler (Ctrl+V)');
     window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      console.log('❌ WhiteboardCanvas: Odinstalowyuję keyboard handler');
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [tool, selectedElementIds]); // ✅ Dependencies dla keyboard shortcuts
 
   // Canvas setup
@@ -516,20 +634,28 @@ useEffect(() => {
   // 🖼️ CALLBACKI DLA IMAGETOOL
   // ========================================
   const handleImageCreate = useCallback((image: ImageElement) => {
+    console.log('🎨 handleImageCreate wywołany:', image);
+    
     const newElements = [...elements, image];
     setElements(newElements);
     saveToHistory(newElements);
     
+    console.log('💾 Elements zaktualizowany, nowa długość:', newElements.length);
+    
     // Preload obrazu do cache
     if (image.src) {
+      console.log('🖼️ Rozpoczynam preload obrazu, src length:', image.src.length);
       const img = new Image();
-      img.src = image.src;
       img.onload = () => {
+        console.log('✅ Obraz załadowany do cache:', image.id, img.width, 'x', img.height);
         setLoadedImages(prev => new Map(prev).set(image.id, img));
       };
-      img.onerror = () => {
-        console.error('Failed to load image:', image.id);
+      img.onerror = (err) => {
+        console.error('❌ Failed to load image:', image.id, err);
       };
+      img.src = image.src;
+    } else {
+      console.log('⚠️ Brak src w obrazie!');
     }
   }, [elements, saveToHistory]);
 
@@ -841,14 +967,13 @@ useEffect(() => {
           />
         )}
 
-        {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
-        {tool === 'image' && canvasWidth > 0 && (
+        {/* 🖼️ IMAGETOOL - zawsze aktywny w tle (drag & drop + button) */}
+        {canvasWidth > 0 && (
           <ImageTool
             viewport={viewport}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onImageCreate={handleImageCreate}
-            onViewportChange={handleViewportChange}
           />
         )}
         
