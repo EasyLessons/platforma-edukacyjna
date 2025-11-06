@@ -11,4 +11,6 @@ uvicorn main:app --reload z glownego lub z /backend
 npm install
 npm run dev
 
-# alembic push do tabli zeby w oddzilencyh plikach robić tableki
+# alembic push do neon
+alembic revision --autogenerate -m "opis zmiany"
+alembic upgrade head
