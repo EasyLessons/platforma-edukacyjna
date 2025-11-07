@@ -42,7 +42,7 @@
 
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Upload, Clipboard, X, ImageIcon } from 'lucide-react';
 import { Point, ViewportTransform, ImageElement } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
@@ -53,6 +53,12 @@ interface ImageToolProps {
   canvasHeight: number;
   onImageCreate: (image: ImageElement) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+}
+
+// 🆕 Ref API dla ImageTool (używane przez ToolbarUI)
+export interface ImageToolRef {
+  handlePasteFromClipboard: () => void;
+  triggerFileUpload: () => void;
 }
 
 interface ImageDraft {
@@ -66,13 +72,13 @@ interface ImageDraft {
   originalHeight: number;
 }
 
-export function ImageTool({
+export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(function ImageTool({
   viewport,
   canvasWidth,
   canvasHeight,
   onImageCreate,
   onViewportChange,
-}: ImageToolProps) {
+}, ref) {
   const [isDragging, setIsDragging] = useState(false);
   const [imageDraft, setImageDraft] = useState<ImageDraft | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -253,7 +259,13 @@ export function ImageTool({
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64]);
 
-  // 🎯 Drag & Drop z eksploratora
+  // � Eksponuj funkcje przez ref (dla ToolbarUI)
+  useImperativeHandle(ref, () => ({
+    handlePasteFromClipboard,
+    triggerFileUpload: () => fileInputRef.current?.click(),
+  }), [handlePasteFromClipboard]);
+
+  // �🎯 Drag & Drop z eksploratora
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -454,65 +466,41 @@ export function ImageTool({
 
   return (
     <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      {/* Floating toolbar */}
-      <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg border border-gray-200 p-3 z-50 pointer-events-auto">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={handlePasteFromClipboard}
-            disabled={isProcessing}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Wklej obraz ze schowka (Ctrl+V)"
-          >
-            <Clipboard className="w-5 h-5" />
-            <span className="text-sm font-medium">Wklej (Ctrl+V)</span>
-          </button>
+      {/* 🔴 Floating toolbar usunięty - przyciski przeniesione do ToolbarUI properties panel */}
+      
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleFileSelect}
+        className="hidden"
+      />
 
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isProcessing}
-            className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Wybierz plik z dysku"
-          >
-            <Upload className="w-5 h-5" />
-            <span className="text-sm font-medium">Wybierz plik</span>
-          </button>
+      {/* Status overlay - pokazuj tylko gdy jest processing lub error */}
+      {(isProcessing || error || (imageDraft && imageDraft.imageData)) && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-2 z-50 pointer-events-none">
+          {isProcessing && (
+            <div className="text-sm text-blue-600 font-medium flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+              Przetwarzanie obrazu...
+            </div>
+          )}
 
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
+          {error && (
+            <div className="text-sm text-red-600 font-medium flex items-center gap-2">
+              <X className="w-4 h-4" />
+              {error}
+            </div>
+          )}
 
-          <div className="w-px h-8 bg-gray-300" />
-
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <ImageIcon className="w-4 h-4" />
-            <span>lub przeciągnij obraz</span>
-          </div>
+          {imageDraft && imageDraft.imageData && !error && !isProcessing && (
+            <div className="text-sm text-green-600 font-medium">
+              ✓ Obraz załadowany. Kliknij aby umieścić lub przeciągnij rozmiar.
+            </div>
+          )}
         </div>
-
-        {/* Status messages */}
-        {isProcessing && (
-          <div className="mt-2 text-sm text-blue-600 font-medium">
-            Przetwarzanie obrazu...
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-2 text-sm text-red-600 font-medium flex items-center gap-2">
-            <X className="w-4 h-4" />
-            {error}
-          </div>
-        )}
-
-        {imageDraft && imageDraft.imageData && (
-          <div className="mt-2 text-sm text-green-600 font-medium">
-            ✓ Obraz załadowany. Kliknij aby umieścić na tablicy lub przeciągnij rozmiar.
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Overlay dla mouse events */}
       <div
@@ -531,4 +519,4 @@ export function ImageTool({
       {renderPreview()}
     </div>
   );
-}
+});

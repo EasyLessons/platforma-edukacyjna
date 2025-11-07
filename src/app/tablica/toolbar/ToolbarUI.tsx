@@ -29,7 +29,8 @@
 import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
-  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon
+  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
+  Upload, Clipboard as ClipboardIcon
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -62,6 +63,10 @@ interface ToolbarUIProps {
   // Mobile state
   isMobileMenuOpen: boolean;
   setIsMobileMenuOpen: (open: boolean) => void;
+  
+  // 🖼️ ImageTool handlers
+  onImagePaste?: () => void;
+  onImageUpload?: () => void;
 }
 
 const ToolButton = ({
@@ -116,6 +121,8 @@ export function ToolbarUI({
   onClear,
   isMobileMenuOpen,
   setIsMobileMenuOpen,
+  onImagePaste,
+  onImageUpload,
 }: ToolbarUIProps) {
   const getShapeIcon = () => {
     switch (selectedShape) {
@@ -132,8 +139,11 @@ export function ToolbarUI({
     }
   };
 
-  // 🆕 FunctionTool ma własny panel, więc nie pokazuj properties
-  const hasProperties = tool !== 'select' && tool !== 'pan' && tool !== 'function';
+  // 🆕 Narzędzia z własnymi panelami nie wyświetlają properties
+  // - select, pan: brak properties
+  // - text: ma własny mini toolbar przy zaznaczeniu
+  // - function: ma własny panel input
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
 
   return (
     <>
@@ -531,6 +541,34 @@ export function ToolbarUI({
             {/* 🔴 TEXT - properties panel usunięty, TextTool ma własny mini toolbar */}
 
             {/* 🔴 FUNCTION - usunięte z toolbara, FunctionTool ma własny panel */}
+            
+            {/* 🖼️ IMAGE */}
+            {tool === 'image' && (
+              <>
+                <button
+                  onClick={onImagePaste}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  title="Wklej obraz ze schowka (Ctrl+V)"
+                >
+                  <ClipboardIcon className="w-5 h-5" />
+                  <span className="text-sm font-medium">Wklej</span>
+                </button>
+
+                <button
+                  onClick={onImageUpload}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  title="Wybierz plik z dysku"
+                >
+                  <Upload className="w-5 h-5" />
+                  <span className="text-sm font-medium">Upload</span>
+                </button>
+
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  <ImageIcon className="w-5 h-5" />
+                  <span>Ctrl+V lub przeciągnij obraz</span>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

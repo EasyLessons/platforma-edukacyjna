@@ -85,7 +85,7 @@ import { PenTool } from '../toolbar/PenTool';
 import { ShapeTool } from '../toolbar/ShapeTool';
 import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
-import { ImageTool } from '../toolbar/ImageTool';
+import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 
 // Import wszystkich modułów
 import {
@@ -117,6 +117,7 @@ interface WhiteboardCanvasProps {
 export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageToolRef = useRef<ImageToolRef>(null); // 🖼️ Ref dla ImageTool
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -837,6 +838,15 @@ useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
   }, [handleGlobalPasteImage]);
   
+  // 🖼️ Handlery dla przycisków w ToolbarUI (ImageTool)
+  const handleImageToolPaste = useCallback(() => {
+    imageToolRef.current?.handlePasteFromClipboard();
+  }, []);
+  
+  const handleImageToolUpload = useCallback(() => {
+    imageToolRef.current?.triggerFileUpload();
+  }, []);
+  
   // ========================================
   // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
   // ========================================
@@ -928,6 +938,8 @@ useEffect(() => {
           onResetView={resetView}
           canUndo={canUndo}
           canRedo={canRedo}
+          onImagePaste={handleImageToolPaste}
+          onImageUpload={handleImageToolUpload}
         />
         
         <ZoomControls
@@ -1027,6 +1039,7 @@ useEffect(() => {
         {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
         {tool === 'image' && canvasWidth > 0 && (
           <ImageTool
+            ref={imageToolRef}
             viewport={viewport}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}

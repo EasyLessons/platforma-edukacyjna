@@ -57,6 +57,9 @@ interface ToolbarProps {
   onResetView: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  // 🖼️ ImageTool handlers
+  onImagePaste?: () => void;
+  onImageUpload?: () => void;
 }
 
 function Toolbar({
@@ -78,6 +81,8 @@ function Toolbar({
   onResetView,
   canUndo,
   canRedo,
+  onImagePaste,
+  onImageUpload,
 }: ToolbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -106,6 +111,8 @@ function Toolbar({
         onClear={onClear}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+        onImagePaste={onImagePaste}
+        onImageUpload={onImageUpload}
       />
     </div>
   );
