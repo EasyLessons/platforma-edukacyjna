@@ -1,0 +1,308 @@
+/**
+ * ============================================================================
+ * PLIK: src/app/tablica/toolbar/EraserTool.tsx
+ * ============================================================================
+ * 
+ * IMPORTUJE Z:
+ * - react (useState, useRef, useEffect, useCallback)
+ * - ../whiteboard/types (Point, ViewportTransform, DrawingElement)
+ * - ../whiteboard/viewport (inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
+ * 
+ * EKSPORTUJE:
+ * - EraserTool (component) - narzędzie gumki (usuwa elementy pod kursorem)
+ * 
+ * UŻYWANE PRZEZ:
+ * - WhiteboardCanvas.tsx (główny komponent)
+ * 
+ * ⚠️ ZALEŻNOŚCI:
+ * - types.ts - wszystkie typy elementów
+ * - viewport.ts - transformacje współrzędnych, pan/zoom
+ * 
+ * PRZEZNACZENIE:
+ * Inteligentna gumka - usuwa elementy przy najechaniu myszką.
+ * Wizualne podświetlenie elementu przed usunięciem.
+ * Obsługuje wheel events (pan/zoom).
+ * ============================================================================
+ */
+
+'use client';
+
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
+import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+
+interface EraserToolProps {
+  viewport: ViewportTransform;
+  canvasWidth: number;
+  canvasHeight: number;
+  elements: DrawingElement[];
+  onElementDelete: (id: string) => void;
+  onViewportChange?: (viewport: ViewportTransform) => void;
+}
+
+export function EraserTool({
+  viewport,
+  canvasWidth,
+  canvasHeight,
+  elements,
+  onElementDelete,
+  onViewportChange,
+}: EraserToolProps) {
+  const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
+  const [cursorPosition, setCursorPosition] = useState<Point | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  // Wheel events dla pan/zoom
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !onViewportChange) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey) {
+        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        onViewportChange(constrainViewport(newViewport));
+      } else {
+        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        onViewportChange(constrainViewport(newViewport));
+      }
+    };
+
+    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleNativeWheel);
+  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+
+  // Sprawdza czy punkt jest w elemencie
+  const isPointInElement = useCallback((worldPoint: Point, element: DrawingElement): boolean => {
+    if (element.type === 'shape') {
+      const minX = Math.min(element.startX, element.endX);
+      const maxX = Math.max(element.startX, element.endX);
+      const minY = Math.min(element.startY, element.endY);
+      const maxY = Math.max(element.startY, element.endY);
+
+      return (
+        worldPoint.x >= minX &&
+        worldPoint.x <= maxX &&
+        worldPoint.y >= minY &&
+        worldPoint.y <= maxY
+      );
+    } else if (element.type === 'text') {
+      const width = element.width || 3;
+      const height = element.height || 1;
+      return (
+        worldPoint.x >= element.x &&
+        worldPoint.x <= element.x + width &&
+        worldPoint.y >= element.y &&
+        worldPoint.y <= element.y + height
+      );
+    } else if (element.type === 'image') {
+      return (
+        worldPoint.x >= element.x &&
+        worldPoint.x <= element.x + element.width &&
+        worldPoint.y >= element.y &&
+        worldPoint.y <= element.y + element.height
+      );
+    } else if (element.type === 'path') {
+      // Dla path sprawdzamy czy punkt jest blisko któregokolwiek segmentu
+      const threshold = 0.3; // tolerancja w jednostkach świata
+      
+      for (let i = 0; i < element.points.length - 1; i++) {
+        const p1 = element.points[i];
+        const p2 = element.points[i + 1];
+        
+        // Odległość punktu od odcinka
+        const dist = pointToSegmentDistance(worldPoint, p1, p2);
+        if (dist < threshold) return true;
+      }
+      return false;
+    } else if (element.type === 'function') {
+      // Dla funkcji używamy bounding box (przybliżenie)
+      const minX = -element.xRange;
+      const maxX = element.xRange;
+      const minY = -element.yRange;
+      const maxY = element.yRange;
+      
+      return (
+        worldPoint.x >= minX &&
+        worldPoint.x <= maxX &&
+        worldPoint.y >= minY &&
+        worldPoint.y <= maxY
+      );
+    }
+
+    return false;
+  }, []);
+
+  // Pomocnicza funkcja: odległość punktu od odcinka
+  const pointToSegmentDistance = (point: Point, segStart: Point, segEnd: Point): number => {
+    const dx = segEnd.x - segStart.x;
+    const dy = segEnd.y - segStart.y;
+    const lengthSquared = dx * dx + dy * dy;
+    
+    if (lengthSquared === 0) {
+      // Segment to punkt
+      const distX = point.x - segStart.x;
+      const distY = point.y - segStart.y;
+      return Math.sqrt(distX * distX + distY * distY);
+    }
+    
+    // Projekcja punktu na odcinek
+    const t = Math.max(0, Math.min(1, 
+      ((point.x - segStart.x) * dx + (point.y - segStart.y) * dy) / lengthSquared
+    ));
+    
+    const projX = segStart.x + t * dx;
+    const projY = segStart.y + t * dy;
+    
+    const distX = point.x - projX;
+    const distY = point.y - projY;
+    return Math.sqrt(distX * distX + distY * distY);
+  };
+
+  // Znajduje element pod kursorem (od góry - ostatni rysowany)
+  const findElementUnderCursor = useCallback((worldPoint: Point): string | null => {
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const el = elements[i];
+      if (isPointInElement(worldPoint, el)) {
+        return el.id;
+      }
+    }
+    return null;
+  }, [elements, isPointInElement]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const screenPoint = { x: e.clientX, y: e.clientY };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    
+    setCursorPosition(screenPoint);
+    
+    const elementId = findElementUnderCursor(worldPoint);
+    setHoveredElementId(elementId);
+  }, [viewport, canvasWidth, canvasHeight, findElementUnderCursor]);
+
+  const handleMouseLeave = useCallback(() => {
+    setHoveredElementId(null);
+    setCursorPosition(null);
+  }, []);
+
+  const handleClick = useCallback((e: React.MouseEvent) => {
+    if (hoveredElementId) {
+      onElementDelete(hoveredElementId);
+      setHoveredElementId(null);
+    }
+  }, [hoveredElementId, onElementDelete]);
+
+  // Renderuj highlight dla hovered element
+  const renderHighlight = () => {
+    if (!hoveredElementId) return null;
+
+    const element = elements.find(el => el.id === hoveredElementId);
+    if (!element) return null;
+
+    let box: { x: number; y: number; width: number; height: number } | null = null;
+
+    if (element.type === 'shape') {
+      const minX = Math.min(element.startX, element.endX);
+      const maxX = Math.max(element.startX, element.endX);
+      const minY = Math.min(element.startY, element.endY);
+      const maxY = Math.max(element.startY, element.endY);
+      box = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    } else if (element.type === 'text') {
+      box = {
+        x: element.x,
+        y: element.y,
+        width: element.width || 3,
+        height: element.height || 1,
+      };
+    } else if (element.type === 'image') {
+      box = {
+        x: element.x,
+        y: element.y,
+        width: element.width,
+        height: element.height,
+      };
+    } else if (element.type === 'path') {
+      const xs = element.points.map((p: Point) => p.x);
+      const ys = element.points.map((p: Point) => p.y);
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minY = Math.min(...ys);
+      const maxY = Math.max(...ys);
+      box = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+    } else if (element.type === 'function') {
+      box = {
+        x: -element.xRange,
+        y: -element.yRange,
+        width: element.xRange * 2,
+        height: element.yRange * 2,
+      };
+    }
+
+    if (!box) return null;
+
+    const topLeft = transformPoint({ x: box.x, y: box.y }, viewport, canvasWidth, canvasHeight);
+    const bottomRight = transformPoint(
+      { x: box.x + box.width, y: box.y + box.height },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
+
+    const width = bottomRight.x - topLeft.x;
+    const height = bottomRight.y - topLeft.y;
+
+    return (
+      <div
+        className="absolute border-2 border-red-500 bg-red-500/10 pointer-events-none animate-pulse"
+        style={{
+          left: topLeft.x,
+          top: topLeft.y,
+          width: width,
+          height: height,
+        }}
+      />
+    );
+  };
+
+  return (
+    <>
+      {/* Invisible overlay for wheel events */}
+      <div
+        ref={overlayRef}
+        className="absolute inset-0 pointer-events-none z-20"
+        style={{ touchAction: 'none' }}
+      />
+
+      {/* Interactive overlay */}
+      <div
+        className="absolute inset-0 z-30 pointer-events-auto"
+        style={{ cursor: hoveredElementId ? 'pointer' : 'default', touchAction: 'none' }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={handleClick}
+      />
+
+      {/* Highlight hovered element */}
+      {renderHighlight()}
+
+      {/* Custom eraser cursor */}
+      {cursorPosition && (
+        <div
+          className="absolute pointer-events-none z-40"
+          style={{
+            left: cursorPosition.x - 12,
+            top: cursorPosition.y - 12,
+            width: 24,
+            height: 24,
+          }}
+        >
+          <div className="w-full h-full rounded-full border-2 border-red-500 bg-white/50 flex items-center justify-center">
+            <div className="w-3 h-3 rounded-full bg-red-500" />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

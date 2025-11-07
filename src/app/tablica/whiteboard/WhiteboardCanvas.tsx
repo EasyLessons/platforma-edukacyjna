@@ -86,6 +86,7 @@ import { ShapeTool } from '../toolbar/ShapeTool';
 import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
+import { EraserTool } from '../toolbar/EraserTool';
 
 // Import wszystkich modułów
 import {
@@ -204,6 +205,12 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         setTool('select');
         setSelectedElementIds(new Set());
         setEditingTextId(null);
+      }
+      
+      // E key - Eraser tool
+      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setTool('eraser');
       }
       
       // 🆕 Typing on selected text - enter edit mode and replace text
@@ -563,6 +570,15 @@ useEffect(() => {
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
   }, []);
+
+  // ========================================
+  // 🆕 CALLBACK DLA ERASERTOOL
+  // ========================================
+  const handleElementDelete = useCallback((id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
 
   // ========================================
   // 🆕 CALLBACKI DLA SELECTTOOL
@@ -1047,6 +1063,18 @@ useEffect(() => {
             onViewportChange={handleViewportChange}
           />
         )}
+
+        {/* 🆕 ERASERTOOL - aktywny gdy tool === 'eraser' */}
+        {tool === 'eraser' && canvasWidth > 0 && (
+          <EraserTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements}
+            onElementDelete={handleElementDelete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
         
         <canvas
           ref={canvasRef}
@@ -1057,6 +1085,7 @@ useEffect(() => {
               tool === 'pan' ? 'grab' : 
               tool === 'select' ? 'default' : 
               tool === 'text' ? 'crosshair' :
+              tool === 'eraser' ? 'none' :
               'crosshair',
             willChange: 'auto',
             imageRendering: 'crisp-edges',

@@ -30,7 +30,7 @@ import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
-  Upload, Clipboard as ClipboardIcon
+  Upload, Clipboard as ClipboardIcon, Eraser
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -204,6 +204,12 @@ export function ToolbarUI({
             onClick={() => onToolChange('image')}
             title="Obraz (I)"
           />
+          <ToolButton
+            icon={Eraser}
+            active={tool === 'eraser'}
+            onClick={() => onToolChange('eraser')}
+            title="Gumka (E)"
+          />
 
           <Divider />
 
@@ -322,6 +328,19 @@ export function ToolbarUI({
                 >
                   <ImageIcon className="w-5 h-5" />
                   <span className="text-xs font-medium">Obraz</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onToolChange('eraser');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
+                    tool === 'eraser' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Eraser className="w-5 h-5" />
+                  <span className="text-xs font-medium">Gumka</span>
                 </button>
               </div>
 

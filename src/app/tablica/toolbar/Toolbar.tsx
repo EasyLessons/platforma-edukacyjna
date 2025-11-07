@@ -35,7 +35,7 @@ import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
-export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function'|'image';
+export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow';
 
 interface ToolbarProps {
