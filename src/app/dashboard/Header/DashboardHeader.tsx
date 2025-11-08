@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -13,11 +13,21 @@ import {
   ChevronDown
 } from 'lucide-react';
 
+// Import funkcji API
+import { getUser, isAuthenticated, type User } from '@/auth_api/api';
+
 // Import popupów
 import InvitePopup from './popups/InvitePopup';
 import GiftPopup from './popups/GiftPopup';
 import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
+
+// Rozszerzony typ User z dodatkowymi polami dla UI
+interface ExtendedUser extends User {
+  name: string;
+  avatar: string;
+  isPremium: boolean;
+}
 
 export default function DashboardHeader() {
   const router = useRouter();
@@ -28,16 +38,78 @@ export default function DashboardHeader() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Dane użytkownika (później z API)
-  const user = {
-    name: "Mateusz",
-    email: "mateusz@easylesson.com",
-    avatar: "M",
-    isPremium: false
-  };
+  // State dla danych użytkownika
+  const [user, setUser] = useState<ExtendedUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Pobieranie danych użytkownika
+  useEffect(() => {
+    const fetchUser = () => {
+      try {
+        // Sprawdź czy użytkownik jest zalogowany
+        if (!isAuthenticated()) {
+          router.push('/login');
+          return;
+        }
+
+        // Pobierz dane użytkownika z localStorage
+        const userData = getUser();
+        
+        if (!userData) {
+          router.push('/login');
+          return;
+        }
+
+        // Rozszerz dane użytkownika o dodatkowe pola
+        setUser({
+          ...userData,
+          name: userData.full_name || userData.username,
+          avatar: userData.username?.charAt(0).toUpperCase() || 'U',
+          isPremium: false // Tutaj później sprawdzisz czy ma premium
+        });
+      } catch (error) {
+        console.error('Błąd pobierania danych użytkownika:', error);
+        router.push('/login');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [router]);
 
   // Nazwa aktualnej przestrzeni (później dynamicznie)
   const currentSpace = "Klasa 5A";
+
+  // Loading state
+  if (loading) {
+    return (
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="w-full px-6 py-3">
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="flex items-center gap-3">
+              <Link href="/" className="flex items-center cursor-pointer">
+                <Image
+                  src="/resources/LogoEasyLesson.webp"
+                  alt="EasyLesson Logo"
+                  width={140}
+                  height={36}
+                  className="h-9 w-auto"
+                  priority
+                />
+              </Link>
+            </div>
+            <div className="flex justify-center">
+              <div className="w-full max-w-md h-10 bg-gray-100 animate-pulse rounded-xl"></div>
+            </div>
+            <div className="flex items-center justify-end gap-2">
+              <div className="w-8 h-8 bg-gray-200 animate-pulse rounded-lg"></div>
+            </div>
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <>
@@ -59,7 +131,7 @@ export default function DashboardHeader() {
               </Link>
               
               {/* Badge Free */}
-              {!user.isPremium && (
+              {user && !user.isPremium && (
                 <div className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg">
                   FREE PLAN
                 </div>
@@ -98,7 +170,7 @@ export default function DashboardHeader() {
               </button>
 
               {/* Premium Button */}
-              {!user.isPremium && (
+              {user && !user.isPremium && (
                 <Link href="/#pricing">
                   <button className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2 whitespace-nowrap cursor-pointer">
                     <Crown size={16} />
@@ -140,27 +212,29 @@ export default function DashboardHeader() {
               </div>
 
               {/* Avatar */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer"
-                >
-                  <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
-                    <span className="text-white font-semibold text-sm">
-                      {user.avatar}
-                    </span>
-                  </div>
-                  <ChevronDown size={14} className="text-gray-400" />
-                </button>
+              {user && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer"
+                  >
+                    <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <span className="text-white font-semibold text-sm">
+                        {user.avatar}
+                      </span>
+                    </div>
+                    <ChevronDown size={14} className="text-gray-400" />
+                  </button>
 
-                {/* User Menu Popup */}
-                {showUserMenu && (
-                  <UserMenuPopup 
-                    onClose={() => setShowUserMenu(false)} 
-                    user={user}
-                  />
-                )}
-              </div>
+                  {/* User Menu Popup */}
+                  {showUserMenu && (
+                    <UserMenuPopup 
+                      onClose={() => setShowUserMenu(false)} 
+                      user={user}
+                    />
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
