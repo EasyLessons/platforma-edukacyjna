@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
 from fastapi import HTTPException, status
+from datetime import datetime
 
 # Importy modeli z bazy danych
 from core.models import Workspace, WorkspaceMember, Board, User
@@ -244,7 +245,8 @@ def create_workspace(db: Session, workspace_data: WorkspaceCreate, user_id: int)
         name=workspace_data.name,
         icon=workspace_data.icon or "Home",
         bg_color=workspace_data.bg_color or "bg-green-500",
-        created_by=user_id  # ← to jest OK
+        created_by=user_id,  # ← to jest OK
+        created_at=datetime.utcnow()
     )
     
     db.add(new_workspace)
@@ -275,6 +277,7 @@ def create_workspace(db: Session, workspace_data: WorkspaceCreate, user_id: int)
         icon=new_workspace.icon,
         bg_color=new_workspace.bg_color,
         created_by=new_workspace.created_by,
+        created_at=new_workspace.created_at,
         creator=UserBasic.from_orm(creator),  # ← użyj from_orm albo ręcznie
         member_count=1,
         board_count=0,
