@@ -6,9 +6,9 @@ import Ad from "./layout/ad";
 import Header from "./layout/Header";
 import Footer from "./layout/Footer";
 import AuthHeader from "./layout/AuthHeader";
-// 🔥 DODAJ TE IMPORTY!
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { usePathname } from 'next/navigation';
+import { WorkspaceProvider } from './context/WorkspaceContext';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,14 +20,19 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 🔥 NOWY WEWNĘTRZNY KOMPONENT - używa useAuth()
 function LayoutContent({ children }: { children: React.ReactNode }) {
-  // 🔥 Pobierz PRAWDZIWY stan logowania z Context
   const { isLoggedIn, loading } = useAuth();
   const pathname = usePathname();
-  const isHomepage = pathname === '/';
   
-  // Pokaż loader podczas sprawdzania
+  // 🔥 ROZSZERZONA LOGIKA - headery na więcej stronach
+  const showHeader = pathname === '/' || 
+                     pathname === '/login' || 
+                     pathname === '/rejestracja' || 
+                     pathname === '/weryfikacja';
+  
+  // Footer tylko na homepage dla niezalogowanych
+  const showFooter = pathname === '/' && !isLoggedIn;
+  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -38,8 +43,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
   
   return (
     <>
-      
-      {isHomepage && (
+      {/* 🔥 Headery pokazują się na: /, /login, /rejestracja, /weryfikacja */}
+      {showHeader && (
         <>
           <Ad />
           {isLoggedIn ? <AuthHeader /> : <Header />}
@@ -51,12 +56,11 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
       </main>
       
       {/* Footer tylko na homepage dla niezalogowanych */}
-      {isHomepage && !isLoggedIn && <Footer />}
+      {showFooter && <Footer />}
     </>
   );
 }
 
-// 🔥 GŁÓWNY LAYOUT - opakowuje w AuthProvider
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -69,9 +73,10 @@ export default function RootLayout({
         <meta name="description" content="Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        {/* 🔥 Opakowujemy WSZYSTKO w AuthProvider */}
         <AuthProvider>
-          <LayoutContent>{children}</LayoutContent>
+          <WorkspaceProvider>
+            <LayoutContent>{children}</LayoutContent>
+          </WorkspaceProvider>
         </AuthProvider>
       </body>
     </html>

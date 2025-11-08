@@ -6,6 +6,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.logging import setup_logging
 from auth.routes import router as auth_router
+from dashboard.routes import router as dashboard_router
+
 
 # Inicjalizuj logging
 setup_logging(log_level="INFO")
@@ -36,6 +38,7 @@ app.add_middleware(
 
 # Zarejestruj routery
 app.include_router(auth_router)
+app.include_router(dashboard_router)
 
 @app.get("/")
 async def root():
