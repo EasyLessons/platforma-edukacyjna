@@ -28,7 +28,84 @@
  * ============================================================================
  */
 
-import { Point, ViewportTransform } from './types';
+import { Point, ViewportTransform, MomentumState } from './types';
+
+const MOMENTUM_FRICTION = 0.9; // Tarcie - im wyższe, tym dłużej się ślizga
+const MOMENTUM_THRESHOLD = 0.001; // Prędkość poniżej której zatrzymujemy
+const MAX_MOMENTUM_VELOCITY = 1; // Maksymalna prędkość
+
+// 🆕 Funkcja do aktualizacji momentum
+export const updateMomentum = (
+  momentum: MomentumState,
+  currentTime: number
+): { momentum: MomentumState; viewport: { x: number; y: number } | null } => {
+  if (!momentum.isActive) {
+    return { momentum, viewport: null };
+  }
+
+  const deltaTime = (currentTime - momentum.lastTimestamp) / 16; // Normalizuj do 60fps
+  
+  // Zastosuj tarcie
+  let newVelocityX = momentum.velocityX * Math.pow(MOMENTUM_FRICTION, deltaTime);
+  let newVelocityY = momentum.velocityY * Math.pow(MOMENTUM_FRICTION, deltaTime);
+  
+  // Sprawdź czy prędkość jest poniżej progu zatrzymania
+  const speed = Math.sqrt(newVelocityX * newVelocityX + newVelocityY * newVelocityY);
+  if (speed < MOMENTUM_THRESHOLD) {
+    return {
+      momentum: { ...momentum, isActive: false, velocityX: 0, velocityY: 0 },
+      viewport: null
+    };
+  }
+  
+  // Oblicz przesunięcie viewport na podstawie prędkości
+  const viewportChange = {
+    x: newVelocityX * deltaTime,
+    y: newVelocityY * deltaTime
+  };
+  
+  return {
+    momentum: {
+      ...momentum,
+      velocityX: newVelocityX,
+      velocityY: newVelocityY,
+      lastTimestamp: currentTime
+    },
+    viewport: viewportChange
+  };
+};
+
+// 🆕 Funkcja do uruchomienia momentum
+export const startMomentum = (
+  momentum: MomentumState,
+  velocityX: number,
+  velocityY: number
+): MomentumState => {
+  // Ogranicz maksymalną prędkość
+  const speed = Math.sqrt(velocityX * velocityX + velocityY * velocityY);
+  if (speed > MAX_MOMENTUM_VELOCITY) {
+    const scale = MAX_MOMENTUM_VELOCITY / speed;
+    velocityX *= scale;
+    velocityY *= scale;
+  }
+  
+  return {
+    velocityX,
+    velocityY,
+    isActive: true,
+    lastTimestamp: performance.now()
+  };
+};
+
+// 🆕 Funkcja do zatrzymania momentum
+export const stopMomentum = (momentum: MomentumState): MomentumState => {
+  return {
+    ...momentum,
+    isActive: false,
+    velocityX: 0,
+    velocityY: 0
+  };
+};
 
 /**
  * Transform: world coordinates → screen coordinates

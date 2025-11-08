@@ -88,6 +88,7 @@ import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
 
+
 // Import wszystkich modułów
 import {
   Point,
@@ -97,7 +98,8 @@ import {
   Shape,
   TextElement,
   FunctionPlot,
-  ImageElement
+  ImageElement,
+  MomentumState 
 } from './types';
 
 import {
@@ -105,7 +107,10 @@ import {
   panViewportWithMouse,
   zoomViewport,
   constrainViewport,
-  inverseTransformPoint
+  inverseTransformPoint,
+  updateMomentum,   
+  startMomentum,     
+  stopMomentum     
 } from './viewport';
 
 import { drawGrid } from './Grid';
@@ -125,6 +130,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     x: 0,
     y: 0,
     scale: 1
+  });
+
+  // 🎢 Momentum state (inercja jak na lodzie)
+  const [momentum, setMomentum] = useState<MomentumState>({
+    velocityX: 0,
+    velocityY: 0,
+    isActive: false,
+    lastTimestamp: performance.now()
   });
   
   // Drawing state
@@ -864,70 +877,219 @@ useEffect(() => {
   }, []);
   
   // ========================================
-  // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
-  // ========================================
-  useEffect(() => {
-    let isPanning = false;
-    let lastX = 0;
-    let lastY = 0;
+// 🆕 MIDDLE BUTTON - PROSTY MOMENTUM Z DUŻYMI PROGAMI
+// ========================================
+useEffect(() => {
+  let isPanning = false;
+  let lastX = 0;
+  let lastY = 0;
+  let startX = 0;
+  let startY = 0;
+  let lastMoveTime = 0;
+  
+  // Historia ostatnich ruchów
+  const velocityHistory: Array<{ vx: number; vy: number }> = [];
 
-    const handleMouseDown = (e: MouseEvent) => {
-      // Middle button (button 1)
-      if (e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-        isPanning = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        document.body.style.cursor = 'grabbing';
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
-      
+  const handleMouseDown = (e: MouseEvent) => {
+    if (e.button === 1) {
       e.preventDefault();
       e.stopPropagation();
       
+      setMomentum(prev => stopMomentum(prev));
+      
+      isPanning = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      startX = e.clientX;
+      startY = e.clientY;
+      lastMoveTime = performance.now();
+      velocityHistory.length = 0;
+      document.body.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isPanning) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const currentTime = performance.now();
+    const deltaTime = currentTime - lastMoveTime;
+    
+    if (deltaTime > 0 && deltaTime < 50) {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       
+      const vx = dx / deltaTime;
+      const vy = dy / deltaTime;
+      
+      velocityHistory.push({ vx, vy });
+      
+      // Trzymaj tylko ostatnie 5 sampli
+      if (velocityHistory.length > 5) {
+        velocityHistory.shift();
+      }
+      
       lastX = e.clientX;
       lastY = e.clientY;
+      lastMoveTime = currentTime;
       
       const currentViewport = viewportRef.current;
-      
-      // Pan viewport - bez minusa, żeby kierunek był naturalny
       const newViewport = panViewportWithMouse(currentViewport, dx, dy);
       
       setViewport(constrainViewport(newViewport));
-    };
+    }
+  };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-        isPanning = false;
-        document.body.style.cursor = '';
+  const handleMouseUp = (e: MouseEvent) => {
+    if (e.button === 1) {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      if (isPanning && velocityHistory.length >= 2) {
+        // Całkowita odległość ruchu
+        const totalDx = e.clientX - startX;
+        const totalDy = e.clientY - startY;
+        const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+        
+        // 🔥 PRÓG 1: Minimum 50px dystansu
+        if (totalDistance < 50) {
+          isPanning = false;
+          document.body.style.cursor = '';
+          return; // BRAK MOMENTUM
+        }
+        
+        // Średnia z ostatnich 3 sampli
+        const recentSamples = velocityHistory.slice(-3);
+        let avgVx = 0;
+        let avgVy = 0;
+        
+        recentSamples.forEach(sample => {
+          avgVx += sample.vx;
+          avgVy += sample.vy;
+        });
+        
+        avgVx /= recentSamples.length;
+        avgVy /= recentSamples.length;
+        
+        const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+        
+        // 🔥 PRÓG 2: Minimum 0.3 px/ms prędkości (= 18px na 60ms frame)
+        if (speed < 0.5) {
+          isPanning = false;
+          document.body.style.cursor = '';
+          return; // BRAK MOMENTUM
+        }
+        
+        // 🔥 PRÓG 3: Tylko jeśli dystans > 100px, daj pełną moc
+        let multiplier = 0.1;
+        if (totalDistance > 100) {
+          multiplier = 0.1;
+        }
+        if (totalDistance > 200) {
+          multiplier = 0.12;
+        }
+        if (totalDistance > 300) {
+          multiplier = 0.14;
+        }
+        if (totalDistance > 400) {
+          multiplier = 0.16;
+        }
+        if (totalDistance > 500) {
+          multiplier = 0.18;
+        }
+        if (totalDistance > 600) {
+          multiplier = 0.2;
+        }
+        if (totalDistance > 750) {
+          multiplier = 0.22;
+        }
+        if (totalDistance > 800) {
+          multiplier = 0.24;
+        }
+        if (totalDistance > 850) {
+          multiplier = 0.26;
+        }
+        if (totalDistance > 900) {
+          multiplier = 0.28;
+        }
+        if (totalDistance > 950) {
+          multiplier = 0.3;
+        }
+        if (totalDistance > 1000) {
+          multiplier = 0.32;
+        }
+
+        const currentScale = viewportRef.current.scale;
+        const scaleMultiplier = 1 / currentScale;
+        
+        setMomentum(prev => startMomentum(
+          prev, 
+          -avgVx * 2 * multiplier * scaleMultiplier, 
+          -avgVy * 2 * multiplier * scaleMultiplier
+        ));
+      }
+      
+      isPanning = false;
+      document.body.style.cursor = '';
+    }
+  };
+
+  window.addEventListener('mousedown', handleMouseDown, { capture: true });
+  window.addEventListener('mousemove', handleMouseMove, { capture: true });
+  window.addEventListener('mouseup', handleMouseUp, { capture: true });
+  
+  return () => {
+    window.removeEventListener('mousedown', handleMouseDown, { capture: true });
+    window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+    window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+    document.body.style.cursor = '';
+  };
+}, []);
+
+  // ========================================
+  // 🎢 MOMENTUM ANIMATION LOOP
+  // ========================================
+  useEffect(() => {
+    if (!momentum.isActive) return;
+    
+    let animationFrameId: number;
+    
+    const animate = () => {
+      const currentTime = performance.now();
+      const { momentum: newMomentum, viewport: viewportChange } = updateMomentum(momentum, currentTime);
+      
+      if (viewportChange) {
+        // Zastosuj zmianę viewport
+        setViewport(prev => constrainViewport({
+          x: prev.x + viewportChange.x,
+          y: prev.y + viewportChange.y,
+          scale: prev.scale
+        }));
+      }
+      
+      // Zaktualizuj momentum state
+      setMomentum(newMomentum);
+      
+      // Kontynuuj animację jeśli momentum jest aktywne
+      if (newMomentum.isActive) {
+        animationFrameId = requestAnimationFrame(animate);
       }
     };
-
-    // Capture phase = true - przechwytuj eventy PRZED innymi narzędziami
-    window.addEventListener('mousedown', handleMouseDown, { capture: true });
-    window.addEventListener('mousemove', handleMouseMove, { capture: true });
-    window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    
+    animationFrameId = requestAnimationFrame(animate);
     
     return () => {
-      window.removeEventListener('mousedown', handleMouseDown, { capture: true });
-      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
-      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
-      document.body.style.cursor = '';
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
-  }, []); // Pusta tablica - używamy refs
+  }, [momentum]);
   
   return (
     <div 
-      className={`relative w-full h-full bg-white ${className}`}
+      className={`relative w-full h-full bg-[#FEF2F2] ${className}`}
       onDrop={handleGlobalDropImage}
       onDragOver={(e) => {
         e.preventDefault();
