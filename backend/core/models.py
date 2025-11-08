@@ -43,11 +43,8 @@ class Workspace(Base):
     icon = Column(String, default='Home')
     bg_color = Column(String(50), default="bg-green-500")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-<<<<<<< HEAD
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)  # ← DODANE!
-=======
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
->>>>>>> 642d0675ad56bdf51c9d1ce4e00f28502e554504
+
     
     # Relationships
     creator = relationship("User", back_populates="created_workspaces")
