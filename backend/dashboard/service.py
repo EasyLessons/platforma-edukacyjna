@@ -275,7 +275,12 @@ def create_workspace(db: Session, workspace_data: WorkspaceCreate, user_id: int)
         icon=new_workspace.icon,
         bg_color=new_workspace.bg_color,
         created_by=new_workspace.created_by,
-        creator=UserBasic.from_orm(creator),  # ← użyj from_orm albo ręcznie
+        creator={
+            "id": creator.id,
+            "username": creator.username,
+            "email": creator.email,
+            "full_name": creator.full_name
+        },  # ← Przekazuj jako dict, NIE używaj from_orm()
         member_count=1,
         board_count=0,
         is_owner=True,
