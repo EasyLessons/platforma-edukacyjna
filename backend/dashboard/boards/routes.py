@@ -17,9 +17,9 @@ from dashboard.boards.schemas import (
 from dashboard.boards.service import BoardService
 from dashboard.boards.utils import get_current_user_id
 
-router = APIRouter(prefix="/api", tags=["dashboard", "boards"])
+router = APIRouter(prefix="/api/boards", tags=["dashboard", "boards"])
 
-@router.post("/boards", response_model=BoardResponse)
+@router.post("", response_model=BoardResponse)
 async def create_board(
     board_data: CreateBoard, 
     db: Session = Depends(get_db),
@@ -29,7 +29,7 @@ async def create_board(
     service = BoardService(db)
     return await service.create_board(board_data, user_id)
 
-@router.get("/boards", response_model=BoardListResponse)
+@router.get("", response_model=BoardListResponse)
 async def list_boards(
     workspace_id: int,
     limit: int = 10,
@@ -41,7 +41,7 @@ async def list_boards(
     service = BoardService(db)
     return await service.list_boards(workspace_id, user_id, limit, offset)
 
-@router.put("/boards/{board_id}", response_model=BoardResponse)
+@router.put("/{board_id}", response_model=BoardResponse)
 async def update_board(
     board_id: int, 
     board_data: UpdateBoard, 
@@ -52,7 +52,7 @@ async def update_board(
     service = BoardService(db)
     return await service.update_board(board_id, board_data, user_id)
 
-@router.post("/boards/{board_id}/toggle-favourite", response_model=ToggleFavouriteResponse)
+@router.post("/{board_id}/toggle-favourite", response_model=ToggleFavouriteResponse)
 async def toggle_favourite(
     board_id: int, 
     toggle_data: ToggleFavourite, 
@@ -63,7 +63,7 @@ async def toggle_favourite(
     service = BoardService(db)
     return await service.toggle_favourite(board_id, toggle_data, user_id)
 
-@router.get("/boards/{board_id}/online-users", response_model=List[OnlineUserInfo])
+@router.get("/{board_id}/online-users", response_model=List[OnlineUserInfo])
 async def get_online_users(
     board_id: int, 
     limit: int = 50,
@@ -74,7 +74,7 @@ async def get_online_users(
     service = BoardService(db)
     return await service.get_online_users(board_id, limit, offset)
 
-@router.delete("/boards/{board_id}")
+@router.delete("/{board_id}")
 async def delete_board(
     board_id: int, 
     db: Session = Depends(get_db),
@@ -84,19 +84,19 @@ async def delete_board(
     service = BoardService(db)
     return await service.delete_board(board_id, user_id)
 
-@router.get("/boards/{board_id}/owner", response_model=BoardOwnerInfo)
+@router.get("/{board_id}/owner", response_model=BoardOwnerInfo)
 async def get_board_owner(board_id: int, db: Session = Depends(get_db)):
     """Pobieranie informacji o właścicielu tablicy"""
     service = BoardService(db)
     return await service.get_board_owner_info(board_id)
 
-@router.get("/boards/{board_id}/last-modified-by", response_model=LastModifiedByInfo)
+@router.get("/{board_id}/last-modified-by", response_model=LastModifiedByInfo)
 async def get_last_modified_by(board_id: int, db: Session = Depends(get_db)):
     """Pobieranie informacji o ostatnim modyfikatorze tablicy"""
     service = BoardService(db)
     return await service.get_last_modifier_info(board_id)
 
-@router.get("/boards/{board_id}/last-opened", response_model=LastOpenedInfo)
+@router.get("/{board_id}/last-opened", response_model=LastOpenedInfo)
 async def get_last_opened(
     board_id: int, 
     db: Session = Depends(get_db),

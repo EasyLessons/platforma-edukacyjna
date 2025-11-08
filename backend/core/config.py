@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     from_email: str  # WYMAGANE - adres nadawcy emaili
     # Development: onboarding@resend.dev (testowy, działa od razu)
     # Production: noreply@twoja-domena.com (wymaga weryfikacji domeny w Resend)
+
+    port: int = 8000
     
     # === KONFIGURACJA PYDANTIC ===
     class Config:

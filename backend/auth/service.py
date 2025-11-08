@@ -116,7 +116,7 @@ class AuthService:
         
         # Token
         access_token = create_access_token(
-            data={"sub": user.id},
+            data={"sub": str(user.id)},
             secret_key=self.settings.secret_key,
             algorithm=self.settings.algorithm,
             expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
@@ -146,7 +146,7 @@ class AuthService:
         
         # Token
         access_token = create_access_token(
-            data={"sub": user.id},
+            data={"sub": str(user.id)},
             secret_key=self.settings.secret_key,
             algorithm=self.settings.algorithm,
             expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)

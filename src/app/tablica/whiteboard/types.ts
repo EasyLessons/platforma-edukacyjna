@@ -102,3 +102,10 @@ export interface ImageElement {
 }
 
 export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement;
+
+export interface MomentumState {
+  velocityX: number;
+  velocityY: number;
+  isActive: boolean;
+  lastTimestamp: number;
+}

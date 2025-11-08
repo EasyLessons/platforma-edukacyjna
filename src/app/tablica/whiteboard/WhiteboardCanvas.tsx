@@ -86,6 +86,8 @@ import { ShapeTool } from '../toolbar/ShapeTool';
 import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
+import { EraserTool } from '../toolbar/EraserTool';
+
 
 // Import wszystkich modułów
 import {
@@ -96,7 +98,8 @@ import {
   Shape,
   TextElement,
   FunctionPlot,
-  ImageElement
+  ImageElement,
+  MomentumState 
 } from './types';
 
 import {
@@ -104,7 +107,10 @@ import {
   panViewportWithMouse,
   zoomViewport,
   constrainViewport,
-  inverseTransformPoint
+  inverseTransformPoint,
+  updateMomentum,   
+  startMomentum,     
+  stopMomentum     
 } from './viewport';
 
 import { drawGrid } from './Grid';
@@ -124,6 +130,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     x: 0,
     y: 0,
     scale: 1
+  });
+
+  // 🎢 Momentum state (inercja jak na lodzie)
+  const [momentum, setMomentum] = useState<MomentumState>({
+    velocityX: 0,
+    velocityY: 0,
+    isActive: false,
+    lastTimestamp: performance.now()
   });
   
   // Drawing state
@@ -204,6 +218,12 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         setTool('select');
         setSelectedElementIds(new Set());
         setEditingTextId(null);
+      }
+      
+      // E key - Eraser tool
+      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setTool('eraser');
       }
       
       // 🆕 Typing on selected text - enter edit mode and replace text
@@ -565,6 +585,15 @@ useEffect(() => {
   }, []);
 
   // ========================================
+  // 🆕 CALLBACK DLA ERASERTOOL
+  // ========================================
+  const handleElementDelete = useCallback((id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
+
+  // ========================================
   // 🆕 CALLBACKI DLA SELECTTOOL
   // ========================================
   const handleSelectionChange = useCallback((ids: Set<string>) => {
@@ -848,70 +877,183 @@ useEffect(() => {
   }, []);
   
   // ========================================
-  // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
-  // ========================================
-  useEffect(() => {
-    let isPanning = false;
-    let lastX = 0;
-    let lastY = 0;
+// 🆕 MIDDLE BUTTON - PROSTY MOMENTUM Z DUŻYMI PROGAMI
+// ========================================
+useEffect(() => {
+  let isPanning = false;
+  let lastX = 0;
+  let lastY = 0;
+  let startX = 0;
+  let startY = 0;
+  let lastMoveTime = 0;
+  
+  // Historia ostatnich ruchów
+  const velocityHistory: Array<{ vx: number; vy: number }> = [];
 
-    const handleMouseDown = (e: MouseEvent) => {
-      // Middle button (button 1)
-      if (e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
-        isPanning = true;
-        lastX = e.clientX;
-        lastY = e.clientY;
-        document.body.style.cursor = 'grabbing';
-      }
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
-      
+  const handleMouseDown = (e: MouseEvent) => {
+    if (e.button === 1) {
       e.preventDefault();
       e.stopPropagation();
       
+      setMomentum(prev => stopMomentum(prev));
+      
+      isPanning = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      startX = e.clientX;
+      startY = e.clientY;
+      lastMoveTime = performance.now();
+      velocityHistory.length = 0;
+      document.body.style.cursor = 'grabbing';
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (!isPanning) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const currentTime = performance.now();
+    const deltaTime = currentTime - lastMoveTime;
+    
+    if (deltaTime > 0 && deltaTime < 50) {
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       
+      const vx = dx / deltaTime;
+      const vy = dy / deltaTime;
+      
+      velocityHistory.push({ vx, vy });
+      
+      // Trzymaj tylko ostatnie 5 sampli
+      if (velocityHistory.length > 5) {
+        velocityHistory.shift();
+      }
+      
       lastX = e.clientX;
       lastY = e.clientY;
+      lastMoveTime = currentTime;
       
       const currentViewport = viewportRef.current;
-      
-      // Pan viewport - bez minusa, żeby kierunek był naturalny
       const newViewport = panViewportWithMouse(currentViewport, dx, dy);
       
       setViewport(constrainViewport(newViewport));
-    };
+    }
+  };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button === 1) {
-        e.preventDefault();
-        e.stopPropagation();
+  const handleMouseUp = (e: MouseEvent) => {
+  if (e.button === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isPanning && velocityHistory.length >= 2) {
+      const totalDx = e.clientX - startX;
+      const totalDy = e.clientY - startY;
+      const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+      
+      // 🔥 PRÓG 1: Minimum 50px
+      if (totalDistance < 50) {
         isPanning = false;
         document.body.style.cursor = '';
+        return;
+      }
+      
+      // Średnia z ostatnich 3 sampli
+      const recentSamples = velocityHistory.slice(-3);
+      let avgVx = 0;
+      let avgVy = 0;
+      
+      recentSamples.forEach(sample => {
+        avgVx += sample.vx;
+        avgVy += sample.vy;
+      });
+      
+      avgVx /= recentSamples.length;
+      avgVy /= recentSamples.length;
+      
+      const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+      
+      // 🔥 PRÓG 2: Minimum 0.5 px/ms
+      if (speed < 0.5) {
+        isPanning = false;
+        document.body.style.cursor = '';
+        return;
+      }
+      
+      // 🚀 PROSTA FUNKCJA LINIOWA (bez lagów)
+      let multiplier = 0.05 + (totalDistance * 0.0002);
+      multiplier = Math.min(multiplier, 0.5); // Max 0.5
+      
+      const currentScale = viewportRef.current.scale;
+      const scaleMultiplier = 1 / currentScale;
+      
+      setMomentum(prev => startMomentum(
+        prev, 
+        -avgVx * 2 * multiplier * scaleMultiplier, 
+        -avgVy * 2 * multiplier * scaleMultiplier
+      ));
+    }
+    
+    isPanning = false;
+    document.body.style.cursor = '';
+  }
+};
+
+  window.addEventListener('mousedown', handleMouseDown, { capture: true });
+  window.addEventListener('mousemove', handleMouseMove, { capture: true });
+  window.addEventListener('mouseup', handleMouseUp, { capture: true });
+  
+  return () => {
+    window.removeEventListener('mousedown', handleMouseDown, { capture: true });
+    window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+    window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+    document.body.style.cursor = '';
+  };
+}, []);
+
+  // ========================================
+  // 🎢 MOMENTUM ANIMATION LOOP
+  // ========================================
+  useEffect(() => {
+    if (!momentum.isActive) return;
+    
+    let animationFrameId: number;
+    
+    const animate = () => {
+      const currentTime = performance.now();
+      const { momentum: newMomentum, viewport: viewportChange } = updateMomentum(momentum, currentTime);
+      
+      if (viewportChange) {
+        // Zastosuj zmianę viewport
+        setViewport(prev => constrainViewport({
+          x: prev.x + viewportChange.x,
+          y: prev.y + viewportChange.y,
+          scale: prev.scale
+        }));
+      }
+      
+      // Zaktualizuj momentum state
+      setMomentum(newMomentum);
+      
+      // Kontynuuj animację jeśli momentum jest aktywne
+      if (newMomentum.isActive) {
+        animationFrameId = requestAnimationFrame(animate);
       }
     };
-
-    // Capture phase = true - przechwytuj eventy PRZED innymi narzędziami
-    window.addEventListener('mousedown', handleMouseDown, { capture: true });
-    window.addEventListener('mousemove', handleMouseMove, { capture: true });
-    window.addEventListener('mouseup', handleMouseUp, { capture: true });
+    
+    animationFrameId = requestAnimationFrame(animate);
     
     return () => {
-      window.removeEventListener('mousedown', handleMouseDown, { capture: true });
-      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
-      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
-      document.body.style.cursor = '';
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
     };
-  }, []); // Pusta tablica - używamy refs
+  }, [momentum]);
   
   return (
     <div 
-      className={`relative w-full h-full bg-white ${className}`}
+      className={`relative w-full h-full bg-[#FEF2F2] ${className}`}
       onDrop={handleGlobalDropImage}
       onDragOver={(e) => {
         e.preventDefault();
@@ -1047,6 +1189,18 @@ useEffect(() => {
             onViewportChange={handleViewportChange}
           />
         )}
+
+        {/* 🆕 ERASERTOOL - aktywny gdy tool === 'eraser' */}
+        {tool === 'eraser' && canvasWidth > 0 && (
+          <EraserTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements}
+            onElementDelete={handleElementDelete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
         
         <canvas
           ref={canvasRef}
@@ -1057,6 +1211,7 @@ useEffect(() => {
               tool === 'pan' ? 'grab' : 
               tool === 'select' ? 'default' : 
               tool === 'text' ? 'crosshair' :
+              tool === 'eraser' ? 'none' :
               'crosshair',
             willChange: 'auto',
             imageRendering: 'crisp-edges',

@@ -19,7 +19,7 @@ export default function Dashboard() {
 
         {/* PRAWA STRONA - Główna treść */}
         <div className="flex-1 overflow-auto">
-          <div className="max-w-7xl mx-auto p-8">
+          <div className="w-full mx-auto p-8">
             
             {/* SEKCJA POWITALNA */}
             <WelcomeSection />

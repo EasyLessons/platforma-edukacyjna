@@ -142,31 +142,40 @@ export function SelectTool({
         const scaleX = newBoxWidth / resizeOriginalBox.width;
         const scaleY = newBoxHeight / resizeOriginalBox.height;
         
-        let pivotX = newBoxX;
-        let pivotY = newBoxY;
+        // 🔥 POPRAWKA: Pivot to ORYGINALNY przeciwległy róg, nie nowy!
+        let pivotX: number;
+        let pivotY: number;
         
         if (resizeHandle === 'se') {
-          pivotX = newBoxX;
-          pivotY = newBoxY;
+          // Lewy górny róg (oryginalny)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y;
         } else if (resizeHandle === 'sw') {
-          pivotX = newBoxX + newBoxWidth;
-          pivotY = newBoxY;
+          // Prawy górny róg (oryginalny)
+          pivotX = resizeOriginalBox.x + resizeOriginalBox.width;
+          pivotY = resizeOriginalBox.y;
         } else if (resizeHandle === 'ne') {
-          pivotX = newBoxX;
-          pivotY = newBoxY + newBoxHeight;
+          // Lewy dolny róg (oryginalny)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y + resizeOriginalBox.height;
         } else if (resizeHandle === 'nw') {
-          pivotX = newBoxX + newBoxWidth;
-          pivotY = newBoxY + newBoxHeight;
+          // Prawy dolny róg (oryginalny)
+          pivotX = resizeOriginalBox.x + resizeOriginalBox.width;
+          pivotY = resizeOriginalBox.y + resizeOriginalBox.height;
+        } else {
+          // Fallback (nie powinno się zdarzyć)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y;
         }
         
         const updates = new Map<string, Partial<DrawingElement>>();
 
         resizeOriginalElements.forEach((originalEl, id) => {
           if (originalEl.type === 'shape') {
-            const newStartX = pivotX + (originalEl.startX - (resizeOriginalBox.x + (pivotX - newBoxX))) * scaleX;
-            const newStartY = pivotY + (originalEl.startY - (resizeOriginalBox.y + (pivotY - newBoxY))) * scaleY;
-            const newEndX = pivotX + (originalEl.endX - (resizeOriginalBox.x + (pivotX - newBoxX))) * scaleX;
-            const newEndY = pivotY + (originalEl.endY - (resizeOriginalBox.y + (pivotY - newBoxY))) * scaleY;
+            const newStartX = pivotX + (originalEl.startX - pivotX) * scaleX;
+            const newStartY = pivotY + (originalEl.startY - pivotY) * scaleY;
+            const newEndX = pivotX + (originalEl.endX - pivotX) * scaleX;
+            const newEndY = pivotY + (originalEl.endY - pivotY) * scaleY;
 
             updates.set(id, {
               startX: newStartX,
@@ -175,11 +184,8 @@ export function SelectTool({
               endY: newEndY,
             });
           } else if (originalEl.type === 'text') {
-            const originalPivotX = resizeOriginalBox.x + (pivotX - newBoxX);
-            const originalPivotY = resizeOriginalBox.y + (pivotY - newBoxY);
-            
-            const newX = pivotX + (originalEl.x - originalPivotX) * scaleX;
-            const newY = pivotY + (originalEl.y - originalPivotY) * scaleY;
+            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
             const newWidth = (originalEl.width || 3) * scaleX;
             const newHeight = (originalEl.height || 1) * scaleY;
             
@@ -194,11 +200,8 @@ export function SelectTool({
               fontSize: Math.max(8, Math.min(120, newFontSize)),
             });
           } else if (originalEl.type === 'image') {
-            const originalPivotX = resizeOriginalBox.x + (pivotX - newBoxX);
-            const originalPivotY = resizeOriginalBox.y + (pivotY - newBoxY);
-            
-            const newX = pivotX + (originalEl.x - originalPivotX) * scaleX;
-            const newY = pivotY + (originalEl.y - originalPivotY) * scaleY;
+            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
             const newWidth = originalEl.width * scaleX;
             const newHeight = originalEl.height * scaleY;
 
@@ -209,12 +212,9 @@ export function SelectTool({
               height: Math.max(MIN_SIZE, newHeight),
             });
           } else if (originalEl.type === 'path') {
-            const originalPivotX = resizeOriginalBox.x + (pivotX - newBoxX);
-            const originalPivotY = resizeOriginalBox.y + (pivotY - newBoxY);
-            
             const newPoints = originalEl.points.map((p: Point) => ({
-              x: pivotX + (p.x - originalPivotX) * scaleX,
-              y: pivotY + (p.y - originalPivotY) * scaleY,
+              x: pivotX + (p.x - pivotX) * scaleX,
+              y: pivotY + (p.y - pivotY) * scaleY,
             }));
 
             updates.set(id, { points: newPoints });

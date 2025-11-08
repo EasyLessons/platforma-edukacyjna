@@ -42,31 +42,43 @@ export function drawGrid(
   height: number
 ): void {
   // === SIATKA W TLE ===
-  ctx.strokeStyle = 'rgba(200, 200, 200, 0.3)';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  
+
   // Zakres widocznych kratek w świecie (co 0.5 jednostki)
   const startX = Math.floor((viewport.x - width / (2 * viewport.scale)) / 0.5) * 0.5;
   const endX = Math.ceil((viewport.x + width / (2 * viewport.scale)) / 0.5) * 0.5;
   const startY = Math.floor((viewport.y - height / (2 * viewport.scale)) / 0.5) * 0.5;
   const endY = Math.ceil((viewport.y + height / (2 * viewport.scale)) / 0.5) * 0.5;
-  
+
   // Pionowe linie siatki (co 0.5 jednostki)
   for (let worldX = startX; worldX <= endX; worldX += 0.5) {
+    // Co druga linia (pełne liczby) jest grubsza
+    const isMainLine = worldX % 1 === 0;
+    ctx.strokeStyle = isMainLine 
+      ? 'rgba(200, 200, 200, 0.45)'  // Grubsza (pełne liczby: 0, 1, 2...)
+      : 'rgba(200, 200, 200, 0.3)'; // Cieńsza (0.5, 1.5, 2.5...)
+    
+    ctx.beginPath();
     const screenPos = transformPoint({ x: worldX, y: 0 }, viewport, width, height);
     ctx.moveTo(screenPos.x, 0);
     ctx.lineTo(screenPos.x, height);
+    ctx.stroke();
   }
+
+// Poziome linie siatki (co 0.5 jednostki)
+for (let worldY = startY; worldY <= endY; worldY += 0.5) {
+  // Co druga linia (pełne liczby) jest grubsza
+  const isMainLine = worldY % 1 === 0;
+  ctx.strokeStyle = isMainLine 
+    ? 'rgba(200, 200, 200, 0.45)'  // Grubsza (pełne liczby: 0, 1, 2...)
+    : 'rgba(200, 200, 200, 0.3)'; // Cieńsza (0.5, 1.5, 2.5...)
   
-  // Poziome linie siatki (co 0.5 jednostki)
-  for (let worldY = startY; worldY <= endY; worldY += 0.5) {
-    const screenPos = transformPoint({ x: 0, y: worldY }, viewport, width, height);
-    ctx.moveTo(0, screenPos.y);
-    ctx.lineTo(width, screenPos.y);
-  }
-  
+  ctx.beginPath();
+  const screenPos = transformPoint({ x: 0, y: worldY }, viewport, width, height);
+  ctx.moveTo(0, screenPos.y);
+  ctx.lineTo(width, screenPos.y);
   ctx.stroke();
+  } 
   
   // === OSIE ===
   const origin = transformPoint({ x: 0, y: 0 }, viewport, width, height);

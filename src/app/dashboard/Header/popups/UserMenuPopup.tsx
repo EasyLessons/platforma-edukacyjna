@@ -3,6 +3,8 @@
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Settings, Crown, LogOut } from 'lucide-react';
+// 🔥 DODAJ TEN IMPORT - 3 poziomy w górę do app/, potem context/
+import { useAuth } from '../../../context/AuthContext';
 
 interface UserMenuPopupProps {
   onClose: () => void;
@@ -16,17 +18,21 @@ interface UserMenuPopupProps {
 
 export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   const router = useRouter();
+  // 🔥 DODAJ TO - pobierz funkcję logout z contextu
+  const { logout } = useAuth();
 
   const handleNavigation = (path: string) => {
     router.push(path);
     onClose();
   };
 
+  // 🔥 POPRAWIONY LOGOUT - tak jak w AuthHeader
   const handleLogout = () => {
-    // TODO: Dodaj prawdziwą logikę wylogowania
-    console.log('Wylogowano');
-    router.push('/');
-    onClose();
+    console.log('🚪 Wylogowywanie...');
+    logout(); // ✅ Używa prawdziwego logout z AuthContext
+    console.log('✅ Wylogowano!');
+    onClose(); // Zamknij popup
+    router.push('/'); // Przekieruj na stronę główną
   };
 
   return (
