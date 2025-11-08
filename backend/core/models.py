@@ -43,6 +43,7 @@ class Workspace(Base):
     icon = Column(String, default='Home')
     bg_color = Column(String(50), default="bg-green-500")
     created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
     creator = relationship("User", back_populates="created_workspaces")
@@ -70,6 +71,7 @@ class Board(Base):
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     name = Column(String(200), nullable=False)
     icon = Column(String(50), default="PenTool")
     bg_color = Column(String(50), default="bg-gray-500")
