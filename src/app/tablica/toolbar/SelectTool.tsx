@@ -3,36 +3,17 @@
  * PLIK: src/app/tablica/toolbar/SelectTool.tsx
  * ============================================================================
  * 
- * IMPORTUJE Z:
- * - react (useState, useCallback)
- * - ../whiteboard/types (Point, ViewportTransform, DrawingElement)
- * - ../whiteboard/viewport (transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
- * 
- * EKSPORTUJE:
- * - SelectTool (component) - narzędzie zaznaczania/przesuwania/skalowania
- * 
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (aktywne gdy tool === 'select')
- * 
- * ⚠️ ZALEŻNOŚCI:
- * - types.ts - używa DrawingElement (zmiana typów wymaga aktualizacji)
- * - viewport.ts - używa funkcji transformacji i zoom/pan
- * - WhiteboardCanvas.tsx - dostarcza callback'i: onSelectionChange, onElementUpdate, etc.
- * 
- * ⚠️ WAŻNE - WHEEL EVENTS:
- * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
- * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
- * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
- * 
- * PRZEZNACZENIE:
- * Zaznaczanie elementów (klik/box), przeciąganie, skalowanie (uchwyty).
- * Double-click na tekst otwiera edytor (onTextEdit).
+ * ✅ POPRAWKI:
+ * - Używamy newBoxX/newBoxY do obliczania pivotu (KRYTYCZNE!)
+ * - Skalujemy fontSize dla tekstów (nie tylko width/height)
+ * - Tylko 4 rogi (nw, ne, se, sw)
+ * - MIN_SIZE = 0.1 zapobiega znikaniu elementów
  * ============================================================================
  */
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { TextMiniToolbar } from './TextMiniToolbar';
@@ -45,22 +26,18 @@ interface SelectToolProps {
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
-  onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void; // 🆕 Dla formatowania
+  onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void;
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
-  onOperationFinish?: () => void; // Callback po zakończeniu drag/resize
-  onTextEdit?: (id: string) => void; // 🆕 Callback do edycji tekstu (double-click)
-  onViewportChange?: (viewport: ViewportTransform) => void; // 🆕 Do obsługi wheel
+  onOperationFinish?: () => void;
+  onTextEdit?: (id: string) => void;
+  onViewportChange?: (viewport: ViewportTransform) => void;
 }
 
 type ResizeHandle =
-  | 'nw' // north-west (top-left)
-  | 'n' // north (top)
-  | 'ne' // north-east (top-right)
-  | 'e' // east (right)
-  | 'se' // south-east (bottom-right)
-  | 's' // south (bottom)
-  | 'sw' // south-west (bottom-left)
-  | 'w' // west (left)
+  | 'nw'
+  | 'ne'
+  | 'se'
+  | 'sw'
   | null;
 
 interface BoundingBox {
@@ -78,11 +55,11 @@ export function SelectTool({
   selectedIds,
   onSelectionChange,
   onElementUpdate,
-  onElementUpdateWithHistory, // 🆕
+  onElementUpdateWithHistory,
   onElementsUpdate,
   onOperationFinish,
-  onTextEdit, // 🆕
-  onViewportChange, // 🆕
+  onTextEdit,
+  onViewportChange,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -90,36 +67,226 @@ export function SelectTool({
 
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState<Point | null>(null);
-  const [draggedElementsOriginal, setDraggedElementsOriginal] = useState<
-    Map<string, DrawingElement>
-  >(new Map());
+  const [draggedElementsOriginal, setDraggedElementsOriginal] = useState<Map<string, DrawingElement>>(new Map());
 
   const [isResizing, setIsResizing] = useState(false);
   const [resizeHandle, setResizeHandle] = useState<ResizeHandle>(null);
   const [resizeOriginalBox, setResizeOriginalBox] = useState<BoundingBox | null>(null);
-  const [resizeOriginalElements, setResizeOriginalElements] = useState<
-    Map<string, DrawingElement>
-  >(new Map());
+  const [resizeOriginalElements, setResizeOriginalElements] = useState<Map<string, DrawingElement>>(new Map());
 
-  // 🆕 Handler dla wheel event - obsługuje zoom i pan bezpośrednio
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!onViewportChange) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.ctrlKey) {
-      // Zoom
-      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
-      onViewportChange(constrainViewport(newViewport));
-    } else {
-      // Pan
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      onViewportChange(constrainViewport(newViewport));
-    }
-  };
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Calculate bounding box for selected elements
+  // 🆕 Natywny wheel listener z { passive: false }
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !onViewportChange) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey) {
+        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        onViewportChange(constrainViewport(newViewport));
+      } else {
+        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        onViewportChange(constrainViewport(newViewport));
+      }
+    };
+
+    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleNativeWheel);
+  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+
+  // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag
+  useEffect(() => {
+    if (!isResizing && !isDragging) return;
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const screenPoint = { x: e.clientX, y: e.clientY };
+      const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+      if (isResizing && resizeHandle && resizeOriginalBox) {
+        const currentWorldX = worldPoint.x;
+        const currentWorldY = worldPoint.y;
+        
+        let newBoxX = resizeOriginalBox.x;
+        let newBoxY = resizeOriginalBox.y;
+        let newBoxWidth = resizeOriginalBox.width;
+        let newBoxHeight = resizeOriginalBox.height;
+        
+        const MIN_SIZE = 0.1;
+        
+        if (resizeHandle === 'se') {
+          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          newBoxHeight = Math.max(MIN_SIZE, currentWorldY - resizeOriginalBox.y);
+        } else if (resizeHandle === 'sw') {
+          const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          newBoxX = originalRight - newBoxWidth;
+          newBoxHeight = Math.max(MIN_SIZE, currentWorldY - resizeOriginalBox.y);
+        } else if (resizeHandle === 'ne') {
+          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
+          newBoxHeight = Math.max(MIN_SIZE, originalBottom - currentWorldY);
+          newBoxY = originalBottom - newBoxHeight;
+        } else if (resizeHandle === 'nw') {
+          const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
+          const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          newBoxX = originalRight - newBoxWidth;
+          newBoxHeight = Math.max(MIN_SIZE, originalBottom - currentWorldY);
+          newBoxY = originalBottom - newBoxHeight;
+        }
+        
+        const scaleX = newBoxWidth / resizeOriginalBox.width;
+        const scaleY = newBoxHeight / resizeOriginalBox.height;
+        
+        // 🔥 POPRAWKA: Pivot to ORYGINALNY przeciwległy róg, nie nowy!
+        let pivotX: number;
+        let pivotY: number;
+        
+        if (resizeHandle === 'se') {
+          // Lewy górny róg (oryginalny)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y;
+        } else if (resizeHandle === 'sw') {
+          // Prawy górny róg (oryginalny)
+          pivotX = resizeOriginalBox.x + resizeOriginalBox.width;
+          pivotY = resizeOriginalBox.y;
+        } else if (resizeHandle === 'ne') {
+          // Lewy dolny róg (oryginalny)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y + resizeOriginalBox.height;
+        } else if (resizeHandle === 'nw') {
+          // Prawy dolny róg (oryginalny)
+          pivotX = resizeOriginalBox.x + resizeOriginalBox.width;
+          pivotY = resizeOriginalBox.y + resizeOriginalBox.height;
+        } else {
+          // Fallback (nie powinno się zdarzyć)
+          pivotX = resizeOriginalBox.x;
+          pivotY = resizeOriginalBox.y;
+        }
+        
+        const updates = new Map<string, Partial<DrawingElement>>();
+
+        resizeOriginalElements.forEach((originalEl, id) => {
+          if (originalEl.type === 'shape') {
+            const newStartX = pivotX + (originalEl.startX - pivotX) * scaleX;
+            const newStartY = pivotY + (originalEl.startY - pivotY) * scaleY;
+            const newEndX = pivotX + (originalEl.endX - pivotX) * scaleX;
+            const newEndY = pivotY + (originalEl.endY - pivotY) * scaleY;
+
+            updates.set(id, {
+              startX: newStartX,
+              startY: newStartY,
+              endX: newEndX,
+              endY: newEndY,
+            });
+          } else if (originalEl.type === 'text') {
+            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
+            const newWidth = (originalEl.width || 3) * scaleX;
+            const newHeight = (originalEl.height || 1) * scaleY;
+            
+            const avgScale = (scaleX + scaleY) / 2;
+            const newFontSize = originalEl.fontSize * avgScale;
+
+            updates.set(id, {
+              x: newX,
+              y: newY,
+              width: Math.max(MIN_SIZE, newWidth),
+              height: Math.max(MIN_SIZE, newHeight),
+              fontSize: Math.max(8, Math.min(120, newFontSize)),
+            });
+          } else if (originalEl.type === 'image') {
+            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
+            const newWidth = originalEl.width * scaleX;
+            const newHeight = originalEl.height * scaleY;
+
+            updates.set(id, {
+              x: newX,
+              y: newY,
+              width: Math.max(MIN_SIZE, newWidth),
+              height: Math.max(MIN_SIZE, newHeight),
+            });
+          } else if (originalEl.type === 'path') {
+            const newPoints = originalEl.points.map((p: Point) => ({
+              x: pivotX + (p.x - pivotX) * scaleX,
+              y: pivotY + (p.y - pivotY) * scaleY,
+            }));
+
+            updates.set(id, { points: newPoints });
+          }
+        });
+
+        onElementsUpdate(updates);
+      } else if (isDragging && dragStart) {
+        const dx = worldPoint.x - dragStart.x;
+        const dy = worldPoint.y - dragStart.y;
+
+        const updates = new Map<string, Partial<DrawingElement>>();
+
+        draggedElementsOriginal.forEach((originalEl, id) => {
+          if (originalEl.type === 'path') {
+            const newPoints = originalEl.points.map((p: Point) => ({
+              x: p.x + dx,
+              y: p.y + dy,
+            }));
+            updates.set(id, { points: newPoints });
+          } else if (originalEl.type === 'shape') {
+            updates.set(id, {
+              startX: originalEl.startX + dx,
+              startY: originalEl.startY + dy,
+              endX: originalEl.endX + dx,
+              endY: originalEl.endY + dy,
+            });
+          } else if (originalEl.type === 'text') {
+            updates.set(id, {
+              x: originalEl.x + dx,
+              y: originalEl.y + dy,
+            });
+          } else if (originalEl.type === 'image') {
+            updates.set(id, {
+              x: originalEl.x + dx,
+              y: originalEl.y + dy,
+            });
+          }
+        });
+
+        onElementsUpdate(updates);
+      }
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (isDragging && draggedElementsOriginal.size > 0) {
+        onOperationFinish?.();
+      }
+      
+      if (isResizing && resizeOriginalElements.size > 0) {
+        onOperationFinish?.();
+      }
+      
+      setIsDragging(false);
+      setDragStart(null);
+      setDraggedElementsOriginal(new Map());
+      
+      setIsResizing(false);
+      setResizeHandle(null);
+      setResizeOriginalBox(null);
+      setResizeOriginalElements(new Map());
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, viewport, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish]);
+
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedIds.size === 0) return null;
 
@@ -149,6 +316,11 @@ export function SelectTool({
         minY = Math.min(minY, el.y);
         maxX = Math.max(maxX, el.x + (el.width || 3));
         maxY = Math.max(maxY, el.y + (el.height || 1));
+      } else if (el.type === 'image') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.width);
+        maxY = Math.max(maxY, el.y + el.height);
       }
     });
 
@@ -160,7 +332,6 @@ export function SelectTool({
     };
   }, [elements, selectedIds]);
 
-  // Check if point is inside element
   const isPointInElement = (worldPoint: Point, element: DrawingElement): boolean => {
     if (element.type === 'shape') {
       const minX = Math.min(element.startX, element.endX);
@@ -183,8 +354,14 @@ export function SelectTool({
         worldPoint.y >= element.y &&
         worldPoint.y <= element.y + height
       );
+    } else if (element.type === 'image') {
+      return (
+        worldPoint.x >= element.x &&
+        worldPoint.x <= element.x + element.width &&
+        worldPoint.y >= element.y &&
+        worldPoint.y <= element.y + element.height
+      );
     } else if (element.type === 'path') {
-      // Simple bounding box check for paths
       const xs = element.points.map((p: Point) => p.x);
       const ys = element.points.map((p: Point) => p.y);
       const minX = Math.min(...xs);
@@ -203,12 +380,10 @@ export function SelectTool({
     return false;
   };
 
-  // Get resize handle at point
   const getResizeHandleAt = (screenPoint: Point, boundingBox: BoundingBox): ResizeHandle => {
     const box = boundingBox;
-    const handleSize = 10; // px
+    const handleSize = 10;
 
-    // Transform box corners to screen
     const topLeft = transformPoint({ x: box.x, y: box.y }, viewport, canvasWidth, canvasHeight);
     const topRight = transformPoint(
       { x: box.x + box.width, y: box.y },
@@ -229,11 +404,6 @@ export function SelectTool({
       canvasHeight
     );
 
-    const midTop = { x: (topLeft.x + topRight.x) / 2, y: topLeft.y };
-    const midRight = { x: topRight.x, y: (topRight.y + bottomRight.y) / 2 };
-    const midBottom = { x: (bottomLeft.x + bottomRight.x) / 2, y: bottomLeft.y };
-    const midLeft = { x: topLeft.x, y: (topLeft.y + bottomLeft.y) / 2 };
-
     const isNear = (p1: Point, p2: Point) => {
       const dx = p1.x - p2.x;
       const dy = p1.y - p2.y;
@@ -241,29 +411,22 @@ export function SelectTool({
     };
 
     if (isNear(screenPoint, topLeft)) return 'nw';
-    if (isNear(screenPoint, midTop)) return 'n';
     if (isNear(screenPoint, topRight)) return 'ne';
-    if (isNear(screenPoint, midRight)) return 'e';
     if (isNear(screenPoint, bottomRight)) return 'se';
-    if (isNear(screenPoint, midBottom)) return 's';
     if (isNear(screenPoint, bottomLeft)) return 'sw';
-    if (isNear(screenPoint, midLeft)) return 'w';
 
     return null;
   };
 
-  // 🆕 Double-click handler - otwiera edytor tekstu
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (!onTextEdit) return;
     
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
-    // Znajdź kliknięty element
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       
-      // Sprawdź tylko teksty
       if (el.type === 'text' && isPointInElement(worldPoint, el)) {
         onTextEdit(el.id);
         return;
@@ -271,12 +434,10 @@ export function SelectTool({
     }
   };
 
-  // Mouse down handler
   const handleMouseDown = (e: React.MouseEvent) => {
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
-    // Check if clicking on resize handle
     const bbox = getSelectionBoundingBox();
     if (bbox && selectedIds.size > 0) {
       const handle = getResizeHandleAt(screenPoint, bbox);
@@ -296,7 +457,6 @@ export function SelectTool({
       }
     }
 
-    // Check if clicking on selected element (start drag)
     if (selectedIds.size > 0) {
       const clickedSelected = elements.find(
         (el) => selectedIds.has(el.id) && isPointInElement(worldPoint, el)
@@ -317,12 +477,10 @@ export function SelectTool({
       }
     }
 
-    // Check if clicking on any element (select)
     const clickedElement = elements.find((el) => isPointInElement(worldPoint, el));
 
     if (clickedElement) {
       if (e.shiftKey) {
-        // Shift+Click = add/remove from selection
         const newSelection = new Set(selectedIds);
         if (newSelection.has(clickedElement.id)) {
           newSelection.delete(clickedElement.id);
@@ -331,133 +489,24 @@ export function SelectTool({
         }
         onSelectionChange(newSelection);
       } else {
-        // Single select
         onSelectionChange(new Set([clickedElement.id]));
       }
     } else {
-      // Start selection box
       setIsSelecting(true);
       setSelectionStart(screenPoint);
       setSelectionEnd(screenPoint);
     }
   };
 
-  // Mouse move handler
   const handleMouseMove = (e: React.MouseEvent) => {
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-
-    // Resizing
-    if (isResizing && resizeHandle && resizeOriginalBox) {
-      const deltaX = worldPoint.x - resizeOriginalBox.x;
-      const deltaY = worldPoint.y - resizeOriginalBox.y;
-
-      // Calculate scale factors based on handle
-      let scaleX = 1;
-      let scaleY = 1;
-      let pivotX = resizeOriginalBox.x;
-      let pivotY = resizeOriginalBox.y;
-
-      if (resizeHandle.includes('e')) {
-        scaleX = (worldPoint.x - resizeOriginalBox.x) / resizeOriginalBox.width;
-        pivotX = resizeOriginalBox.x;
-      } else if (resizeHandle.includes('w')) {
-        scaleX = (resizeOriginalBox.x + resizeOriginalBox.width - worldPoint.x) / resizeOriginalBox.width;
-        pivotX = resizeOriginalBox.x + resizeOriginalBox.width;
-      }
-
-      if (resizeHandle.includes('s')) {
-        scaleY = (worldPoint.y - resizeOriginalBox.y) / resizeOriginalBox.height;
-        pivotY = resizeOriginalBox.y;
-      } else if (resizeHandle.includes('n')) {
-        scaleY = (resizeOriginalBox.y + resizeOriginalBox.height - worldPoint.y) / resizeOriginalBox.height;
-        pivotY = resizeOriginalBox.y + resizeOriginalBox.height;
-      }
-
-      // Apply transformations to all selected elements
-      const updates = new Map<string, Partial<DrawingElement>>();
-
-      resizeOriginalElements.forEach((originalEl, id) => {
-        if (originalEl.type === 'shape') {
-          const newStartX = pivotX + (originalEl.startX - pivotX) * scaleX;
-          const newStartY = pivotY + (originalEl.startY - pivotY) * scaleY;
-          const newEndX = pivotX + (originalEl.endX - pivotX) * scaleX;
-          const newEndY = pivotY + (originalEl.endY - pivotY) * scaleY;
-
-          updates.set(id, {
-            startX: newStartX,
-            startY: newStartY,
-            endX: newEndX,
-            endY: newEndY,
-          });
-        } else if (originalEl.type === 'text') {
-          const newX = pivotX + (originalEl.x - pivotX) * scaleX;
-          const newY = pivotY + (originalEl.y - pivotY) * scaleY;
-          const newWidth = (originalEl.width || 3) * scaleX;
-          const newHeight = (originalEl.height || 1) * scaleY;
-
-          updates.set(id, {
-            x: newX,
-            y: newY,
-            width: newWidth,
-            height: newHeight,
-          });
-        } else if (originalEl.type === 'path') {
-          const newPoints = originalEl.points.map((p: Point) => ({
-            x: pivotX + (p.x - pivotX) * scaleX,
-            y: pivotY + (p.y - pivotY) * scaleY,
-          }));
-
-          updates.set(id, { points: newPoints });
-        }
-      });
-
-      onElementsUpdate(updates);
-      return;
-    }
-
-    // Dragging
-    if (isDragging && dragStart) {
-      const dx = worldPoint.x - dragStart.x;
-      const dy = worldPoint.y - dragStart.y;
-
-      const updates = new Map<string, Partial<DrawingElement>>();
-
-      draggedElementsOriginal.forEach((originalEl, id) => {
-        if (originalEl.type === 'path') {
-          const newPoints = originalEl.points.map((p: Point) => ({
-            x: p.x + dx,
-            y: p.y + dy,
-          }));
-          updates.set(id, { points: newPoints });
-        } else if (originalEl.type === 'shape') {
-          updates.set(id, {
-            startX: originalEl.startX + dx,
-            startY: originalEl.startY + dy,
-            endX: originalEl.endX + dx,
-            endY: originalEl.endY + dy,
-          });
-        } else if (originalEl.type === 'text') {
-          updates.set(id, {
-            x: originalEl.x + dx,
-            y: originalEl.y + dy,
-          });
-        }
-      });
-
-      onElementsUpdate(updates);
-      return;
-    }
-
-    // Selection box
+    // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
-      setSelectionEnd(screenPoint);
+      setSelectionEnd({ x: e.clientX, y: e.clientY });
     }
   };
 
-  // Mouse up handler
   const handleMouseUp = () => {
-    // Finish selection box
+    // Tylko dla zaznaczania obszaru - resize/drag mouseup obsługiwane przez global listener
     if (isSelecting && selectionStart && selectionEnd) {
       const worldStart = inverseTransformPoint(selectionStart, viewport, canvasWidth, canvasHeight);
       const worldEnd = inverseTransformPoint(selectionEnd, viewport, canvasWidth, canvasHeight);
@@ -467,7 +516,6 @@ export function SelectTool({
       const minY = Math.min(worldStart.y, worldEnd.y);
       const maxY = Math.max(worldStart.y, worldEnd.y);
 
-      // Find elements inside selection box
       const newSelection = new Set<string>();
       elements.forEach((el) => {
         if (el.type === 'shape') {
@@ -482,6 +530,13 @@ export function SelectTool({
         } else if (el.type === 'text') {
           const elMaxX = el.x + (el.width || 3);
           const elMaxY = el.y + (el.height || 1);
+
+          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+            newSelection.add(el.id);
+          }
+        } else if (el.type === 'image') {
+          const elMaxX = el.x + el.width;
+          const elMaxY = el.y + el.height;
 
           if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
             newSelection.add(el.id);
@@ -502,30 +557,9 @@ export function SelectTool({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
-    
-    // 🆕 Zakończenie drag - zapisz do historii
-    if (isDragging && draggedElementsOriginal.size > 0) {
-      onOperationFinish?.();
-    }
-    
-    setIsDragging(false);
-    setDragStart(null);
-    setDraggedElementsOriginal(new Map());
-    
-    // 🆕 Zakończenie resize - zapisz do historii
-    if (isResizing && resizeOriginalElements.size > 0) {
-      onOperationFinish?.();
-    }
-    
-    setIsResizing(false);
-    setResizeHandle(null);
-    setResizeOriginalBox(null);
-    setResizeOriginalElements(new Map());
   };
 
-  // 🆕 Render mini toolbar for selected text
   const renderTextToolbar = () => {
-    // Tylko gdy zaznaczony jest dokładnie 1 element typu text
     if (selectedIds.size !== 1 || !onElementUpdateWithHistory) return null;
     
     const selectedId = Array.from(selectedIds)[0];
@@ -535,7 +569,6 @@ export function SelectTool({
     
     const textElement = selectedElement;
     
-    // Pozycja toolbara nad zaznaczonym tekstem
     const topLeft = transformPoint(
       { x: textElement.x, y: textElement.y },
       viewport,
@@ -559,7 +592,6 @@ export function SelectTool({
     );
   };
 
-  // Render selection box
   const renderSelectionBox = () => {
     const bbox = getSelectionBoundingBox();
     if (!bbox || selectedIds.size === 0) return null;
@@ -579,7 +611,6 @@ export function SelectTool({
 
     return (
       <>
-        {/* Selection rectangle */}
         <div
           className="absolute border-2 z-40 border-blue-500 pointer-events-none"
           style={{
@@ -590,17 +621,12 @@ export function SelectTool({
           }}
         />
 
-        {/* Resize handles */}
         {[
-          { pos: 'nw', x: topLeft.x, y: topLeft.y },
-          { pos: 'n', x: topLeft.x + width / 2, y: topLeft.y },
-          { pos: 'ne', x: topLeft.x + width, y: topLeft.y },
-          { pos: 'e', x: topLeft.x + width, y: topLeft.y + height / 2 },
-          { pos: 'se', x: topLeft.x + width, y: topLeft.y + height },
-          { pos: 's', x: topLeft.x + width / 2, y: topLeft.y + height },
-          { pos: 'sw', x: topLeft.x, y: topLeft.y + height },
-          { pos: 'w', x: topLeft.x, y: topLeft.y + height / 2 },
-        ].map(({ pos, x, y }) => (
+          { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
+          { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
+          { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
+          { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
+        ].map(({ pos, x, y, cursor }) => (
           <div
             key={pos}
             className="absolute bg-white z-50 border-2 border-blue-500 rounded-full pointer-events-auto"
@@ -609,14 +635,21 @@ export function SelectTool({
               top: y - handleSize / 2,
               width: handleSize,
               height: handleSize,
-              cursor:
-                pos === 'nw' || pos === 'se'
-                  ? 'nwse-resize'
-                  : pos === 'ne' || pos === 'sw'
-                  ? 'nesw-resize'
-                  : pos === 'n' || pos === 's'
-                  ? 'ns-resize'
-                  : 'ew-resize',
+              cursor: cursor,
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation(); // 🔥 KRYTYCZNE: zatrzymaj propagację do interactive overlay!
+              setIsResizing(true);
+              setResizeHandle(pos as ResizeHandle);
+              setResizeOriginalBox(bbox);
+
+              const originalElements = new Map<string, DrawingElement>();
+              elements.forEach((el) => {
+                if (selectedIds.has(el.id)) {
+                  originalElements.set(el.id, { ...el });
+                }
+              });
+              setResizeOriginalElements(originalElements);
             }}
           />
         ))}
@@ -624,22 +657,25 @@ export function SelectTool({
     );
   };
 
-  return (
-    <div
-      className="absolute inset-0 z-20"
-      style={{ cursor: 'default' }}
-    >
-      {/* Invisible overlay for mouse events */}
+ return (
+    <>
+      {/* Invisible overlay for wheel events only */}
       <div
-        className="absolute inset-0 pointer-events-auto z-30"
+        ref={overlayRef}
+        className="absolute inset-0 pointer-events-none z-20"
         style={{ touchAction: 'none' }}
+      />
+      
+      {/* Interactive overlay for mouse events */}
+      <div
+        className="absolute inset-0 z-30 pointer-events-auto"
+        style={{ cursor: 'default', touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onDoubleClick={handleDoubleClick}
-        onWheel={handleWheel}
       />
-      {/* Active selection box */}
+      
       {isSelecting && selectionStart && selectionEnd && (
         <div
           className="absolute border-2 z-40 border-dashed border-blue-500 bg-blue-50/20 pointer-events-none"
@@ -652,11 +688,8 @@ export function SelectTool({
         />
       )}
 
-      {/* 🆕 Mini toolbar for selected text */}
       {renderTextToolbar()}
-
-      {/* Selection bounding box + handles */}
       {renderSelectionBox()}
-    </div>
+    </>
   );
 }

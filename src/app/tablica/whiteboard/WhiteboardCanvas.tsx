@@ -12,8 +12,9 @@
  * - ../toolbar/PenTool (PenTool)
  * - ../toolbar/ShapeTool (ShapeTool)
  * - ../toolbar/FunctionTool (FunctionTool)
- * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot)
- * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport)
+ * - ../toolbar/ImageTool (ImageTool)
+ * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ImageElement)
+ * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport, inverseTransformPoint)
  * - ./Grid (drawGrid)
  * - ./rendering (drawElement)
  * 
@@ -32,6 +33,7 @@
  * - PenTool.tsx - logika rysowania piórem (aktywny gdy tool='pen')
  * - ShapeTool.tsx - logika wstawiania kształtów (aktywny gdy tool='shape')
  * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
+ * - ImageTool.tsx - logika wstawiania obrazów (aktywny gdy tool='image')
  * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
  * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
  * 
@@ -40,24 +42,35 @@
  * - Kontener obsługuje wheel events (backup dla gdy żadne narzędzie nie jest aktywne)
  * - Każde narzędzie obsługuje własne wheel events przez onViewportChange
  * 
+ * ⚠️ GLOBALNE FUNKCJE OBRAZÓW:
+ * - Ctrl+V (wklejanie ze schowka) działa ZAWSZE, niezależnie od aktywnego narzędzia
+ * - Drag & Drop obrazów działa ZAWSZE na głównym kontenerze
+ * - ImageTool zapewnia dodatkowe opcje gdy tool='image'
+ * 
  * ⚠️ KLUCZOWE CALLBACKI:
  * - handlePathCreate - tworzenie ścieżek (PenTool)
  * - handleShapeCreate - tworzenie kształtów (ShapeTool)
  * - handleFunctionCreate - tworzenie funkcji (FunctionTool)
+ * - handleImageCreate - tworzenie obrazów (ImageTool + globalne)
  * - handleTextCreate/Update/Delete - zarządzanie tekstami (TextTool)
  * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem (SelectTool)
  * - handleViewportChange - synchronizacja viewport między narzędziami
  * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
+ * - handleGlobalPasteImage - globalne wklejanie obrazów (Ctrl+V)
+ * - handleGlobalDropImage - globalne drag&drop obrazów
  * 
  * ⚠️ KEYBOARD SHORTCUTS:
+ * - Ctrl+V: Wklej obraz ze schowka (globalne - działa zawsze)
  * - Ctrl+Z: Undo
  * - Ctrl+Y / Ctrl+Shift+Z: Redo
  * - Delete: Usuń zaznaczone elementy
+ * - ESC: Powrót do SelectTool
  * 
  * PRZEZNACZENIE:
  * Główny komponent tablicy - zarządza viewport, elements, historią,
- * koordynuje narzędzia (pen/shape/text/select/function), renderuje canvas.
+ * koordynuje narzędzia (pen/shape/text/select/function/image), renderuje canvas.
  * Każde narzędzie jest teraz osobnym komponentem z własną logiką.
+ * Obsługuje globalne wklejanie i drag&drop obrazów niezależnie od aktywnego narzędzia.
  * ============================================================================
  */
 
@@ -72,6 +85,8 @@ import { PenTool } from '../toolbar/PenTool';
 import { ShapeTool } from '../toolbar/ShapeTool';
 import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
+import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
+import { EraserTool } from '../toolbar/EraserTool';
 
 // Import wszystkich modułów
 import {
@@ -81,14 +96,16 @@ import {
   DrawingPath,
   Shape,
   TextElement,
-  FunctionPlot
+  FunctionPlot,
+  ImageElement
 } from './types';
 
 import {
   panViewportWithWheel,
   panViewportWithMouse,
   zoomViewport,
-  constrainViewport
+  constrainViewport,
+  inverseTransformPoint
 } from './viewport';
 
 import { drawGrid } from './Grid';
@@ -101,6 +118,7 @@ interface WhiteboardCanvasProps {
 export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imageToolRef = useRef<ImageToolRef>(null); // 🖼️ Ref dla ImageTool
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -122,12 +140,17 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
   const [debugMode, setDebugMode] = useState(false); // 🔍 Debug mode for text sizing
+  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map()); // 🖼️ Cache dla obrazów
   
   // History state - inicjalizacja z pustym stanem
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   
+  // 🖼️ State dla wklejania/dropowania obrazów (globalne)
+  const [imageProcessing, setImageProcessing] = useState(false);
+  
   const redrawCanvasRef = useRef<() => void>(() => {});
+  const handleGlobalPasteImageRef = useRef<() => void>(() => {});
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
@@ -169,12 +192,25 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         return; // Wyjdź natychmiast - input/textarea obsługuje to sam
       }
       
+      // 🖼️ Ctrl+V - wklej obraz ze schowka (globalne - działa zawsze)
+      if (e.ctrlKey && e.key === 'v') {
+        e.preventDefault();
+        handleGlobalPasteImageRef.current();
+        return;
+      }
+      
       // ESC - powrót do SelectTool
       if (e.key === 'Escape') {
         e.preventDefault();
         setTool('select');
         setSelectedElementIds(new Set());
         setEditingTextId(null);
+      }
+      
+      // E key - Eraser tool
+      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        setTool('eraser');
       }
       
       // 🆕 Typing on selected text - enter edit mode and replace text
@@ -380,9 +416,9 @@ useEffect(() => {
     elements.forEach(element => {
       // Nie rysuj elementu który jest aktualnie edytowany w TextTool
       if (element.id === editingTextId) return;
-      drawElement(ctx, element, viewport, width, height, undefined, debugMode, handleAutoExpand);
+      drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
     });
-  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand]);
+  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand, loadedImages]);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -509,10 +545,40 @@ useEffect(() => {
     setTool('select'); // 🆕 Automatyczne przełączenie na narzędzie zaznaczania po zapisaniu tekstu
   }, []);
 
+  // ========================================
+  // 🖼️ CALLBACKI DLA IMAGETOOL
+  // ========================================
+  const handleImageCreate = useCallback((image: ImageElement) => {
+    const newElements = [...elements, image];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    // Preload obrazu do cache
+    if (image.src) {
+      const img = new Image();
+      img.src = image.src;
+      img.onload = () => {
+        setLoadedImages(prev => new Map(prev).set(image.id, img));
+      };
+      img.onerror = () => {
+        console.error('Failed to load image:', image.id);
+      };
+    }
+  }, [elements, saveToHistory]);
+
   // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
   }, []);
+
+  // ========================================
+  // 🆕 CALLBACK DLA ERASERTOOL
+  // ========================================
+  const handleElementDelete = useCallback((id: string) => {
+    const newElements = elements.filter(el => el.id !== id);
+    setElements(newElements);
+    saveToHistory(newElements);
+  }, [elements, saveToHistory]);
 
   // ========================================
   // 🆕 CALLBACKI DLA SELECTTOOL
@@ -638,6 +704,166 @@ useEffect(() => {
   const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
   
   // ========================================
+  // 🖼️ GLOBALNE CALLBACKI DLA OBRAZÓW (działają zawsze, niezależnie od narzędzia)
+  // ========================================
+  
+  // 🖼️ Konwersja File/Blob do base64 z kompresją
+  const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('Cannot get canvas context'));
+            return;
+          }
+
+          let width = img.width;
+          let height = img.height;
+
+          // 🔥 Kompresja jeśli obraz jest za duży (>1000px lub rozmiar >500KB)
+          const MAX_DIMENSION = 1000;
+          const maxSize = Math.max(width, height);
+          
+          if (maxSize > MAX_DIMENSION || file.size > 500000) {
+            const scale = MAX_DIMENSION / maxSize;
+            width = Math.floor(width * scale);
+            height = Math.floor(height * scale);
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // Konwersja do base64 (JPEG dla lepszej kompresji)
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+          
+          resolve({ 
+            data: dataUrl, 
+            width: img.width,
+            height: img.height 
+          });
+        };
+        
+        img.onerror = () => reject(new Error('Cannot load image'));
+        img.src = e.target?.result as string;
+      };
+      
+      reader.onerror = () => reject(new Error('Cannot read file'));
+      reader.readAsDataURL(file);
+    });
+  }, []);
+
+  // 🖼️ Globalne wklejanie obrazu ze schowka (Ctrl+V) - działa zawsze
+  const handleGlobalPasteImage = useCallback(async () => {
+    setImageProcessing(true);
+
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      
+      for (const item of clipboardItems) {
+        const imageTypes = item.types.filter(type => type.startsWith('image/'));
+        
+        if (imageTypes.length > 0) {
+          const blob = await item.getType(imageTypes[0]);
+          const { data, width, height } = await fileToBase64(blob);
+          
+          // Wstaw obraz w centrum widoku
+          const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+          
+          // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+          const aspectRatio = height / width;
+          const worldWidth = 3;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: Date.now().toString(),
+            type: 'image',
+            x: centerWorld.x - worldWidth / 2,
+            y: centerWorld.y - worldHeight / 2,
+            width: worldWidth,
+            height: worldHeight,
+            src: data,
+            alt: 'Pasted image',
+          };
+
+          handleImageCreate(newImage);
+          setImageProcessing(false);
+          return;
+        }
+      }
+      
+      console.log('No image in clipboard');
+    } catch (err) {
+      console.error('Clipboard paste error:', err);
+    } finally {
+      setImageProcessing(false);
+    }
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+
+  // 🖼️ Globalny drag & drop obrazu - działa zawsze
+  const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const file = e.dataTransfer.files?.[0];
+    if (!file || !file.type.startsWith('image/')) {
+      return;
+    }
+
+    setImageProcessing(true);
+
+    try {
+      const { data, width, height } = await fileToBase64(file);
+      
+      // Pozycja gdzie upuszczono
+      const dropScreen = { x: e.clientX, y: e.clientY };
+      const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+      
+      // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+      const aspectRatio = height / width;
+      const worldWidth = 3;
+      const worldHeight = worldWidth * aspectRatio;
+      
+      const newImage: ImageElement = {
+        id: Date.now().toString(),
+        type: 'image',
+        x: dropWorld.x - worldWidth / 2,
+        y: dropWorld.y - worldHeight / 2,
+        width: worldWidth,
+        height: worldHeight,
+        src: data,
+        alt: 'Dropped image',
+      };
+
+      handleImageCreate(newImage);
+    } catch (err) {
+      console.error('Drop error:', err);
+    } finally {
+      setImageProcessing(false);
+    }
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+  
+  // Zaktualizuj ref dla handleGlobalPasteImage
+  useEffect(() => {
+    handleGlobalPasteImageRef.current = handleGlobalPasteImage;
+  }, [handleGlobalPasteImage]);
+  
+  // 🖼️ Handlery dla przycisków w ToolbarUI (ImageTool)
+  const handleImageToolPaste = useCallback(() => {
+    imageToolRef.current?.handlePasteFromClipboard();
+  }, []);
+  
+  const handleImageToolUpload = useCallback(() => {
+    imageToolRef.current?.triggerFileUpload();
+  }, []);
+  
+  // ========================================
   // 🆕 MIDDLE BUTTON (SCROLL) - BEZPOŚREDNI PAN
   // ========================================
   useEffect(() => {
@@ -700,7 +926,14 @@ useEffect(() => {
   }, []); // Pusta tablica - używamy refs
   
   return (
-    <div className={`relative w-full h-full bg-white ${className}`}>
+    <div 
+      className={`relative w-full h-full bg-white ${className}`}
+      onDrop={handleGlobalDropImage}
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    >
       <div ref={containerRef} className="absolute inset-0 overflow-hidden">
         <Toolbar
           tool={tool}
@@ -721,6 +954,8 @@ useEffect(() => {
           onResetView={resetView}
           canUndo={canUndo}
           canRedo={canRedo}
+          onImagePaste={handleImageToolPaste}
+          onImageUpload={handleImageToolUpload}
         />
         
         <ZoomControls
@@ -816,6 +1051,30 @@ useEffect(() => {
             onViewportChange={handleViewportChange}
           />
         )}
+
+        {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
+        {tool === 'image' && canvasWidth > 0 && (
+          <ImageTool
+            ref={imageToolRef}
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onImageCreate={handleImageCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🆕 ERASERTOOL - aktywny gdy tool === 'eraser' */}
+        {tool === 'eraser' && canvasWidth > 0 && (
+          <EraserTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={elements}
+            onElementDelete={handleElementDelete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
         
         <canvas
           ref={canvasRef}
@@ -826,12 +1085,23 @@ useEffect(() => {
               tool === 'pan' ? 'grab' : 
               tool === 'select' ? 'default' : 
               tool === 'text' ? 'crosshair' :
+              tool === 'eraser' ? 'none' :
               'crosshair',
             willChange: 'auto',
             imageRendering: 'crisp-edges',
             pointerEvents: 'none' // ⚠️ WAŻNE! Wszystkie narzędzia mają swoje overlaye
           }}
         />
+        
+        {/* 🖼️ Wskaźnik ładowania podczas przetwarzania obrazu */}
+        {imageProcessing && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
+              <span className="text-sm text-gray-700">Przetwarzanie obrazu...</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

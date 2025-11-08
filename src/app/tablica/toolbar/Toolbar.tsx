@@ -35,7 +35,7 @@ import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
-export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function';
+export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow';
 
 interface ToolbarProps {
@@ -57,6 +57,9 @@ interface ToolbarProps {
   onResetView: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  // 🖼️ ImageTool handlers
+  onImagePaste?: () => void;
+  onImageUpload?: () => void;
 }
 
 function Toolbar({
@@ -78,6 +81,8 @@ function Toolbar({
   onResetView,
   canUndo,
   canRedo,
+  onImagePaste,
+  onImageUpload,
 }: ToolbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -106,6 +111,8 @@ function Toolbar({
         onClear={onClear}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+        onImagePaste={onImagePaste}
+        onImageUpload={onImageUpload}
       />
     </div>
   );
