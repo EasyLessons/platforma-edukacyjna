@@ -943,98 +943,62 @@ useEffect(() => {
   };
 
   const handleMouseUp = (e: MouseEvent) => {
-    if (e.button === 1) {
-      e.preventDefault();
-      e.stopPropagation();
+  if (e.button === 1) {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isPanning && velocityHistory.length >= 2) {
+      const totalDx = e.clientX - startX;
+      const totalDy = e.clientY - startY;
+      const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
       
-      if (isPanning && velocityHistory.length >= 2) {
-        // Całkowita odległość ruchu
-        const totalDx = e.clientX - startX;
-        const totalDy = e.clientY - startY;
-        const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
-        
-        // 🔥 PRÓG 1: Minimum 50px dystansu
-        if (totalDistance < 50) {
-          isPanning = false;
-          document.body.style.cursor = '';
-          return; // BRAK MOMENTUM
-        }
-        
-        // Średnia z ostatnich 3 sampli
-        const recentSamples = velocityHistory.slice(-3);
-        let avgVx = 0;
-        let avgVy = 0;
-        
-        recentSamples.forEach(sample => {
-          avgVx += sample.vx;
-          avgVy += sample.vy;
-        });
-        
-        avgVx /= recentSamples.length;
-        avgVy /= recentSamples.length;
-        
-        const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
-        
-        // 🔥 PRÓG 2: Minimum 0.3 px/ms prędkości (= 18px na 60ms frame)
-        if (speed < 0.5) {
-          isPanning = false;
-          document.body.style.cursor = '';
-          return; // BRAK MOMENTUM
-        }
-        
-        // 🔥 PRÓG 3: Tylko jeśli dystans > 100px, daj pełną moc
-        let multiplier = 0.1;
-        if (totalDistance > 100) {
-          multiplier = 0.1;
-        }
-        if (totalDistance > 200) {
-          multiplier = 0.12;
-        }
-        if (totalDistance > 300) {
-          multiplier = 0.14;
-        }
-        if (totalDistance > 400) {
-          multiplier = 0.16;
-        }
-        if (totalDistance > 500) {
-          multiplier = 0.18;
-        }
-        if (totalDistance > 600) {
-          multiplier = 0.2;
-        }
-        if (totalDistance > 750) {
-          multiplier = 0.22;
-        }
-        if (totalDistance > 800) {
-          multiplier = 0.24;
-        }
-        if (totalDistance > 850) {
-          multiplier = 0.26;
-        }
-        if (totalDistance > 900) {
-          multiplier = 0.28;
-        }
-        if (totalDistance > 950) {
-          multiplier = 0.3;
-        }
-        if (totalDistance > 1000) {
-          multiplier = 0.32;
-        }
-
-        const currentScale = viewportRef.current.scale;
-        const scaleMultiplier = 1 / currentScale;
-        
-        setMomentum(prev => startMomentum(
-          prev, 
-          -avgVx * 2 * multiplier * scaleMultiplier, 
-          -avgVy * 2 * multiplier * scaleMultiplier
-        ));
+      // 🔥 PRÓG 1: Minimum 50px
+      if (totalDistance < 50) {
+        isPanning = false;
+        document.body.style.cursor = '';
+        return;
       }
       
-      isPanning = false;
-      document.body.style.cursor = '';
+      // Średnia z ostatnich 3 sampli
+      const recentSamples = velocityHistory.slice(-3);
+      let avgVx = 0;
+      let avgVy = 0;
+      
+      recentSamples.forEach(sample => {
+        avgVx += sample.vx;
+        avgVy += sample.vy;
+      });
+      
+      avgVx /= recentSamples.length;
+      avgVy /= recentSamples.length;
+      
+      const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+      
+      // 🔥 PRÓG 2: Minimum 0.5 px/ms
+      if (speed < 0.5) {
+        isPanning = false;
+        document.body.style.cursor = '';
+        return;
+      }
+      
+      // 🚀 PROSTA FUNKCJA LINIOWA (bez lagów)
+      let multiplier = 0.05 + (totalDistance * 0.0002);
+      multiplier = Math.min(multiplier, 0.5); // Max 0.5
+      
+      const currentScale = viewportRef.current.scale;
+      const scaleMultiplier = 1 / currentScale;
+      
+      setMomentum(prev => startMomentum(
+        prev, 
+        -avgVx * 2 * multiplier * scaleMultiplier, 
+        -avgVy * 2 * multiplier * scaleMultiplier
+      ));
     }
-  };
+    
+    isPanning = false;
+    document.body.style.cursor = '';
+  }
+};
 
   window.addEventListener('mousedown', handleMouseDown, { capture: true });
   window.addEventListener('mousemove', handleMouseMove, { capture: true });
