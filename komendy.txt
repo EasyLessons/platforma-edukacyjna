@@ -14,3 +14,6 @@ npm run dev
 # alembic push do neon
 alembic revision --autogenerate -m "opis zmiany"
 alembic upgrade head
+
+# odpalanie testów
+pytest tests\dashboard\boards\ -v 
