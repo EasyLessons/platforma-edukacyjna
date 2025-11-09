@@ -1,77 +1,24 @@
 /**
- * ============================================================================
- * PLIK: src/app/tablica/whiteboard/WhiteboardCanvas.tsx
- * ============================================================================
+ * ═══════════════════════════════════════════════════════════════════════════
+ *                    WHITEBOARD CANVAS - REALTIME VERSION
+ *                         Tablica z Synchronizacją
+ * ═══════════════════════════════════════════════════════════════════════════
  * 
- * IMPORTUJE Z:
- * - react (useState, useRef, useEffect, useCallback)
- * - ../toolbar/Toolbar (Toolbar, Tool, ShapeType)
- * - ../toolbar/ZoomControls (ZoomControls)
- * - ../toolbar/TextTool (TextTool)
- * - ../toolbar/SelectTool (SelectTool)
- * - ../toolbar/PenTool (PenTool)
- * - ../toolbar/ShapeTool (ShapeTool)
- * - ../toolbar/FunctionTool (FunctionTool)
- * - ../toolbar/ImageTool (ImageTool)
- * - ./types (Point, ViewportTransform, DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ImageElement)
- * - ./viewport (panViewportWithWheel, zoomViewport, constrainViewport, inverseTransformPoint)
- * - ./Grid (drawGrid)
- * - ./rendering (drawElement)
+ * 🔄 ZMIANY:
+ * - Dodano useBoardRealtime() hook
+ * - Automatyczne wysyłanie zmian do innych użytkowników
+ * - Automatyczne odbieranie zmian od innych użytkowników
+ * - Komponent OnlineUsers w prawym górnym rogu
  * 
- * EKSPORTUJE:
- * - WhiteboardCanvas (component, default) - główny komponent tablicy interaktywnej
- * 
- * UŻYWANE PRZEZ:
- * - ../page.tsx (strona /tablica)
- * 
- * ⚠️ ZALEŻNOŚCI - TO JEST GŁÓWNY HUB PROJEKTU:
- * - types.ts - definiuje wszystkie typy elementów
- * - viewport.ts - transformacje i zoom/pan (wheel events dla kontenera)
- * - rendering.ts - renderowanie elementów na canvas
- * - Grid.tsx - renderowanie siatki kartezjańskiej
- * - Toolbar.tsx - UI narzędzi
- * - PenTool.tsx - logika rysowania piórem (aktywny gdy tool='pen')
- * - ShapeTool.tsx - logika wstawiania kształtów (aktywny gdy tool='shape')
- * - FunctionTool.tsx - logika rysowania funkcji (aktywny gdy tool='function')
- * - ImageTool.tsx - logika wstawiania obrazów (aktywny gdy tool='image')
- * - SelectTool.tsx - logika zaznaczania (aktywny gdy tool='select')
- * - TextTool.tsx - logika tekstu (aktywny gdy tool='text')
- * 
- * ⚠️ WAŻNE - WHEEL/PAN/ZOOM:
- * - Canvas ma pointerEvents: 'none' - wszystkie narzędzia mają swoje overlaye
- * - Kontener obsługuje wheel events (backup dla gdy żadne narzędzie nie jest aktywne)
- * - Każde narzędzie obsługuje własne wheel events przez onViewportChange
- * 
- * ⚠️ GLOBALNE FUNKCJE OBRAZÓW:
- * - Ctrl+V (wklejanie ze schowka) działa ZAWSZE, niezależnie od aktywnego narzędzia
- * - Drag & Drop obrazów działa ZAWSZE na głównym kontenerze
- * - ImageTool zapewnia dodatkowe opcje gdy tool='image'
- * 
- * ⚠️ KLUCZOWE CALLBACKI:
- * - handlePathCreate - tworzenie ścieżek (PenTool)
- * - handleShapeCreate - tworzenie kształtów (ShapeTool)
- * - handleFunctionCreate - tworzenie funkcji (FunctionTool)
- * - handleImageCreate - tworzenie obrazów (ImageTool + globalne)
- * - handleTextCreate/Update/Delete - zarządzanie tekstami (TextTool)
- * - handleSelectionChange/ElementUpdate - zarządzanie zaznaczeniem (SelectTool)
- * - handleViewportChange - synchronizacja viewport między narzędziami
- * - handleTextEdit - double-click w SelectTool otwiera edytor tekstu
- * - handleGlobalPasteImage - globalne wklejanie obrazów (Ctrl+V)
- * - handleGlobalDropImage - globalne drag&drop obrazów
- * 
- * ⚠️ KEYBOARD SHORTCUTS:
- * - Ctrl+V: Wklej obraz ze schowka (globalne - działa zawsze)
- * - Ctrl+Z: Undo
- * - Ctrl+Y / Ctrl+Shift+Z: Redo
- * - Delete: Usuń zaznaczone elementy
- * - ESC: Powrót do SelectTool
- * 
- * PRZEZNACZENIE:
- * Główny komponent tablicy - zarządza viewport, elements, historią,
- * koordynuje narzędzia (pen/shape/text/select/function/image), renderuje canvas.
- * Każde narzędzie jest teraz osobnym komponentem z własną logiką.
- * Obsługuje globalne wklejanie i drag&drop obrazów niezależnie od aktywnego narzędzia.
- * ============================================================================
+ * 📝 MODYFIKACJE:
+ * 1. handlePathCreate → broadcastElementCreated
+ * 2. handleShapeCreate → broadcastElementCreated
+ * 3. handleFunctionCreate → broadcastElementCreated
+ * 4. handleTextCreate → broadcastElementCreated
+ * 5. handleImageCreate → broadcastElementCreated
+ * 6. handleElementUpdate → broadcastElementUpdated
+ * 7. handleElementDelete → broadcastElementDeleted
+ * 8. useEffect → onRemoteElementCreated/Updated/Deleted
  */
 
 'use client';
@@ -87,9 +34,11 @@ import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
+import { OnlineUsers } from './OnlineUsers'; // 🆕 Import komponentu OnlineUsers
 
+// 🆕 Import hooka Realtime
+import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
-// Import wszystkich modułów
 import {
   Point,
   ViewportTransform,
@@ -123,7 +72,18 @@ interface WhiteboardCanvasProps {
 export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageToolRef = useRef<ImageToolRef>(null); // 🖼️ Ref dla ImageTool
+  const imageToolRef = useRef<ImageToolRef>(null);
+  
+  // 🆕 REALTIME HOOK
+  const {
+    broadcastElementCreated,
+    broadcastElementUpdated,
+    broadcastElementDeleted,
+    onRemoteElementCreated,
+    onRemoteElementUpdated,
+    onRemoteElementDeleted,
+    isConnected
+  } = useBoardRealtime();
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -132,7 +92,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     scale: 1
   });
 
-  // 🎢 Momentum state (inercja jak na lodzie)
   const [momentum, setMomentum] = useState<MomentumState>({
     velocityX: 0,
     velocityY: 0,
@@ -151,15 +110,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
-  const [editingTextId, setEditingTextId] = useState<string | null>(null); // 🆕 Dla edycji tekstu
-  const [debugMode, setDebugMode] = useState(false); // 🔍 Debug mode for text sizing
-  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map()); // 🖼️ Cache dla obrazów
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [debugMode, setDebugMode] = useState(false);
+  const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   
-  // History state - inicjalizacja z pustym stanem
+  // History state
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   
-  // 🖼️ State dla wklejania/dropowania obrazów (globalne)
   const [imageProcessing, setImageProcessing] = useState(false);
   
   const redrawCanvasRef = useRef<() => void>(() => {});
@@ -193,26 +151,57 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     selectedElementIdsRef.current = selectedElementIds;
   }, [selectedElementIds]);
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🆕 REALTIME - ODBIERANIE ZMIAN OD INNYCH UŻYTKOWNIKÓW
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  useEffect(() => {
+    // Handler: Nowy element od innego użytkownika
+    onRemoteElementCreated((element, userId, username) => {
+      console.log(`📥 [${username}] dodał element:`, element.id);
+      
+      setElements(prev => {
+        // Sprawdź czy element już istnieje (unikaj duplikatów)
+        if (prev.some(el => el.id === element.id)) {
+          return prev;
+        }
+        return [...prev, element];
+      });
+    });
+    
+    // Handler: Aktualizacja elementu od innego użytkownika
+    onRemoteElementUpdated((element, userId, username) => {
+      console.log(`📥 [${username}] zaktualizował element:`, element.id);
+      
+      setElements(prev =>
+        prev.map(el => (el.id === element.id ? element : el))
+      );
+    });
+    
+    // Handler: Usunięcie elementu przez innego użytkownika
+    onRemoteElementDeleted((elementId, userId, username) => {
+      console.log(`📥 [${username}] usunął element:`, elementId);
+      
+      setElements(prev => prev.filter(el => el.id !== elementId));
+    });
+  }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
+
   // ========================================
-  // 🆕 KEYBOARD SHORTCUTS
+  // KEYBOARD SHORTCUTS (bez zmian)
   // ========================================
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // 🔥 WAŻNE: Jeśli event pochodzi z input/textarea, ignoruj go całkowicie
-      // (pozwól input obsłużyć swoje własne eventy)
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') {
-        return; // Wyjdź natychmiast - input/textarea obsługuje to sam
+        return;
       }
       
-      // 🖼️ Ctrl+V - wklej obraz ze schowka (globalne - działa zawsze)
       if (e.ctrlKey && e.key === 'v') {
         e.preventDefault();
         handleGlobalPasteImageRef.current();
         return;
       }
       
-      // ESC - powrót do SelectTool
       if (e.key === 'Escape') {
         e.preventDefault();
         setTool('select');
@@ -220,30 +209,25 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         setEditingTextId(null);
       }
       
-      // E key - Eraser tool
       if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setTool('eraser');
       }
       
-      // 🆕 Typing on selected text - enter edit mode and replace text
-      // Tylko gdy: tool='select', zaznaczony dokładnie 1 element typu text, normalny znak
       if (
         tool === 'select' &&
         selectedElementIds.size === 1 &&
-        e.key.length === 1 && // Pojedynczy znak (a-z, 0-9, spacja, etc.)
-        !e.ctrlKey && !e.metaKey && !e.altKey // Bez modyfikatorów (Ctrl, Cmd, Alt)
+        e.key.length === 1 &&
+        !e.ctrlKey && !e.metaKey && !e.altKey
       ) {
         const selectedId = Array.from(selectedElementIds)[0];
         const selectedElement = elementsRef.current.find(el => el.id === selectedId);
         
         if (selectedElement && selectedElement.type === 'text') {
           e.preventDefault();
-          // Wejdź w tryb edycji i zastąp tekst wpisanym znakiem
           setEditingTextId(selectedId);
           setTool('text');
           
-          // Wyczyść tekst i dodaj pierwszy znak (to zostanie obsłużone przez TextTool)
           const newElements = elementsRef.current.map(el =>
             el.id === selectedId ? { ...el, text: e.key } as DrawingElement : el
           );
@@ -251,7 +235,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         }
       }
       
-      // Ctrl+Z - Undo
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
         const currentIndex = historyIndexRef.current;
@@ -265,7 +248,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         }
       }
       
-      // Ctrl+Y lub Ctrl+Shift+Z - Redo
       if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
         e.preventDefault();
         const currentIndex = historyIndexRef.current;
@@ -279,7 +261,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         }
       }
       
-      // Delete - usuń wybrane elementy
       if (e.key === 'Delete') {
         const currentSelectedIds = selectedElementIdsRef.current;
         const currentElements = elementsRef.current;
@@ -290,10 +271,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
           setElements(newElements);
           saveToHistoryRef.current(newElements);
           setSelectedElementIds(new Set());
+          
+          // 🆕 BROADCAST DELETE
+          currentSelectedIds.forEach(id => {
+            broadcastElementDeleted(id);
+          });
         }
       }
       
-      // 🔍 D key - Toggle debug mode
       if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setDebugMode(prev => {
@@ -305,9 +290,9 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tool, selectedElementIds]); // ✅ Dependencies dla keyboard shortcuts
+  }, [tool, selectedElementIds, broadcastElementDeleted]);
 
-  // Canvas setup
+  // Canvas setup (bez zmian)
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -363,41 +348,39 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     };
   }, []);
   
-  // Wheel/Touchpad handling
-useEffect(() => {
-  const container = containerRef.current; // ✅ CONTAINER zamiast canvas!
-  if (!container) return;
-  
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
+  // Wheel/Touchpad handling (bez zmian)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
     
-    const rect = container.getBoundingClientRect(); // ← container.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    const width = rect.width;
-    const height = rect.height;
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const width = rect.width;
+      const height = rect.height;
+      
+      if (e.ctrlKey) {
+        const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
+        setViewport(constrainViewport(newViewport));
+      } else {
+        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        setViewport(constrainViewport(newViewport));
+      }
+    };
     
-    if (e.ctrlKey) {
-      const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
-      setViewport(constrainViewport(newViewport));
-    } else {
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      setViewport(constrainViewport(newViewport));
-    }
-  };
-  
-  container.addEventListener('wheel', handleWheel, { passive: false });
-  return () => container.removeEventListener('wheel', handleWheel);
-}, [viewport]);
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, [viewport]);
 
-  // Redraw canvas
-  // 🔍 Auto-expand text boxes when text doesn't fit
+  // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
     setElements(prevElements => {
       const updated = prevElements.map(el => {
         if (el.id === elementId && el.type === 'text') {
           const currentHeight = el.height || 0;
-          // Only expand, never shrink automatically
           if (newHeight > currentHeight) {
             console.log(`📏 Auto-expanding ${elementId}: ${currentHeight.toFixed(2)} → ${newHeight.toFixed(2)}`);
             return { ...el, height: newHeight };
@@ -409,6 +392,7 @@ useEffect(() => {
     });
   }, []);
 
+  // Redraw canvas (bez zmian)
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -419,15 +403,10 @@ useEffect(() => {
     const width = canvas.width / (window.devicePixelRatio || 1);
     const height = canvas.height / (window.devicePixelRatio || 1);
     
-    // Clear
     ctx.clearRect(0, 0, width, height);
-    
-    // Draw grid
     drawGrid(ctx, viewport, width, height);
     
-    // Draw all elements (pomijamy element który jest aktualnie edytowany)
     elements.forEach(element => {
-      // Nie rysuj elementu który jest aktualnie edytowany w TextTool
       if (element.id === editingTextId) return;
       drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
     });
@@ -441,20 +420,17 @@ useEffect(() => {
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // History - POPRAWIONE: limit 50 stanów, nie obcina historii przy nowym stanie
+  // History (bez zmian)
   const MAX_HISTORY_SIZE = 50;
   
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
     setHistoryIndex(prevIndex => {
       setHistory(prevHistory => {
-        // Gdy dodajemy nowy stan w środku historii, obcinamy przyszłość
         const newHistory = prevHistory.slice(0, prevIndex + 1);
         newHistory.push(newElements);
         
-        // Ogranicz historię do ostatnich MAX_HISTORY_SIZE stanów
         if (newHistory.length > MAX_HISTORY_SIZE) {
           const trimmed = newHistory.slice(newHistory.length - MAX_HISTORY_SIZE);
-          // Zwróć przycięta historię i przesuń indeks
           setHistoryIndex(trimmed.length - 1);
           return trimmed;
         }
@@ -462,7 +438,6 @@ useEffect(() => {
         return newHistory;
       });
       
-      // Zwróć nowy indeks (ostatni element w historii)
       return Math.min(prevIndex + 1, MAX_HISTORY_SIZE - 1);
     });
   }, []);
@@ -495,42 +470,45 @@ useEffect(() => {
     setSelectedElementIds(new Set());
   }, [saveToHistory]);
 
-  // ========================================
-  // 🆕 CALLBACKI DLA PENTOOL
-  // ========================================
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🆕 CALLBACKI DLA NARZĘDZI - Z BROADCAST
+  // ═══════════════════════════════════════════════════════════════════════════
+  
   const handlePathCreate = useCallback((path: DrawingPath) => {
     const newElements = [...elements, path];
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST
+    broadcastElementCreated(path);
+  }, [elements, saveToHistory, broadcastElementCreated]);
 
-  // ========================================
-  // 🆕 CALLBACKI DLA SHAPETOOL
-  // ========================================
   const handleShapeCreate = useCallback((shape: Shape) => {
     const newElements = [...elements, shape];
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST
+    broadcastElementCreated(shape);
+  }, [elements, saveToHistory, broadcastElementCreated]);
 
-  // ========================================
-  // 🆕 CALLBACKI DLA FUNCTIONTOOL - funkcja w properties
-  // ========================================
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
     const newElements = [...elements, func];
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST
+    broadcastElementCreated(func);
+  }, [elements, saveToHistory, broadcastElementCreated]);
 
-  // ========================================
-  // 🆕 CALLBACKI DLA TEXTTOOL
-  // ========================================
   const handleTextCreate = useCallback((text: TextElement) => {
     const newElements = [...elements, text];
     setElements(newElements);
     saveToHistory(newElements);
-    // NIE przełączaj automatycznie na select - użytkownik może chcieć dodać więcej tekstów
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST
+    broadcastElementCreated(text);
+  }, [elements, saveToHistory, broadcastElementCreated]);
 
   const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
     const newElements = elements.map(el => 
@@ -538,35 +516,41 @@ useEffect(() => {
     );
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST UPDATE
+    const updatedElement = newElements.find(el => el.id === id);
+    if (updatedElement) {
+      broadcastElementUpdated(updatedElement);
+    }
+  }, [elements, saveToHistory, broadcastElementUpdated]);
 
   const handleTextDelete = useCallback((id: string) => {
     const newElements = elements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST DELETE
+    broadcastElementDeleted(id);
+  }, [elements, saveToHistory, broadcastElementDeleted]);
 
-  // 🆕 Handler do edycji tekstu (double-click w SelectTool)
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
-    setTool('text'); // Przełącz na narzędzie text
+    setTool('text');
   }, []);
 
-  // 🆕 Handler do zakończenia edycji tekstu
   const handleEditingComplete = useCallback(() => {
     setEditingTextId(null);
-    setTool('select'); // 🆕 Automatyczne przełączenie na narzędzie zaznaczania po zapisaniu tekstu
+    setTool('select');
   }, []);
 
-  // ========================================
-  // 🖼️ CALLBACKI DLA IMAGETOOL
-  // ========================================
   const handleImageCreate = useCallback((image: ImageElement) => {
     const newElements = [...elements, image];
     setElements(newElements);
     saveToHistory(newElements);
     
-    // Preload obrazu do cache
+    // 🆕 BROADCAST
+    broadcastElementCreated(image);
+    
     if (image.src) {
       const img = new Image();
       img.src = image.src;
@@ -577,25 +561,21 @@ useEffect(() => {
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [elements, saveToHistory]);
+  }, [elements, saveToHistory, broadcastElementCreated]);
 
-  // 🆕 Handler do zmiany viewport (dla SelectTool i TextTool wheel events)
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
   }, []);
 
-  // ========================================
-  // 🆕 CALLBACK DLA ERASERTOOL
-  // ========================================
   const handleElementDelete = useCallback((id: string) => {
     const newElements = elements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST DELETE
+    broadcastElementDeleted(id);
+  }, [elements, saveToHistory, broadcastElementDeleted]);
 
-  // ========================================
-  // 🆕 CALLBACKI DLA SELECTTOOL
-  // ========================================
   const handleSelectionChange = useCallback((ids: Set<string>) => {
     setSelectedElementIds(ids);
   }, []);
@@ -605,17 +585,21 @@ useEffect(() => {
       el.id === id ? { ...el, ...updates } as DrawingElement : el
     );
     setElements(newElements);
-    // Nie zapisujemy do historii przy każdym ruchu - tylko przy mouseUp
   }, [elements]);
 
-  // 🆕 Handler dla aktualizacji z natychmiastowym zapisem (np. formatowanie tekstu)
   const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
     const newElements = elements.map(el => 
       el.id === id ? { ...el, ...updates } as DrawingElement : el
     );
     setElements(newElements);
-    saveToHistory(newElements); // ✅ Zapisz do historii od razu
-  }, [elements, saveToHistory]);
+    saveToHistory(newElements);
+    
+    // 🆕 BROADCAST UPDATE
+    const updatedElement = newElements.find(el => el.id === id);
+    if (updatedElement) {
+      broadcastElementUpdated(updatedElement);
+    }
+  }, [elements, saveToHistory, broadcastElementUpdated]);
 
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
     const newElements = elements.map(el => {
@@ -625,22 +609,33 @@ useEffect(() => {
     setElements(newElements);
   }, [elements]);
 
-  // Zapisz do historii po zakończeniu dragowania/resizowania
   const handleSelectionFinish = useCallback(() => {
     saveToHistory(elements);
-  }, [elements, saveToHistory]);
+    
+    // 🆕 BROADCAST wszystkie zmienione elementy
+    elements.forEach(element => {
+      if (selectedElementIds.has(element.id)) {
+        broadcastElementUpdated(element);
+      }
+    });
+  }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated]);
 
-  // Funkcja usuwania wybranych elementów (dostępna z klawiatury Delete)
   const deleteSelectedElements = useCallback(() => {
     if (selectedElementIds.size === 0) return;
     
     const newElements = elements.filter(el => !selectedElementIds.has(el.id));
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 BROADCAST DELETE dla każdego
+    selectedElementIds.forEach(id => {
+      broadcastElementDeleted(id);
+    });
+    
     setSelectedElementIds(new Set());
-  }, [elements, selectedElementIds, saveToHistory]);
+  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted]);
 
-  // Zoom functions
+  // Zoom functions (bez zmian)
   const zoomInRef = useRef(() => {
     setViewport(prev => {
       const newScale = Math.min(prev.scale * 1.2, 5.0);
@@ -662,7 +657,7 @@ useEffect(() => {
   const zoomIn = useCallback(() => zoomInRef.current(), []);
   const zoomOut = useCallback(() => zoomOutRef.current(), []);
 
-  // Stable callbacks for Toolbar
+  // Stable callbacks (bez zmian)
   const handleToolChangeRef = useRef((newTool: Tool) => setTool(newTool));
   const handleShapeChangeRef = useRef((shape: ShapeType) => setSelectedShape(shape));
   const handleColorChangeRef = useRef((newColor: string) => setColor(newColor));
@@ -706,7 +701,6 @@ useEffect(() => {
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
-  // Get canvas dimensions for tools
   const getCanvasDimensions = () => {
     const canvas = canvasRef.current;
     if (!canvas) return { width: 0, height: 0 };
@@ -716,11 +710,7 @@ useEffect(() => {
 
   const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
   
-  // ========================================
-  // 🖼️ GLOBALNE CALLBACKI DLA OBRAZÓW (działają zawsze, niezależnie od narzędzia)
-  // ========================================
-  
-  // 🖼️ Konwersja File/Blob do base64 z kompresją
+  // Globalne obrazy (bez zmian)
   const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -738,7 +728,6 @@ useEffect(() => {
           let width = img.width;
           let height = img.height;
 
-          // 🔥 Kompresja jeśli obraz jest za duży (>1000px lub rozmiar >500KB)
           const MAX_DIMENSION = 1000;
           const maxSize = Math.max(width, height);
           
@@ -752,7 +741,6 @@ useEffect(() => {
           canvas.height = height;
           ctx.drawImage(img, 0, 0, width, height);
 
-          // Konwersja do base64 (JPEG dla lepszej kompresji)
           const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
           
           resolve({ 
@@ -771,7 +759,6 @@ useEffect(() => {
     });
   }, []);
 
-  // 🖼️ Globalne wklejanie obrazu ze schowka (Ctrl+V) - działa zawsze
   const handleGlobalPasteImage = useCallback(async () => {
     setImageProcessing(true);
 
@@ -785,11 +772,9 @@ useEffect(() => {
           const blob = await item.getType(imageTypes[0]);
           const { data, width, height } = await fileToBase64(blob);
           
-          // Wstaw obraz w centrum widoku
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
           const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
           
-          // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
           const aspectRatio = height / width;
           const worldWidth = 3;
           const worldHeight = worldWidth * aspectRatio;
@@ -819,7 +804,6 @@ useEffect(() => {
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
 
-  // 🖼️ Globalny drag & drop obrazu - działa zawsze
   const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -834,11 +818,9 @@ useEffect(() => {
     try {
       const { data, width, height } = await fileToBase64(file);
       
-      // Pozycja gdzie upuszczono
       const dropScreen = { x: e.clientX, y: e.clientY };
       const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
       
-      // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
       const aspectRatio = height / width;
       const worldWidth = 3;
       const worldHeight = worldWidth * aspectRatio;
@@ -862,12 +844,10 @@ useEffect(() => {
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
   
-  // Zaktualizuj ref dla handleGlobalPasteImage
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
   }, [handleGlobalPasteImage]);
   
-  // 🖼️ Handlery dla przycisków w ToolbarUI (ImageTool)
   const handleImageToolPaste = useCallback(() => {
     imageToolRef.current?.handlePasteFromClipboard();
   }, []);
@@ -876,145 +856,135 @@ useEffect(() => {
     imageToolRef.current?.triggerFileUpload();
   }, []);
   
-  // ========================================
-// 🆕 MIDDLE BUTTON - PROSTY MOMENTUM Z DUŻYMI PROGAMI
-// ========================================
-useEffect(() => {
-  let isPanning = false;
-  let lastX = 0;
-  let lastY = 0;
-  let startX = 0;
-  let startY = 0;
-  let lastMoveTime = 0;
-  
-  // Historia ostatnich ruchów
-  const velocityHistory: Array<{ vx: number; vy: number }> = [];
+  // Middle button pan (bez zmian)
+  useEffect(() => {
+    let isPanning = false;
+    let lastX = 0;
+    let lastY = 0;
+    let startX = 0;
+    let startY = 0;
+    let lastMoveTime = 0;
+    
+    const velocityHistory: Array<{ vx: number; vy: number }> = [];
 
-  const handleMouseDown = (e: MouseEvent) => {
-    if (e.button === 1) {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        setMomentum(prev => stopMomentum(prev));
+        
+        isPanning = true;
+        lastX = e.clientX;
+        lastY = e.clientY;
+        startX = e.clientX;
+        startY = e.clientY;
+        lastMoveTime = performance.now();
+        velocityHistory.length = 0;
+        document.body.style.cursor = 'grabbing';
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
+      
       e.preventDefault();
       e.stopPropagation();
       
-      setMomentum(prev => stopMomentum(prev));
+      const currentTime = performance.now();
+      const deltaTime = currentTime - lastMoveTime;
       
-      isPanning = true;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      startX = e.clientX;
-      startY = e.clientY;
-      lastMoveTime = performance.now();
-      velocityHistory.length = 0;
-      document.body.style.cursor = 'grabbing';
-    }
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (!isPanning) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    const currentTime = performance.now();
-    const deltaTime = currentTime - lastMoveTime;
-    
-    if (deltaTime > 0 && deltaTime < 50) {
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      
-      const vx = dx / deltaTime;
-      const vy = dy / deltaTime;
-      
-      velocityHistory.push({ vx, vy });
-      
-      // Trzymaj tylko ostatnie 5 sampli
-      if (velocityHistory.length > 5) {
-        velocityHistory.shift();
+      if (deltaTime > 0 && deltaTime < 50) {
+        const dx = e.clientX - lastX;
+        const dy = e.clientY - lastY;
+        
+        const vx = dx / deltaTime;
+        const vy = dy / deltaTime;
+        
+        velocityHistory.push({ vx, vy });
+        
+        if (velocityHistory.length > 5) {
+          velocityHistory.shift();
+        }
+        
+        lastX = e.clientX;
+        lastY = e.clientY;
+        lastMoveTime = currentTime;
+        
+        const currentViewport = viewportRef.current;
+        const newViewport = panViewportWithMouse(currentViewport, dx, dy);
+        
+        setViewport(constrainViewport(newViewport));
       }
-      
-      lastX = e.clientX;
-      lastY = e.clientY;
-      lastMoveTime = currentTime;
-      
-      const currentViewport = viewportRef.current;
-      const newViewport = panViewportWithMouse(currentViewport, dx, dy);
-      
-      setViewport(constrainViewport(newViewport));
-    }
-  };
+    };
 
-  const handleMouseUp = (e: MouseEvent) => {
-  if (e.button === 1) {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (isPanning && velocityHistory.length >= 2) {
-      const totalDx = e.clientX - startX;
-      const totalDy = e.clientY - startY;
-      const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
-      
-      // 🔥 PRÓG 1: Minimum 50px
-      if (totalDistance < 50) {
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (isPanning && velocityHistory.length >= 2) {
+          const totalDx = e.clientX - startX;
+          const totalDy = e.clientY - startY;
+          const totalDistance = Math.sqrt(totalDx * totalDx + totalDy * totalDy);
+          
+          if (totalDistance < 50) {
+            isPanning = false;
+            document.body.style.cursor = '';
+            return;
+          }
+          
+          const recentSamples = velocityHistory.slice(-3);
+          let avgVx = 0;
+          let avgVy = 0;
+          
+          recentSamples.forEach(sample => {
+            avgVx += sample.vx;
+            avgVy += sample.vy;
+          });
+          
+          avgVx /= recentSamples.length;
+          avgVy /= recentSamples.length;
+          
+          const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
+          
+          if (speed < 0.5) {
+            isPanning = false;
+            document.body.style.cursor = '';
+            return;
+          }
+          
+          let multiplier = 0.05 + (totalDistance * 0.0002);
+          multiplier = Math.min(multiplier, 0.5);
+          
+          const currentScale = viewportRef.current.scale;
+          const scaleMultiplier = 1 / currentScale;
+          
+          setMomentum(prev => startMomentum(
+            prev, 
+            -avgVx * 2 * multiplier * scaleMultiplier, 
+            -avgVy * 2 * multiplier * scaleMultiplier
+          ));
+        }
+        
         isPanning = false;
         document.body.style.cursor = '';
-        return;
       }
-      
-      // Średnia z ostatnich 3 sampli
-      const recentSamples = velocityHistory.slice(-3);
-      let avgVx = 0;
-      let avgVy = 0;
-      
-      recentSamples.forEach(sample => {
-        avgVx += sample.vx;
-        avgVy += sample.vy;
-      });
-      
-      avgVx /= recentSamples.length;
-      avgVy /= recentSamples.length;
-      
-      const speed = Math.sqrt(avgVx * avgVx + avgVy * avgVy);
-      
-      // 🔥 PRÓG 2: Minimum 0.5 px/ms
-      if (speed < 0.5) {
-        isPanning = false;
-        document.body.style.cursor = '';
-        return;
-      }
-      
-      // 🚀 PROSTA FUNKCJA LINIOWA (bez lagów)
-      let multiplier = 0.05 + (totalDistance * 0.0002);
-      multiplier = Math.min(multiplier, 0.5); // Max 0.5
-      
-      const currentScale = viewportRef.current.scale;
-      const scaleMultiplier = 1 / currentScale;
-      
-      setMomentum(prev => startMomentum(
-        prev, 
-        -avgVx * 2 * multiplier * scaleMultiplier, 
-        -avgVy * 2 * multiplier * scaleMultiplier
-      ));
-    }
+    };
+
+    window.addEventListener('mousedown', handleMouseDown, { capture: true });
+    window.addEventListener('mousemove', handleMouseMove, { capture: true });
+    window.addEventListener('mouseup', handleMouseUp, { capture: true });
     
-    isPanning = false;
-    document.body.style.cursor = '';
-  }
-};
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown, { capture: true });
+      window.removeEventListener('mousemove', handleMouseMove, { capture: true });
+      window.removeEventListener('mouseup', handleMouseUp, { capture: true });
+      document.body.style.cursor = '';
+    };
+  }, []);
 
-  window.addEventListener('mousedown', handleMouseDown, { capture: true });
-  window.addEventListener('mousemove', handleMouseMove, { capture: true });
-  window.addEventListener('mouseup', handleMouseUp, { capture: true });
-  
-  return () => {
-    window.removeEventListener('mousedown', handleMouseDown, { capture: true });
-    window.removeEventListener('mousemove', handleMouseMove, { capture: true });
-    window.removeEventListener('mouseup', handleMouseUp, { capture: true });
-    document.body.style.cursor = '';
-  };
-}, []);
-
-  // ========================================
-  // 🎢 MOMENTUM ANIMATION LOOP
-  // ========================================
+  // Momentum animation (bez zmian)
   useEffect(() => {
     if (!momentum.isActive) return;
     
@@ -1025,7 +995,6 @@ useEffect(() => {
       const { momentum: newMomentum, viewport: viewportChange } = updateMomentum(momentum, currentTime);
       
       if (viewportChange) {
-        // Zastosuj zmianę viewport
         setViewport(prev => constrainViewport({
           x: prev.x + viewportChange.x,
           y: prev.y + viewportChange.y,
@@ -1033,10 +1002,8 @@ useEffect(() => {
         }));
       }
       
-      // Zaktualizuj momentum state
       setMomentum(newMomentum);
       
-      // Kontynuuj animację jeśli momentum jest aktywne
       if (newMomentum.isActive) {
         animationFrameId = requestAnimationFrame(animate);
       }
@@ -1061,6 +1028,9 @@ useEffect(() => {
       }}
     >
       <div ref={containerRef} className="absolute inset-0 overflow-hidden">
+        {/* 🆕 KOMPONENT ONLINE USERS */}
+        <OnlineUsers />
+        
         <Toolbar
           tool={tool}
           setTool={handleToolChange}
@@ -1091,7 +1061,6 @@ useEffect(() => {
           onResetView={resetView}
         />
         
-        {/* 🆕 TEXTTOOL - aktywny gdy tool === 'text' */}
         {tool === 'text' && canvasWidth > 0 && (
           <TextTool
             viewport={viewport}
@@ -1107,7 +1076,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 SELECTTOOL - aktywny gdy tool === 'select' */}
         {tool === 'select' && canvasWidth > 0 && (
           <SelectTool
             viewport={viewport}
@@ -1125,7 +1093,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 PENTOOL - aktywny gdy tool === 'pen' */}
         {tool === 'pen' && canvasWidth > 0 && (
           <PenTool
             viewport={viewport}
@@ -1138,7 +1105,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 SHAPETOOL - aktywny gdy tool === 'shape' */}
         {tool === 'shape' && canvasWidth > 0 && (
           <ShapeTool
             viewport={viewport}
@@ -1153,7 +1119,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 PANTOOL - aktywny gdy tool === 'pan' */}
         {tool === 'pan' && canvasWidth > 0 && (
           <PanTool
             viewport={viewport}
@@ -1163,7 +1128,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 FUNCTIONTOOL - aktywny gdy tool === 'function' */}
         {tool === 'function' && canvasWidth > 0 && (
           <FunctionTool
             viewport={viewport}
@@ -1178,7 +1142,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🖼️ IMAGETOOL - aktywny gdy tool === 'image' */}
         {tool === 'image' && canvasWidth > 0 && (
           <ImageTool
             ref={imageToolRef}
@@ -1190,7 +1153,6 @@ useEffect(() => {
           />
         )}
 
-        {/* 🆕 ERASERTOOL - aktywny gdy tool === 'eraser' */}
         {tool === 'eraser' && canvasWidth > 0 && (
           <EraserTool
             viewport={viewport}
@@ -1215,16 +1177,25 @@ useEffect(() => {
               'crosshair',
             willChange: 'auto',
             imageRendering: 'crisp-edges',
-            pointerEvents: 'none' // ⚠️ WAŻNE! Wszystkie narzędzia mają swoje overlaye
+            pointerEvents: 'none'
           }}
         />
         
-        {/* 🖼️ Wskaźnik ładowania podczas przetwarzania obrazu */}
         {imageProcessing && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-lg border border-gray-200 p-4 z-50">
             <div className="flex items-center gap-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
               <span className="text-sm text-gray-700">Przetwarzanie obrazu...</span>
+            </div>
+          </div>
+        )}
+        
+        {/* 🆕 INDICATOR POŁĄCZENIA */}
+        {!isConnected && (
+          <div className="absolute bottom-4 right-4 bg-yellow-100 border border-yellow-400 rounded-lg px-3 py-2 shadow-lg z-50">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
+              <span className="text-sm text-yellow-800">Reconnecting...</span>
             </div>
           </div>
         )}

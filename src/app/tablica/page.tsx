@@ -1,40 +1,61 @@
 /**
  * ============================================================================
- * PLIK: src/app/tablica/page.tsx
+ * PLIK: src/app/tablica/page.tsx - FINAL VERSION
  * ============================================================================
  * 
+ * 🎯 SCALENIE:
+ * - Oryginalny layout (przycisk powrotu, logo, tooltip)
+ * - BoardRealtimeProvider (synchronizacja)
+ * - boardId z query params
+ * 
  * IMPORTUJE Z:
- * - next/navigation (useRouter)
- * - next/dynamic (dynamic import)
+ * - next/navigation (useRouter, useSearchParams)
  * - next/image (Image)
  * - ./whiteboard/WhiteboardCanvas (główny komponent tablicy)
- * 
- * EKSPORTUJE:
- * - Tablica (default) - główna strona tablicy interaktywnej
+ * - ../context/BoardRealtimeContext (synchronizacja realtime)
  * 
  * PRZEZNACZENIE:
- * Strona Next.js dla routy /tablica. Renderuje pełnoekranową tablicę
- * z przyciskiem powrotu do dashboardu. Używa dynamic import dla WhiteboardCanvas
- * z wyłączonym SSR (client-side only).
+ * Strona /tablica z pełnoekranową tablicą, synchronizacją realtime,
+ * i przyciskiem powrotu do dashboardu.
  * ============================================================================
  */
 
 'use client';
 
-import { useRouter } from 'next/navigation';
-import dynamic from 'next/dynamic';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
+import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
+import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 
-// NOWY IMPORT - z refaktoryzowanego folderu whiteboard/
-const WhiteboardCanvas = dynamic(
-  () => import('./whiteboard/WhiteboardCanvas'),
-  { ssr: false }
-);
+// ═══════════════════════════════════════════════════════════════════════════
+// GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
+// ═══════════════════════════════════════════════════════════════════════════
 
-export default function Tablica() {
+function TablicaContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);
+  const [boardId, setBoardId] = useState<string | null>(null);
+
+  // Pobierz boardId z URL query params
+  useEffect(() => {
+    const id = searchParams.get('boardId') || 'demo-board';
+    setBoardId(id);
+    console.log('📋 Board ID:', id);
+  }, [searchParams]);
+
+  // Loading state
+  if (!boardId) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Ładowanie tablicy...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{
@@ -92,10 +113,10 @@ export default function Tablica() {
           <div
             style={{
               position: 'absolute',
-              top: '100%', // Umieszczamy pod przyciskiem
+              top: '100%',
               left: '50%',
               transform: 'translateX(-50%)',
-              marginTop: '8px', // Dodajemy odstęp od przycisku
+              marginTop: '8px',
               backgroundColor: '#1f2937',
               color: 'white',
               padding: '8px 14px',
@@ -110,11 +131,11 @@ export default function Tablica() {
             }}
           >
             Wróć do panelu
-            {/* Strzałka tooltipa - na górze wskazująca w górę na przycisk */}
+            {/* Strzałka tooltipa */}
             <div
               style={{
                 position: 'absolute',
-                top: '-6px', // Umieszczamy nad tooltipem
+                top: '-6px',
                 left: '50%',
                 transform: 'translateX(-50%)',
                 width: 0,
@@ -128,8 +149,10 @@ export default function Tablica() {
         )}
       </div>
 
-      {/* Pełnoekranowa tablica */}
-      <WhiteboardCanvas />
+      {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
+      <BoardRealtimeProvider boardId={boardId}>
+        <WhiteboardCanvas />
+      </BoardRealtimeProvider>
 
       {/* Style dla animacji */}
       <style jsx>{`
@@ -148,65 +171,45 @@ export default function Tablica() {
   );
 }
 
-//przed refaktoringiem
-// 'use client';
+// ═══════════════════════════════════════════════════════════════════════════
+// EXPORT (z Suspense)
+// ═══════════════════════════════════════════════════════════════════════════
 
-// import { useRouter } from 'next/navigation';
-// import dynamic from 'next/dynamic';
+export default function TablicaPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-screen h-screen flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p className="text-gray-600">Inicjalizacja...</p>
+          </div>
+        </div>
+      }
+    >
+      <TablicaContent />
+    </Suspense>
+  );
+}
 
-// // Dynamic import z SSR disabled dla komponentu canvas
-// const WhiteboardCanvas = dynamic(
-//   () => import('./whiteboard-components/WhiteboardCanvas'),
-//   { ssr: false }
-// );
-
-// export default function Tablica() {
-//   const router = useRouter();
-
-//   return (
-//     <div style={{
-//       position: 'fixed',
-//       inset: 0,
-//       background: 'white',
-//       overflow: 'hidden'
-//     }}>
-//       {/* Ikonka powrotu - lewy górny róg */}
-//       <button
-//         onClick={() => router.push('/dashboard')}
-//         style={{
-//           position: 'absolute',
-//           top: '16px',
-//           left: '16px',
-//           zIndex: 100,
-//           padding: '12px',
-//           fontSize: '20px',
-//           fontWeight: '600',
-//           color: '#2c3e50',
-//           backgroundColor: 'white',
-//           border: '2px solid #e0e0e0',
-//           borderRadius: '8px',
-//           cursor: 'pointer',
-//           transition: 'all 0.2s',
-//           boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-//           display: 'flex',
-//           alignItems: 'center',
-//           gap: '8px'
-//         }}
-//         onMouseOver={(e) => {
-//           (e.target as HTMLButtonElement).style.transform = 'translateY(-2px)';
-//           (e.target as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-//         }}
-//         onMouseOut={(e) => {
-//           (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
-//           (e.target as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-//         }}
-//         title="Wróć do dashboard"
-//       >
-//         🏠
-//       </button>
-
-//       {/* Pełnoekranowa tablica */}
-//       <WhiteboardCanvas />
-//     </div>
-//   );
-// } 
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 📚 JAK UŻYWAĆ
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * URL:
+ * /tablica?boardId=123  → Tablica o ID 123
+ * /tablica              → Domyślna tablica "demo-board"
+ * 
+ * PRZYKŁAD LINKU Z DASHBOARD:
+ * <Link href="/tablica?boardId=456">Otwórz tablicę</Link>
+ * 
+ * CO DZIAŁA:
+ * ✅ Przycisk powrotu (logo EasyLesson) w lewym górnym rogu
+ * ✅ Tooltip "Wróć do panelu" po najechaniu
+ * ✅ Synchronizacja realtime przez BoardRealtimeProvider
+ * ✅ boardId z URL query params
+ * ✅ Lista użytkowników online (OnlineUsers w WhiteboardCanvas)
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ */

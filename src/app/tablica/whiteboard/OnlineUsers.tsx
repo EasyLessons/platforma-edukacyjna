@@ -1,0 +1,146 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ *                        ONLINE USERS COMPONENT
+ *                   Lista Użytkowników Online na Tablicy
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * 🎯 CEL:
+ * Wyświetla awatary użytkowników którzy są aktualnie na tablicy.
+ * 
+ * 📦 UŻYWANE W:
+ * - WhiteboardCanvas.tsx → w prawym górnym rogu tablicy
+ * 
+ * 🔄 JAK TO DZIAŁA:
+ * 1. Pobiera listę użytkowników z useBoardRealtime()
+ * 2. Wyświetla kolorowe awatary z inicjałami
+ * 3. Pokazuje tooltip z pełnym imieniem
+ */
+
+'use client'
+
+import { useBoardRealtime } from '@/app/context/BoardRealtimeContext'
+import { useAuth } from '@/app/context/AuthContext'
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-yellow-500',
+  'bg-red-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-orange-500',
+  'bg-cyan-500'
+]
+
+const getAvatarColor = (userId: number) => {
+  return AVATAR_COLORS[userId % AVATAR_COLORS.length]
+}
+
+const getInitials = (username: string) => {
+  return username.slice(0, 2).toUpperCase()
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 🧩 KOMPONENT
+// ═══════════════════════════════════════════════════════════════════════════
+
+export function OnlineUsers() {
+  const { onlineUsers, isConnected } = useBoardRealtime()
+  const { user: currentUser } = useAuth()
+  
+  if (!isConnected) {
+    return (
+      <div className="absolute top-4 right-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 px-4 py-2">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-gray-400 animate-pulse"></div>
+          <span className="text-sm text-gray-500">Łączenie...</span>
+        </div>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="absolute top-4 right-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
+      <div className="flex items-center gap-3">
+        {/* Status połączenia */}
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full bg-green-500"></div>
+          <span className="text-sm text-gray-600 font-medium">
+            {onlineUsers.length} {onlineUsers.length === 1 ? 'osoba' : 'osób'} online
+          </span>
+        </div>
+        
+        {/* Separator */}
+        {onlineUsers.length > 0 && (
+          <div className="w-px h-6 bg-gray-300"></div>
+        )}
+        
+        {/* Awatary użytkowników */}
+        <div className="flex -space-x-2">
+          {onlineUsers.map((onlineUser, index) => {
+            const isCurrentUser = onlineUser.user_id === currentUser?.id
+            const color = getAvatarColor(onlineUser.user_id)
+            const initials = getInitials(onlineUser.username)
+            
+            // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
+            const uniqueKey = `${onlineUser.user_id}-${onlineUser.online_at || index}`
+            
+            return (
+              <div
+                key={uniqueKey}
+                className={`
+                  relative group w-10 h-10 rounded-full 
+                  ${color} 
+                  flex items-center justify-center 
+                  text-white text-sm font-bold
+                  ring-2 ring-white
+                  transition-transform hover:scale-110 hover:z-10
+                  ${isCurrentUser ? 'ring-4 ring-blue-300' : ''}
+                `}
+                title={onlineUser.username}
+              >
+                {initials}
+                
+                {/* Tooltip */}
+                <div className="
+                  absolute top-12 right-0 
+                  bg-gray-800 text-white text-xs 
+                  px-2 py-1 rounded 
+                  whitespace-nowrap
+                  opacity-0 group-hover:opacity-100
+                  transition-opacity
+                  pointer-events-none
+                ">
+                  {onlineUser.username}
+                  {isCurrentUser && ' (Ty)'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 📚 PRZYKŁAD UŻYCIA
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * W WhiteboardCanvas.tsx:
+ * 
+ * <div className="relative w-full h-full">
+ *   <OnlineUsers /> 
+ *   <Toolbar ... />
+ *   <canvas ... />
+ * </div>
+ * 
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
