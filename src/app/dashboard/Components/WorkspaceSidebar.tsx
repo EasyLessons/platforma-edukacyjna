@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
+import { setActiveWorkspace } from '@/workspace_api/api';
 
 // Mapowanie ikon z nazw na komponenty
 const iconMap = {
@@ -168,6 +169,22 @@ export default function WorkspaceSidebar() {
   const cancelEdit = () => {
     setEditingSpace(null);
     setEditName('');
+  };
+
+  const handleWorkspaceClick = async (id: number) => {
+    // Jeśli klikamy ten sam workspace - nie rób nic
+    if (activeSpace === id) {
+      return;
+    }
+    
+    setActiveSpace(id); // Stan lokalny
+    
+    try {
+      await setActiveWorkspace(id); // 🔥 Zapisz w bazie
+      console.log(`✅ Aktywny workspace: ${id}`);
+    } catch (err) {
+      console.error('❌ Błąd ustawiania aktywnego workspace:', err);
+    }
   };
 
   // Filtrowanie i sortowanie workspace'ów z backendu
@@ -452,7 +469,7 @@ export default function WorkspaceSidebar() {
                             ? 'bg-yellow-50' 
                             : ''
                     }`}
-                    onClick={() => setActiveSpace(space.id)}
+                    onClick={() => handleWorkspaceClick(space.id)}
                   >
                     <div className={`w-10 h-10 bg-${space.bg_color} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
                       <IconComponent size={20} className="text-white" />

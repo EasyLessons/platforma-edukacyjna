@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { 
   PenTool,
   Calculator,
@@ -25,6 +26,7 @@ interface Template {
 
 export default function TemplatesSection() {
   const router = useRouter();
+  const { activeWorkspace } = useWorkspaces();
 
   const templates: Template[] = [
     {
@@ -120,7 +122,16 @@ export default function TemplatesSection() {
   ];
 
   const handleTemplateClick = (route: string) => {
-    router.push(route);
+    if (!activeWorkspace) {
+      console.error('Brak aktywnego workspace');
+      return;
+    }
+
+    // Dodaj workspaceId do URL
+    const separator = route.includes('?') ? '&' : '?';
+    const fullRoute = `${route}${separator}workspaceId=${activeWorkspace.id}`;
+    
+    router.push(fullRoute);
   };
 
   return (

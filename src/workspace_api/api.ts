@@ -510,6 +510,51 @@ export const toggleWorkspaceFavourite = async (
 
 
 /**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 🔥 USTAW AKTYWNY WORKSPACE
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Ustaw workspace jako aktywny dla użytkownika
+ * 
+ * ENDPOINT:
+ * PATCH /api/workspaces/{workspaceId}/set-active
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI mieć dostęp do workspace'a
+ * 
+ * PARAMETRY:
+ * - workspaceId: ID workspace'a (number)
+ * 
+ * ZWRACA:
+ * { message: "...", active_workspace_id: number }
+ * 
+ * LOGIKA:
+ * Zapisuje active_workspace_id w tabeli users
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * await setActiveWorkspace(1);  // Ustaw workspace 1 jako aktywny
+ */
+export const setActiveWorkspace = async (workspaceId: number): Promise<void> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/api/workspaces/${workspaceId}/set-active`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  return handleResponse(response);
+};
+
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * 📚 PODSUMOWANIE FUNKCJI
  * ═══════════════════════════════════════════════════════════════════════════

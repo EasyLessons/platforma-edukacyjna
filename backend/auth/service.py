@@ -85,9 +85,13 @@ class AuthService:
             )
             self.db.add(membership)
             
+            # 🔥 NOWE - Ustaw jako aktywny workspace
+            new_user.active_workspace_id = starter_workspace.id
+            
             # COMMIT WSZYSTKIEGO NARAZ (atomowa transakcja)
             self.db.commit()
             logger.info(f"✅ Membership utworzony: user {new_user.id} → workspace {starter_workspace.id}")
+            logger.info(f"⭐ Aktywny workspace ustawiony: workspace {starter_workspace.id}")
             
             # Refresh tylko na końcu (opcjonalnie, jeśli potrzebujesz relacji)
             self.db.refresh(new_user)

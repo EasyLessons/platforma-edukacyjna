@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
@@ -26,9 +26,11 @@ import {
   Cpu,
   Dna
 } from 'lucide-react';
+import { fetchBoards, createBoard, Board as APIBoard } from '@/boards_api/api';
+import { useWorkspaces } from '@/app/context/WorkspaceContext';
 
 interface Board {
-  id: string;
+  id: number;  // ← ZMIANA: number zamiast string
   name: string;
   icon: any;
   lastModified: string;
@@ -66,102 +68,96 @@ const allIcons = [
 
 export default function LastBoards() {
   const router = useRouter();
+  const { workspaces } = useWorkspaces();
+  
+  const [boards, setBoards] = useState<Board[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
-  const [boards, setBoards] = useState<Board[]>([
-    {
-      id: '1',
-      name: 'Matura 2025 - Algebra',
-      icon: Calculator,
-      lastModified: '2 godziny temu',
-      lastModifiedBy: 'Jan Kowalski',
-      lastOpened: 'Dzisiaj, 14:32',
-      owner: 'Ty',
-      onlineUsers: 3,
-      isFavorite: true
-    },
-    {
-      id: '2',
-      name: 'Geometria - Bryły',
-      icon: Globe,
-      lastModified: 'Wczoraj',
-      lastModifiedBy: 'Anna Nowak',
-      lastOpened: '2 dni temu',
-      owner: 'Anna Nowak',
-      onlineUsers: 0,
-      isFavorite: false
-    },
-    {
-      id: '3',
-      name: 'Trygonometria - Zadania',
-      icon: Target,
-      lastModified: '5 godzin temu',
-      lastModifiedBy: 'Ty',
-      lastOpened: 'Dzisiaj, 09:15',
-      owner: 'Ty',
-      onlineUsers: 1,
-      isFavorite: true
-    },
-    {
-      id: '4',
-      name: 'Statystyka - Rozkłady',
-      icon: Presentation,
-      lastModified: '3 dni temu',
-      lastModifiedBy: 'Michał Wiśniewski',
-      lastOpened: 'Tydzień temu',
-      owner: 'Michał Wiśniewski',
-      onlineUsers: 0,
-      isFavorite: false
-    },
-    {
-      id: '5',
-      name: 'Pusta tablica - Notatki',
-      icon: PenTool,
-      lastModified: 'Teraz',
-      lastModifiedBy: 'Ty',
-      lastOpened: 'Właśnie otwarta',
-      owner: 'Ty',
-      onlineUsers: 2,
-      isFavorite: false
-    },
-    {
-      id: '6',
-      name: 'Fizyka - Prędkość',
-      icon: Zap,
-      lastModified: '1 godzinę temu',
-      lastModifiedBy: 'Kasia Zielińska',
-      lastOpened: 'Dzisiaj, 11:20',
-      owner: 'Kasia Zielińska',
-      onlineUsers: 1,
-      isFavorite: false
-    },
-    {
-      id: '7',
-      name: 'Biologia - Komórka',
-      icon: Dna,
-      lastModified: '4 godziny temu',
-      lastModifiedBy: 'Ty',
-      lastOpened: 'Wczoraj',
-      owner: 'Ty',
-      onlineUsers: 0,
-      isFavorite: true
+  
+  // Znajdź aktywny workspace (ulubiony lub pierwszy)
+  const activeWorkspace = workspaces.find(w => w.is_favourite) || workspaces[0];
+  
+  // Mapowanie nazwy ikony → komponent
+  const getIconComponent = (iconName: string) => {
+    const map: Record<string, any> = {
+      PenTool, Calculator, Globe, Lightbulb, Target, Rocket,
+      BookOpen, Presentation, Zap, Beaker, Brain, Compass, Cpu, Dna
+    };
+    return map[iconName] || PenTool;
+  };
+  
+  // Formatowanie daty
+  const formatDate = (dateString: string | null): string => {
+    if (!dateString) return 'Nigdy';
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'Nieznana data';
+      
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMins / 60);
+      const diffDays = Math.floor(diffHours / 24);
+      
+      if (diffMins < 1) return 'Teraz';
+      if (diffMins < 60) return `${diffMins} min temu`;
+      if (diffHours < 24) return `${diffHours} godz. temu`;
+      if (diffDays === 1) return 'Wczoraj';
+      if (diffDays < 7) return `${diffDays} dni temu`;
+      return date.toLocaleDateString('pl-PL');
+    } catch {
+      return 'Nieznana data';
     }
-  ]);
+  };
+  
+  // Załaduj tablice z API
+  useEffect(() => {
+    const loadBoards = async () => {
+      if (!activeWorkspace) {
+        setLoading(false);
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        setError(null);
+        const data = await fetchBoards(activeWorkspace.id);
+        
+        // Mapuj API Board → UI Board
+        const mappedBoards: Board[] = data.boards.map((b: APIBoard) => ({
+          id: b.id,
+          name: b.name,
+          icon: getIconComponent(b.icon),
+          lastModified: formatDate(b.last_modified),
+          lastModifiedBy: b.last_modified_by || b.created_by,
+          lastOpened: formatDate(b.last_opened || b.created_at),
+          owner: b.owner_username,
+          onlineUsers: 0,  // TODO: WebSocket
+          isFavorite: b.is_favourite
+        }));
+        
+        setBoards(mappedBoards);
+      } catch (err) {
+        console.error('❌ Błąd ładowania tablic:', err);
+        setError(err instanceof Error ? err.message : 'Błąd ładowania tablic');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadBoards();
+  }, [activeWorkspace]);
 
   // Sortowanie: ulubione na górze
   const sortedBoards = [...boards].sort((a, b) => {
     if (a.isFavorite && !b.isFavorite) return -1;
     if (!a.isFavorite && b.isFavorite) return 1;
 
-    if (sortBy === 'recent') {
-      const order = ['Właśnie otwarta', 'Teraz', 'Dzisiaj', 'Wczoraj', '2 dni temu', 'Tydzień temu'];
-      const aKey = a.lastOpened.split(',')[0];
-      const bKey = b.lastOpened.split(',')[0];
-      return (order.indexOf(aKey) === -1 ? 999 : order.indexOf(aKey)) - 
-             (order.indexOf(bKey) === -1 ? 999 : order.indexOf(bKey));
-    }
     if (sortBy === 'name') return a.name.localeCompare(b.name);
-    return 0;
+    return 0;  // 'recent' jest już posortowane przez API
   });
 
   const filteredBoards = sortedBoards.filter(board =>
@@ -170,21 +166,85 @@ export default function LastBoards() {
     (filterOwner === 'others' && board.owner !== 'Ty')
   );
 
-  const handleCreateBoard = () => {
-    router.push('/tablica');
+  const handleCreateBoard = async () => {
+    if (!activeWorkspace) {
+      console.error('❌ Brak aktywnego workspace');
+      return;
+    }
+    
+    try {
+      const newBoard = await createBoard({
+        name: 'Nowa tablica',
+        workspace_id: activeWorkspace.id,
+        icon: 'PenTool',
+        bg_color: 'gray-500'
+      });
+      
+      // Przekieruj do tablicy z boardId
+      router.push(`/tablica?boardId=${newBoard.id}`);
+    } catch (err) {
+      console.error('❌ Błąd tworzenia tablicy:', err);
+      setError(err instanceof Error ? err.message : 'Nie udało się utworzyć tablicy');
+    }
   };
 
-  const handleBoardClick = (boardId: string) => {
-    router.push(`/tablica/${boardId}`);
+  const handleBoardClick = (boardId: number) => {
+    router.push(`/tablica?boardId=${boardId}`);
   };
-
-  const toggleFavorite = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    setBoards(prev =>
-      prev.map(board =>
-        board.id === id ? { ...board, isFavorite: !board.isFavorite } : board
-      )
+  
+  // Loading state
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="text-center py-16">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+          <p className="text-gray-600">Ładowanie tablic...</p>
+        </div>
+      </div>
     );
+  }
+  
+  // Error state
+  if (error) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+        <div className="text-center py-16">
+          <div className="text-red-500 mb-4">❌ {error}</div>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+          >
+            Odśwież stronę
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const toggleFavorite = async (e: React.MouseEvent, id: number) => {
+    e.stopPropagation();
+    const board = boards.find(b => b.id === id);
+    if (!board) return;
+    
+    try {
+      // Optymistyczna aktualizacja UI
+      setBoards(prev =>
+        prev.map(b =>
+          b.id === id ? { ...b, isFavorite: !b.isFavorite } : b
+        )
+      );
+      
+      // Wywołaj API
+      // await toggleBoardFavourite(id, !board.isFavorite);  // TODO: gdy endpoint zadziała
+    } catch (err) {
+      console.error('❌ Błąd zmiany ulubionej:', err);
+      // Cofnij zmianę przy błędzie
+      setBoards(prev =>
+        prev.map(b =>
+          b.id === id ? { ...b, isFavorite: board.isFavorite } : b
+        )
+      );
+    }
   };
 
   const getRandomIcon = () => {

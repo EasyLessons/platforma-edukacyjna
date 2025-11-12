@@ -106,3 +106,39 @@ async def toggle_favourite(
 ):
     """Zmienia status ulubionego dla workspace'a"""
     return toggle_workspace_favourite(db, workspace_id, current_user.id, request.is_favourite)
+
+
+@router.patch("/{workspace_id}/set-active", status_code=status.HTTP_200_OK)
+async def set_active_workspace(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Ustaw workspace jako aktywny dla użytkownika"""
+    from core.models import WorkspaceMember
+    from fastapi import HTTPException
+    
+    # Sprawdź czy user ma dostęp do workspace
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == current_user.id
+        )
+        .first()
+    )
+    
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie masz dostępu do tego workspace'a"
+        )
+    
+    # Ustaw jako aktywny
+    current_user.active_workspace_id = workspace_id
+    db.commit()
+    
+    return {
+        "message": "Aktywny workspace został zmieniony",
+        "active_workspace_id": workspace_id
+    }

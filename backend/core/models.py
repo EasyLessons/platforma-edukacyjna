@@ -20,9 +20,12 @@ class User(Base):
     # Kod weryfikacyjny - bezpośrednio w tabeli user
     verification_code = Column(String(6), nullable=True)
     verification_code_expires = Column(DateTime, nullable=True)
+    
+    # 🔥 NOWE - Aktywny workspace
+    active_workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relationships
-    created_workspaces = relationship("Workspace", back_populates="creator")
+    created_workspaces = relationship("Workspace", back_populates="creator", foreign_keys="[Workspace.created_by]")
     workspace_memberships = relationship("WorkspaceMember", back_populates="user")
     created_boards = relationship(
         "Board",
@@ -48,7 +51,7 @@ class Workspace(Base):
 
     
     # Relationships
-    creator = relationship("User", back_populates="created_workspaces")
+    creator = relationship("User", back_populates="created_workspaces", foreign_keys=[created_by])
     members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
     boards = relationship("Board", back_populates="workspace", cascade="all, delete-orphan")
     invites = relationship("WorkspaceInvite", back_populates="workspace", cascade="all, delete-orphan")
