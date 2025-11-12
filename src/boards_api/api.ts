@@ -328,22 +328,222 @@ export const toggleBoardFavourite = async (
   return handleResponse(response);
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 🎨 BOARD ELEMENTS - Zapisywanie i ładowanie rysunków
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Element tablicy (rysunek, kształt, tekst, obraz)
+ * 
+ * STRUKTURA:
+ * - element_id: UUID z frontendu (unikalny ID elementu)
+ * - type: Typ elementu ("path", "rect", "text", "image", etc.)
+ * - data: Pełne dane elementu (cały obiekt DrawingElement)
+ */
+export interface BoardElement {
+  element_id: string;
+  type: string;
+  data: any;
+}
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 💾 ZAPIS BATCH - Zapisz wiele elementów naraz
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Zapisuje wiele elementów w 1 request (optymalizacja)
+ * 
+ * ENDPOINT:
+ * POST /api/boards/{boardId}/elements/batch
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI mieć dostęp do tablicy (workspace member)
+ * - Lista elementów NIE może być pusta
+ * - Maksymalnie 100 elementów w batch
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number)
+ * - elements: Lista elementów BoardElement[]
+ * 
+ * ZWRACA:
+ * {
+ *   success: boolean,
+ *   saved: number (ilość zapisanych)
+ * }
+ * 
+ * LOGIKA BACKENDU:
+ * - Jeśli element_id istnieje → UPDATE
+ * - Jeśli element_id nowy → INSERT
+ * - Używa transakcji (commit na końcu)
+ * 
+ * BŁĘDY:
+ * - 400: Lista pusta lub > 100 elementów
+ * - 401: Niezalogowany
+ * - 403: Brak dostępu do tablicy
+ * - 404: Tablica nie istnieje
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * const elements = [
+ *   {
+ *     element_id: "uuid-123",
+ *     type: "path",
+ *     data: { id: "uuid-123", type: "path", points: [...], color: "#000" }
+ *   }
+ * ];
+ * const result = await saveBoardElementsBatch(1, elements);
+ * console.log(`Zapisano ${result.saved} elementów`);
+ */
+export const saveBoardElementsBatch = async (
+  boardId: number,
+  elements: BoardElement[]
+): Promise<{ success: boolean; saved: number }> => {
+  const token = getToken();
+  if (!token) throw new Error('Brak autoryzacji');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/elements/batch`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(elements)
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 📥 ŁADOWANIE - Załaduj wszystkie elementy tablicy
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Pobiera wszystkie elementy z bazy danych
+ * 
+ * ENDPOINT:
+ * GET /api/boards/{boardId}/elements
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI mieć dostęp do tablicy
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number)
+ * 
+ * ZWRACA:
+ * {
+ *   elements: BoardElement[]
+ * }
+ * 
+ * FILTROWANIE:
+ * - Backend zwraca tylko is_deleted == False
+ * - Sortowanie po created_at ASC (najstarsze pierwsze)
+ * 
+ * BŁĘDY:
+ * - 401: Niezalogowany
+ * - 403: Brak dostępu
+ * - 404: Tablica nie istnieje
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * const data = await loadBoardElements(1);
+ * const elements = data.elements.map(e => e.data);
+ * setElements(elements);
+ */
+export const loadBoardElements = async (
+  boardId: number
+): Promise<{ elements: BoardElement[] }> => {
+  const token = getToken();
+  if (!token) throw new Error('Brak autoryzacji');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/elements`,
+    {
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 🗑️ USUWANIE - Usuń element (soft delete)
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Usuwa element (ustawia is_deleted = True)
+ * 
+ * ENDPOINT:
+ * DELETE /api/boards/{boardId}/elements/{elementId}
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI mieć dostęp do tablicy
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number)
+ * - elementId: UUID elementu (string)
+ * 
+ * ZWRACA:
+ * {
+ *   success: boolean
+ * }
+ * 
+ * LOGIKA:
+ * - Soft delete (is_deleted = True)
+ * - Element fizycznie pozostaje w bazie
+ * - GET /elements nie zwróci usuniętych
+ * 
+ * BŁĘDY:
+ * - 401: Niezalogowany
+ * - 403: Brak dostępu
+ * - 404: Element nie znaleziony
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * await deleteBoardElement(1, "uuid-123");
+ * console.log('Element usunięty');
+ */
+export const deleteBoardElement = async (
+  boardId: number,
+  elementId: string
+): Promise<{ success: boolean }> => {
+  const token = getToken();
+  if (!token) throw new Error('Brak autoryzacji');
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/elements/${elementId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * 📚 PODSUMOWANIE FUNKCJI
  * ═══════════════════════════════════════════════════════════════════════════
  * 
- * POBIERANIE:
+ * BOARDS:
  * ✅ fetchBoards(workspaceId, limit, offset) - lista tablic
- * 
- * TWORZENIE:
  * ✅ createBoard(data) - nowa tablica
- * 
- * USUWANIE:
  * ✅ deleteBoard(boardId) - usunięcie tablicy
- * 
- * ZMIANA STATUSU:
  * ✅ toggleBoardFavourite(boardId, isFavourite) - ulubiona
+ * 
+ * BOARD ELEMENTS:
+ * ✅ saveBoardElementsBatch(boardId, elements) - zapis batch
+ * ✅ loadBoardElements(boardId) - ładowanie wszystkich
+ * ✅ deleteBoardElement(boardId, elementId) - usunięcie
  * 
  * AUTORYZACJA:
  * ✅ Wszystkie funkcje pobierają token z localStorage

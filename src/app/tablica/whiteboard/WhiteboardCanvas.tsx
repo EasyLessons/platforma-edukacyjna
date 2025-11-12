@@ -34,10 +34,13 @@ import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
-import { OnlineUsers } from './OnlineUsers'; // 🆕 Import komponentu OnlineUsers
+import { OnlineUsers } from './OnlineUsers';
 
 // 🆕 Import hooka Realtime
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
+
+// 🆕 Import API dla elementów tablicy
+import { saveBoardElementsBatch, loadBoardElements } from '@/boards_api/api';
 
 import {
   Point,
@@ -73,6 +76,16 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
+  
+  // 🆕 Pobierz boardId z URL (z page.tsx)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const id = params.get('boardId');
+      setBoardIdState(id);
+      console.log('📋 Board ID dla zapisu:', id);
+    }
+  }, []);
   
   // 🆕 REALTIME HOOK
   const {
@@ -114,6 +127,14 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const [debugMode, setDebugMode] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   
+  // 🆕 ZAPISYWANIE - state i refs
+  const [unsavedElements, setUnsavedElements] = useState<Set<string>>(new Set());
+  const [isSaving, setIsSaving] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isSavingRef = useRef(false);
+  const unsavedElementsRef = useRef<Set<string>>(new Set());
+  const [boardIdState, setBoardIdState] = useState<string | null>(null);
+  
   // History state
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -150,6 +171,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   useEffect(() => {
     selectedElementIdsRef.current = selectedElementIds;
   }, [selectedElementIds]);
+  
+  // 🆕 Synchronizacja unsavedElementsRef
+  useEffect(() => {
+    unsavedElementsRef.current = unsavedElements;
+  }, [unsavedElements]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 REALTIME - ODBIERANIE ZMIAN OD INNYCH UŻYTKOWNIKÓW
@@ -185,6 +211,126 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
       setElements(prev => prev.filter(el => el.id !== elementId));
     });
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 💾 DEBOUNCED SAVE - Zapisywanie elementów z opóźnieniem 2s
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const debouncedSave = useCallback(async (boardId: string) => {
+    // Anuluj poprzedni timer
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+    
+    // Ustaw nowy timer (2 sekundy)
+    saveTimeoutRef.current = setTimeout(async () => {
+      // Walidacja: boardId musi być liczbą
+      const boardIdNum = parseInt(boardId);
+      if (isNaN(boardIdNum)) {
+        console.warn('⚠️ Nieprawidłowy boardId, pomijam zapis');
+        return;
+      }
+      
+      // Jeśli już trwa zapisywanie lub brak unsaved, wyjdź
+      if (isSavingRef.current || unsavedElementsRef.current.size === 0) {
+        return;
+      }
+      
+      try {
+        setIsSaving(true);
+        isSavingRef.current = true;
+        
+        // Znajdź elementy do zapisania
+        const currentElements = elementsRef.current;
+        const currentUnsaved = unsavedElementsRef.current;
+        
+        const elementsToSave = currentElements
+          .filter(el => currentUnsaved.has(el.id))
+          .map(el => ({
+            element_id: el.id,
+            type: el.type,
+            data: el
+          }));
+        
+        if (elementsToSave.length === 0) {
+          return;
+        }
+        
+        console.log(`💾 Zapisuję ${elementsToSave.length} elementów...`);
+        
+        // ZAPISZ BATCH
+        const result = await saveBoardElementsBatch(boardIdNum, elementsToSave);
+        
+        console.log(`✅ Zapisano ${result.saved} elementów`);
+        
+        // Wyczyść zapisane elementy z unsaved
+        const savedIds = new Set(elementsToSave.map(e => e.element_id));
+        setUnsavedElements(prev => {
+          const newSet = new Set(prev);
+          savedIds.forEach(id => newSet.delete(id));
+          return newSet;
+        });
+        
+      } catch (err) {
+        console.error('❌ Błąd zapisu:', err);
+        // NIE czyść unsavedElements - spróbuj ponownie później
+      } finally {
+        isSavingRef.current = false;
+        setIsSaving(false);
+        
+        // Jeśli pojawiły się nowe unsaved podczas zapisu, zaplanuj kolejny
+        if (unsavedElementsRef.current.size > 0) {
+          console.log(`🔄 Są nowe unsaved (${unsavedElementsRef.current.size}), planuję kolejny zapis...`);
+          debouncedSave(boardId);
+        }
+      }
+    }, 2000);  // 2 sekundy opóźnienia
+  }, [elements]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 📥 ŁADOWANIE ELEMENTÓW - Przy otwarciu tablicy
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  useEffect(() => {
+    const loadElements = async () => {
+      if (!boardIdState) return;
+      
+      // Walidacja boardId
+      const boardIdNum = parseInt(boardIdState);
+      if (isNaN(boardIdNum)) {
+        console.warn('⚠️ Nieprawidłowy boardId, pomijam ładowanie');
+        return;
+      }
+      
+      try {
+        console.log(`📥 Ładowanie elementów dla board ${boardIdNum}...`);
+        
+        const data = await loadBoardElements(boardIdNum);
+        
+        // Ustaw elementy (mapuj data → element)
+        const loadedElements = data.elements.map(e => e.data);
+        setElements(loadedElements);
+        
+        console.log(`✅ Załadowano ${loadedElements.length} elementów`);
+        
+        // Załaduj obrazy
+        loadedElements.forEach((el: DrawingElement) => {
+          if (el.type === 'image' && (el as ImageElement).src) {
+            const img = new Image();
+            img.src = (el as ImageElement).src;
+            img.onload = () => {
+              setLoadedImages(prev => new Map(prev).set(el.id, img));
+            };
+          }
+        });
+        
+      } catch (err) {
+        console.error('❌ Błąd ładowania elementów:', err);
+      }
+    };
+    
+    loadElements();
+  }, [boardIdState]);
 
   // ========================================
   // KEYBOARD SHORTCUTS (bez zmian)
@@ -481,7 +627,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     // 🆕 BROADCAST
     broadcastElementCreated(path);
-  }, [elements, saveToHistory, broadcastElementCreated]);
+    
+    // 🆕 ZAPISYWANIE - oznacz jako unsaved i zaplanuj zapis
+    setUnsavedElements(prev => new Set(prev).add(path.id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   const handleShapeCreate = useCallback((shape: Shape) => {
     const newElements = [...elements, shape];
@@ -490,7 +640,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     // 🆕 BROADCAST
     broadcastElementCreated(shape);
-  }, [elements, saveToHistory, broadcastElementCreated]);
+    
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(shape.id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
     const newElements = [...elements, func];
@@ -499,7 +653,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     // 🆕 BROADCAST
     broadcastElementCreated(func);
-  }, [elements, saveToHistory, broadcastElementCreated]);
+    
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(func.id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   const handleTextCreate = useCallback((text: TextElement) => {
     const newElements = [...elements, text];
@@ -508,7 +666,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     
     // 🆕 BROADCAST
     broadcastElementCreated(text);
-  }, [elements, saveToHistory, broadcastElementCreated]);
+    
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(text.id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
     const newElements = elements.map(el => 
@@ -522,7 +684,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
-  }, [elements, saveToHistory, broadcastElementUpdated]);
+    
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleTextDelete = useCallback((id: string) => {
     const newElements = elements.filter(el => el.id !== id);
@@ -551,6 +717,10 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     // 🆕 BROADCAST
     broadcastElementCreated(image);
     
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(image.id));
+    if (boardIdState) debouncedSave(boardIdState);
+    
     if (image.src) {
       const img = new Image();
       img.src = image.src;
@@ -561,7 +731,7 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [elements, saveToHistory, broadcastElementCreated]);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
@@ -599,7 +769,11 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
-  }, [elements, saveToHistory, broadcastElementUpdated]);
+    
+    // 🆕 ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(id));
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
     const newElements = elements.map(el => {
@@ -1187,6 +1361,21 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500"></div>
               <span className="text-sm text-gray-700">Przetwarzanie obrazu...</span>
             </div>
+          </div>
+        )}
+        
+        {/* 🆕 UI INDICATOR - Zapisywanie */}
+        {isSaving && (
+          <div className="absolute top-20 right-4 bg-green-100 text-green-700 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 z-50">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600"></div>
+            <span className="text-sm font-medium">Zapisywanie...</span>
+          </div>
+        )}
+
+        {/* 🆕 UI INDICATOR - Niezapisane zmiany */}
+        {unsavedElements.size > 0 && !isSaving && (
+          <div className="absolute top-20 right-4 bg-yellow-100 text-yellow-700 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 z-50">
+            <span className="text-sm font-medium">Niezapisane zmiany: {unsavedElements.size}</span>
           </div>
         )}
         

@@ -2,11 +2,13 @@
 BOARDS ROUTES - Endpointy zarządzania tablicami w dashboardzie
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Dict, Any
+from datetime import datetime, timezone
 
 from core.database import get_db
+from core.models import BoardElement, Board, WorkspaceMember
 from dashboard.boards.schemas import (
     CreateBoard, BoardResponse,
     BoardListResponse, UpdateBoard,
@@ -105,3 +107,226 @@ async def get_last_opened(
     """Pobieranie informacji o ostatnim otwarciu tablicy"""
     service = BoardService(db)
     return await service.get_last_opened_info(board_id, user_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# BOARD ELEMENTS - Zapisywanie i ładowanie elementów tablicy
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.post("/{board_id}/elements/batch")
+async def save_elements_batch(
+    board_id: int,
+    elements: List[Dict[str, Any]],
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Zapisz wiele elementów naraz (batch)
+    
+    Parametry:
+    - board_id: ID tablicy
+    - elements: Lista elementów w formacie:
+      [
+        {
+          "element_id": "uuid-123",
+          "type": "path",
+          "data": { cały obiekt elementu }
+        }
+      ]
+    
+    Zwraca:
+    {
+      "success": true,
+      "saved": 5
+    }
+    """
+    
+    # Walidacja: Lista nie może być pusta
+    if not elements or len(elements) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Lista elementów jest pusta"
+        )
+    
+    # Walidacja: Maksymalnie 100 elementów
+    if len(elements) > 100:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Zbyt wiele elementów (maksymalnie 100)"
+        )
+    
+    # Sprawdź czy tablica istnieje
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona"
+        )
+    
+    # Sprawdź czy użytkownik ma dostęp (jest członkiem workspace)
+    workspace_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    
+    if not workspace_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brak dostępu do tej tablicy"
+        )
+    
+    saved_count = 0
+    
+    for elem in elements:
+        # Sprawdź czy element już istnieje
+        existing = db.query(BoardElement).filter(
+            BoardElement.board_id == board_id,
+            BoardElement.element_id == elem["element_id"]
+        ).first()
+        
+        if existing:
+            # AKTUALIZUJ istniejący
+            existing.data = elem["data"]
+            existing.updated_at = datetime.now(timezone.utc)
+        else:
+            # UTWÓRZ nowy
+            new_element = BoardElement(
+                board_id=board_id,
+                element_id=elem["element_id"],
+                type=elem["type"],
+                data=elem["data"],
+                created_by=user_id,
+                is_deleted=False
+            )
+            db.add(new_element)
+        
+        saved_count += 1
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "saved": saved_count
+    }
+
+
+@router.get("/{board_id}/elements")
+async def get_board_elements(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Pobierz wszystkie elementy tablicy
+    
+    Parametry:
+    - board_id: ID tablicy
+    
+    Zwraca:
+    {
+      "elements": [
+        {
+          "element_id": "uuid-123",
+          "type": "path",
+          "data": { cały obiekt }
+        }
+      ]
+    }
+    """
+    
+    # Sprawdź czy tablica istnieje
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona"
+        )
+    
+    # Sprawdź czy użytkownik ma dostęp
+    workspace_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    
+    if not workspace_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brak dostępu do tej tablicy"
+        )
+    
+    # Pobierz tylko nie usunięte elementy
+    elements = db.query(BoardElement).filter(
+        BoardElement.board_id == board_id,
+        BoardElement.is_deleted == False
+    ).order_by(BoardElement.created_at.asc()).all()
+    
+    return {
+        "elements": [
+            {
+                "element_id": e.element_id,
+                "type": e.type,
+                "data": e.data
+            }
+            for e in elements
+        ]
+    }
+
+
+@router.delete("/{board_id}/elements/{element_id}")
+async def delete_element(
+    board_id: int,
+    element_id: str,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Usuń element (soft delete)
+    
+    Parametry:
+    - board_id: ID tablicy
+    - element_id: UUID elementu
+    
+    Zwraca:
+    {
+      "success": true
+    }
+    """
+    
+    # Sprawdź czy tablica istnieje
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona"
+        )
+    
+    # Sprawdź czy użytkownik ma dostęp
+    workspace_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    
+    if not workspace_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Brak dostępu do tej tablicy"
+        )
+    
+    # Znajdź element
+    element = db.query(BoardElement).filter(
+        BoardElement.board_id == board_id,
+        BoardElement.element_id == element_id
+    ).first()
+    
+    if not element:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Element nie znaleziony"
+        )
+    
+    # Soft delete (nie usuwamy fizycznie)
+    element.is_deleted = True
+    element.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    
+    return {"success": True}
