@@ -1,6 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
 from core.database import Base
@@ -114,3 +115,36 @@ class WorkspaceInvite(Base):
     # Relationships
     workspace = relationship("Workspace", back_populates="invites")
     inviter = relationship("User")
+
+class BoardElement(Base):
+    """
+    Elementy na tablicy (rysunki, kształty, teksty, obrazy)
+    
+    STRUKTURA:
+    - board_id: Do której tablicy należy
+    - element_id: UUID z frontendu (unikalny ID elementu)
+    - type: Typ elementu ("path", "rect", "text", "image", etc.)
+    - data: Pełne dane elementu w formacie JSONB (flexible)
+    - created_by: Kto narysował
+    - is_deleted: Soft delete (do undo/redo)
+    
+    PRZYKŁAD data (JSONB):
+    {
+      "id": "uuid-123",
+      "type": "path",
+      "points": [[10, 20], [30, 40]],
+      "color": "#000000",
+      "strokeWidth": 2
+    }
+    """
+    __tablename__ = "board_elements"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True)
+    element_id = Column(String(36), nullable=False, index=True)  # UUID z frontendu
+    type = Column(String(20), nullable=False)  # "path", "rect", "text", etc.
+    data = Column(JSONB, nullable=False)  # Pełne dane elementu
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    is_deleted = Column(Boolean, default=False, index=True)
