@@ -1,5 +1,6 @@
 """
 System logowania dla aplikacji
+KOMPATYBILNY Z UVICORN - NIE NADPISUJE UVICORN LOGGERÓW!
 """
 import logging
 import sys
@@ -8,25 +9,42 @@ from logging.handlers import RotatingFileHandler
 
 def setup_logging(log_level: str = "INFO"):
     """
-    Konfiguruje logi dla aplikacji
+    Konfiguruje logi dla aplikacji (KOMPATYBILNE Z UVICORN!)
+    
+    ⚠️ WAŻNE:
+    - NIE używa root loggera (nie nadpisuje uvicorn!)
+    - Konfiguruje tylko loggery aplikacji
+    - Uvicorn zachowuje swoją konfigurację
+    
+    Handlersy:
     - Konsola: kolorowe logi
     - Plik: logs/app.log (wszystko)
     - Plik: logs/error.log (tylko błędy)
     """
     
-    # Root logger
-    root_logger = logging.getLogger()
-    root_logger.setLevel(getattr(logging, log_level.upper()))
-    root_logger.handlers.clear()
+    # ========================================
+    # ⚠️ KLUCZ DO SUKCESU: NIE RUSZAJ ROOT LOGGERA!
+    # ========================================
+    # Poprzednio: root_logger.handlers.clear() ← TO NISZCZYŁO UVICORN!
+    # Teraz: Konfigurujemy tylko nasze loggery aplikacji
     
-    # === KONSOLA ===
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S"
-    )
-    console_handler.setFormatter(console_formatter)
-    root_logger.addHandler(console_handler)
+    # Konfiguruj handlery dla CAŁEJ aplikacji (root logger)
+    root_logger = logging.getLogger()
+    
+    # Usuń TYLKO nasze poprzednie handlery (jeśli były)
+    # NIE usuwaj handlerów uvicorn!
+    for handler in root_logger.handlers[:]:
+        # Zachowaj handlery uvicorn (mają inne formattery)
+        if isinstance(handler, logging.StreamHandler) and hasattr(handler, 'formatter'):
+            if handler.formatter and 'uvicorn' in str(type(handler.formatter)):
+                continue
+        # Usuń nasze stare handlery
+        if isinstance(handler, (RotatingFileHandler,)):
+            root_logger.removeHandler(handler)
+    
+    # Ustaw poziom dla root loggera (jeśli nie jest ustawiony)
+    if root_logger.level == logging.NOTSET:
+        root_logger.setLevel(getattr(logging, log_level.upper()))
     
     # === PLIK: app.log (wszystko) ===
     log_path = Path("logs")
@@ -38,7 +56,7 @@ def setup_logging(log_level: str = "INFO"):
         backupCount=5,
         encoding="utf-8"
     )
-    file_handler.setLevel(logging.INFO)
+    file_handler.setLevel(logging.DEBUG)  # Zbierz wszystko
     file_formatter = logging.Formatter(
         fmt="%(asctime)s | %(levelname)-8s | %(name)s:%(funcName)s:%(lineno)d | %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S"
@@ -57,9 +75,42 @@ def setup_logging(log_level: str = "INFO"):
     error_handler.setFormatter(file_formatter)
     root_logger.addHandler(error_handler)
     
+    # ========================================
+    # KONFIGURUJ LOGGERY APLIKACJI
+    # ========================================
+    # Wszystkie moduły aplikacji będą logować do plików
+    
+    # Logger dla auth
+    auth_logger = logging.getLogger("auth")
+    auth_logger.setLevel(logging.DEBUG)
+    auth_logger.propagate = True  # Propaguj do root (pliki)
+    
+    # Logger dla dashboard
+    dashboard_logger = logging.getLogger("dashboard")
+    dashboard_logger.setLevel(logging.DEBUG)
+    dashboard_logger.propagate = True
+    
+    # Logger dla core
+    core_logger = logging.getLogger("core")
+    core_logger.setLevel(logging.DEBUG)
+    core_logger.propagate = True
+    
+    # ========================================
+    # UVICORN LOGGERS - NIE RUSZAJ ICH!
+    # ========================================
+    # Uvicorn ma własne loggery:
+    # - uvicorn
+    # - uvicorn.error
+    # - uvicorn.access
+    # 
+    # Te loggery są już skonfigurowane przez uvicorn
+    # i NIE POTRZEBUJĄ naszej ingerencji!
+    
     # Info o uruchomieniu
     logger = logging.getLogger(__name__)
     logger.info("✅ System logowania zainicjalizowany")
+    logger.debug(f"📝 Poziom logowania: {log_level}")
+    logger.debug(f"📁 Katalog logów: {log_path.absolute()}")
 
 def get_logger(name: str) -> logging.Logger:
     """Pobiera logger dla modułu"""
