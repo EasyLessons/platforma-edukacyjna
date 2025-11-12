@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
+import { createBoard } from '@/boards_api/api';
 import { 
   PenTool,
   Calculator,
@@ -121,17 +122,34 @@ export default function TemplatesSection() {
     }
   ];
 
-  const handleTemplateClick = (route: string) => {
+  const handleTemplateClick = async (route: string, templateName: string) => {
     if (!activeWorkspace) {
       console.error('Brak aktywnego workspace');
       return;
     }
 
-    // Dodaj workspaceId do URL
-    const separator = route.includes('?') ? '&' : '?';
-    const fullRoute = `${route}${separator}workspaceId=${activeWorkspace.id}`;
-    
-    router.push(fullRoute);
+    try {
+      // 1. Utwórz nową tablicę w bazie danych
+      const newBoard = await createBoard({
+        name: templateName,
+        workspace_id: activeWorkspace.id,
+        icon: 'PenTool',
+        bg_color: 'gray-500'
+      });
+      
+      console.log(`✅ Utworzono tablicę: ${newBoard.id}`);
+      
+      // 2. Przekieruj do tablicy z boardId (i opcjonalnie template)
+      const hasTemplate = route.includes('template=');
+      const fullRoute = hasTemplate 
+        ? `/tablica?boardId=${newBoard.id}&${route.split('?')[1]}`
+        : `/tablica?boardId=${newBoard.id}`;
+      
+      router.push(fullRoute);
+      
+    } catch (err) {
+      console.error('❌ Błąd tworzenia tablicy:', err);
+    }
   };
 
   return (
@@ -171,7 +189,7 @@ export default function TemplatesSection() {
           return (
             <button
               key={template.id}
-              onClick={() => handleTemplateClick(template.route)}
+              onClick={() => handleTemplateClick(template.route, template.name)}
               className="group relative bg-white rounded-2xl p-6 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition-all duration-300 cursor-pointer text-left flex-shrink-0 w-[220px]"
             >
               {/* Ikona z gradientem */}

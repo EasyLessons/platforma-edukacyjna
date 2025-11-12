@@ -70,22 +70,23 @@ import { drawElement } from './rendering';
 
 interface WhiteboardCanvasProps {
   className?: string;
+  boardId: string; // 🆕 boardId z URL params (page.tsx)
 }
 
-export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
+export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
   
-  // 🆕 Pobierz boardId z URL (z page.tsx)
+  // 🆕 boardId pochodzi z props (przekazany z page.tsx)
+  // Automatycznie aktualizuje się gdy URL się zmienia
+  const [boardIdState, setBoardIdState] = useState<string>(boardId);
+  
+  // Synchronizuj boardIdState gdy boardId prop się zmienia
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const id = params.get('boardId');
-      setBoardIdState(id);
-      console.log('📋 Board ID dla zapisu:', id);
-    }
-  }, []);
+    setBoardIdState(boardId);
+    console.log('📋 Board ID zaktualizowany:', boardId);
+  }, [boardId]);
   
   // 🆕 REALTIME HOOK
   const {
@@ -133,7 +134,6 @@ export function WhiteboardCanvas({ className = '' }: WhiteboardCanvasProps) {
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef(false);
   const unsavedElementsRef = useRef<Set<string>>(new Set());
-  const [boardIdState, setBoardIdState] = useState<string | null>(null);
   
   // History state
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);

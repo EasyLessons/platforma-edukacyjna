@@ -55,6 +55,8 @@ const iconMap = {
 export default function WorkspaceSidebar() {
   const { 
     workspaces,
+    activeWorkspace,
+    setActiveWorkspace: setActiveWorkspaceContext,
     loading,
     error,
     createWorkspace,
@@ -68,7 +70,7 @@ export default function WorkspaceSidebar() {
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [hoveredSpace, setHoveredSpace] = useState<number | null>(null);
-  const [activeSpace, setActiveSpace] = useState<number | null>(null);
+  // activeSpace zastąpiony przez activeWorkspace z kontekstu
   const [editingSpace, setEditingSpace] = useState<number | null>(null);
   const [editName, setEditName] = useState('');
 
@@ -139,8 +141,9 @@ export default function WorkspaceSidebar() {
       await deleteWorkspace(id);
       setShowDeleteConfirm(null);
       
-      if (activeSpace === id) {
-        setActiveSpace(workspaces[0]?.id || null);
+      // Jeśli usuwamy aktywny workspace, ustaw pierwszy
+      if (activeWorkspace?.id === id) {
+        setActiveWorkspaceContext(workspaces[0] || null);
       }
     } catch (err) {
       console.error('Błąd usuwania workspace:', err);
@@ -173,14 +176,23 @@ export default function WorkspaceSidebar() {
 
   const handleWorkspaceClick = async (id: number) => {
     // Jeśli klikamy ten sam workspace - nie rób nic
-    if (activeSpace === id) {
+    if (activeWorkspace?.id === id) {
       return;
     }
     
-    setActiveSpace(id); // Stan lokalny
+    // Znajdź workspace
+    const workspace = workspaces.find(ws => ws.id === id);
+    if (!workspace) {
+      console.error('❌ Workspace nie znaleziony:', id);
+      return;
+    }
+    
+    // Ustaw w kontekście (lokalnie)
+    setActiveWorkspaceContext(workspace);
     
     try {
-      await setActiveWorkspace(id); // 🔥 Zapisz w bazie
+      // Zapisz w bazie
+      await setActiveWorkspace(id);
       console.log(`✅ Aktywny workspace: ${id}`);
     } catch (err) {
       console.error('❌ Błąd ustawiania aktywnego workspace:', err);
@@ -442,7 +454,7 @@ export default function WorkspaceSidebar() {
 
           {sortedSpaces.map((space) => {
             const IconComponent = iconMap[space.icon as keyof typeof iconMap] || Home;
-            const isActive = activeSpace === space.id;
+            const isActive = activeWorkspace?.id === space.id;
             const isHovered = hoveredSpace === space.id;
             const isEditing = editingSpace === space.id;
 

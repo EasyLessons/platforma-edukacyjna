@@ -73,6 +73,14 @@ interface WorkspaceContextType {
   // ☝️ Lista wszystkich workspace'ów użytkownika
   // Przykład: [{ id: 1, name: "Praca", ... }, { id: 2, name: "Szkoła", ... }]
   
+  activeWorkspace: Workspace | null;
+  // ☝️ Aktywny workspace (wybrany przez użytkownika)
+  // null = brak wybranego
+  
+  setActiveWorkspace: (workspace: Workspace | null) => void;
+  // ☝️ Funkcja do ustawienia aktywnego workspace'a
+  // Przykład: setActiveWorkspace(workspace);
+  
   loading: boolean;
   // ☝️ Czy właśnie pobieramy workspace'y z backendu?
   // true = ładowanie, false = gotowe
@@ -157,6 +165,14 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   
   /**
+   * activeWorkspace - Aktywny workspace (wybrany przez użytkownika)
+   * 
+   * Na początku: null (brak wybranego)
+   * Po wyborze: { id: 1, name: "Praca", ... }
+   */
+  const [activeWorkspace, setActiveWorkspace] = useState<Workspace | null>(null);
+  
+  /**
    * loading - Czy właśnie pobieramy dane?
    * 
    * Na początku: true (pobieramy)
@@ -210,7 +226,12 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Zapisz do stanu
       setWorkspaces(response.workspaces);
       
-      // 📝 Możesz odkomentować:
+      // 🆕 Jeśli nie ma aktywnego workspace'a, ustaw pierwszy
+      if (!activeWorkspace && response.workspaces.length > 0) {
+        setActiveWorkspace(response.workspaces[0]);
+      }
+      
+      // 📝 Możesz odkomentowaC:
       // console.log(`✅ Pobrano ${response.total} workspace'ów`);
       
     } catch (err) {
@@ -491,6 +512,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     <WorkspaceContext.Provider
       value={{
         workspaces,
+        activeWorkspace,
+        setActiveWorkspace,
         loading,
         error,
         

@@ -151,7 +151,7 @@ function TablicaContent() {
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>
-        <WhiteboardCanvas />
+        <WhiteboardCanvas boardId={boardId} />
       </BoardRealtimeProvider>
 
       {/* Style dla animacji */}
