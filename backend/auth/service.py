@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from core.logging import get_logger
 from core.config import get_settings
 
-from core.models import User
+from core.models import User, Workspace, WorkspaceMember
 from auth.schemas import RegisterUser, LoginData, VerifyEmail
 from auth.utils import (
     hash_password, verify_password, create_access_token,
@@ -58,27 +58,60 @@ class AuthService:
         )
         
         try:
+            # === USER ===
             self.db.add(new_user)
-            self.db.commit()
-            self.db.refresh(new_user)
+            self.db.flush()  # Daje ID ale nie commituje
             logger.info(f"✅ User utworzony: {new_user.username} (ID: {new_user.id})")
+            
+            # === WORKSPACE ===
+            starter_workspace = Workspace(
+                name="Moja Przestrzeń",
+                icon="Home",
+                bg_color="bg-green-500",
+                created_by=new_user.id,
+                created_at=datetime.utcnow()
+            )
+            self.db.add(starter_workspace)
+            self.db.flush()  # Daje ID ale nie commituje
+            logger.info(f"🏢 Workspace utworzony: '{starter_workspace.name}' (ID: {starter_workspace.id})")
+
+            # === MEMBERSHIP ===
+            membership = WorkspaceMember(
+                workspace_id=starter_workspace.id,
+                user_id=new_user.id,
+                role="owner",
+                is_favourite=True,
+                joined_at=datetime.utcnow()
+            )
+            self.db.add(membership)
+            
+            # COMMIT WSZYSTKIEGO NARAZ (atomowa transakcja)
+            self.db.commit()
+            logger.info(f"✅ Membership utworzony: user {new_user.id} → workspace {starter_workspace.id}")
+            
+            # Refresh tylko na końcu (opcjonalnie, jeśli potrzebujesz relacji)
+            self.db.refresh(new_user)
+
         except Exception as e:
             logger.exception(f"❌ Błąd zapisu do bazy: {e}")
             self.db.rollback()
             raise HTTPException(status_code=500, detail="Błąd serwera")
         
-        # Wyślij email
-        try:
-            await send_verification_email(
-                new_user.email,
-                new_user.username,
-                verification_code,
-                self.settings.resend_api_key,
-                self.settings.from_email
-            )
-            logger.info(f"📧 Email wysłany do {new_user.email}")
-        except Exception as e:
-            logger.exception(f"❌ Błąd wysyłania emaila: {e}")
+        # Wyślij email (DEV: wyłączone jeśli brak API key)
+        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
+            try:
+                await send_verification_email(
+                    new_user.email,
+                    new_user.username,
+                    verification_code,
+                    self.settings.resend_api_key,
+                    self.settings.from_email
+                )
+                logger.info(f"📧 Email wysłany do {new_user.email}")
+            except Exception as e:
+                logger.exception(f"❌ Błąd wysyłania emaila: {e}")
+        else:
+            logger.warning(f"⚠️ Email NIE wysłany (RESEND_API_KEY=SKIP) - KOD: {verification_code}")
         
         return {
             "user": new_user,

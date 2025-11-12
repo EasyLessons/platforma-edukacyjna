@@ -63,9 +63,14 @@ async def send_verification_email(email: str, username: str, code: str,
             """
         }
         
-        resend.Emails.send(params)
+        response = resend.Emails.send(params)
+        print(f"✅ Email wysłany! Response: {response}")
         return True
         
     except Exception as e:
         print(f"❌ Błąd wysyłania emaila: {e}")
+        print(f"📧 API Key: {resend_api_key[:10]}... (pierwsze 10 znaków)")
+        print(f"📧 From: {from_email}")
+        print(f"📧 To: {email}")
+        raise  # Rzuć błąd dalej aby zobaczyć pełny traceback
         return False
