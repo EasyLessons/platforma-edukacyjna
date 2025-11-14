@@ -16,4 +16,4 @@ alembic revision --autogenerate -m "opis zmiany"
 alembic upgrade head
 
 # odpalanie testów
-pytest tests\dashboard\boards\ -v 
+pytest tests\dashboard\ -v 
