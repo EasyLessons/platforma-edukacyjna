@@ -158,4 +158,4 @@ def get_db():
     try:
         yield db  # Pożycz sesję do endpointu
     finally:
-        db.close()  # Zawsze zamknij sesję (nawet przy exception)
+        db.close()  # Zawsze zamknij sesję 

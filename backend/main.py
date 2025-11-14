@@ -9,7 +9,8 @@ from core.logging import setup_logging
 from auth.routes import router as auth_router
 from dashboard.workspaces.routes import router as workspaces_router
 from dashboard.boards.routes import router as boards_router
-
+from fastapi import HTTPException
+from datetime import datetime
 
 # Inicjalizuj logging PRZED utworzeniem app
 setup_logging(log_level="DEBUG")  # DEBUG żeby widzieć wszystko
@@ -56,6 +57,24 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(workspaces_router)
 app.include_router(boards_router)
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint - dla UptimeRobot i monitoringu"""
+    try:
+        # Opcjonalnie: sprawdź bazę danych
+        from core.database import engine
+        with engine.connect() as conn:
+            conn.execute("SELECT 1")
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"❌ Health check failed: {e}")
+        raise HTTPException(status_code=503, detail="Service unavailable")
+
 
 @app.get("/")
 async def root():
