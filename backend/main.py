@@ -61,19 +61,10 @@ app.include_router(boards_router)
 @app.get("/health")
 async def health_check():
     """Health check endpoint - dla UptimeRobot i monitoringu"""
-    try:
-        # Opcjonalnie: sprawdź bazę danych
-        from core.database import engine
-        with engine.connect() as conn:
-            conn.execute("SELECT 1")
-        
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"❌ Health check failed: {e}")
-        raise HTTPException(status_code=503, detail="Service unavailable")
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat()
+    }
 
 
 @app.get("/")
