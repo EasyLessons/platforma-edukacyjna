@@ -41,6 +41,13 @@ export interface RegisterResponse {
   message: string;
 }
 
+export interface UserSearchResult {
+  id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+}
+
 // Helper do obsługi błędów
 const handleResponse = async (response: Response) => {
   const data = await response.json().catch(() => ({}));
@@ -194,4 +201,73 @@ export const checkUser = async (email: string): Promise<{ exists: boolean; verif
   });
   
   return handleResponse(response);
+};
+
+/**
+ * Wyszukuje użytkowników
+ */
+export const searchUsers = async (query: string, limit: number = 10): Promise<UserSearchResult[]> => {
+  if (!query || query.length < 2) return []; // minimalna długość
+  const token = getToken();
+
+  console.log(query);
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/users/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+      }
+    );
+
+    if (!response.ok) {
+      let errorMessage = `Błąd ${response.status}: ${response.statusText}`;
+      try {
+        const error = await response.json();
+        if (error.detail) errorMessage = error.detail;
+      } catch {}
+      throw new Error(errorMessage);
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('Search users exception:', error);
+    throw error;
+  }
+};
+
+
+/**
+ * Sprawdza czy użytkownik może być zaproszony
+ */
+export const checkUserInviteStatus = async (
+  workspaceId: number, 
+  userId: number
+): Promise<{is_member: boolean; has_pending_invite: boolean; can_invite: boolean}> => {
+  const token = localStorage.getItem('access_token');
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces/${workspaceId}/members/check/${userId}`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.detail || 'Błąd sprawdzania statusu');
+  }
+  
+  return response.json();
 };

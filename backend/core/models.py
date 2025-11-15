@@ -109,15 +109,16 @@ class WorkspaceInvite(Base):
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    invited_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     invite_token = Column(String(100), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False)
     accepted_at = Column(DateTime, nullable=True)
     is_used = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
-    # Relationships
     workspace = relationship("Workspace", back_populates="invites")
-    inviter = relationship("User")
+    inviter = relationship("User", foreign_keys=[invited_by], backref="sent_invites")
+    invited_user = relationship("User", foreign_keys=[invited_id], backref="received_invites")
 
 class BoardElement(Base):
     """

@@ -249,6 +249,73 @@ def shared_workspace(db_session: Session, test_user, test_user2):
     return workspace
 
 
+@pytest.fixture
+def test_invite(db_session: Session, test_workspace, test_user, test_user2):
+    """Tworzy testowe zaproszenie do workspace'a"""
+    from core.models import WorkspaceInvite
+    from datetime import datetime, timedelta
+    import secrets
+    
+    invite = WorkspaceInvite(
+        workspace_id=test_workspace.id,
+        invited_by=test_user.id,
+        invited_id=test_user2.id,
+        invite_token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() + timedelta(days=7),
+        is_used=False,
+        created_at=datetime.utcnow()
+    )
+    db_session.add(invite)
+    db_session.commit()
+    db_session.refresh(invite)
+    return invite
+
+
+@pytest.fixture
+def expired_invite(db_session: Session, test_workspace, test_user, test_user2):
+    """Tworzy wygasłe zaproszenie"""
+    from core.models import WorkspaceInvite
+    from datetime import datetime, timedelta
+    import secrets
+    
+    invite = WorkspaceInvite(
+        workspace_id=test_workspace.id,
+        invited_by=test_user.id,
+        invited_id=test_user2.id,
+        invite_token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() - timedelta(days=1),  # Wygasłe
+        is_used=False,
+        created_at=datetime.utcnow() - timedelta(days=8)
+    )
+    db_session.add(invite)
+    db_session.commit()
+    db_session.refresh(invite)
+    return invite
+
+
+@pytest.fixture
+def used_invite(db_session: Session, test_workspace, test_user, test_user2):
+    """Tworzy już użyte zaproszenie"""
+    from core.models import WorkspaceInvite
+    from datetime import datetime, timedelta
+    import secrets
+    
+    invite = WorkspaceInvite(
+        workspace_id=test_workspace.id,
+        invited_by=test_user.id,
+        invited_id=test_user2.id,
+        invite_token=secrets.token_urlsafe(32),
+        expires_at=datetime.utcnow() + timedelta(days=7),
+        is_used=True,  # Już użyte
+        accepted_at=datetime.utcnow(),
+        created_at=datetime.utcnow()
+    )
+    db_session.add(invite)
+    db_session.commit()
+    db_session.refresh(invite)
+    return invite
+
+
 # ═══════════════════════════════════════════════════════════════════════════
 # FIXTURES DLA TABLIC (BOARDS)
 # ═══════════════════════════════════════════════════════════════════════════
