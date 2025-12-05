@@ -22,9 +22,34 @@ import {
   Zap,
   Compass,
   Cpu,
-  Edit3,
+  Settings,
   Trash2,
-  Palette
+  // Dodatkowe ikony z BoardSettingsModal
+  Palette,
+  Camera,
+  Music,
+  Video,
+  Film,
+  Code,
+  Terminal,
+  Database,
+  Server,
+  Cloud,
+  Wifi,
+  Smartphone,
+  Monitor,
+  Laptop,
+  Gamepad2,
+  Trophy,
+  Heart,
+  Flame,
+  Sparkles,
+  Award,
+  Home,
+  Calendar,
+  FileText,
+  MessageCircle,
+  Bell
 } from 'lucide-react';
 import { fetchBoards, createBoard, updateBoard, deleteBoard, Board as APIBoard } from '@/boards_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
@@ -93,7 +118,12 @@ export default function LastBoards() {
   const getIconComponent = (iconName: string) => {
     const map: Record<string, any> = {
       PenTool, Calculator, Globe, Lightbulb, Target, Rocket,
-      BookOpen, Presentation, Zap, Compass, Cpu
+      BookOpen, Presentation, Zap, Compass, Cpu,
+      Palette, Camera, Music, Video, Film,
+      Code, Terminal, Database, Server, Cloud, Wifi,
+      Smartphone, Monitor, Laptop, Gamepad2,
+      Trophy, Star, Heart, Flame, Sparkles, Award,
+      Home, Users, Calendar, FileText, MessageCircle, Bell
     };
     return map[iconName] || PenTool;
   };
@@ -509,18 +539,8 @@ export default function LastBoards() {
                         }}
                         className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
                       >
-                        <Edit3 size={16} className="text-gray-500" />
-                        <span>Zmień nazwę</span>
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenEditModal(board);
-                        }}
-                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                      >
-                        <Palette size={16} className="text-gray-500" />
-                        <span>Zmień ikonę i kolor</span>
+                        <Settings size={16} className="text-gray-500" />
+                        <span>Ustawienia</span>
                       </button>
                       <div className="border-t border-gray-100 my-1" />
                       <button

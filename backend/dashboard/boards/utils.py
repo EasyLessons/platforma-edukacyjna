@@ -14,13 +14,14 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     try:
         # Dekodowanie tokenu JWT
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Nieprawidłowy token",
             )
-        return user_id
+        # Token przechowuje user_id jako string, konwertuj na int
+        return int(user_id_str)
     except jwt.PyJWTError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
