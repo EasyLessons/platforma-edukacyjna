@@ -12,7 +12,7 @@ import {
   Coffee,
   Compass,
   Crown,
-  Gamepad,
+  Gamepad2,
   Heart,
   Home,
   Lightbulb,
@@ -22,25 +22,25 @@ import {
   Sparkles,
   Target,
   Zap,
-  Edit2,
-  Check,
   Users,
   Calendar,
-  FileText
+  FileText,
+  Settings
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { setActiveWorkspace } from '@/workspace_api/api';
+import WorkspaceSettingsModal from './WorkspaceSettingsModal';
 
 // Mapowanie ikon z nazw na komponenty
-const iconMap = {
+const iconMap: Record<string, any> = {
   BookOpen,
   Briefcase,
   Code,
   Coffee,
   Compass,
   Crown,
-  Gamepad,
+  Gamepad2,
   Heart,
   Home,
   Lightbulb,
@@ -50,6 +50,40 @@ const iconMap = {
   Sparkles,
   Target,
   Zap
+};
+
+// Mapowanie kolorów - Tailwind nie obsługuje dynamicznych klas
+const colorMap: Record<string, string> = {
+  'green-500': 'bg-green-500',
+  'blue-500': 'bg-blue-500',
+  'purple-500': 'bg-purple-500',
+  'pink-500': 'bg-pink-500',
+  'orange-500': 'bg-orange-500',
+  'red-500': 'bg-red-500',
+  'yellow-500': 'bg-yellow-500',
+  'indigo-500': 'bg-indigo-500',
+  'teal-500': 'bg-teal-500',
+  'cyan-500': 'bg-cyan-500',
+  'emerald-500': 'bg-emerald-500',
+  'gray-500': 'bg-gray-500',
+  // Obsługa starych formatów z prefixem bg-
+  'bg-green-500': 'bg-green-500',
+  'bg-blue-500': 'bg-blue-500',
+  'bg-purple-500': 'bg-purple-500',
+  'bg-pink-500': 'bg-pink-500',
+  'bg-orange-500': 'bg-orange-500',
+  'bg-red-500': 'bg-red-500',
+  'bg-yellow-500': 'bg-yellow-500',
+  'bg-indigo-500': 'bg-indigo-500',
+  'bg-teal-500': 'bg-teal-500',
+  'bg-cyan-500': 'bg-cyan-500',
+  'bg-emerald-500': 'bg-emerald-500',
+  'bg-gray-500': 'bg-gray-500',
+};
+
+// Helper do pobrania klasy koloru
+const getColorClass = (color: string): string => {
+  return colorMap[color] || 'bg-green-500';
 };
 
 export default function WorkspaceSidebar() {
@@ -69,58 +103,44 @@ export default function WorkspaceSidebar() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState<number | null>(null);
-  const [showAddPopup, setShowAddPopup] = useState(false);
-  const [newSpaceName, setNewSpaceName] = useState('');
   const [hoveredSpace, setHoveredSpace] = useState<number | null>(null);
-  // activeSpace zastąpiony przez activeWorkspace z kontekstu
-  const [editingSpace, setEditingSpace] = useState<number | null>(null);
-  const [editName, setEditName] = useState('');
+  
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingWorkspace, setEditingWorkspace] = useState<{ id: number; name: string; icon: string; bg_color: string } | null>(null);
 
-  const availableIcons = [
-    'BookOpen', 'Briefcase', 'Code', 'Coffee', 'Compass', 'Crown', 
-    'Gamepad', 'Heart', 'Home', 'Lightbulb', 'Music', 'Palette', 
-    'Rocket', 'Sparkles', 'Target', 'Zap'
-  ];
-
-  const availableColors = [
-    'bg-green-500',
-    'bg-blue-500',
-    'bg-purple-500',
-    'bg-pink-500',
-    'bg-orange-500',
-    'bg-red-500',
-    'bg-yellow-500',
-    'bg-indigo-500',
-    'bg-teal-500',
-    'bg-cyan-500',
-  ];
-
-  const getRandomIcon = () => availableIcons[Math.floor(Math.random() * availableIcons.length)];
-  const getRandomColor = () => availableColors[Math.floor(Math.random() * availableColors.length)];
-
-  const openAddPopup = () => {
-    setNewSpaceName('');
-    setShowAddPopup(true);
+  // Tworzenie workspace przez modal
+  const handleCreateWorkspace = async (data: { name: string; icon: string; bg_color: string }) => {
+    await createWorkspace({
+      name: data.name,
+      icon: data.icon,
+      bg_color: data.bg_color // format: "green-500"
+    });
+    console.log('✅ Workspace utworzony w bazie danych!');
   };
 
-  const handleAddSpace = async () => {
-    if (!newSpaceName.trim()) return;
+  // Otwórz modal edycji workspace
+  const handleOpenEditModal = (space: any) => {
+    setEditingWorkspace({
+      id: space.id,
+      name: space.name,
+      icon: space.icon,
+      bg_color: space.bg_color
+    });
+    setShowEditModal(true);
+  };
 
-    try {
-      await createWorkspace({
-        name: newSpaceName.trim(),
-        icon: getRandomIcon(),
-        bg_color: getRandomColor().replace('bg-', '') // np. "green-500"
-      });
-      
-      setShowAddPopup(false);
-      setNewSpaceName('');
-      
-      console.log('✅ Workspace utworzony w bazie danych!');
-      
-    } catch (err) {
-      console.error('❌ Błąd tworzenia workspace:', err);
-    }
+  // Aktualizacja workspace przez modal
+  const handleUpdateWorkspace = async (data: { name: string; icon: string; bg_color: string }) => {
+    if (!editingWorkspace) return;
+    
+    await updateWorkspace(editingWorkspace.id, {
+      name: data.name,
+      icon: data.icon,
+      bg_color: data.bg_color
+    });
+    console.log('✅ Workspace zaktualizowany!');
   };
 
   const toggleFavorite = async (id: number) => {
@@ -165,30 +185,6 @@ export default function WorkspaceSidebar() {
     } catch (err) {
       console.error('Błąd opuszczania workspace:', err);
     }
-  };
-
-  const startEdit = (space: any) => {
-    setEditingSpace(space.id);
-    setEditName(space.name);
-  };
-
-  const saveEdit = async () => {
-    if (editingSpace && editName.trim()) {
-      try {
-        await updateWorkspace(editingSpace, {
-          name: editName.trim()
-        });
-        setEditingSpace(null);
-        setEditName('');
-      } catch (err) {
-        console.error('Błąd edycji workspace:', err);
-      }
-    }
-  };
-
-  const cancelEdit = () => {
-    setEditingSpace(null);
-    setEditName('');
   };
 
   const handleWorkspaceClick = async (id: number) => {
@@ -355,7 +351,7 @@ export default function WorkspaceSidebar() {
             </div>
 
             <button
-              onClick={openAddPopup}
+              onClick={() => setShowCreateModal(true)}
               className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer transform hover:scale-105"
             >
               <Plus size={24} />
@@ -368,64 +364,13 @@ export default function WorkspaceSidebar() {
           </div>
         </div>
 
-        {/* POPUP DODAWANIA (ten sam co poniżej) */}
-        {showAddPopup && (
-          <div 
-            className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
-            style={{ zIndex: 9999 }}
-            onClick={() => setShowAddPopup(false)}
-          >
-            <div 
-              className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2 className="text-xl font-bold text-gray-800 mb-4">
-                Stwórz swoją pierwszą przestrzeń
-              </h2>
-              
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nazwa przestrzeni:
-                </label>
-                <input
-                  type="text"
-                  value={newSpaceName}
-                  onChange={(e) => setNewSpaceName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleAddSpace();
-                    if (e.key === 'Escape') setShowAddPopup(false);
-                  }}
-                  placeholder="np. Korepetycje z matematyki, Klasa 6A itp."
-                  className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                  autoFocus
-                />
-                <p className="text-xs text-gray-500 mt-2">
-                  Kolor i ikonka zostaną przypisane losowo
-                </p>
-              </div>
-              
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowAddPopup(false)}
-                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
-                >
-                  Anuluj
-                </button>
-                <button
-                  onClick={handleAddSpace}
-                  disabled={!newSpaceName.trim()}
-                  className={`flex-1 px-4 py-2 font-semibold rounded-lg transition-colors ${
-                    newSpaceName.trim()
-                      ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-                      : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  }`}
-                >
-                  Stwórz przestrzeń
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Modal tworzenia przestrzeni */}
+        <WorkspaceSettingsModal
+          isOpen={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onSave={handleCreateWorkspace}
+          mode="create"
+        />
       </>
     );
   }
@@ -473,7 +418,6 @@ export default function WorkspaceSidebar() {
             const IconComponent = iconMap[space.icon as keyof typeof iconMap] || Home;
             const isActive = activeWorkspace?.id === space.id;
             const isHovered = hoveredSpace === space.id;
-            const isEditing = editingSpace === space.id;
 
             return (
               <Fragment key={space.id}>
@@ -500,90 +444,66 @@ export default function WorkspaceSidebar() {
                     }`}
                     onClick={() => handleWorkspaceClick(space.id)}
                   >
-                    <div className={`w-10 h-10 bg-${space.bg_color} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <div className={`w-10 h-10 ${getColorClass(space.bg_color)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
                       <IconComponent size={20} className="text-white" />
                     </div>
 
-                    {isEditing ? (
-                      <div className="flex-1 flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') saveEdit();
-                            if (e.key === 'Escape') cancelEdit();
-                          }}
-                          className="flex-1 px-2 py-1 text-sm font-semibold text-gray-900 border-2 border-green-400 rounded focus:outline-none"
-                          autoFocus
-                        />
+                    <span className={`text-sm font-medium flex-1 truncate ${
+                      isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
+                    }`}>
+                      {space.name}
+                    </span>
+
+                    {isHovered && (
+                      <div className="flex items-center gap-1">
+                        {/* Przycisk ustawień (edycja ikony, koloru, nazwy) - tylko dla właściciela */}
+                        {space.is_owner && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenEditModal(space);
+                            }}
+                            className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                            title="Ustawienia przestrzeni"
+                          >
+                            <Settings size={14} className="text-gray-600 hover:text-blue-600" />
+                          </button>
+                        )}
+
                         <button
-                          onClick={saveEdit}
-                          className="p-1 bg-green-600 text-white rounded hover:bg-green-700 cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleFavorite(space.id);
+                          }}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                            space.is_favourite 
+                              ? 'bg-yellow-100 hover:bg-yellow-200' 
+                              : 'bg-gray-200 hover:bg-gray-300'
+                          }`}
+                          title={space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
                         >
-                          <Check size={14} />
+                          <Star 
+                            size={14} 
+                            className={space.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'} 
+                          />
+                        </button>
+
+                        {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (space.is_owner) {
+                              setShowDeleteConfirm(space.id);
+                            } else {
+                              setShowLeaveConfirm(space.id);
+                            }
+                          }}
+                          className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                          title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
+                        >
+                          <X size={14} className="text-gray-600 hover:text-red-600" />
                         </button>
                       </div>
-                    ) : (
-                      <>
-                        <span className={`text-sm font-medium flex-1 truncate ${
-                          isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
-                        }`}>
-                          {space.name}
-                        </span>
-
-                        {isHovered && !isEditing && (
-                          <div className="flex items-center gap-1">
-                            {/* Przycisk edycji - tylko dla właściciela */}
-                            {space.is_owner && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEdit(space);
-                                }}
-                                className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                                title="Zmień nazwę"
-                              >
-                                <Edit2 size={14} className="text-gray-600 hover:text-blue-600" />
-                              </button>
-                            )}
-
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleFavorite(space.id);
-                              }}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                                space.is_favourite 
-                                  ? 'bg-yellow-100 hover:bg-yellow-200' 
-                                  : 'bg-gray-200 hover:bg-gray-300'
-                              }`}
-                              title={space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
-                            >
-                              <Star 
-                                size={14} 
-                                className={space.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'} 
-                              />
-                            </button>
-
-                            {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (space.is_owner) {
-                                  setShowDeleteConfirm(space.id);
-                                } else {
-                                  setShowLeaveConfirm(space.id);
-                                }
-                              }}
-                              className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                              title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
-                            >
-                              <X size={14} className="text-gray-600 hover:text-red-600" />
-                            </button>
-                          </div>
-                        )}
-                      </>
                     )}
                   </div>
                 </div>
@@ -611,7 +531,7 @@ export default function WorkspaceSidebar() {
           </div>
 
           <button
-            onClick={openAddPopup}
+            onClick={() => setShowCreateModal(true)}
             className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
           >
             <Plus size={20} />
@@ -620,64 +540,25 @@ export default function WorkspaceSidebar() {
         </div>
       </div>
 
-      {/* POPUPY */}
-      {showAddPopup && (
-        <div 
-          className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
-          style={{ zIndex: 9999 }}
-          onClick={() => setShowAddPopup(false)}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-xl font-bold text-gray-800 mb-4">
-              {workspaces.length === 0 ? 'Stwórz swoją pierwszą przestrzeń' : 'Dodaj nową przestrzeń'}
-            </h2>
-            
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nazwa przestrzeni:
-              </label>
-              <input
-                type="text"
-                value={newSpaceName}
-                onChange={(e) => setNewSpaceName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAddSpace();
-                  if (e.key === 'Escape') setShowAddPopup(false);
-                }}
-                placeholder="np. Korepetycja matematyka, Klasa 6a itp."
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100"
-                autoFocus
-              />
-              <p className="text-xs text-gray-500 mt-2">
-                Kolor i ikonka zostaną przypisane losowo
-              </p>
-            </div>
-            
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowAddPopup(false)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
-              >
-                Anuluj
-              </button>
-              <button
-                onClick={handleAddSpace}
-                disabled={!newSpaceName.trim()}
-                className={`flex-1 px-4 py-2 font-semibold rounded-lg transition-colors ${
-                  newSpaceName.trim()
-                    ? 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                {workspaces.length === 0 ? 'Stwórz przestrzeń' : 'Dodaj'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal tworzenia przestrzeni */}
+      <WorkspaceSettingsModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSave={handleCreateWorkspace}
+        mode="create"
+      />
+
+      {/* Modal edycji przestrzeni */}
+      <WorkspaceSettingsModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingWorkspace(null);
+        }}
+        onSave={handleUpdateWorkspace}
+        mode="edit"
+        initialData={editingWorkspace || undefined}
+      />
 
       {/* POPUP - Usuń przestrzeń (tylko dla owner) */}
       {showDeleteConfirm && (

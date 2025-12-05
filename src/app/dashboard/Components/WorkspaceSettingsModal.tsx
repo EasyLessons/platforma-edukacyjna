@@ -5,41 +5,40 @@ import { X, Check } from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🎨 DOSTĘPNE IKONY I KOLORY
+// 🎨 DOSTĘPNE IKONY I KOLORY DLA WORKSPACE'ÓW
 // ═══════════════════════════════════════════════════════════════════════════
 
-// Ikony dostępne dla tablic (dopasowane do iconGradientMap z LastBoards)
+// Ikony dostępne dla workspace'ów (dopasowane do iconMap z WorkspaceSidebar)
 const availableIcons = [
-  'PenTool', 'Calculator', 'Globe', 'Lightbulb', 'Target', 'Rocket',
-  'BookOpen', 'Presentation', 'Zap', 'Compass', 'Cpu',
-  'Palette', 'Camera', 'Music', 'Video', 'Film',
-  'Code', 'Terminal', 'Database', 'Server', 'Cloud', 'Wifi',
-  'Smartphone', 'Monitor', 'Laptop', 'Gamepad2',
-  'Trophy', 'Star', 'Heart', 'Flame', 'Sparkles', 'Award',
-  'Home', 'Users', 'Calendar', 'FileText', 'MessageCircle', 'Bell'
+  'BookOpen', 'Briefcase', 'Code', 'Coffee', 'Compass', 'Crown',
+  'Gamepad2', 'Heart', 'Home', 'Lightbulb', 'Music', 'Palette',
+  'Rocket', 'Sparkles', 'Target', 'Zap', 'Users', 'Calendar',
+  'FileText', 'MessageCircle', 'Bell', 'Star', 'Trophy', 'Award',
+  'Globe', 'Calculator', 'Camera', 'Monitor', 'Laptop', 'Cloud',
+  'Database', 'Server', 'Wifi', 'Smartphone', 'PenTool', 'Presentation'
 ] as const;
 
-// Kolory tła (gradient mapping)
+// Kolory tła (format bg-{color}-500)
 const availableColors = [
-  { name: 'gray', label: 'Szary', class: 'bg-gray-500', gradient: 'from-gray-400 to-gray-600' },
-  { name: 'blue', label: 'Niebieski', class: 'bg-blue-500', gradient: 'from-blue-400 to-blue-600' },
-  { name: 'green', label: 'Zielony', class: 'bg-green-500', gradient: 'from-green-400 to-green-600' },
-  { name: 'purple', label: 'Fioletowy', class: 'bg-purple-500', gradient: 'from-purple-400 to-purple-600' },
-  { name: 'pink', label: 'Różowy', class: 'bg-pink-500', gradient: 'from-pink-400 to-pink-600' },
-  { name: 'red', label: 'Czerwony', class: 'bg-red-500', gradient: 'from-red-400 to-red-600' },
-  { name: 'orange', label: 'Pomarańczowy', class: 'bg-orange-500', gradient: 'from-orange-400 to-orange-600' },
-  { name: 'yellow', label: 'Żółty', class: 'bg-yellow-500', gradient: 'from-yellow-400 to-yellow-600' },
-  { name: 'teal', label: 'Turkusowy', class: 'bg-teal-500', gradient: 'from-teal-400 to-teal-600' },
-  { name: 'indigo', label: 'Indygo', class: 'bg-indigo-500', gradient: 'from-indigo-400 to-indigo-600' },
-  { name: 'cyan', label: 'Cyjan', class: 'bg-cyan-500', gradient: 'from-cyan-400 to-cyan-600' },
-  { name: 'emerald', label: 'Szmaragdowy', class: 'bg-emerald-500', gradient: 'from-emerald-400 to-emerald-600' },
+  { name: 'green', label: 'Zielony', class: 'bg-green-500' },
+  { name: 'blue', label: 'Niebieski', class: 'bg-blue-500' },
+  { name: 'purple', label: 'Fioletowy', class: 'bg-purple-500' },
+  { name: 'pink', label: 'Różowy', class: 'bg-pink-500' },
+  { name: 'orange', label: 'Pomarańczowy', class: 'bg-orange-500' },
+  { name: 'red', label: 'Czerwony', class: 'bg-red-500' },
+  { name: 'yellow', label: 'Żółty', class: 'bg-yellow-500' },
+  { name: 'indigo', label: 'Indygo', class: 'bg-indigo-500' },
+  { name: 'teal', label: 'Turkusowy', class: 'bg-teal-500' },
+  { name: 'cyan', label: 'Cyjan', class: 'bg-cyan-500' },
+  { name: 'emerald', label: 'Szmaragdowy', class: 'bg-emerald-500' },
+  { name: 'gray', label: 'Szary', class: 'bg-gray-500' },
 ] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📝 TYPY
 // ═══════════════════════════════════════════════════════════════════════════
 
-interface BoardSettingsModalProps {
+interface WorkspaceSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: { name: string; icon: string; bg_color: string }) => Promise<void>;
@@ -55,16 +54,16 @@ interface BoardSettingsModalProps {
 // 🎯 KOMPONENT MODALU
 // ═══════════════════════════════════════════════════════════════════════════
 
-export default function BoardSettingsModal({
+export default function WorkspaceSettingsModal({
   isOpen,
   onClose,
   onSave,
   mode,
   initialData
-}: BoardSettingsModalProps) {
+}: WorkspaceSettingsModalProps) {
   const [name, setName] = useState(initialData?.name || '');
-  const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'PenTool');
-  const [selectedColor, setSelectedColor] = useState(initialData?.bg_color || 'gray-500');
+  const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'Home');
+  const [selectedColor, setSelectedColor] = useState(initialData?.bg_color || 'green-500');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -74,8 +73,10 @@ export default function BoardSettingsModal({
   useEffect(() => {
     if (isOpen) {
       setName(initialData?.name || '');
-      setSelectedIcon(initialData?.icon || 'PenTool');
-      setSelectedColor(initialData?.bg_color || 'gray-500');
+      setSelectedIcon(initialData?.icon || 'Home');
+      // Normalizuj format koloru (usuń "bg-" jeśli jest)
+      const color = initialData?.bg_color || 'green-500';
+      setSelectedColor(color.replace('bg-', ''));
       setError(null);
       // Focus na input po otwarciu
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -114,12 +115,12 @@ export default function BoardSettingsModal({
 
   const handleSave = async () => {
     if (!name.trim()) {
-      setError('Nazwa tablicy jest wymagana');
+      setError('Nazwa przestrzeni jest wymagana');
       return;
     }
 
-    if (name.length > 50) {
-      setError('Nazwa może mieć maksymalnie 50 znaków');
+    if (name.length > 200) {
+      setError('Nazwa może mieć maksymalnie 200 znaków');
       return;
     }
 
@@ -130,7 +131,7 @@ export default function BoardSettingsModal({
       await onSave({
         name: name.trim(),
         icon: selectedIcon,
-        bg_color: selectedColor
+        bg_color: selectedColor // Bez prefixu "bg-"
       });
       onClose();
     } catch (err) {
@@ -148,7 +149,8 @@ export default function BoardSettingsModal({
 
   // Znajdź kolor po nazwie
   const getColorData = (colorName: string) => {
-    return availableColors.find(c => c.name === colorName.replace('-500', '')) || availableColors[0];
+    const normalizedColor = colorName.replace('bg-', '').replace('-500', '');
+    return availableColors.find(c => c.name === normalizedColor) || availableColors[0];
   };
 
   if (!isOpen) return null;
@@ -157,7 +159,7 @@ export default function BoardSettingsModal({
   const selectedColorData = getColorData(selectedColor);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
       {/* Backdrop */}
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
 
@@ -169,7 +171,7 @@ export default function BoardSettingsModal({
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
           <h2 className="text-xl font-bold text-gray-900">
-            {mode === 'create' ? 'Nowa tablica' : 'Ustawienia tablicy'}
+            {mode === 'create' ? 'Nowa przestrzeń' : 'Ustawienia przestrzeni'}
           </h2>
           <button
             onClick={onClose}
@@ -183,7 +185,7 @@ export default function BoardSettingsModal({
         <div className="p-6 space-y-6">
           {/* Podgląd */}
           <div className="flex items-center justify-center">
-            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${selectedColorData.gradient} flex items-center justify-center shadow-lg`}>
+            <div className={`w-20 h-20 rounded-2xl ${selectedColorData.class} flex items-center justify-center shadow-lg`}>
               <SelectedIconComponent size={40} className="text-white drop-shadow" />
             </div>
           </div>
@@ -191,19 +193,19 @@ export default function BoardSettingsModal({
           {/* Nazwa */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nazwa tablicy
+              Nazwa przestrzeni
             </label>
             <input
               ref={inputRef}
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Wpisz nazwę tablicy..."
+              placeholder="Wpisz nazwę przestrzeni..."
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-gray-900 placeholder-gray-400"
-              maxLength={50}
+              maxLength={200}
             />
             <div className="text-right text-xs text-gray-400 mt-1">
-              {name.length}/50
+              {name.length}/200
             </div>
           </div>
 
@@ -241,7 +243,7 @@ export default function BoardSettingsModal({
             </label>
             <div className="flex flex-wrap gap-2">
               {availableColors.map((color) => {
-                const isSelected = selectedColor === `${color.name}-500`;
+                const isSelected = selectedColor === `${color.name}-500` || selectedColor === color.name;
                 return (
                   <button
                     key={color.name}
@@ -285,7 +287,7 @@ export default function BoardSettingsModal({
                 <span>Zapisywanie...</span>
               </>
             ) : (
-              <span>{mode === 'create' ? 'Utwórz tablicę' : 'Zapisz zmiany'}</span>
+              <span>{mode === 'create' ? 'Utwórz przestrzeń' : 'Zapisz zmiany'}</span>
             )}
           </button>
         </div>

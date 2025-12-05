@@ -20,11 +20,8 @@ import {
   BookOpen,
   Presentation,
   Zap,
-  Beaker,
-  Brain,
   Compass,
   Cpu,
-  Dna,
   Edit3,
   Trash2,
   Palette
@@ -47,29 +44,30 @@ interface Board {
   isFavorite: boolean;
 }
 
-const iconGradientMap: Record<string, string> = {
-  // Podstawowe
-  PenTool: 'from-gray-400 to-gray-600',
-  Calculator: 'from-blue-400 to-blue-600',
-  Globe: 'from-teal-400 to-teal-600',
-  Lightbulb: 'from-yellow-400 to-yellow-600',
-  Target: 'from-green-400 to-green-600',
-  Rocket: 'from-purple-400 to-purple-600',
-  BookOpen: 'from-orange-400 to-orange-600',
-  Presentation: 'from-red-400 to-red-600',
+// Mapowanie kolorów z bazy na gradienty Tailwind
+const colorGradientMap: Record<string, string> = {
+  'gray-500': 'from-gray-400 to-gray-600',
+  'blue-500': 'from-blue-400 to-blue-600',
+  'green-500': 'from-green-400 to-green-600',
+  'purple-500': 'from-purple-400 to-purple-600',
+  'pink-500': 'from-pink-400 to-pink-600',
+  'red-500': 'from-red-400 to-red-600',
+  'orange-500': 'from-orange-400 to-orange-600',
+  'yellow-500': 'from-yellow-400 to-yellow-600',
+  'teal-500': 'from-teal-400 to-teal-600',
+  'indigo-500': 'from-indigo-400 to-indigo-600',
+  'cyan-500': 'from-cyan-400 to-cyan-600',
+  'emerald-500': 'from-emerald-400 to-emerald-600',
+};
 
-  // Nowe, żywe
-  Zap: 'from-pink-400 to-pink-600',
-  Beaker: 'from-cyan-400 to-cyan-600',
-  Brain: 'from-indigo-400 to-indigo-600',
-  Compass: 'from-emerald-400 to-emerald-600',
-  Cpu: 'from-violet-400 to-violet-600',
-  Dna: 'from-rose-400 to-rose-600'
+// Helper do pobrania gradientu z koloru
+const getGradientFromColor = (color: string): string => {
+  return colorGradientMap[color] || 'from-gray-400 to-gray-600';
 };
 
 const allIcons = [
   PenTool, Calculator, Globe, Lightbulb, Target, Rocket, BookOpen, Presentation,
-  Zap, Beaker, Brain, Compass, Cpu, Dna
+  Zap, Compass, Cpu
 ];
 
 export default function LastBoards() {
@@ -329,10 +327,6 @@ export default function LastBoards() {
     return allIcons[Math.floor(Math.random() * allIcons.length)];
   };
 
-  const getGradient = (Icon: any) => {
-    return iconGradientMap[Icon.name] || 'from-indigo-400 to-indigo-600';
-  };
-
   return (
     <>
       {/* Modal tworzenia tablicy */}
@@ -416,7 +410,7 @@ export default function LastBoards() {
       </div>
 
       {/* Lista tablic */}
-      <div className="space-y-3">
+      <div className="space-y-3 overflow-visible">
         {filteredBoards.length === 0 ? (
           <div className="text-center py-16 bg-gray-50 rounded-xl">
             <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center">
@@ -428,7 +422,8 @@ export default function LastBoards() {
         ) : (
           filteredBoards.map((board) => {
             const Icon = board.icon || getRandomIcon();
-            const gradient = getGradient(Icon);
+            // Użyj koloru z bazy zamiast gradientu opartego na ikonie
+            const gradient = getGradientFromColor(board.bgColor);
             return (
               <div
                 key={board.id}
@@ -506,7 +501,7 @@ export default function LastBoards() {
 
                   {/* Dropdown menu */}
                   {openDropdownId === board.id && (
-                    <div className="absolute right-0 top-10 z-50 bg-white rounded-xl shadow-lg border border-gray-200 py-2 min-w-[180px]">
+                    <div className="absolute right-0 top-full mt-1 z-[100] bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[180px]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
