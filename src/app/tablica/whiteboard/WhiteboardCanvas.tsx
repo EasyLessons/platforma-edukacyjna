@@ -193,6 +193,18 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
         }
         return [...prev, element];
       });
+      
+      // 🆕 Jeśli to obraz, załaduj go do loadedImages
+      if (element.type === 'image' && (element as ImageElement).src) {
+        const img = new Image();
+        img.src = (element as ImageElement).src;
+        img.onload = () => {
+          setLoadedImages(prev => new Map(prev).set(element.id, img));
+        };
+        img.onerror = () => {
+          console.error('Failed to load remote image:', element.id);
+        };
+      }
     });
     
     // Handler: Aktualizacja elementu od innego użytkownika

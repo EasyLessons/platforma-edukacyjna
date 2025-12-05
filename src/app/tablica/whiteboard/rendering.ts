@@ -45,6 +45,7 @@ import { clampLineWidth, clampFontSize, evaluateExpression } from './utils';
 /**
  * Rysuje ścieżkę (path) - linie rysowane piórem
  * WAŻNE: Używa clamp dla lineWidth!
+ * Obsługuje też pojedyncze punkty (kropki)
  */
 export function drawPath(
   ctx: CanvasRenderingContext2D,
@@ -53,10 +54,22 @@ export function drawPath(
   canvasWidth: number,
   canvasHeight: number
 ): void {
-  if (path.points.length < 2) return;
+  if (path.points.length === 0) return;
+  
+  const lineWidth = clampLineWidth(path.width, viewport.scale);
+  
+  // Pojedynczy punkt - rysuj jako kółko (kropka)
+  if (path.points.length === 1) {
+    const point = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
+    ctx.fillStyle = path.color;
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
+    ctx.fill();
+    return;
+  }
   
   ctx.strokeStyle = path.color;
-  ctx.lineWidth = clampLineWidth(path.width, viewport.scale);
+  ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();

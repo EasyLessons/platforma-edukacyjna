@@ -107,7 +107,7 @@ export function PenTool({
 
   // Mouse up - zakończ rysowanie
   const handleMouseUp = () => {
-    if (isDrawing && currentPath && currentPath.points.length > 1) {
+    if (isDrawing && currentPath && currentPath.points.length >= 1) {
       onPathCreate(currentPath);
     }
 
