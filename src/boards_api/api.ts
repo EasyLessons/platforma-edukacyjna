@@ -328,6 +328,72 @@ export const toggleBoardFavourite = async (
   return handleResponse(response);
 };
 
+/**
+ * Dane do aktualizacji tablicy (wszystkie opcjonalne)
+ */
+export interface BoardUpdate {
+  name?: string;
+  icon?: string;
+  bg_color?: string;
+}
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * ✏️ AKTUALIZACJA TABLICY
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Aktualizuje dane tablicy (nazwę, ikonę, kolor)
+ * 
+ * ENDPOINT:
+ * PUT /api/boards/{boardId}
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI być właścicielem tablicy
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number)
+ * - data: BoardUpdate {
+ *     name?: string (1-50 znaków),
+ *     icon?: string (nazwa ikony),
+ *     bg_color?: string (kolor tła)
+ *   }
+ * 
+ * ZWRACA:
+ * Board (pełne dane zaktualizowanej tablicy)
+ * 
+ * BŁĘDY:
+ * - 401: Niezalogowany
+ * - 403: Użytkownik nie jest właścicielem
+ * - 404: Tablica nie istnieje
+ * - 422: Błąd walidacji
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * const updated = await updateBoard(1, { name: "Nowa nazwa" });
+ * console.log(`Zaktualizowano: ${updated.name}`);
+ */
+export const updateBoard = async (
+  boardId: number,
+  data: BoardUpdate
+): Promise<Board> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany żeby aktualizować tablice');
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/api/boards/${boardId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(data)
+  });
+  
+  return handleResponse(response);
+};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 BOARD ELEMENTS - Zapisywanie i ładowanie rysunków
 // ═══════════════════════════════════════════════════════════════════════════

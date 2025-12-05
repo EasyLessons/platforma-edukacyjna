@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Plus,
@@ -24,15 +24,21 @@ import {
   Brain,
   Compass,
   Cpu,
-  Dna
+  Dna,
+  Edit3,
+  Trash2,
+  Palette
 } from 'lucide-react';
-import { fetchBoards, createBoard, Board as APIBoard } from '@/boards_api/api';
+import { fetchBoards, createBoard, updateBoard, deleteBoard, Board as APIBoard } from '@/boards_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
+import BoardSettingsModal from './BoardSettingsModal';
 
 interface Board {
   id: number;  // ← ZMIANA: number zamiast string
   name: string;
   icon: any;
+  iconName: string;  // Nazwa ikony do edycji
+  bgColor: string;   // Kolor tła do edycji
   lastModified: string;
   lastModifiedBy: string;
   lastOpened: string;
@@ -75,6 +81,15 @@ export default function LastBoards() {
   const [error, setError] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
+  
+  // Modal states
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBoard, setEditingBoard] = useState<{ id: number; name: string; icon: string; bg_color: string } | null>(null);
+  
+  // Dropdown state
+  const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   
   // Mapowanie nazwy ikony → komponent
   const getIconComponent = (iconName: string) => {
@@ -128,6 +143,8 @@ export default function LastBoards() {
           id: b.id,
           name: b.name,
           icon: getIconComponent(b.icon),
+          iconName: b.icon,  // Zachowaj nazwę ikony do edycji
+          bgColor: b.bg_color,  // Zachowaj kolor do edycji
           lastModified: formatDate(b.last_modified),
           lastModifiedBy: b.last_modified_by || b.created_by,
           lastOpened: formatDate(b.last_opened || b.created_at),
@@ -148,6 +165,18 @@ export default function LastBoards() {
     loadBoards();
   }, [activeWorkspace?.id]);
 
+  // Zamknij dropdown przy kliknięciu poza nim
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpenDropdownId(null);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // Sortowanie: ulubione na górze
   const sortedBoards = [...boards].sort((a, b) => {
     if (a.isFavorite && !b.isFavorite) return -1;
@@ -163,25 +192,77 @@ export default function LastBoards() {
     (filterOwner === 'others' && board.owner !== 'Ty')
   );
 
-  const handleCreateBoard = async () => {
+  // Otwórz modal tworzenia tablicy
+  const handleOpenCreateModal = () => {
     if (!activeWorkspace) {
       console.error('❌ Brak aktywnego workspace');
       return;
     }
+    setShowCreateModal(true);
+  };
+
+  // Tworzenie nowej tablicy
+  const handleCreateBoard = async (data: { name: string; icon: string; bg_color: string }) => {
+    if (!activeWorkspace) {
+      throw new Error('Brak aktywnego workspace');
+    }
+    
+    const newBoard = await createBoard({
+      name: data.name,
+      workspace_id: activeWorkspace.id,
+      icon: data.icon,
+      bg_color: data.bg_color
+    });
+    
+    // Przekieruj do tablicy z boardId
+    router.push(`/tablica?boardId=${newBoard.id}`);
+  };
+
+  // Otwórz modal edycji tablicy
+  const handleOpenEditModal = (board: Board) => {
+    setEditingBoard({
+      id: board.id,
+      name: board.name,
+      icon: board.iconName,
+      bg_color: board.bgColor
+    });
+    setOpenDropdownId(null);
+    setShowEditModal(true);
+  };
+
+  // Aktualizacja tablicy
+  const handleUpdateBoard = async (data: { name: string; icon: string; bg_color: string }) => {
+    if (!editingBoard) return;
+    
+    await updateBoard(editingBoard.id, data);
+    
+    // Zaktualizuj lokalny stan
+    setBoards(prev => prev.map(b => 
+      b.id === editingBoard.id 
+        ? { 
+            ...b, 
+            name: data.name, 
+            icon: getIconComponent(data.icon),
+            iconName: data.icon,
+            bgColor: data.bg_color
+          }
+        : b
+    ));
+  };
+
+  // Usuń tablicę
+  const handleDeleteBoard = async (boardId: number) => {
+    if (!confirm('Czy na pewno chcesz usunąć tę tablicę? Ta akcja jest nieodwracalna.')) {
+      return;
+    }
     
     try {
-      const newBoard = await createBoard({
-        name: 'Nowa tablica',
-        workspace_id: activeWorkspace.id,
-        icon: 'PenTool',
-        bg_color: 'gray-500'
-      });
-      
-      // Przekieruj do tablicy z boardId
-      router.push(`/tablica?boardId=${newBoard.id}`);
+      await deleteBoard(boardId);
+      setBoards(prev => prev.filter(b => b.id !== boardId));
+      setOpenDropdownId(null);
     } catch (err) {
-      console.error('❌ Błąd tworzenia tablicy:', err);
-      setError(err instanceof Error ? err.message : 'Nie udało się utworzyć tablicy');
+      console.error('❌ Błąd usuwania tablicy:', err);
+      setError(err instanceof Error ? err.message : 'Nie udało się usunąć tablicy');
     }
   };
 
@@ -254,13 +335,33 @@ export default function LastBoards() {
 
   return (
     <>
+      {/* Modal tworzenia tablicy */}
+      <BoardSettingsModal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        onSave={handleCreateBoard}
+        mode="create"
+      />
+
+      {/* Modal edycji tablicy */}
+      <BoardSettingsModal
+        isOpen={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingBoard(null);
+        }}
+        onSave={handleUpdateBoard}
+        mode="edit"
+        initialData={editingBoard || undefined}
+      />
+
       {/* Nagłówek */}
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-2xl font-bold text-gray-900">
           Tablice w tej przestrzeni
         </h2>
         <button
-          onClick={handleCreateBoard}
+          onClick={handleOpenCreateModal}
           className="bg-green-600 hover:bg-green-700 text-white font-medium px-4 py-2 rounded-md flex items-center gap-2 transition-all duration-200 text-sm cursor-pointer shadow-sm hover:shadow"
         >
           <Plus size={18} />
@@ -389,14 +490,56 @@ export default function LastBoards() {
                   </button>
                 </div>
 
-                {/* Trzy kropki */}
-                <div className="col-span-1 flex justify-end">
+                {/* Trzy kropki - dropdown menu */}
+                <div className="col-span-1 flex justify-end relative" ref={openDropdownId === board.id ? dropdownRef : null}>
                   <button
-                    onClick={(e) => e.stopPropagation()}
-                    className="p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 opacity-0 group-hover:opacity-100 transition-all duration-200 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDropdownId(openDropdownId === board.id ? null : board.id);
+                    }}
+                    className={`p-2 rounded-xl text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all duration-200 cursor-pointer ${
+                      openDropdownId === board.id ? 'opacity-100 bg-gray-100 text-gray-700' : 'opacity-0 group-hover:opacity-100'
+                    }`}
                   >
                     <MoreVertical size={20} />
                   </button>
+
+                  {/* Dropdown menu */}
+                  {openDropdownId === board.id && (
+                    <div className="absolute right-0 top-10 z-50 bg-white rounded-xl shadow-lg border border-gray-200 py-2 min-w-[180px]">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(board);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      >
+                        <Edit3 size={16} className="text-gray-500" />
+                        <span>Zmień nazwę</span>
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEditModal(board);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                      >
+                        <Palette size={16} className="text-gray-500" />
+                        <span>Zmień ikonę i kolor</span>
+                      </button>
+                      <div className="border-t border-gray-100 my-1" />
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteBoard(board.id);
+                        }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
+                      >
+                        <Trash2 size={16} />
+                        <span>Usuń tablicę</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             );
