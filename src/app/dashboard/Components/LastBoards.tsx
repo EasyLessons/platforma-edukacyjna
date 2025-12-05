@@ -93,7 +93,7 @@ export default function LastBoards() {
   const getIconComponent = (iconName: string) => {
     const map: Record<string, any> = {
       PenTool, Calculator, Globe, Lightbulb, Target, Rocket,
-      BookOpen, Presentation, Zap, Beaker, Brain, Compass, Cpu, Dna
+      BookOpen, Presentation, Zap, Compass, Cpu
     };
     return map[iconName] || PenTool;
   };
