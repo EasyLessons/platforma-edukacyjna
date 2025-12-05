@@ -127,6 +127,23 @@ export interface WorkspaceUpdate {
   bg_color?: string;
 }
 
+/**
+  * Pojedyncze zaproszenie oczekujące na akceptację
+ */
+export interface PendingInvite {
+  id: number;
+  workspace_id: number;
+  workspace_name: string;
+  workspace_icon: string;
+  workspace_bg_color: string;
+  invited_by: number;
+  inviter_name: string;
+   invited_id: number;
+  invited_user_name: string;
+  invite_token: string;
+  expires_at: string;
+  created_at: string;
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🛡️ HELPER - Pobieranie tokenu
@@ -553,6 +570,108 @@ export const setActiveWorkspace = async (workspaceId: number): Promise<void> => 
   return handleResponse(response);
 };
 
+/**
+ * Tworzy zaproszenie do workspace'a
+ */
+export const createInvite = async (
+  workspaceId: number, 
+  invitedUserId: number
+): Promise<any> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/invite`, 
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        workspace_id: workspaceId,
+        invited_user_id: invitedUserId
+      })
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Pobiera zaproszenia oczekujące
+ */
+export const fetchPendingInvites = async (): Promise<PendingInvite[]> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/invites/pending`, 
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Akceptuje zaproszenie
+ */
+export const acceptInvite = async (token: string): Promise<any> => {
+  const authToken = getToken();
+  
+  if (!authToken) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/invites/accept/${token}`, 
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Odrzuca zaproszenie
+ */
+export const rejectInvite = async (token: string): Promise<any> => {
+  const authToken = getToken();
+  
+  if (!authToken) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/invites/${token}`, 
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
 
 /**
  * ═══════════════════════════════════════════════════════════════════════════

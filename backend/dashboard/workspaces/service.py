@@ -20,16 +20,21 @@ To jak "manager" który rozmawia z bazą danych.
 """
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import func, and_
 from typing import List, Optional
 from fastapi import HTTPException, status
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
+import asyncio
 
 # Importy modeli z bazy danych
-from core.models import Workspace, WorkspaceMember, Board, User
+from core.models import Workspace, WorkspaceMember, Board, User, WorkspaceInvite
+from core.config import get_settings
 
 # Importy schematów Pydantic
-from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, UserBasic
+from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, InviteCreate, InviteResponse, PendingInviteResponse
+
+from dashboard.workspaces.utils import send_workspace_invite_email
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -494,6 +499,291 @@ def toggle_workspace_favourite(db: Session, workspace_id: int, user_id: int, is_
         "is_favourite": is_favourite
     }
 
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Utowrzenie zaproszenia do workspace'a
+# ═══════════════════════════════════════════════════════════════════════════
+
+def create_invite(
+    db: Session, 
+    workspace_id: int, 
+    user_id: int,
+    invited_user_id: int,
+    send_email: bool = True,
+    expires_in_days: int = 7,
+) -> InviteResponse:
+    """Tworzy zaproszenie do workspace'a"""
+    
+    # Sprawdź workspace
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace nie istnieje")
+    
+    # Sprawdź członkostwo
+    membership = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    if not membership:
+        raise HTTPException(status_code=403, detail="Nie jesteś członkiem workspace'a")
+    
+    invited_user = db.query(User).filter(User.id == invited_user_id).first()
+    if not invited_user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie istnieje")
+
+    # Sprawdź czy już nie jest członkiem
+    existing = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == invited_user_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Użytkownik już jest członkiem")
+    
+    # Sprawdź czy nie ma aktywnego zaproszenia
+    existing_invite = db.query(WorkspaceInvite).filter(
+        WorkspaceInvite.workspace_id == workspace_id,
+        WorkspaceInvite.invited_id == invited_user_id,  # ZMIANA
+        WorkspaceInvite.is_used == False,
+        WorkspaceInvite.expires_at > datetime.utcnow()
+    ).first()
+    if existing_invite:
+        raise HTTPException(status_code=409, detail="Aktywne zaproszenie już istnieje")
+   
+    # Generuj unikalny token
+    invite_token = None
+    for _ in range(5):
+        token = secrets.token_urlsafe(32)
+        if not db.query(WorkspaceInvite).filter(WorkspaceInvite.invite_token == token).first():
+            invite_token = token
+            break
+    
+    if not invite_token:
+        raise HTTPException(status_code=500, detail="Błąd generowania tokenu")
+    
+    # Utwórz zaproszenie
+    try:
+        new_invite = WorkspaceInvite(
+        workspace_id=workspace_id,
+        invited_by=user_id,
+        invited_id=invited_user_id,
+        invite_token=invite_token,
+        expires_at=datetime.utcnow() + timedelta(days=expires_in_days),
+        is_used=False,
+        created_at=datetime.utcnow()
+    )
+        
+        db.add(new_invite)
+        db.commit()
+        db.refresh(new_invite)
+
+        # Wyślij email jeśli send_email=True
+        if send_email:
+            try:
+                settings = get_settings()
+                
+                # Pobierz dane zapraszającego
+                inviter = db.query(User).filter(User.id == user_id).first()
+                
+                # Pobierz dane zaproszonego
+                invited_user = db.query(User).filter(User.id == invited_user_id).first()
+                
+                # Pobierz workspace
+                workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+                
+                if settings.resend_api_key and settings.resend_api_key != "SKIP":
+                    # Wywołaj asynchronicznie
+                    asyncio.create_task(
+                        send_workspace_invite_email(
+                            invited_email=invited_user.email,
+                            invited_name=invited_user.username,
+                            inviter_name=inviter.username if inviter else "Ktoś",
+                            workspace_name=workspace.name if workspace else "workspace",
+                            invite_token=invite_token,
+                            resend_api_key=settings.resend_api_key,
+                            from_email=settings.from_email,
+                            frontend_url="https://easylesson.app"
+                        )
+                    )
+                    print(f"📧 Email z zaproszeniem wysłany do {invited_user.email}")
+                else:
+                    print(f"⚠️ Email NIE wysłany (RESEND_API_KEY=SKIP)")
+                    
+            except Exception as email_error:
+                # Email nie powiódł się, ale zaproszenie już stworzone
+                print(f"❌ Błąd wysyłania emaila: {email_error}")
+                # Nie rzucamy błędu - zaproszenie działa mimo braku emaila
+        
+        return InviteResponse(
+            id=new_invite.id,
+            workspace_id=new_invite.workspace_id,
+            invited_by=new_invite.invited_by,
+            invited_id=new_invite.invited_id,
+            invite_token=new_invite.invite_token,
+            expires_at=new_invite.expires_at,
+            created_at=new_invite.created_at
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd tworzenia zaproszenia: {str(e)}")
+    
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Zwracanie aktywnych zaproszeń dla użytkownika
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_user_pending_invites(db: Session, user_id: int) -> List[PendingInviteResponse]:
+    """
+    Pobiera aktywne zaproszenia dla użytkownika
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - user_id: ID zalogowanego użytkownika
+    
+    ZWRACA:
+    Lista zaproszeń z informacjami o workspace'ach i zapraszających
+    """
+    
+    invites = (
+        db.query(WorkspaceInvite)
+        .filter(
+            and_(
+                WorkspaceInvite.invited_id == user_id,
+                WorkspaceInvite.is_used == False,
+                WorkspaceInvite.expires_at > datetime.utcnow()
+            )
+        )
+        .order_by(WorkspaceInvite.created_at.desc())
+        .all()
+    )
+    
+    result = []
+    for invite in invites:
+        workspace = db.query(Workspace).filter(Workspace.id == invite.workspace_id).first()
+        if not workspace:
+            continue
+        
+        inviter = db.query(User).filter(User.id == invite.invited_by).first()
+        invited_user = db.query(User).filter(User.id == invite.invited_id).first()
+
+        result.append(PendingInviteResponse(
+            id=invite.id,
+            workspace_id=invite.workspace_id,
+            workspace_name=workspace.name,
+            workspace_icon=workspace.icon,
+            workspace_bg_color=workspace.bg_color,
+            invited_by=invite.invited_by,
+            inviter_name=inviter.username if inviter else "Nieznany",
+            invited_id=invite.invited_id,
+            invited_user_name=invited_user.username if invited_user else "Nieznany",
+            invite_token=invite.invite_token,
+            expires_at=invite.expires_at,
+            created_at=invite.created_at
+        ))
+    
+    return result
+
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Zaakceptowanie zaproszenia do workspace'a
+# ═══════════════════════════════════════════════════════════════════════════
+
+def accept_invite(db: Session, invite_token: str, user_id: int) -> dict:
+    """Akceptuje zaproszenie"""
+    
+    invite = db.query(WorkspaceInvite).filter(
+        WorkspaceInvite.invite_token == invite_token
+    ).first()
+    
+    if not invite:
+        raise HTTPException(status_code=404, detail="Zaproszenie nie istnieje")
+    
+    # Sprawdź czy zaproszenie jest dla tego użytkownika
+    if invite.invited_id != user_id:
+        raise HTTPException(status_code=403, detail="To zaproszenie nie jest dla Ciebie")
+    
+    # Sprawdź email
+    current_user = db.query(User).filter(User.id == user_id).first()
+    if not current_user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie istnieje")
+    
+    # Sprawdź wygaśnięcie
+    if invite.expires_at < datetime.utcnow():
+        raise HTTPException(status_code=410, detail="Zaproszenie wygasło")
+    
+    # Sprawdź czy już użyte
+    if invite.is_used:
+        raise HTTPException(status_code=409, detail="Zaproszenie już użyte")
+    
+    # Pobierz workspace
+    workspace = db.query(Workspace).filter(Workspace.id == invite.workspace_id).first()
+    if not workspace:
+        raise HTTPException(status_code=404, detail="Workspace nie istnieje")
+    
+    # Sprawdź czy już nie jest członkiem
+    existing = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == invite.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Już jesteś członkiem")
+    
+    # Dodaj do workspace
+    try:
+        new_member = WorkspaceMember(
+            workspace_id=invite.workspace_id,
+            user_id=user_id,
+            role="member",
+            is_favourite=False,
+            joined_at=datetime.utcnow()
+        )
+        db.add(new_member)
+        
+        invite.is_used = True
+        invite.accepted_at = datetime.utcnow()
+        
+        db.commit()
+        
+        return {
+            "message": f"Pomyślnie dołączono do workspace'a '{workspace.name}'",
+            "workspace_id": workspace.id,
+            "workspace_name": workspace.name,
+            "role": "member"
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd dodawania: {str(e)}")
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Odrzucenie zaproszenia do workspace'a
+# ═══════════════════════════════════════════════════════════════════════════
+
+def reject_invite(db: Session, invite_token: str, user_id: int) -> dict:
+    """Odrzuca zaproszenie"""
+    
+    invite = db.query(WorkspaceInvite).filter(
+        WorkspaceInvite.invite_token == invite_token
+    ).first()
+    
+    if not invite:
+        raise HTTPException(status_code=404, detail="Zaproszenie nie istnieje")
+    
+    if invite.invited_id != user_id:
+        raise HTTPException(status_code=403, detail="To zaproszenie nie jest dla Ciebie")
+    
+    if invite.is_used:
+        raise HTTPException(status_code=409, detail="Zaproszenie już użyte")
+    
+    try:
+        invite.is_used = True
+        invite.accepted_at = datetime.utcnow()
+        db.commit()
+        return {"message": "Zaproszenie odrzucone"}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Błąd: {str(e)}")
 
 """
 ═══════════════════════════════════════════════════════════════════════════

@@ -5,12 +5,13 @@
 ═══════════════════════════════════════════════════════════════════════════
 """
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 
 # Importy lokalne
 from core.database import get_db
-from core.models import User
+from core.models import User, WorkspaceMember
 from auth.dependencies import get_current_user  # ← Import wspólnej funkcji autoryzacji
 
 from .schemas import (
@@ -18,7 +19,10 @@ from .schemas import (
     WorkspaceUpdate,
     WorkspaceResponse,
     WorkspaceListResponse,
-    ToggleFavouriteRequest
+    ToggleFavouriteRequest,
+    InviteResponse,
+    InviteCreate,
+    PendingInviteResponse,
 )
 from .service import (
     get_user_workspaces,
@@ -26,7 +30,10 @@ from .service import (
     create_workspace,
     update_workspace,
     delete_workspace,
-    toggle_workspace_favourite
+    toggle_workspace_favourite,
+    get_user_pending_invites,
+    accept_invite,
+    reject_invite,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -115,8 +122,6 @@ async def set_active_workspace(
     current_user: User = Depends(get_current_user)
 ):
     """Ustaw workspace jako aktywny dla użytkownika"""
-    from core.models import WorkspaceMember
-    from fastapi import HTTPException
     
     # Sprawdź czy user ma dostęp do workspace
     membership = (
@@ -141,4 +146,84 @@ async def set_active_workspace(
     return {
         "message": "Aktywny workspace został zmieniony",
         "active_workspace_id": workspace_id
+    }
+
+
+@router.post("/{workspace_id}/invite", response_model=InviteResponse)
+async def create_workspace_invite(
+    workspace_id: int,
+    invite_data: InviteCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Tworzy zaproszenie do workspace'a"""
+    from .service import create_invite
+    return create_invite(
+        db, 
+        workspace_id, 
+        current_user.id, 
+        invite_data.invited_user_id
+    )
+
+
+@router.get("/invites/pending", response_model=List[PendingInviteResponse])
+async def get_pending_invites(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Pobiera zaproszenia oczekujące dla zalogowanego użytkownika"""
+    return get_user_pending_invites(db, current_user.id)
+
+
+@router.post("/invites/accept/{token}")
+async def accept_workspace_invite(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Akceptuje zaproszenie"""
+    return accept_invite(db, token, current_user.id)
+
+
+@router.delete("/invites/{token}")
+async def reject_workspace_invite(
+    token: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Odrzuca zaproszenie"""
+    return reject_invite(db, token, current_user.id)
+
+
+@router.get("/{workspace_id}/members/check/{user_id}")
+async def check_user_membership(
+    workspace_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+):
+    """
+    Sprawdza czy użytkownik jest już członkiem workspace'a
+    lub ma aktywne zaproszenie
+    """
+    from core.models import WorkspaceMember, WorkspaceInvite
+    from datetime import datetime
+    
+    # Sprawdź członkostwo
+    is_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first() is not None
+    
+    # Sprawdź aktywne zaproszenie
+    has_pending_invite = db.query(WorkspaceInvite).filter(
+        WorkspaceInvite.workspace_id == workspace_id,
+        WorkspaceInvite.invited_id == user_id,
+        WorkspaceInvite.is_used == False,
+        WorkspaceInvite.expires_at > datetime.utcnow()
+    ).first() is not None
+    
+    return {
+        "is_member": is_member,
+        "has_pending_invite": has_pending_invite,
+        "can_invite": not is_member and not has_pending_invite
     }

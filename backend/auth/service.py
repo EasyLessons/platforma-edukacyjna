@@ -6,9 +6,10 @@ from datetime import datetime, timedelta
 from fastapi import HTTPException
 from core.logging import get_logger
 from core.config import get_settings
+from typing import List
 
 from core.models import User, Workspace, WorkspaceMember
-from auth.schemas import RegisterUser, LoginData, VerifyEmail
+from auth.schemas import RegisterUser, LoginData, VerifyEmail, UserSearchResult
 from auth.utils import (
     hash_password, verify_password, create_access_token,
     generate_verification_code, send_verification_email
@@ -265,3 +266,37 @@ class AuthService:
             "user_id": user.id,
             "message": "Nowy kod wysłany"
         }
+    
+    def search_users(self, query: str, current_user_id: int, limit: int = 10) -> List[UserSearchResult]:
+        """
+        Wyszukuje użytkowników po username lub email
+        """
+        logger.info(f"🔍 Query: {query}")
+        query = query.strip().lower()
+        # Walidacja długości query
+        if len(query.strip()) < 2:
+            return []
+        
+        # Wyszukaj użytkowników
+        users = (
+            self.db.query(User)
+            .filter(
+                (User.username.ilike(f"%{query}%")) | 
+                (User.email.ilike(f"%{query}%")) |
+                (User.full_name.ilike(f"%{query}%"))
+            )
+            .filter(User.id != current_user_id)  # Wykluczamy siebie
+            .filter(User.is_active == True)  # Tylko zweryfikowani
+            .limit(limit)
+            .all()
+        )
+        
+        return [
+            UserSearchResult(
+                id=user.id,
+                username=user.username,
+                email=user.email,
+                full_name=user.full_name
+            )
+            for user in users
+        ]

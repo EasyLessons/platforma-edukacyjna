@@ -1,16 +1,20 @@
 """
 AUTH ROUTES - Endpointy autentykacji
 """
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from typing import List
 
 from core.database import get_db
 from auth.schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
-    VerifyEmail, ResendCode, CheckUser
+    VerifyEmail, ResendCode, CheckUser,
+    UserSearchResult
 )
+from auth.dependencies import get_current_user
 from auth.service import AuthService
+from core.models import User
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
@@ -48,3 +52,17 @@ async def check_user(check_data: CheckUser, db: Session = Depends(get_db)):
     """Sprawdza czy użytkownik istnieje"""
     service = AuthService(db)
     return await service.check_user(check_data.email)
+
+@router.get("/users/search", response_model=List[UserSearchResult])
+async def search_users_endpoint(
+    query: str = Query(..., min_length=2),
+    limit: int = Query(10, ge=1, le=50),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Wyszukuje użytkowników po username, email lub full_name
+    """
+    
+    service = AuthService(db)
+    return service.search_users(query, current_user.id, limit)

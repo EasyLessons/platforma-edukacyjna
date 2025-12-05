@@ -50,3 +50,13 @@ class RegisterResponse(BaseModel):
     """Response po rejestracji"""
     user: UserResponse
     message: str
+
+class UserSearchResult(BaseModel):
+    """Wynik wyszukiwania użytkownika"""
+    id: int
+    username: str
+    email: str
+    full_name: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
