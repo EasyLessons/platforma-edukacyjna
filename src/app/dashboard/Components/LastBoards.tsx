@@ -68,16 +68,13 @@ const allIcons = [
 
 export default function LastBoards() {
   const router = useRouter();
-  const { workspaces } = useWorkspaces();
+  const { workspaces, activeWorkspace } = useWorkspaces();
   
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
-  
-  // Znajdź aktywny workspace (ulubiony lub pierwszy)
-  const activeWorkspace = workspaces.find(w => w.is_favourite) || workspaces[0];
   
   // Mapowanie nazwy ikony → komponent
   const getIconComponent = (iconName: string) => {
@@ -149,7 +146,7 @@ export default function LastBoards() {
     };
     
     loadBoards();
-  }, [activeWorkspace]);
+  }, [activeWorkspace?.id]);
 
   // Sortowanie: ulubione na górze
   const sortedBoards = [...boards].sort((a, b) => {

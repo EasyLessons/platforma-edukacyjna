@@ -226,9 +226,10 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       // Zapisz do stanu
       setWorkspaces(response.workspaces);
       
-      // 🆕 Jeśli nie ma aktywnego workspace'a, ustaw pierwszy
+      // 🆕 Jeśli nie ma aktywnego workspace'a, ustaw ulubiony lub pierwszy
       if (!activeWorkspace && response.workspaces.length > 0) {
-        setActiveWorkspace(response.workspaces[0]);
+        const favouriteWorkspace = response.workspaces.find((w: Workspace) => w.is_favourite);
+        setActiveWorkspace(favouriteWorkspace || response.workspaces[0]);
       }
       
       // 📝 Możesz odkomentowaC:
