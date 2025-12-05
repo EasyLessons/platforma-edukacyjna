@@ -500,6 +500,61 @@ def toggle_workspace_favourite(db: Session, workspace_id: int, user_id: int, is_
     }
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 🚪 OPUSZCZANIE WORKSPACE'A (dla memberów)
+# ═══════════════════════════════════════════════════════════════════════════
+
+def leave_workspace(db: Session, workspace_id: int, user_id: int) -> dict:
+    """
+    Pozwala użytkownikowi OPUŚCIĆ workspace (usunąć swoje członkostwo)
+    
+    BEZPIECZEŃSTWO:
+    - Owner NIE MOŻE opuścić swojego workspace'a (musi go usunąć)
+    - Member może opuścić w dowolnym momencie
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - workspace_id: ID workspace'a
+    - user_id: ID użytkownika który opuszcza
+    
+    ZWRACA:
+    {"message": "Opuściłeś workspace"}
+    
+    BŁĘDY:
+    - 404: Nie jesteś członkiem tego workspace'a
+    - 403: Właściciel nie może opuścić swojego workspace'a
+    """
+    
+    # Sprawdź członkostwo
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id
+        )
+        .first()
+    )
+    
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie jesteś członkiem tego workspace'a"
+        )
+    
+    # Sprawdź czy to nie owner
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if workspace and workspace.created_by == user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Właściciel nie może opuścić swojego workspace'a. Musisz go usunąć."
+        )
+    
+    # Usuń członkostwo
+    db.delete(membership)
+    db.commit()
+    
+    return {"message": "Opuściłeś workspace"}
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # Utowrzenie zaproszenia do workspace'a

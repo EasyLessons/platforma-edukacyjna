@@ -49,6 +49,7 @@ import {
   createWorkspace as apiCreateWorkspace,
   updateWorkspace as apiUpdateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
+  leaveWorkspace as apiLeaveWorkspace,
   toggleWorkspaceFavourite as apiToggleFavourite,
   Workspace,
   WorkspaceCreate,
@@ -107,8 +108,12 @@ interface WorkspaceContextType {
   // Przykład: await updateWorkspace(1, { name: "Zmieniona Nazwa" });
   
   deleteWorkspace: (id: number) => Promise<void>;
-  // ☝️ Funkcja do USUWANIA workspace'a
+  // ☝️ Funkcja do USUWANIA workspace'a (tylko owner)
   // Przykład: await deleteWorkspace(1);
+
+  leaveWorkspace: (id: number) => Promise<void>;
+  // ☝️ Funkcja do OPUSZCZANIA workspace'a (tylko member, nie owner)
+  // Przykład: await leaveWorkspace(1);
 
   toggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
 }
@@ -452,7 +457,52 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       const errorMessage = err instanceof Error ? err.message : 'Nie udało się usunąć workspace\'a';
       throw new Error(errorMessage);
     }
- };
+  };
+
+  // ───────────────────────────────────────────────────────────────────────
+  // 🚪 OPUSZCZANIE WORKSPACE'A (dla memberów)
+  // ───────────────────────────────────────────────────────────────────────
+  
+  /**
+   * leaveWorkspace - Opuszcza workspace (usuwa członkostwo)
+   * 
+   * PARAMETRY:
+   * - id: ID workspace'a
+   * 
+   * LOGIKA:
+   * 1. Wywołaj API leaveWorkspace()
+   * 2. USUŃ workspace ze stanu (bo użytkownik już nie ma do niego dostępu)
+   * 
+   * RÓŻNICA OD deleteWorkspace:
+   * - deleteWorkspace → usuwa CAŁY workspace (tylko owner)
+   * - leaveWorkspace → usuwa tylko CZŁONKOSTWO użytkownika (tylko member)
+   * 
+   * PRZYKŁAD:
+   * await leaveWorkspace(1);
+   * console.log('Opuściłeś workspace!');
+   */
+  const leaveWorkspace = async (id: number): Promise<void> => {
+    try {
+      // Wywołaj API
+      await apiLeaveWorkspace(id);
+      
+      // USUŃ ze stanu (użytkownik już nie ma dostępu)
+      setWorkspaces(prev => prev.filter(ws => ws.id !== id));
+      
+      // Jeśli opuszczamy aktywny workspace, ustaw inny
+      if (activeWorkspace?.id === id) {
+        const remaining = workspaces.filter(ws => ws.id !== id);
+        setActiveWorkspace(remaining[0] || null);
+      }
+      
+      // 📝 Możesz odkomentować:
+      // console.log('✅ Opuściłeś workspace');
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Nie udało się opuścić workspace\'a';
+      throw new Error(errorMessage);
+    }
+  };
 
     // ───────────────────────────────────────────────────────────────────────
   // ⭐ TOGGLE FAVOURITE - DODAJ TU (po deleteWorkspace, przed return)
@@ -523,6 +573,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         createWorkspace,
         updateWorkspace,
         deleteWorkspace,
+        leaveWorkspace,
         toggleFavourite
       }}
     >

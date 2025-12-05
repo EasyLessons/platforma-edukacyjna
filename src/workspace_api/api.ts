@@ -475,6 +475,59 @@ export const deleteWorkspace = async (workspaceId: number): Promise<{ message: s
   return handleResponse(response);
 };
 
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 🚪 OPUSZCZANIE WORKSPACE'A
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Pozwala użytkownikowi OPUŚCIĆ workspace (usunąć swoje członkostwo)
+ * 
+ * ENDPOINT:
+ * DELETE /api/workspaces/{workspaceId}/leave
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI być członkiem workspace'a (ale NIE ownerem)
+ * 
+ * PARAMETRY:
+ * - workspaceId: ID workspace'a (number)
+ * 
+ * ZWRACA:
+ * { message: "Opuściłeś workspace" }
+ * 
+ * RÓŻNICA OD deleteWorkspace:
+ * - deleteWorkspace → usuwa CAŁY workspace (tylko owner)
+ * - leaveWorkspace → usuwa tylko CZŁONKOSTWO użytkownika (tylko member)
+ * 
+ * BŁĘDY:
+ * - 401: Niezalogowany
+ * - 403: Właściciel nie może opuścić swojego workspace'a
+ * - 404: Nie jesteś członkiem
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * await leaveWorkspace(1);
+ * console.log('Opuściłeś workspace!');
+ */
+export const leaveWorkspace = async (workspaceId: number): Promise<{ message: string }> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/api/workspaces/${workspaceId}/leave`, {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  return handleResponse(response);
+};
+
+
 /**
  * ───────────────────────────────────────────────────────────────────────────
  * ⭐ TOGGLE ULUBIONY

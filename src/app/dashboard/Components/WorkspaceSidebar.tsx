@@ -62,11 +62,13 @@ export default function WorkspaceSidebar() {
     createWorkspace,
     updateWorkspace,
     deleteWorkspace,
+    leaveWorkspace,
     toggleFavourite  
   } = useWorkspaces();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState<number | null>(null);
   const [showAddPopup, setShowAddPopup] = useState(false);
   const [newSpaceName, setNewSpaceName] = useState('');
   const [hoveredSpace, setHoveredSpace] = useState<number | null>(null);
@@ -147,6 +149,21 @@ export default function WorkspaceSidebar() {
       }
     } catch (err) {
       console.error('Błąd usuwania workspace:', err);
+    }
+  };
+
+  const handleLeaveSpace = async (id: number) => {
+    try {
+      await leaveWorkspace(id);
+      setShowLeaveConfirm(null);
+      
+      // Jeśli opuszczamy aktywny workspace, ustaw pierwszy z pozostałych
+      if (activeWorkspace?.id === id) {
+        const remaining = workspaces.filter(ws => ws.id !== id);
+        setActiveWorkspaceContext(remaining[0] || null);
+      }
+    } catch (err) {
+      console.error('Błąd opuszczania workspace:', err);
     }
   };
 
@@ -517,16 +534,19 @@ export default function WorkspaceSidebar() {
 
                         {isHovered && !isEditing && (
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                startEdit(space);
-                              }}
-                              className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                              title="Zmień nazwę"
-                            >
-                              <Edit2 size={14} className="text-gray-600 hover:text-blue-600" />
-                            </button>
+                            {/* Przycisk edycji - tylko dla właściciela */}
+                            {space.is_owner && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  startEdit(space);
+                                }}
+                                className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                                title="Zmień nazwę"
+                              >
+                                <Edit2 size={14} className="text-gray-600 hover:text-blue-600" />
+                              </button>
+                            )}
 
                             <button
                               onClick={(e) => {
@@ -546,13 +566,18 @@ export default function WorkspaceSidebar() {
                               />
                             </button>
 
+                            {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setShowDeleteConfirm(space.id);
+                                if (space.is_owner) {
+                                  setShowDeleteConfirm(space.id);
+                                } else {
+                                  setShowLeaveConfirm(space.id);
+                                }
                               }}
                               className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                              title="Usuń przestrzeń"
+                              title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
                             >
                               <X size={14} className="text-gray-600 hover:text-red-600" />
                             </button>
@@ -654,7 +679,7 @@ export default function WorkspaceSidebar() {
         </div>
       )}
 
-      {/* POPUP - Usuń przestrzeń */}
+      {/* POPUP - Usuń przestrzeń (tylko dla owner) */}
       {showDeleteConfirm && (
         <div 
           className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
@@ -670,6 +695,8 @@ export default function WorkspaceSidebar() {
             </h2>
             <p className="text-gray-600 mb-6">
               Czy na pewno chcesz usunąć przestrzeń <strong>"{workspaces.find(s => s.id === showDeleteConfirm)?.name}"</strong>?
+              <br />
+              <span className="text-red-500 text-sm">To usunie wszystkie tablice i dane w tej przestrzeni!</span>
             </p>
             
             <div className="flex gap-3">
@@ -683,7 +710,45 @@ export default function WorkspaceSidebar() {
                 onClick={() => handleDeleteSpace(showDeleteConfirm)}
                 className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
               >
-                Tak
+                Usuń
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* POPUP - Opuść przestrzeń (tylko dla member) */}
+      {showLeaveConfirm && (
+        <div 
+          className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
+          style={{ zIndex: 9999 }}
+          onClick={() => setShowLeaveConfirm(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-gray-800 mb-2">
+              Opuść przestrzeń?
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Czy na pewno chcesz opuścić przestrzeń <strong>"{workspaces.find(s => s.id === showLeaveConfirm)?.name}"</strong>?
+              <br />
+              <span className="text-gray-500 text-sm">Przestrzeń nie zostanie usunięta - tylko stracisz do niej dostęp.</span>
+            </p>
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveConfirm(null)}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
+              >
+                Zostań
+              </button>
+              <button
+                onClick={() => handleLeaveSpace(showLeaveConfirm)}
+                className="flex-1 px-4 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-colors cursor-pointer"
+              >
+                Opuść
               </button>
             </div>
           </div>

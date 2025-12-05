@@ -31,6 +31,7 @@ from .service import (
     update_workspace,
     delete_workspace,
     toggle_workspace_favourite,
+    leave_workspace,
     get_user_pending_invites,
     accept_invite,
     reject_invite,
@@ -102,6 +103,16 @@ async def delete_existing_workspace(
 ):
     """Usuwa workspace"""
     return delete_workspace(db, workspace_id, current_user.id)
+
+
+@router.delete("/{workspace_id}/leave", status_code=status.HTTP_200_OK)
+async def leave_existing_workspace(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Opuszcza workspace (usuwa członkostwo użytkownika, nie cały workspace)"""
+    return leave_workspace(db, workspace_id, current_user.id)
 
 
 @router.patch("/{workspace_id}/favourite", status_code=status.HTTP_200_OK)
