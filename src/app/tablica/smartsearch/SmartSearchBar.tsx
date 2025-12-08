@@ -120,15 +120,18 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
             setIsOpen(true);
             setTimeout(() => inputRef.current?.focus(), 50);
           }}
-          className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-colors shadow-sm"
+          className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl"
           title="Szukaj wzorów (Ctrl+K)"
         >
-          <Search className="w-4 h-4 text-gray-500" />
-          <span className="text-sm text-gray-500 hidden sm:inline">Szukaj wzorów...</span>
+          <Search className="w-5 h-5 text-gray-400" />
+          <span className="text-base text-gray-500">Szukaj wzorów matematycznych...</span>
+          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-400 bg-gray-100 rounded border border-gray-200">
+            Ctrl+K
+          </kbd>
         </button>
       ) : (
-        <div className="flex items-center gap-2 bg-white rounded-lg border-2 border-blue-500 shadow-lg">
-          <Search className="w-4 h-4 text-blue-500 ml-3" />
+        <div className="flex items-center gap-3 bg-white rounded-xl border-2 border-blue-500 shadow-xl px-4">
+          <Search className="w-5 h-5 text-blue-500" />
           <input
             ref={inputRef}
             type="text"
@@ -136,7 +139,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
-            className="text-black w-64 sm:w-80 py-2 pr-3 text-sm bg-transparent outline-none"
+            className="text-black w-[400px] py-3 text-base bg-transparent outline-none"
             autoFocus
           />
           <button
@@ -144,9 +147,9 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
               setIsOpen(false);
               setQuery('');
             }}
-            className="p-2 hover:bg-gray-100 rounded-r-lg"
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
           >
-            <X className="w-4 h-4 text-gray-400" />
+            <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
       )}

@@ -61,9 +61,11 @@ interface Board {
   icon: any;
   iconName: string;  // Nazwa ikony do edycji
   bgColor: string;   // Kolor tła do edycji
-  lastModified: string;
+  lastModified: string;  // Sformatowana data do wyświetlania
+  lastModifiedRaw: string | null;  // Surowa data ISO do sortowania
   lastModifiedBy: string;
-  lastOpened: string;
+  lastOpened: string;  // Sformatowana data do wyświetlania
+  lastOpenedRaw: string | null;  // Surowa data ISO do sortowania
   owner: string;
   onlineUsers: number;
   isFavorite: boolean;
@@ -174,8 +176,10 @@ export default function LastBoards() {
           iconName: b.icon,  // Zachowaj nazwę ikony do edycji
           bgColor: b.bg_color,  // Zachowaj kolor do edycji
           lastModified: formatDate(b.last_modified),
+          lastModifiedRaw: b.last_modified,  // Surowa data do sortowania
           lastModifiedBy: b.last_modified_by || b.created_by,
           lastOpened: formatDate(b.last_opened || b.created_at),
+          lastOpenedRaw: b.last_opened || b.created_at,  // Surowa data do sortowania
           owner: b.owner_username,
           onlineUsers: 0,  // TODO: WebSocket
           isFavorite: b.is_favourite
@@ -205,13 +209,30 @@ export default function LastBoards() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Sortowanie: ulubione na górze
+  // Helper do porównywania dat
+  const compareDates = (dateA: string | null, dateB: string | null): number => {
+    if (!dateA && !dateB) return 0;
+    if (!dateA) return 1;  // Brak daty = na końcu
+    if (!dateB) return -1;
+    return new Date(dateB).getTime() - new Date(dateA).getTime();  // Najnowsze pierwsze
+  };
+
+  // Sortowanie: ulubione na górze, potem wg wybranego kryterium
   const sortedBoards = [...boards].sort((a, b) => {
+    // Ulubione zawsze na górze
     if (a.isFavorite && !b.isFavorite) return -1;
     if (!a.isFavorite && b.isFavorite) return 1;
 
-    if (sortBy === 'name') return a.name.localeCompare(b.name);
-    return 0;  // 'recent' jest już posortowane przez API
+    // Sortowanie wg wybranego kryterium
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name, 'pl');
+      case 'modified':
+        return compareDates(a.lastModifiedRaw, b.lastModifiedRaw);
+      case 'recent':
+      default:
+        return compareDates(a.lastOpenedRaw, b.lastOpenedRaw);
+    }
   });
 
   const filteredBoards = sortedBoards.filter(board =>

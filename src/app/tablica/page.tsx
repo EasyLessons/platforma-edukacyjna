@@ -27,6 +27,7 @@ import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
+import { joinBoardWorkspace } from '@/boards_api/api';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
@@ -37,12 +38,41 @@ function TablicaContent() {
   const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [isJoining, setIsJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
-  // Pobierz boardId z URL query params
+  // Pobierz boardId z URL query params i dołącz do workspace
   useEffect(() => {
     const id = searchParams.get('boardId') || 'demo-board';
     setBoardId(id);
     console.log('📋 Board ID:', id);
+    
+    // Automatyczne dołączenie do workspace przy wejściu przez link
+    const joinWorkspace = async () => {
+      if (id && id !== 'demo-board') {
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) {
+          try {
+            setIsJoining(true);
+            const result = await joinBoardWorkspace(numericId);
+            console.log('✅ Join workspace result:', result);
+            if (!result.already_member) {
+              console.log('🆕 Dołączono do nowego workspace!');
+            }
+          } catch (error: any) {
+            console.error('❌ Błąd dołączania do workspace:', error);
+            // Nie blokujemy - użytkownik może nie być zalogowany
+            if (error.message?.includes('Brak tokenu')) {
+              setJoinError('Zaloguj się, aby edytować tablicę');
+            }
+          } finally {
+            setIsJoining(false);
+          }
+        }
+      }
+    };
+    
+    joinWorkspace();
   }, [searchParams]);
 
   // Loading state
@@ -64,6 +94,19 @@ function TablicaContent() {
       background: 'white',
       overflow: 'hidden'
     }}>
+      {/* Komunikat o dołączaniu / błędzie */}
+      {isJoining && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg shadow-md z-[200] flex items-center gap-2">
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+          <span>Dołączanie do tablicy...</span>
+        </div>
+      )}
+      {joinError && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg shadow-md z-[200]">
+          {joinError}
+        </div>
+      )}
+      
       {/* Logo powrotu - lewy górny róg */}
       <div
         style={{

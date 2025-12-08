@@ -34,6 +34,7 @@
 import { useState } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { clampLineWidth } from '../whiteboard/utils';
 
 interface PenToolProps {
   viewport: ViewportTransform;
@@ -162,7 +163,7 @@ export function PenTool({
           <circle
             cx={screenPoint.x}
             cy={screenPoint.y}
-            r={currentPath.width * viewport.scale}
+            r={clampLineWidth(currentPath.width, viewport.scale)}
             fill={currentPath.color}
           />
         </svg>
@@ -185,7 +186,7 @@ export function PenTool({
         <path
           d={pathData}
           stroke={currentPath.color}
-          strokeWidth={currentPath.width * viewport.scale }
+          strokeWidth={clampLineWidth(currentPath.width, viewport.scale)}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"

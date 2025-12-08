@@ -60,14 +60,15 @@ export function TextMiniToolbar({
         type="number"
         value={style.fontSize}
         onChange={(e) => {
-          // Pozwól na wpisywanie dowolnej wartości (nawet poza zakresem)
+          // Pozwól na wpisywanie, ale zapewnij minimum 1
           const newSize = Number(e.target.value);
           if (!isNaN(newSize)) {
-            onChange({ fontSize: newSize });
+            // Minimum 1, żeby można było wpisywać liczby dwucyfrowe (np. "12" zaczyna od "1")
+            onChange({ fontSize: Math.max(1, newSize) });
           }
         }}
         onBlur={(e) => {
-          // Waliduj TYLKO przy opuszczeniu pola
+          // Waliduj przy opuszczeniu pola - zapewnij zakres 8-120
           const currentSize = Number(e.target.value);
           if (currentSize < 8) {
             onChange({ fontSize: 8 });

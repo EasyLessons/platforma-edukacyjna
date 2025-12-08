@@ -199,7 +199,7 @@ export function FunctionTool({
       />
 
       {/* Input Panel - Pod toolbarem (jak properties innych narzędzi) */}
-      <div className="absolute top-36 left-4 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50 pointer-events-auto max-w-lg">
+      <div className="absolute top-20 left-24 bg-white rounded-xl shadow-lg border border-gray-200 p-4 z-50 pointer-events-auto max-w-lg">
         <h3 className="text-xl font-bold text-gray-800 mb-4">Funkcja matematyczna</h3>
 
         {/* Input wyrażenia */}

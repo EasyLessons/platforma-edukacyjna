@@ -57,6 +57,18 @@ interface OnlineUser {
 }
 
 /**
+ * Kursor innego użytkownika
+ */
+export interface RemoteCursor {
+  userId: number
+  username: string
+  x: number
+  y: number
+  color: string
+  lastUpdate: number
+}
+
+/**
  * Typy eventów synchronizacji
  */
 type BoardEvent =
@@ -73,6 +85,9 @@ interface BoardRealtimeContextType {
   // Użytkownicy online
   onlineUsers: OnlineUser[]
   isConnected: boolean
+  
+  // 🆕 Kursory innych użytkowników
+  remoteCursors: RemoteCursor[]
   
   // Synchronizacja elementów
   broadcastElementCreated: (element: DrawingElement) => Promise<void>
@@ -126,9 +141,13 @@ export function BoardRealtimeProvider({
   
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [isConnected, setIsConnected] = useState(false)
+  const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([])
   const channelRef = useRef<RealtimeChannel | null>(null)
   
   const { user } = useAuth()
+  
+  // Kolory dla kursorów (cyklicznie przydzielane)
+  const cursorColors = useRef(['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'])
   
   // Handlery dla eventów (refs żeby uniknąć re-renderów)
   const elementCreatedHandlerRef = useRef<((element: DrawingElement, userId: number, username: string) => void) | null>(null)
@@ -183,6 +202,9 @@ export function BoardRealtimeProvider({
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
         console.log('🔴 Użytkownik wyszedł:', leftPresences)
+        // Usuń kursory użytkowników którzy wyszli
+        const leftUserIds = leftPresences.map((p: any) => p.user_id)
+        setRemoteCursors(prev => prev.filter(c => !leftUserIds.includes(c.userId)))
       })
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -241,6 +263,22 @@ export function BoardRealtimeProvider({
         
         if (userId === user.id) return
         
+        // Automatycznie aktualizuj remote cursors
+        setRemoteCursors(prev => {
+          const existing = prev.find(c => c.userId === userId)
+          const color = existing?.color || cursorColors.current[userId % cursorColors.current.length]
+          
+          if (existing) {
+            return prev.map(c => 
+              c.userId === userId 
+                ? { ...c, x, y, lastUpdate: Date.now() }
+                : c
+            )
+          } else {
+            return [...prev, { userId, username, x, y, color, lastUpdate: Date.now() }]
+          }
+        })
+        
         if (cursorMoveHandlerRef.current) {
           cursorMoveHandlerRef.current(x, y, userId, username)
         }
@@ -273,13 +311,25 @@ export function BoardRealtimeProvider({
     channelRef.current = channel
     
     // ═══════════════════════════════════════════════════════════════════════
+    // ⏰ CLEANUP NIEAKTYWNYCH KURSORÓW (co 3 sekundy)
+    // ═══════════════════════════════════════════════════════════════════════
+    
+    const cursorCleanupInterval = setInterval(() => {
+      const now = Date.now()
+      const CURSOR_TIMEOUT = 5000 // 5 sekund
+      setRemoteCursors(prev => prev.filter(c => now - c.lastUpdate < CURSOR_TIMEOUT))
+    }, 3000)
+    
+    // ═══════════════════════════════════════════════════════════════════════
     // 🧹 CLEANUP
     // ═══════════════════════════════════════════════════════════════════════
     
     return () => {
       console.log('🔌 Rozłączanie z kanału tablicy')
       channel.unsubscribe()
+      clearInterval(cursorCleanupInterval)
       setIsConnected(false)
+      setRemoteCursors([])
     }
   }, [boardId, user])
   
@@ -391,6 +441,7 @@ export function BoardRealtimeProvider({
       value={{
         onlineUsers,
         isConnected,
+        remoteCursors,
         broadcastElementCreated,
         broadcastElementUpdated,
         broadcastElementDeleted,

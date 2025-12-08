@@ -14,12 +14,15 @@
  * 1. Pobiera listę użytkowników z useBoardRealtime()
  * 2. Wyświetla kolorowe awatary z inicjałami
  * 3. Pokazuje tooltip z pełnym imieniem
+ * 4. Przycisk + pozwala skopiować link do tablicy (zaproszenie)
  */
 
 'use client'
 
+import { useState } from 'react'
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext'
 import { useAuth } from '@/app/context/AuthContext'
+import { Plus, Link, Check } from 'lucide-react'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)
@@ -53,6 +56,18 @@ const getInitials = (username: string) => {
 export function OnlineUsers() {
   const { onlineUsers, isConnected } = useBoardRealtime()
   const { user: currentUser } = useAuth()
+  const [linkCopied, setLinkCopied] = useState(false)
+  
+  // Kopiowanie linku do tablicy
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setLinkCopied(true)
+      setTimeout(() => setLinkCopied(false), 2000)
+    } catch (err) {
+      console.error('Nie udało się skopiować linku:', err)
+    }
+  }
   
   if (!isConnected) {
     return (
@@ -124,6 +139,41 @@ export function OnlineUsers() {
             )
           })}
         </div>
+        
+        {/* Separator przed przyciskiem zaproszenia */}
+        <div className="w-px h-6 bg-gray-300"></div>
+        
+        {/* Przycisk kopiowania linku / zaproszenia */}
+        <button
+          onClick={handleCopyLink}
+          className={`
+            relative group w-10 h-10 rounded-full 
+            flex items-center justify-center 
+            text-white text-sm font-bold
+            ring-2 ring-white
+            transition-all hover:scale-110 hover:z-10
+            ${linkCopied 
+              ? 'bg-green-500' 
+              : 'bg-blue-500 hover:bg-blue-600'
+            }
+          `}
+          title={linkCopied ? 'Skopiowano!' : 'Kopiuj link do tablicy'}
+        >
+          {linkCopied ? <Check size={18} /> : <Plus size={18} />}
+          
+          {/* Tooltip */}
+          <div className="
+            absolute top-12 right-0 
+            bg-gray-800 text-white text-xs 
+            px-2 py-1 rounded 
+            whitespace-nowrap
+            opacity-0 group-hover:opacity-100
+            transition-opacity
+            pointer-events-none
+          ">
+            {linkCopied ? 'Link skopiowany!' : 'Kopiuj link do tablicy'}
+          </div>
+        </button>
       </div>
     </div>
   )

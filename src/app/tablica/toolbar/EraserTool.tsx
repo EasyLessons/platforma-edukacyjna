@@ -19,9 +19,7 @@
  * - viewport.ts - transformacje współrzędnych, pan/zoom
  * 
  * PRZEZNACZENIE:
- * Inteligentna gumka - usuwa elementy przy najechaniu myszką.
- * Wizualne podświetlenie elementu przed usunięciem.
- * Obsługuje wheel events (pan/zoom).
+ * Gumka do usuwania całych elementów - kliknięcie usuwa element pod kursorem.
  * ============================================================================
  */
 
@@ -178,6 +176,7 @@ export function EraserTool({
     
     setCursorPosition(screenPoint);
     
+    // Podświetl element pod kursorem
     const elementId = findElementUnderCursor(worldPoint);
     setHoveredElementId(elementId);
   }, [viewport, canvasWidth, canvasHeight, findElementUnderCursor]);
@@ -187,7 +186,7 @@ export function EraserTool({
     setCursorPosition(null);
   }, []);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
+  const handleClick = useCallback(() => {
     if (hoveredElementId) {
       onElementDelete(hoveredElementId);
       setHoveredElementId(null);
@@ -266,6 +265,8 @@ export function EraserTool({
     );
   };
 
+  const cursorSizePx = 24;
+
   return (
     <>
       {/* Invisible overlay for wheel events */}
@@ -278,7 +279,10 @@ export function EraserTool({
       {/* Interactive overlay */}
       <div
         className="absolute inset-0 z-30 pointer-events-auto"
-        style={{ cursor: hoveredElementId ? 'pointer' : 'default', touchAction: 'none' }}
+        style={{ 
+          cursor: 'none', // Ukryj domyślny kursor - mamy własny
+          touchAction: 'none' 
+        }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
@@ -292,10 +296,10 @@ export function EraserTool({
         <div
           className="absolute pointer-events-none z-40"
           style={{
-            left: cursorPosition.x - 12,
-            top: cursorPosition.y - 12,
-            width: 24,
-            height: 24,
+            left: cursorPosition.x - cursorSizePx / 2,
+            top: cursorPosition.y - cursorSizePx / 2,
+            width: cursorSizePx,
+            height: cursorSizePx,
           }}
         >
           <div className="w-full h-full rounded-full border-2 border-red-500 bg-white/50 flex items-center justify-center">
@@ -306,3 +310,4 @@ export function EraserTool({
     </>
   );
 }
+

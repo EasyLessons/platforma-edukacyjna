@@ -35,6 +35,7 @@ import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
 import { OnlineUsers } from './OnlineUsers';
+import { RemoteCursors } from './RemoteCursors';
 
 // 🆕 Import SmartSearch
 import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../smartsearch';
@@ -96,6 +97,9 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     broadcastElementCreated,
     broadcastElementUpdated,
     broadcastElementDeleted,
+    broadcastElementsBatch,
+    broadcastCursorMove,
+    remoteCursors,
     onRemoteElementCreated,
     onRemoteElementUpdated,
     onRemoteElementDeleted,
@@ -123,6 +127,8 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const [lineWidth, setLineWidth] = useState(3);
   const [fontSize, setFontSize] = useState(24);
   const [fillShape, setFillShape] = useState(false);
+  
+
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
@@ -236,6 +242,48 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // 🖱️ BROADCAST CURSOR POSITION - Wysyłanie pozycji kursora do innych
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const lastCursorBroadcastRef = useRef<number>(0);
+  const CURSOR_BROADCAST_INTERVAL = 50; // ms - throttle do ~20 FPS
+  
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    
+    const handlePointerMove = (e: PointerEvent) => {
+      const now = Date.now();
+      
+      // Throttle - nie wysyłaj częściej niż co CURSOR_BROADCAST_INTERVAL ms
+      if (now - lastCursorBroadcastRef.current < CURSOR_BROADCAST_INTERVAL) return;
+      
+      lastCursorBroadcastRef.current = now;
+      
+      // Oblicz pozycję w world coordinates
+      const rect = container.getBoundingClientRect();
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+      
+      const worldPos = inverseTransformPoint(
+        { x: screenX, y: screenY },
+        viewportRef.current,
+        rect.width,
+        rect.height
+      );
+      
+      // Broadcast pozycji
+      broadcastCursorMove(worldPos.x, worldPos.y);
+    };
+    
+    container.addEventListener('pointermove', handlePointerMove, { passive: true });
+    
+    return () => {
+      container.removeEventListener('pointermove', handlePointerMove);
+    };
+  }, [broadcastCursorMove]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // 💾 DEBOUNCED SAVE - Zapisywanie elementów z opóźnieniem 2s
   // ═══════════════════════════════════════════════════════════════════════════
   
@@ -333,6 +381,10 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
         // Ustaw elementy (mapuj data → element)
         const loadedElements = data.elements.map(e => e.data);
         setElements(loadedElements);
+        
+        // 🆕 Ustaw początkową historię na załadowane elementy
+        setHistory([loadedElements]);
+        setHistoryIndex(0);
         
         console.log(`✅ Załadowano ${loadedElements.length} elementów`);
         
@@ -445,9 +497,12 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           currentSelectedIds.forEach(id => {
             broadcastElementDeleted(id);
             if (boardIdStateRef.current) {
-              deleteBoardElement(boardIdStateRef.current, id).catch(err => {
-                console.error('❌ Błąd usuwania elementu:', id, err);
-              });
+              const numericBoardId = parseInt(boardIdStateRef.current);
+              if (!isNaN(numericBoardId)) {
+                deleteBoardElement(numericBoardId, id).catch(err => {
+                  console.error('❌ Błąd usuwania elementu:', id, err);
+                });
+              }
             }
           });
         }
@@ -594,25 +649,28 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // History (bez zmian)
+  // History - uproszczona i stabilna wersja
   const MAX_HISTORY_SIZE = 50;
   
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
-    setHistoryIndex(prevIndex => {
-      setHistory(prevHistory => {
-        const newHistory = prevHistory.slice(0, prevIndex + 1);
-        newHistory.push(newElements);
-        
-        if (newHistory.length > MAX_HISTORY_SIZE) {
-          const trimmed = newHistory.slice(newHistory.length - MAX_HISTORY_SIZE);
-          setHistoryIndex(trimmed.length - 1);
-          return trimmed;
-        }
-        
-        return newHistory;
-      });
+    setHistory(prevHistory => {
+      const currentIndex = historyIndexRef.current;
+      // Odetnij przyszłość (jeśli cofnęliśmy i teraz robimy nową akcję)
+      const newHistory = prevHistory.slice(0, currentIndex + 1);
+      // Dodaj nowy stan
+      newHistory.push([...newElements]); // kopia tablicy
       
-      return Math.min(prevIndex + 1, MAX_HISTORY_SIZE - 1);
+      // Ogranicz rozmiar historii
+      if (newHistory.length > MAX_HISTORY_SIZE) {
+        const trimmed = newHistory.slice(newHistory.length - MAX_HISTORY_SIZE);
+        historyIndexRef.current = trimmed.length - 1;
+        setHistoryIndex(trimmed.length - 1);
+        return trimmed;
+      }
+      
+      historyIndexRef.current = newHistory.length - 1;
+      setHistoryIndex(newHistory.length - 1);
+      return newHistory;
     });
   }, []);
 
@@ -621,28 +679,134 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   }, [saveToHistory]);
 
   const undo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1;
+    const currentIndex = historyIndexRef.current;
+    const currentHistory = historyRef.current;
+    
+    if (currentIndex > 0) {
+      const newIndex = currentIndex - 1;
+      historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
-      setElements(history[newIndex]);
+      setElements([...currentHistory[newIndex]]);
       setSelectedElementIds(new Set());
     }
-  }, [historyIndex, history]);
+  }, []);
 
   const redo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1;
+    const currentIndex = historyIndexRef.current;
+    const currentHistory = historyRef.current;
+    
+    if (currentIndex < currentHistory.length - 1) {
+      const newIndex = currentIndex + 1;
+      historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
-      setElements(history[newIndex]);
+      setElements([...currentHistory[newIndex]]);
       setSelectedElementIds(new Set());
     }
-  }, [historyIndex, history]);
+  }, []);
 
   const clearCanvas = useCallback(() => {
+    // Usuń wszystkie elementy z bazy danych
+    const numericBoardId = parseInt(boardIdState);
+    if (!isNaN(numericBoardId)) {
+      elements.forEach(el => {
+        deleteBoardElement(numericBoardId, el.id).catch(err => {
+          console.error('❌ Błąd usuwania elementu:', el.id, err);
+        });
+      });
+    }
+    
     setElements([]);
     saveToHistory([]);
     setSelectedElementIds(new Set());
-  }, [saveToHistory]);
+    setLoadedImages(new Map()); // Wyczyść też załadowane obrazy
+  }, [saveToHistory, boardIdState, elements]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 📦 EKSPORT/IMPORT TABLICY
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleExport = useCallback(() => {
+    try {
+      const exportData = {
+        version: '1.0',
+        boardId: boardIdState,
+        exportedAt: new Date().toISOString(),
+        elements: elements.map(el => {
+          // Dla obrazów z data URL - zachowaj je
+          // Dla obrazów z external URL - też zachowaj
+          return { ...el };
+        })
+      };
+      
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `tablica-${boardIdState || 'export'}-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      
+      console.log('✅ Eksport zakończony:', elements.length, 'elementów');
+    } catch (err) {
+      console.error('❌ Błąd eksportu:', err);
+      alert('Wystąpił błąd podczas eksportu tablicy');
+    }
+  }, [elements, boardIdState]);
+
+  const handleImport = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        const importData = JSON.parse(text);
+        
+        // Walidacja formatu
+        if (!importData.version || !Array.isArray(importData.elements)) {
+          throw new Error('Nieprawidłowy format pliku');
+        }
+        
+        // Generuj nowe ID dla importowanych elementów żeby uniknąć konfliktów
+        const importedElements = importData.elements.map((el: DrawingElement) => ({
+          ...el,
+          id: `${el.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        }));
+        
+        // Dodaj do istniejących elementów
+        const newElements = [...elements, ...importedElements];
+        setElements(newElements);
+        saveToHistory(newElements);
+        
+        // Zapisz do bazy
+        if (boardIdState) {
+          importedElements.forEach((el: DrawingElement) => {
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          debouncedSave(boardIdState);
+        }
+        
+        // Broadcast do innych użytkowników
+        if (importedElements.length > 0) {
+          broadcastElementsBatch(importedElements);
+        }
+        
+        console.log('✅ Import zakończony:', importedElements.length, 'elementów');
+      } catch (err) {
+        console.error('❌ Błąd importu:', err);
+        alert('Wystąpił błąd podczas importu. Upewnij się, że wybrałeś prawidłowy plik.');
+      }
+    };
+    
+    input.click();
+  }, [elements, saveToHistory, boardIdState, debouncedSave, broadcastElementsBatch]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 CALLBACKI DLA NARZĘDZI - Z BROADCAST
@@ -725,8 +889,9 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
-    if (boardIdState) {
-      deleteBoardElement(boardIdState, id).catch(err => {
+    const numericBoardId = parseInt(boardIdState);
+    if (!isNaN(numericBoardId)) {
+      deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
@@ -777,12 +942,49 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
-    if (boardIdState) {
-      deleteBoardElement(boardIdState, id).catch(err => {
+    const numericBoardId = parseInt(boardIdState);
+    if (!isNaN(numericBoardId)) {
+      deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
   }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
+
+  // 🆕 PARTIAL ERASE - usuwa fragment ścieżki i tworzy nowe
+  const handlePathPartialErase = useCallback((pathId: string, newPaths: DrawingPath[]) => {
+    // Usuń oryginalną ścieżkę
+    let newElements = elements.filter(el => el.id !== pathId);
+    
+    // Dodaj nowe segmenty (jeśli są)
+    if (newPaths.length > 0) {
+      newElements = [...newElements, ...newPaths];
+    }
+    
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    // API: Usuń oryginalną ścieżkę
+    const numericBoardId = parseInt(boardIdState);
+    if (!isNaN(numericBoardId)) {
+      deleteBoardElement(numericBoardId, pathId).catch(err => {
+        console.error('❌ Błąd usuwania ścieżki:', pathId, err);
+      });
+      
+      // Zapisz nowe segmenty
+      newPaths.forEach(path => {
+        setUnsavedElements(prev => new Set(prev).add(path.id));
+      });
+      if (newPaths.length > 0) {
+        debouncedSave(boardIdState);
+      }
+    }
+    
+    // Broadcast: usuń oryginalną i wyślij nowe
+    broadcastElementDeleted(pathId);
+    if (newPaths.length > 0) {
+      broadcastElementsBatch(newPaths);
+    }
+  }, [elements, saveToHistory, boardIdState, debouncedSave, broadcastElementDeleted, broadcastElementsBatch]);
 
   const handleSelectionChange = useCallback((ids: Set<string>) => {
     setSelectedElementIds(ids);
@@ -844,10 +1046,11 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     saveToHistory(newElements);
     
     // 🆕 BROADCAST DELETE + API DELETE dla każdego
+    const numericBoardId = parseInt(boardIdState);
     selectedElementIds.forEach(id => {
       broadcastElementDeleted(id);
-      if (boardIdState) {
-        deleteBoardElement(boardIdState, id).catch(err => {
+      if (!isNaN(numericBoardId)) {
+        deleteBoardElement(numericBoardId, id).catch(err => {
           console.error('❌ Błąd usuwania elementu:', id, err);
         });
       }
@@ -1010,7 +1213,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     Promise.all(imagePromises)
       .then(loadedFormulas => {
         // Oblicz pozycje w jednostkach świata
-        const newImages: ImageElement[] = loadedFormulas.map(({ formula, img, index }) => {
+        const newImages = loadedFormulas.map(({ formula, img, index }) => {
           // Oblicz proporcje i wymiary w jednostkach świata
           const aspectRatio = img.naturalHeight / img.naturalWidth;
           const worldWidth = WORLD_WIDTH;
@@ -1025,7 +1228,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           const startX = centerWorld.x - ((COLS - 1) * (WORLD_WIDTH + WORLD_PADDING)) / 2;
           const startY = centerWorld.y - 2; // trochę wyżej od środka
           
-          return {
+          const imageElement: ImageElement = {
             id: `formula-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
             type: 'image' as const,
             x: startX + offsetX - worldWidth / 2,
@@ -1034,22 +1237,23 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             height: worldHeight,
             src: formula.path,
             alt: formula.title,
-            _loadedImg: img // tymczasowo przechowaj załadowany obraz
-          } as ImageElement & { _loadedImg: HTMLImageElement };
+          };
+          
+          return { imageElement, loadedImg: img };
         });
 
         // Batch update - dodaj wszystkie naraz
         setElements(prev => {
-          const updated = [...prev, ...newImages.map(({ _loadedImg, ...img }) => img as ImageElement)];
+          const updated = [...prev, ...newImages.map(({ imageElement }) => imageElement)];
           saveToHistory(updated);
           return updated;
         });
 
         // Zapisz załadowane obrazy i broadcast
-        newImages.forEach(image => {
-          setLoadedImages(prev => new Map(prev).set(image.id, image._loadedImg));
-          broadcastElementCreated(image);
-          setUnsavedElements(prev => new Set(prev).add(image.id));
+        newImages.forEach(({ imageElement, loadedImg }) => {
+          setLoadedImages(prev => new Map(prev).set(imageElement.id, loadedImg));
+          broadcastElementCreated(imageElement);
+          setUnsavedElements(prev => new Set(prev).add(imageElement.id));
         });
         
         console.log(`✅ Dodano ${newImages.length} wzorów z karty`);
@@ -1402,12 +1606,16 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           onResetView={resetView}
           canUndo={canUndo}
           canRedo={canRedo}
+          hasSelection={selectedElementIds.size > 0}
+          onDeleteSelected={deleteSelectedElements}
+          onExport={handleExport}
+          onImport={handleImport}
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
         />
         
-        {/* 🆕 SMARTSEARCH BAR */}
-        <div className="absolute top-4 right-64 z-50 pointer-events-auto">
+        {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
           <SmartSearchBar
             onFormulaSelect={handleFormulaSelect}
             onCardSelect={handleCardSelect}
@@ -1548,6 +1756,14 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             imageRendering: 'crisp-edges',
             pointerEvents: 'none'
           }}
+        />
+        
+        {/* 🆕 REMOTE CURSORS - Kursory innych użytkowników */}
+        <RemoteCursors
+          cursors={remoteCursors}
+          viewport={viewport}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
         />
         
         {imageProcessing && (

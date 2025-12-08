@@ -596,6 +596,38 @@ export const deleteBoardElement = async (
 };
 
 /**
+ * ───────────────────────────────────────────────────────────────────────────
+ * 🔗 DOŁĄCZENIE DO WORKSPACE PRZEZ TABLICĘ
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Automatyczne dołączenie do workspace przez link do tablicy.
+ * Jeśli użytkownik nie jest członkiem - zostaje dodany jako member.
+ */
+export const joinBoardWorkspace = async (boardId: number): Promise<{
+  success: boolean;
+  already_member: boolean;
+  workspace_id: number;
+  board_id: number;
+  message?: string;
+}> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Brak tokenu autoryzacji');
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/api/boards/${boardId}/join`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  return handleResponse(response);
+};
+
+/**
  * ═══════════════════════════════════════════════════════════════════════════
  * 📚 PODSUMOWANIE FUNKCJI
  * ═══════════════════════════════════════════════════════════════════════════
@@ -605,6 +637,7 @@ export const deleteBoardElement = async (
  * ✅ createBoard(data) - nowa tablica
  * ✅ deleteBoard(boardId) - usunięcie tablicy
  * ✅ toggleBoardFavourite(boardId, isFavourite) - ulubiona
+ * ✅ joinBoardWorkspace(boardId) - dołączenie do workspace przez tablicę
  * 
  * BOARD ELEMENTS:
  * ✅ saveBoardElementsBatch(boardId, elements) - zapis batch
@@ -621,3 +654,4 @@ export const deleteBoardElement = async (
  * 
  * ═══════════════════════════════════════════════════════════════════════════
  */
+

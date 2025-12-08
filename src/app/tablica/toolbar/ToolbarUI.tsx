@@ -30,7 +30,7 @@ import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
-  Upload, Clipboard as ClipboardIcon, Eraser
+  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -49,6 +49,9 @@ interface ToolbarUIProps {
   canUndo: boolean;
   canRedo: boolean;
   
+  // Selection state
+  hasSelection?: boolean;
+  
   // Handlers
   onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
@@ -59,6 +62,11 @@ interface ToolbarUIProps {
   onUndo: () => void;
   onRedo: () => void;
   onClear: () => void;
+  onDeleteSelected?: () => void;
+  
+  // Export/Import handlers
+  onExport?: () => void;
+  onImport?: () => void;
   
   // Mobile state
   isMobileMenuOpen: boolean;
@@ -93,13 +101,13 @@ const ToolButton = ({
     `}
   >
     <Icon className="w-6 h-6" />
-    <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+    <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
       {title}
     </span>
   </button>
 );
 
-const Divider = () => <div className="w-px h-7 bg-gray-200 mx-1.5" />;
+const Divider = () => <div className="h-px w-7 bg-gray-200 my-1.5" />;
 
 export function ToolbarUI({
   tool,
@@ -110,6 +118,7 @@ export function ToolbarUI({
   fillShape,
   canUndo,
   canRedo,
+  hasSelection,
   onToolChange,
   onShapeChange,
   onColorChange,
@@ -119,6 +128,9 @@ export function ToolbarUI({
   onUndo,
   onRedo,
   onClear,
+  onDeleteSelected,
+  onExport,
+  onImport,
   isMobileMenuOpen,
   setIsMobileMenuOpen,
   onImagePaste,
@@ -143,7 +155,7 @@ export function ToolbarUI({
   // - select, pan: brak properties
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image' || tool === 'eraser';
 
   return (
     <>
@@ -158,9 +170,9 @@ export function ToolbarUI({
         </button>
       </div>
 
-      {/* DESKTOP: GŁÓWNY TOOLBAR */}
+      {/* DESKTOP: GŁÓWNY TOOLBAR - PIONOWY */}
       <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200">
-        <div className="flex items-center gap-1.5 p-2">{/* Main Tools */}
+        <div className="flex flex-col items-center gap-1.5 p-2">
           {/* Main Tools */}
           <ToolButton
             icon={MousePointer2}
@@ -218,6 +230,26 @@ export function ToolbarUI({
           <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo} />
 
           <Divider />
+
+          {/* Export/Import */}
+          {onExport && (
+            <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" />
+          )}
+          {onImport && (
+            <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" />
+          )}
+
+          <Divider />
+
+          {/* Delete Selected - widoczne gdy coś zaznaczone */}
+          {hasSelection && onDeleteSelected && (
+            <ToolButton 
+              icon={XIcon} 
+              active={false} 
+              onClick={onDeleteSelected} 
+              title="Usuń zaznaczone (Del)" 
+            />
+          )}
 
           {/* Clear */}
           <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" />
@@ -395,6 +427,20 @@ export function ToolbarUI({
 
               {/* Actions */}
               <div className="pt-2 border-t border-gray-200 space-y-2">
+                {/* Usuń zaznaczone - widoczne gdy coś jest zaznaczone */}
+                {hasSelection && onDeleteSelected && (
+                  <button
+                    onClick={() => {
+                      onDeleteSelected();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors flex items-center gap-2 justify-center"
+                  >
+                    <XIcon className="w-4 h-4" />
+                    <span className="text-sm font-medium">Usuń zaznaczone</span>
+                  </button>
+                )}
+                
                 <button
                   onClick={() => {
                     onUndo();
@@ -419,6 +465,33 @@ export function ToolbarUI({
                   <span className="text-sm font-medium">Ponów</span>
                 </button>
 
+                {/* Export/Import */}
+                {onExport && (
+                  <button
+                    onClick={() => {
+                      onExport();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-2 justify-center"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span className="text-sm font-medium">Eksportuj tablicę</span>
+                  </button>
+                )}
+
+                {onImport && (
+                  <button
+                    onClick={() => {
+                      onImport();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="w-full p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors flex items-center gap-2 justify-center"
+                  >
+                    <FolderOpen className="w-4 h-4" />
+                    <span className="text-sm font-medium">Importuj tablicę</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     onClear();
@@ -435,34 +508,34 @@ export function ToolbarUI({
         </div>
       )}
 
-      {/* PROPERTIES PANEL - tylko desktop i tylko gdy hasProperties */}
+      {/* PROPERTIES PANEL - tylko desktop i tylko gdy hasProperties - obok toolbara */}
       {hasProperties && (
-        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-3 max-w-xl">
-          <div className="flex flex-wrap items-center gap-4">
+        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-3 ml-2">
+          <div className="flex flex-col gap-3">
             {/* PEN */}
             {tool === 'pen' && (
               <>
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-gray-600">Kolor:</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => onColorChange(e.target.value)}
-                    className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+                    className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
                   />
                 </div>
 
-                <div className="flex items-center gap-3 min-w-[180px]">
-                  <label className="text-sm font-medium text-gray-600">Grubość:</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
                   <input
                     type="range"
                     min="1"
                     max="20"
                     value={lineWidth}
                     onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
-                  <span className="text-sm text-gray-700 font-semibold w-10 text-right">{lineWidth}px</span>
+                  <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
                 </div>
               </>
             )}
@@ -470,10 +543,10 @@ export function ToolbarUI({
             {/* SHAPE */}
             {tool === 'shape' && (
               <>
-                {/* Wybór kształtu */}
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-gray-600">Kształt:</label>
-                  <div className="flex gap-1.5 bg-gray-100 rounded-lg p-1.5">
+                {/* Wybór kształtu - pionowo */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kształt</label>
+                  <div className="flex flex-col gap-1 bg-gray-100 rounded-lg p-1">
                     <button
                       onClick={() => onShapeChange('rectangle')}
                       className={`p-2 rounded-lg transition-all ${
@@ -522,35 +595,37 @@ export function ToolbarUI({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
-                  <label className="text-sm font-medium text-gray-600">Kolor:</label>
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => onColorChange(e.target.value)}
-                    className="w-12 h-12 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+                    className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
                   />
                 </div>
-                <div className="flex items-center gap-3 min-w-[180px]">
-                  <label className="text-sm font-medium text-gray-600">Grubość:</label>
+                
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
                   <input
                     type="range"
                     min="1"
                     max="20"
                     value={lineWidth}
                     onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
-                  <span className="text-sm text-gray-700 font-semibold w-10 text-right">{lineWidth}px</span>
+                  <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
                 </div>
+                
                 {selectedShape !== 'line' && selectedShape !== 'arrow' && (
                   <button
                     onClick={() => onFillShapeChange(!fillShape)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
                       fillShape ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {fillShape ? 'Wypełniony' : 'Kontur'}
+                    {fillShape ? '◼ Wypełniony' : '◻ Kontur'}
                   </button>
                 )}
               </>
@@ -563,30 +638,25 @@ export function ToolbarUI({
             
             {/* 🖼️ IMAGE */}
             {tool === 'image' && (
-              <>
+              <div className="flex flex-col gap-2">
                 <button
                   onClick={onImagePaste}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
                   title="Wklej obraz ze schowka (Ctrl+V)"
                 >
-                  <ClipboardIcon className="w-5 h-5" />
-                  <span className="text-sm font-medium">Wklej</span>
+                  <ClipboardIcon className="w-4 h-4" />
+                  <span className="font-medium">Wklej</span>
                 </button>
 
                 <button
                   onClick={onImageUpload}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
                   title="Wybierz plik z dysku"
                 >
-                  <Upload className="w-5 h-5" />
-                  <span className="text-sm font-medium">Upload</span>
+                  <Upload className="w-4 h-4" />
+                  <span className="font-medium">Upload</span>
                 </button>
-
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <ImageIcon className="w-5 h-5" />
-                  <span>Ctrl+V lub przeciągnij obraz</span>
-                </div>
-              </>
+              </div>
             )}
           </div>
         </div>
@@ -594,3 +664,4 @@ export function ToolbarUI({
     </>
   );
 }
+

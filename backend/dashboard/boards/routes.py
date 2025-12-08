@@ -330,3 +330,54 @@ async def delete_element(
     db.commit()
     
     return {"success": True}
+
+
+@router.post("/{board_id}/join")
+async def join_board_workspace(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Automatyczne dołączenie do workspace przez link do tablicy.
+    Jeśli użytkownik nie jest członkiem workspace - dodajemy go jako member.
+    """
+    # Sprawdź czy tablica istnieje
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona"
+        )
+    
+    # Sprawdź czy użytkownik już jest członkiem workspace
+    existing_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    
+    if existing_member:
+        # Już jest członkiem - zwróć sukces
+        return {
+            "success": True,
+            "already_member": True,
+            "workspace_id": board.workspace_id,
+            "board_id": board_id
+        }
+    
+    # Dodaj jako member workspace
+    new_member = WorkspaceMember(
+        workspace_id=board.workspace_id,
+        user_id=user_id,
+        role="member"
+    )
+    db.add(new_member)
+    db.commit()
+    
+    return {
+        "success": True,
+        "already_member": False,
+        "workspace_id": board.workspace_id,
+        "board_id": board_id,
+        "message": "Dołączono do workspace"
+    }

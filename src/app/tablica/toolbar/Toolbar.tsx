@@ -38,6 +38,8 @@ import { ZoomControls } from './ZoomControls';
 export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow';
 
+
+
 interface ToolbarProps {
   tool: Tool;
   setTool: (tool: Tool) => void;
@@ -57,6 +59,12 @@ interface ToolbarProps {
   onResetView: () => void;
   canUndo: boolean;
   canRedo: boolean;
+  // 🆕 Selection
+  hasSelection?: boolean;
+  onDeleteSelected?: () => void;
+  // 📦 Export/Import handlers
+  onExport?: () => void;
+  onImport?: () => void;
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
@@ -81,6 +89,10 @@ function Toolbar({
   onResetView,
   canUndo,
   canRedo,
+  hasSelection,
+  onDeleteSelected,
+  onExport,
+  onImport,
   onImagePaste,
   onImageUpload,
 }: ToolbarProps) {
@@ -90,7 +102,7 @@ function Toolbar({
   // FunctionTool sam tworzy funkcje i ma własny input
 
   return (
-    <div className="absolute top-4 left-61 z-50 pointer-events-auto flex flex-col items-start gap-2">
+    <div className="absolute top-20 left-4 z-50 pointer-events-auto flex flex-row items-start gap-2">
       <ToolbarUI
         tool={tool}
         selectedShape={selectedShape}
@@ -100,6 +112,7 @@ function Toolbar({
         fillShape={fillShape}
         canUndo={canUndo}
         canRedo={canRedo}
+        hasSelection={hasSelection}
         onToolChange={setTool}
         onShapeChange={setSelectedShape}
         onColorChange={setColor}
@@ -109,6 +122,9 @@ function Toolbar({
         onUndo={onUndo}
         onRedo={onRedo}
         onClear={onClear}
+        onDeleteSelected={onDeleteSelected}
+        onExport={onExport}
+        onImport={onImport}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         onImagePaste={onImagePaste}
@@ -127,7 +143,8 @@ const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
     prevProps.fontSize === nextProps.fontSize &&
     prevProps.fillShape === nextProps.fillShape &&
     prevProps.canUndo === nextProps.canUndo &&
-    prevProps.canRedo === nextProps.canRedo
+    prevProps.canRedo === nextProps.canRedo &&
+    prevProps.hasSelection === nextProps.hasSelection
   );
 };
 
