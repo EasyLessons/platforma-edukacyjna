@@ -1,0 +1,215 @@
+{
+  "version": "1.0.0",
+  "lastUpdated": "2025-12-08",
+  
+  "resourceTypes": {
+    "card": {
+      "label": "Karty wzorów",
+      "color": "#EF4444",
+      "bgColor": "bg-red-500",
+      "icon": "BookOpen",
+      "action": "open-viewer",
+      "priority": 1
+    },
+    "formula": {
+      "label": "Wzory",
+      "color": "#3B82F6",
+      "bgColor": "bg-blue-500",
+      "icon": "Calculator",
+      "action": "instant-add",
+      "priority": 2
+    },
+    "theorem": {
+      "label": "Twierdzenia",
+      "color": "#22C55E",
+      "bgColor": "bg-green-500",
+      "icon": "FileText",
+      "action": "instant-add",
+      "priority": 3
+    },
+    "table": {
+      "label": "Tabele",
+      "color": "#EAB308",
+      "bgColor": "bg-yellow-500",
+      "icon": "Table",
+      "action": "instant-add",
+      "priority": 4
+    },
+    "diagram": {
+      "label": "Diagramy",
+      "color": "#A855F7",
+      "bgColor": "bg-purple-500",
+      "icon": "PieChart",
+      "action": "instant-add",
+      "priority": 5
+    }
+  },
+
+  "categories": [
+    {
+      "id": "matematyka",
+      "name": "Matematyka",
+      "subcategories": [
+        { "id": "trygonometria", "name": "Trygonometria", "order": 1 },
+        { "id": "stereometria", "name": "Stereometria", "order": 2 },
+        { "id": "planimetria", "name": "Planimetria", "order": 3 },
+        { "id": "algebra", "name": "Algebra", "order": 4 },
+        { "id": "ciagi", "name": "Ciągi", "order": 5 },
+        { "id": "funkcje", "name": "Funkcje", "order": 6 }
+      ]
+    }
+  ],
+
+  "formulas": [
+    {
+      "id": "tryg-def-kat-ostry",
+      "type": "formula",
+      "title": "Definicja funkcji trygonometrycznych kąta ostrego",
+      "description": "Definicja sin, cos, tg, ctg w trójkącie prostokątnym",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["definicja", "kąt ostry", "trójkąt prostokątny", "sin", "cos", "tg", "ctg", "przeciwprostokątna", "przyprostokątna"],
+      "path": "/resources/matematyka/wzory/trygonometria/1def-fun-tryg-kata-ostr-w-trj-prostokatnym.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 1
+    },
+    {
+      "id": "tryg-def-dowolny-kat",
+      "type": "formula",
+      "title": "Definicja funkcji trygonometrycznych dowolnego kąta",
+      "description": "Definicja sin, cos, tg, ctg na kole jednostkowym",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["definicja", "dowolny kąt", "koło jednostkowe", "sin", "cos", "tg", "ctg", "współrzędne"],
+      "path": "/resources/matematyka/wzory/trygonometria/2def-fun-tryg-dowolnego-kata.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 2
+    },
+    {
+      "id": "tryg-wykresy",
+      "type": "diagram",
+      "title": "Wykresy funkcji trygonometrycznych",
+      "description": "Wykresy sin(x), cos(x), tg(x), ctg(x)",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["wykres", "sinusoida", "cosinusoida", "tangens", "cotangens", "przebieg", "okres"],
+      "path": "/resources/matematyka/wzory/trygonometria/3wykresy_fun_tryg.webp",
+      "dimensions": { "width": 800, "height": 500 },
+      "order": 3
+    },
+    {
+      "id": "tryg-jedynka-tg",
+      "type": "formula",
+      "title": "Jedynka trygonometryczna i tg przez sin/cos",
+      "description": "sin²α + cos²α = 1, tg α = sin α / cos α",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["jedynka", "tożsamość", "sin²", "cos²", "tangens", "iloraz", "podstawowa"],
+      "path": "/resources/matematyka/wzory/trygonometria/4jedynka-tryg-tg-sin-przez-cos.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 4
+    },
+    {
+      "id": "tryg-wartosci-katow",
+      "type": "table",
+      "title": "Wartości funkcji trygonometrycznych dla wybranych kątów",
+      "description": "Tabelka dla kątów 0°, 30°, 45°, 60°, 90°, 180°, 270°, 360°",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["tabelka", "wartości", "30°", "45°", "60°", "90°", "kąty szczególne", "radiany"],
+      "path": "/resources/matematyka/wzory/trygonometria/5wart.fun.tryg.dla.wybr.katow.webp",
+      "dimensions": { "width": 700, "height": 400 },
+      "order": 5
+    },
+    {
+      "id": "tryg-suma-roznica-katow",
+      "type": "formula",
+      "title": "Funkcje trygonometryczne sumy i różnicy kątów",
+      "description": "sin(α±β), cos(α±β), tg(α±β)",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["suma kątów", "różnica kątów", "sin(α+β)", "cos(α-β)", "dodawanie", "odejmowanie"],
+      "path": "/resources/matematyka/wzory/trygonometria/6fun-tryg-sumy-roznicy-kat.webp",
+      "dimensions": { "width": 700, "height": 400 },
+      "order": 6
+    },
+    {
+      "id": "tryg-podwojony-kat",
+      "type": "formula",
+      "title": "Funkcje trygonometryczne podwojonego kąta",
+      "description": "sin(2α), cos(2α), tg(2α)",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["podwójny kąt", "2α", "sin2α", "cos2α", "tg2α", "podwojenie"],
+      "path": "/resources/matematyka/wzory/trygonometria/7fun-tryg-podwojonego-kata.webp",
+      "dimensions": { "width": 600, "height": 350 },
+      "order": 7
+    },
+    {
+      "id": "tryg-wzory-redukcyjne",
+      "type": "formula",
+      "title": "Wzory redukcyjne",
+      "description": "Redukcja kątów do I ćwiartki",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["redukcja", "90°", "180°", "270°", "360°", "ćwiartki", "znaki funkcji"],
+      "path": "/resources/matematyka/wzory/trygonometria/8wzory-redukcyjne.webp",
+      "dimensions": { "width": 700, "height": 500 },
+      "order": 8
+    },
+    {
+      "id": "tryg-sumy-iloczyny",
+      "type": "formula",
+      "title": "Sumy, różnice i iloczyny funkcji trygonometrycznych",
+      "description": "sin α + sin β, cos α - cos β, sin α · cos β",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["suma", "różnica", "iloczyn", "przekształcenia", "sin+sin", "cos-cos"],
+      "path": "/resources/matematyka/wzory/trygonometria/9sumy-roznice-iloczyny-fun-tryg.webp",
+      "dimensions": { "width": 700, "height": 450 },
+      "order": 9
+    },
+    {
+      "id": "tryg-okresowosc",
+      "type": "formula",
+      "title": "Okresowość funkcji trygonometrycznych",
+      "description": "Okres funkcji sin, cos, tg, ctg",
+      "category": "matematyka",
+      "subcategory": "trygonometria",
+      "tags": ["okres", "okresowość", "2π", "π", "cykliczność", "powtarzalność"],
+      "path": "/resources/matematyka/wzory/trygonometria/10okresowosc-fun.tryg.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 10
+    }
+  ],
+
+  "cards": [
+    {
+      "id": "karta-matura-podstawowa",
+      "type": "card",
+      "title": "Karta wzorów - Matura podstawowa",
+      "description": "Oficjalna karta wzorów CKE (trygonometria)",
+      "category": "matematyka",
+      "tags": ["karta wzorów", "matura", "podstawowa", "CKE", "trygonometria"],
+      "sections": [
+        {
+          "id": "karta-tryg",
+          "name": "Trygonometria",
+          "order": 1,
+          "items": [
+            { "ref": "tryg-def-kat-ostry" },
+            { "ref": "tryg-def-dowolny-kat" },
+            { "ref": "tryg-wykresy" },
+            { "ref": "tryg-jedynka-tg" },
+            { "ref": "tryg-wartosci-katow" },
+            { "ref": "tryg-suma-roznica-katow" },
+            { "ref": "tryg-podwojony-kat" },
+            { "ref": "tryg-wzory-redukcyjne" },
+            { "ref": "tryg-sumy-iloczyny" },
+            { "ref": "tryg-okresowosc" }
+          ]
+        }
+      ]
+    }
+  ]
+}

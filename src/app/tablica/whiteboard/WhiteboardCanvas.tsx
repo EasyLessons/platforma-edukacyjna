@@ -36,11 +36,14 @@ import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
 import { OnlineUsers } from './OnlineUsers';
 
+// 🆕 Import SmartSearch
+import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../smartsearch';
+
 // 🆕 Import hooka Realtime
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
 // 🆕 Import API dla elementów tablicy
-import { saveBoardElementsBatch, loadBoardElements } from '@/boards_api/api';
+import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement } from '@/boards_api/api';
 
 import {
   Point,
@@ -135,6 +138,9 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const isSavingRef = useRef(false);
   const unsavedElementsRef = useRef<Set<string>>(new Set());
   
+  // 🆕 SMARTSEARCH - state
+  const [activeCard, setActiveCard] = useState<CardResource | null>(null);
+  
   // History state
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -151,6 +157,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const historyIndexRef = useRef(historyIndex);
   const selectedElementIdsRef = useRef(selectedElementIds);
   const viewportRef = useRef(viewport);
+  const boardIdStateRef = useRef(boardIdState);
   
   useEffect(() => {
     viewportRef.current = viewport;
@@ -171,6 +178,10 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   useEffect(() => {
     selectedElementIdsRef.current = selectedElementIds;
   }, [selectedElementIds]);
+  
+  useEffect(() => {
+    boardIdStateRef.current = boardIdState;
+  }, [boardIdState]);
   
   // 🆕 Synchronizacja unsavedElementsRef
   useEffect(() => {
@@ -430,9 +441,14 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           saveToHistoryRef.current(newElements);
           setSelectedElementIds(new Set());
           
-          // 🆕 BROADCAST DELETE
+          // 🆕 BROADCAST DELETE + API DELETE
           currentSelectedIds.forEach(id => {
             broadcastElementDeleted(id);
+            if (boardIdStateRef.current) {
+              deleteBoardElement(boardIdStateRef.current, id).catch(err => {
+                console.error('❌ Błąd usuwania elementu:', id, err);
+              });
+            }
           });
         }
       }
@@ -707,9 +723,14 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST DELETE
+    // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
-  }, [elements, saveToHistory, broadcastElementDeleted]);
+    if (boardIdState) {
+      deleteBoardElement(boardIdState, id).catch(err => {
+        console.error('❌ Błąd usuwania elementu:', id, err);
+      });
+    }
+  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
 
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
@@ -754,9 +775,14 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST DELETE
+    // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
-  }, [elements, saveToHistory, broadcastElementDeleted]);
+    if (boardIdState) {
+      deleteBoardElement(boardIdState, id).catch(err => {
+        console.error('❌ Błąd usuwania elementu:', id, err);
+      });
+    }
+  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
 
   const handleSelectionChange = useCallback((ids: Set<string>) => {
     setSelectedElementIds(ids);
@@ -798,13 +824,17 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const handleSelectionFinish = useCallback(() => {
     saveToHistory(elements);
     
-    // 🆕 BROADCAST wszystkie zmienione elementy
+    // 🆕 BROADCAST wszystkie zmienione elementy + zapisz do bazy
     elements.forEach(element => {
       if (selectedElementIds.has(element.id)) {
         broadcastElementUpdated(element);
+        setUnsavedElements(prev => new Set(prev).add(element.id));
       }
     });
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated]);
+    
+    // Zapisz do bazy
+    if (boardIdState) debouncedSave(boardIdState);
+  }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const deleteSelectedElements = useCallback(() => {
     if (selectedElementIds.size === 0) return;
@@ -813,13 +843,18 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST DELETE dla każdego
+    // 🆕 BROADCAST DELETE + API DELETE dla każdego
     selectedElementIds.forEach(id => {
       broadcastElementDeleted(id);
+      if (boardIdState) {
+        deleteBoardElement(boardIdState, id).catch(err => {
+          console.error('❌ Błąd usuwania elementu:', id, err);
+        });
+      }
     });
     
     setSelectedElementIds(new Set());
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted]);
+  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted, boardIdState]);
 
   // Zoom functions (bez zmian)
   const zoomInRef = useRef(() => {
@@ -895,6 +930,137 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   };
 
   const { width: canvasWidth, height: canvasHeight } = getCanvasDimensions();
+
+  // 🆕 SMARTSEARCH HANDLERS
+  // Używamy jednostek świata (world units), nie pikseli!
+  // Typowa szerokość obrazu to 3-5 jednostek świata
+  const FORMULA_WORLD_WIDTH = 4; // szerokość wzoru w jednostkach świata
+  
+  const handleFormulaSelect = useCallback((formula: FormulaResource) => {
+    // Najpierw załaduj obraz, żeby poznać proporcje
+    const img = new Image();
+    img.src = formula.path;
+    
+    img.onload = () => {
+      // Oblicz proporcje i wymiary w jednostkach świata
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const worldWidth = FORMULA_WORLD_WIDTH;
+      const worldHeight = worldWidth * aspectRatio;
+      
+      // Środek ekranu w jednostkach świata
+      const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+      const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+      
+      const newImage: ImageElement = {
+        id: `formula-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'image',
+        x: centerWorld.x - worldWidth / 2,
+        y: centerWorld.y - worldHeight / 2,
+        width: worldWidth,
+        height: worldHeight,
+        src: formula.path,
+        alt: formula.title
+      };
+      
+      // Dodaj do elementów
+      setElements(prev => {
+        const updated = [...prev, newImage];
+        saveToHistory(updated);
+        return updated;
+      });
+      
+      // Zapisz załadowany obraz
+      setLoadedImages(prev => new Map(prev).set(newImage.id, img));
+      
+      // Broadcast i zapis
+      broadcastElementCreated(newImage);
+      setUnsavedElements(prev => new Set(prev).add(newImage.id));
+      if (boardIdState) debouncedSave(boardIdState);
+    };
+    
+    img.onerror = () => {
+      console.error('❌ Nie można załadować wzoru:', formula.path);
+    };
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  const handleCardSelect = useCallback((card: CardResource) => {
+    setActiveCard(card);
+  }, []);
+
+  const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
+    // Używamy jednostek świata, nie pikseli!
+    const WORLD_PADDING = 0.5; // padding w jednostkach świata
+    const COLS = 2;
+    const WORLD_WIDTH = 3.5; // szerokość każdego wzoru w jednostkach świata
+    
+    // Środek ekranu w jednostkach świata
+    const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+    const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+    
+    // Załaduj wszystkie obrazy równolegle
+    const imagePromises = formulas.map((formula, index) => {
+      return new Promise<{formula: FormulaResource, img: HTMLImageElement, index: number}>((resolve, reject) => {
+        const img = new Image();
+        img.src = formula.path;
+        img.onload = () => resolve({ formula, img, index });
+        img.onerror = () => reject(new Error(`Failed to load: ${formula.path}`));
+      });
+    });
+    
+    Promise.all(imagePromises)
+      .then(loadedFormulas => {
+        // Oblicz pozycje w jednostkach świata
+        const newImages: ImageElement[] = loadedFormulas.map(({ formula, img, index }) => {
+          // Oblicz proporcje i wymiary w jednostkach świata
+          const aspectRatio = img.naturalHeight / img.naturalWidth;
+          const worldWidth = WORLD_WIDTH;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const col = index % COLS;
+          const row = Math.floor(index / COLS);
+          
+          const offsetX = col * (WORLD_WIDTH + WORLD_PADDING);
+          const offsetY = row * (worldHeight + WORLD_PADDING);
+          
+          const startX = centerWorld.x - ((COLS - 1) * (WORLD_WIDTH + WORLD_PADDING)) / 2;
+          const startY = centerWorld.y - 2; // trochę wyżej od środka
+          
+          return {
+            id: `formula-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'image' as const,
+            x: startX + offsetX - worldWidth / 2,
+            y: startY + offsetY,
+            width: worldWidth,
+            height: worldHeight,
+            src: formula.path,
+            alt: formula.title,
+            _loadedImg: img // tymczasowo przechowaj załadowany obraz
+          } as ImageElement & { _loadedImg: HTMLImageElement };
+        });
+
+        // Batch update - dodaj wszystkie naraz
+        setElements(prev => {
+          const updated = [...prev, ...newImages.map(({ _loadedImg, ...img }) => img as ImageElement)];
+          saveToHistory(updated);
+          return updated;
+        });
+
+        // Zapisz załadowane obrazy i broadcast
+        newImages.forEach(image => {
+          setLoadedImages(prev => new Map(prev).set(image.id, image._loadedImg));
+          broadcastElementCreated(image);
+          setUnsavedElements(prev => new Set(prev).add(image.id));
+        });
+        
+        console.log(`✅ Dodano ${newImages.length} wzorów z karty`);
+        if (boardIdState) debouncedSave(boardIdState);
+        setActiveCard(null);
+      })
+      .catch(err => {
+        console.error('❌ Błąd ładowania wzorów:', err);
+        setActiveCard(null);
+      });
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
   
   // Globalne obrazy (bez zmian)
   const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
@@ -1239,6 +1405,23 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
         />
+        
+        {/* 🆕 SMARTSEARCH BAR */}
+        <div className="absolute top-4 right-64 z-50 pointer-events-auto">
+          <SmartSearchBar
+            onFormulaSelect={handleFormulaSelect}
+            onCardSelect={handleCardSelect}
+          />
+        </div>
+        
+        {/* 🆕 CARD VIEWER MODAL */}
+        {activeCard && (
+          <CardViewer
+            card={activeCard}
+            onClose={() => setActiveCard(null)}
+            onAddFormulas={handleAddFormulasFromCard}
+          />
+        )}
         
         <ZoomControls
           zoom={viewport.scale}
