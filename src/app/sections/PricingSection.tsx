@@ -35,7 +35,7 @@ const plans: Plan[] = [
       { text: "Priorytetowe wsparcie", included: false },
     ],
     buttonText: "Zacznij za darmo",
-    buttonLink: "/register"
+    buttonLink: "/rejestracja"
   },
   {
     name: "PRO",
@@ -56,7 +56,7 @@ const plans: Plan[] = [
       { text: "Priorytetowe wsparcie", included: true },
     ],
     buttonText: "Wypróbuj PRO - 14 dni za darmo",
-    buttonLink: "/register?plan=pro"
+    buttonLink: "/rejestracja?plan=pro"
   }
 ];
 

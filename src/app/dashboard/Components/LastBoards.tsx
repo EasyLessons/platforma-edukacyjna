@@ -458,7 +458,7 @@ export default function LastBoards() {
               <div
                 key={board.id}
                 onClick={() => handleBoardClick(board.id)}
-                className="group bg-white rounded-2xl p-5 border-2 border-transparent hover:border-green-400 hover:shadow-lg transition-all duration-300 cursor-pointer grid grid-cols-12 gap-4 items-center backdrop-blur-sm"
+                className={`group bg-white rounded-2xl p-5 border-2 border-transparent hover:border-green-400 hover:shadow-lg transition-all duration-300 cursor-pointer grid grid-cols-12 gap-4 items-center backdrop-blur-sm relative ${openDropdownId === board.id ? 'z-50' : 'z-0'}`}
               >
                 {/* Nazwa + ikona */}
                 <div className="col-span-4 flex items-center gap-3">
