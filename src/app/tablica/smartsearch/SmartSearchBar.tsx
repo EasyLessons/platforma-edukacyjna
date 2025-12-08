@@ -136,7 +136,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
-            className="w-64 sm:w-80 py-2 pr-3 text-sm bg-transparent outline-none"
+            className="text-black w-64 sm:w-80 py-2 pr-3 text-sm bg-transparent outline-none"
             autoFocus
           />
           <button
