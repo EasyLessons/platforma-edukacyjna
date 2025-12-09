@@ -3,20 +3,21 @@
  * PLIK: src/app/tablica/smartsearch/SmartSearchBar.tsx
  * ============================================================================
  * 
- * SmartSearchBar - wyszukiwarka wzorów w toolbarze
+ * SmartSearchBar - wyszukiwarka wzorów w toolbarze (FIXED EXPANSION)
  * ============================================================================
  */
 
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart } from 'lucide-react';
+import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library } from 'lucide-react';
 import { loadManifest, searchResources, getResourceTypeColor } from './searchService';
 import { ResourceManifest, SearchResult, FormulaResource, CardResource } from './types';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
   onCardSelect: (card: CardResource) => void;
+  onBrowseAll?: () => void;
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -27,8 +28,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
 };
 
-export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBarProps) {
+export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll }: SmartSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [manifest, setManifest] = useState<ResourceManifest | null>(null);
@@ -37,6 +39,20 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
   
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Ctrl+K skrót klawiszowy
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen(true);
+        setTimeout(() => inputRef.current?.focus(), 50);
+      }
+    };
+
+    document.addEventListener('keydown', handleGlobalKeyDown);
+    return () => document.removeEventListener('keydown', handleGlobalKeyDown);
+  }, []);
 
   // Załaduj manifest przy pierwszym otwarciu
   useEffect(() => {
@@ -63,8 +79,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
   // Keyboard navigation
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
-      setIsOpen(false);
-      setQuery('');
+      handleClose();
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
@@ -81,7 +96,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+        handleClose();
       }
     };
 
@@ -91,14 +106,22 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(() => {
+      setIsOpen(false);
+      setIsClosing(false);
+      setQuery('');
+    }, 300);
+  };
+
   const handleSelect = (result: SearchResult) => {
     if (result.resultType === 'card') {
       onCardSelect(result as CardResource);
     } else {
       onFormulaSelect(result as FormulaResource);
     }
-    setIsOpen(false);
-    setQuery('');
+    handleClose();
   };
 
   const getIcon = (type: string) => {
@@ -112,131 +135,276 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect }: SmartSearchBar
   };
 
   return (
-    <div ref={containerRef} className="relative">
-      {/* Search Button / Input */}
-      {!isOpen ? (
-        <button
-          onClick={() => {
-            setIsOpen(true);
-            setTimeout(() => inputRef.current?.focus(), 50);
-          }}
-          className="flex items-center gap-3 px-5 py-3 bg-white rounded-xl border border-gray-200 hover:border-blue-400 hover:bg-blue-50 transition-all shadow-lg hover:shadow-xl"
-          title="Szukaj wzorów (Ctrl+K)"
-        >
-          <Search className="w-5 h-5 text-gray-400" />
-          <span className="text-base text-gray-500">Szukaj wzorów matematycznych...</span>
-          <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-400 bg-gray-100 rounded border border-gray-200">
-            Ctrl+K
-          </kbd>
-        </button>
-      ) : (
-        <div className="flex items-center gap-3 bg-white rounded-xl border-2 border-blue-500 shadow-xl px-4">
-          <Search className="w-5 h-5 text-blue-500" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
-            className="text-black w-[400px] py-3 text-base bg-transparent outline-none"
-            autoFocus
-          />
+    <>
+      {/* CSS Animacje */}
+      <style jsx>{`
+        @keyframes slideIn {
+          from {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        
+        @keyframes slideOut {
+          from {
+            opacity: 1;
+            transform: translateY(0);
+          }
+          to {
+            opacity: 0;
+            transform: translateY(-8px);
+          }
+        }
+        
+        @keyframes expandWidth {
+          from {
+            width: 500px;
+          }
+          to {
+            width: 800px;
+          }
+        }
+        
+        @keyframes shrinkWidth {
+          from {
+            width: 800px;
+          }
+          to {
+            width: 500px;
+          }
+        }
+        
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+          }
+          50% {
+            opacity: 0.5;
+          }
+        }
+        
+        @keyframes spin {
+          to { 
+            transform: rotate(360deg); 
+          }
+        }
+        
+        /* Naprawiony scroll dla wyników */
+        .results-scroll {
+          overflow-y: auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
+        }
+        
+        .results-scroll::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        .results-scroll::-webkit-scrollbar-track {
+          background: transparent;
+          margin: 8px 0;
+        }
+        
+        .results-scroll::-webkit-scrollbar-thumb {
+          background-color: rgba(59, 130, 246, 0.3);
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        
+        .results-scroll::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(59, 130, 246, 0.5);
+        }
+      `}</style>
+
+      <div ref={containerRef} className="relative">
+        {/* Search Button / Input */}
+        {!isOpen ? (
           <button
             onClick={() => {
-              setIsOpen(false);
-              setQuery('');
+              setIsOpen(true);
+              setTimeout(() => inputRef.current?.focus(), 50);
             }}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="flex items-center gap-3 px-6 py-4 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 transition-all duration-300 shadow-2xl hover:shadow-blue-200/50 hover:scale-[1.02]"
+            style={{ width: '500px', height: '64px' }}
+            title="Szukaj wzorów (Ctrl+K)"
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <Search className="w-5 h-5 text-gray-400" />
+            <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
+            <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
+              Ctrl+K
+            </kbd>
+            
+            {/* Separator + ikonka wzorów */}
+            <div className="w-px h-8 bg-gray-200/50 ml-2" />
+            <div className="relative group ml-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onBrowseAll?.();
+                }}
+                className="p-2 hover:bg-blue-50/80 rounded-xl transition-all duration-200 hover:scale-110"
+                title="Przeglądaj wszystkie wzory"
+              >
+                <Library className="w-5 h-5 text-blue-500" />
+              </button>
+              
+              {/* Tooltip */}
+              <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                  Przeglądaj karty wzorów
+                  <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
+                </div>
+              </div>
+            </div>
           </button>
-        </div>
-      )}
+        ) : (
+          <div 
+            className="flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-2xl px-6 transition-all duration-300 ease-out"
+            style={{
+              animation: isClosing ? 'shrinkWidth 0.3s ease-out forwards' : 'expandWidth 0.3s ease-out forwards',
+              height: '64px'
+            }}
+          >
+            <Search className="w-5 h-5 text-blue-500 animate-pulse" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
+              className="text-black flex-1 py-4 text-base bg-transparent outline-none placeholder:text-gray-400"
+              autoFocus
+            />
+            <button
+              onClick={handleClose}
+              className="p-2 hover:bg-gray-100/80 rounded-xl transition-all duration-200 hover:scale-110"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+        )}
 
-      {/* Results Dropdown */}
-      {isOpen && (query.trim() || isLoading) && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg border border-gray-200 shadow-xl max-h-96 overflow-y-auto z-50 min-w-[320px]">
-          {isLoading ? (
-            <div className="p-4 text-center text-gray-500">
-              <div className="animate-spin w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
-              Ładowanie...
-            </div>
-          ) : results.length === 0 && query.trim() ? (
-            <div className="p-4 text-center text-gray-500">
-              Brak wyników dla "{query}"
-            </div>
-          ) : (
-            <ul className="py-1">
-              {results.map((result, index) => {
-                const Icon = getIcon(result.type);
-                const color = manifest ? getResourceTypeColor(manifest, result.type) : '#3B82F6';
-                const isCard = result.resultType === 'card';
-                
-                return (
-                  <li
-                    key={result.id}
-                    onClick={() => handleSelect(result)}
-                    onMouseEnter={() => setSelectedIndex(index)}
-                    className={`
-                      flex items-start gap-3 px-4 py-3 cursor-pointer transition-colors
-                      ${index === selectedIndex ? 'bg-blue-50' : 'hover:bg-gray-50'}
-                    `}
-                  >
-                    {/* Icon */}
-                    <div 
-                      className="p-2 rounded-lg shrink-0"
-                      style={{ backgroundColor: `${color}20` }}
+        {/* Results Dropdown Z DZIAŁAJĄCYM SCROLLEM */}
+        {isOpen && (query.trim() || isLoading) && !isClosing && (
+          <div 
+            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-2xl max-h-[500px] z-50 results-scroll"
+            style={{
+              animation: 'slideIn 0.3s ease-out'
+            }}
+          >
+            {isLoading ? (
+              <div className="p-6 text-center text-gray-500">
+                <div 
+                  className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"
+                  style={{
+                    animation: 'spin 1s linear infinite, pulse 2s ease-in-out infinite'
+                  }}
+                />
+                Ładowanie...
+              </div>
+            ) : results.length === 0 && query.trim() ? (
+              <div className="p-6 text-center text-gray-500">
+                <div className="text-4xl mb-2">🔍</div>
+                Brak wyników dla "{query}"
+              </div>
+            ) : (
+              <ul className="py-2">
+                {results.map((result, index) => {
+                  const Icon = getIcon(result.type);
+                  const color = manifest ? getResourceTypeColor(manifest, result.type) : '#3B82F6';
+                  const isCard = result.resultType === 'card';
+                  
+                  return (
+                    <li
+                      key={result.id}
+                      onClick={() => handleSelect(result)}
+                      onMouseEnter={() => setSelectedIndex(index)}
+                      className={`
+                        flex items-start gap-4 px-5 py-4 mx-2 mb-1 rounded-2xl cursor-pointer transition-all duration-200
+                        ${index === selectedIndex 
+                          ? 'bg-gradient-to-r from-blue-50/90 to-purple-50/90 shadow-lg scale-[1.02]' 
+                          : 'hover:bg-gray-50/80'
+                        }
+                      `}
+                      style={{
+                        animation: `slideIn 0.2s ease-out ${index * 0.03}s both`
+                      }}
                     >
-                      <div style={{ color }}>
-                        <Icon className="w-5 h-5" />
+                      {/* Icon */}
+                      <div 
+                        className="p-3 rounded-2xl shrink-0 transition-transform duration-200 hover:scale-110"
+                        style={{ 
+                          backgroundColor: `${color}20`,
+                          boxShadow: `0 4px 12px ${color}15`
+                        }}
+                      >
+                        <div style={{ color }}>
+                          <Icon className="w-6 h-6" />
+                        </div>
                       </div>
-                    </div>
-                    
-                    {/* Content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900 truncate">
-                          {result.title}
-                        </span>
-                        {isCard && (
+                      
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-gray-900 truncate text-base">
+                            {result.title}
+                          </span>
+                          {isCard && (
+                            <span 
+                              className="text-xs px-2.5 py-1 rounded-full text-white shrink-0 font-medium"
+                              style={{ backgroundColor: color }}
+                            >
+                              Karta
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 truncate mb-2">
+                          {result.description}
+                        </p>
+                        <div className="flex items-center gap-2">
                           <span 
-                            className="text-xs px-2 py-0.5 rounded-full text-white shrink-0"
-                            style={{ backgroundColor: color }}
+                            className="text-xs px-2 py-1 rounded-lg font-medium"
+                            style={{ backgroundColor: `${color}15`, color }}
                           >
-                            Karta
+                            {getTypeLabel(result.type)}
                           </span>
-                        )}
+                          {!isCard && 'subcategory' in result && (
+                            <span className="text-xs text-gray-400 font-medium">
+                              {result.subcategory}
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-sm text-gray-500 truncate">
-                        {result.description}
-                      </p>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span 
-                          className="text-xs px-1.5 py-0.5 rounded"
-                          style={{ backgroundColor: `${color}15`, color }}
-                        >
-                          {getTypeLabel(result.type)}
-                        </span>
-                        {!isCard && 'subcategory' in result && (
-                          <span className="text-xs text-gray-400">
-                            {result.subcategory}
-                          </span>
-                        )}
+                      
+                      {/* Action hint */}
+                      <div className="flex items-center gap-1 text-sm text-gray-400 shrink-0 self-center font-medium">
+                        {isCard ? 'Przeglądaj' : 'Dodaj'}
+                        <span className="text-lg">→</span>
                       </div>
-                    </div>
-                    
-                    {/* Action hint */}
-                    <div className="text-xs text-gray-400 shrink-0 self-center">
-                      {isCard ? 'Przeglądaj →' : 'Dodaj →'}
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Animacja zamykania wyników */}
+        {isOpen && (query.trim() || isLoading) && isClosing && (
+          <div 
+            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-2xl max-h-[500px] z-50"
+            style={{
+              animation: 'slideOut 0.2s ease-out forwards'
+            }}
+          />
+        )}
+      </div>
+    </>
   );
 }
