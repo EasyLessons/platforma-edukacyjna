@@ -202,7 +202,7 @@ export function PenTool({
 
   return (
     <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      {/* Overlay dla mouse events */
+      {/* Overlay dla mouse events */}
       <div
         ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
