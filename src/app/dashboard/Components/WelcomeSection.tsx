@@ -79,23 +79,23 @@ export default function WelcomeSection() {
   }, []);
 
   return (
-    <div className="w-full relative overflow-hidden bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-3xl px-8 py-12 mb-8 border border-gray-100 shadow-sm">
+    <div className="w-full relative overflow-hidden bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-2xl md:rounded-3xl px-4 md:px-8 py-6 md:py-12 mb-6 md:mb-8 border border-gray-100 shadow-sm">
       
       {/* Dekoracyjne kółka w tle */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-green-200/20 rounded-full blur-3xl"></div>
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-200/20 rounded-full blur-3xl"></div>
+      <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-green-200/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 left-0 w-24 md:w-48 h-24 md:h-48 bg-blue-200/20 rounded-full blur-3xl"></div>
       
       <div className="relative z-10">
         {/* Małe powitanie */}
-        <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={20} className="text-green-600" />
-          <span className="text-sm font-medium text-gray-600">
+        <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
+          <Sparkles size={16} className="text-green-600 md:w-5 md:h-5" />
+          <span className="text-xs md:text-sm font-medium text-gray-600">
             {getGreeting()}, {user?.username || 'Użytkowniku'} • {getDayName()}
           </span>
         </div>
 
         {/* GŁÓWNY NAPIS */}
-        <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4 tracking-tight">
+        <h1 className="text-xl sm:text-2xl md:text-4xl lg:text-5xl font-bold text-gray-900 mb-2 md:mb-4 tracking-tight leading-tight md:leading-tight">
           <span className="bg-gradient-to-r from-black to-gray-700 bg-clip-text text-transparent">
             {motivationalText}
           </span>

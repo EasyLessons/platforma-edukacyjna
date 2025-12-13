@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { createBoard } from '@/boards_api/api';
+import { useRef } from 'react';
 import { 
   PenTool,
   Calculator,
@@ -12,7 +13,9 @@ import {
   Presentation,
   BookOpen,
   Rocket,
-  ArrowRight
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Template {
@@ -28,6 +31,19 @@ interface Template {
 export default function TemplatesSection() {
   const router = useRouter();
   const { activeWorkspace } = useWorkspaces();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  const scrollLeft = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
+    }
+  };
+
+  const scrollRight = () => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
+    }
+  };
 
   const templates: Template[] = [
     {
@@ -153,26 +169,47 @@ export default function TemplatesSection() {
   };
 
   return (
-    <div className="mb-12">
+    <div className="mb-6 md:mb-12">
       {/* Nagłówek sekcji */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-3 md:mb-6">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-1">
+          <h2 className="text-base md:text-2xl font-bold text-gray-900">
             Skorzystaj z szablonu
           </h2>
-          <p className="text-sm text-gray-600">
+          <p className="hidden md:block text-sm text-gray-600">
             Wybierz gotowy szablon lub utwórz własny
           </p>
         </div>
         
-        <button className="text-sm font-medium text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer transition-colors">
-          Zobacz wszystkie
-          <ArrowRight size={16} />
-        </button>
+        <div className="flex items-center gap-3">
+          {/* Strzałki na desktop */}
+          <div className="hidden md:flex items-center gap-1">
+            <button
+              onClick={scrollLeft}
+              className="bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-1.5 shadow-sm transition-all hover:shadow-md"
+            >
+              <ChevronLeft size={14} className="text-gray-600" />
+            </button>
+            <button
+              onClick={scrollRight}
+              className="bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-1.5 shadow-sm transition-all hover:shadow-md"
+            >
+              <ChevronRight size={14} className="text-gray-600" />
+            </button>
+          </div>
+          
+          <button className="text-xs md:text-sm font-medium text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer transition-colors">
+            Zobacz wszystkie
+            <ArrowRight size={14} className="md:w-4 md:h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Poziomy scroll z szablonami */}
-      <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide">
+      <div 
+        ref={scrollContainerRef}
+        className="flex gap-2 md:gap-4 overflow-x-auto pb-2 md:pb-4 scrollbar-hide"
+      >
         <style jsx>{`
           .scrollbar-hide::-webkit-scrollbar {
             display: none;
@@ -182,7 +219,7 @@ export default function TemplatesSection() {
             scrollbar-width: none;
           }
         `}</style>
-        
+          
         {templates.map((template) => {
           const IconComponent = template.icon;
           
@@ -190,25 +227,33 @@ export default function TemplatesSection() {
             <button
               key={template.id}
               onClick={() => handleTemplateClick(template.route, template.name)}
-              className="group relative bg-white rounded-2xl p-6 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition-all duration-300 cursor-pointer text-left flex-shrink-0 w-[220px]"
+              className="group relative bg-white rounded-lg md:rounded-2xl p-3 md:p-6 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition-all duration-300 cursor-pointer text-left flex-shrink-0 min-w-[140px] max-w-[180px] md:min-w-[200px] md:max-w-[280px]"
             >
-              {/* Ikona z gradientem */}
-              <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${template.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md`}>
-                <IconComponent size={26} className="text-white" />
+              {/* Desktop Layout */}
+              <div className="hidden md:block">
+                <div className={`w-14 h-14 flex-shrink-0 rounded-xl bg-gradient-to-br ${template.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                  <IconComponent size={26} className="text-white" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-1 text-sm">
+                  {template.name}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {template.description}
+                </p>
               </div>
 
-              {/* Nazwa szablonu */}
-              <h3 className="font-semibold text-gray-900 mb-1 text-sm">
-                {template.name}
-              </h3>
+              {/* Mobile Layout - ikonka po lewej, nazwa po prawej */}
+              <div className="md:hidden flex items-center gap-3">
+                <div className={`w-8 h-8 flex-shrink-0 rounded-lg bg-gradient-to-br ${template.gradient} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                  <IconComponent size={16} className="text-white" />
+                </div>
+                <h3 className="font-medium text-gray-900 text-xs leading-tight flex-1">
+                  {template.name}
+                </h3>
+              </div>
 
-              {/* Opis */}
-              <p className="text-xs text-gray-500">
-                {template.description}
-              </p>
-
-              {/* Hover arrow */}
-              <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+              {/* Hover arrow - tylko na desktop */}
+              <div className="hidden md:block absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Rocket size={18} className="text-green-600" />
               </div>
             </button>
