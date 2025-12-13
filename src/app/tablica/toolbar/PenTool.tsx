@@ -31,7 +31,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { clampLineWidth } from '../whiteboard/utils';
@@ -57,24 +57,29 @@ export function PenTool({
 }: PenToolProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
-  // 🆕 Handler dla wheel event - obsługuje zoom i pan
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!onViewportChange) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.ctrlKey) {
-      // Zoom
-      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
-      onViewportChange(constrainViewport(newViewport));
-    } else {
-      // Pan
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      onViewportChange(constrainViewport(newViewport));
-    }
-  };
+  // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !onViewportChange) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey) {
+        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        onViewportChange(constrainViewport(newViewport));
+      } else {
+        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        onViewportChange(constrainViewport(newViewport));
+      }
+    };
+
+    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleNativeWheel);
+  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
   // Mouse down - rozpocznij rysowanie
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -197,15 +202,9 @@ export function PenTool({
 
   return (
     <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      {/* Debug info */}
-      {isDrawing && currentPath && (
-        <div className="absolute top-4 left-4 bg-black/70 text-white text-xs p-2 rounded pointer-events-none z-50">
-          Rysowanie: {currentPath.points.length} punktów
-        </div>
-      )}
-      
-      {/* Overlay dla mouse events */}
+      {/* Overlay dla mouse events */
       <div
+        ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
         onMouseDown={handleMouseDown}
@@ -215,7 +214,6 @@ export function PenTool({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        onWheel={handleWheel}
       />
 
       {/* Preview path */}

@@ -17,6 +17,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { TextMiniToolbar } from './TextMiniToolbar';
+import { SelectionPropertiesPanel } from './SelectionPropertiesPanel';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -657,6 +658,41 @@ export function SelectTool({
     );
   };
 
+  // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek
+  const renderPropertiesPanel = () => {
+    if (selectedIds.size === 0 || !onElementUpdateWithHistory) return null;
+    
+    // Sprawdź czy są zaznaczone elementy typu shape lub path (nie text)
+    const selectedElements = elements.filter(el => selectedIds.has(el.id));
+    const hasEditableElements = selectedElements.some(
+      el => el.type === 'shape' || el.type === 'path'
+    );
+    
+    // Nie pokazuj jeśli zaznaczony jest tylko tekst
+    const onlyText = selectedElements.every(el => el.type === 'text');
+    if (!hasEditableElements || onlyText) return null;
+    
+    // Oblicz pozycję panelu - nad bounding box
+    const bbox = getSelectionBoundingBox();
+    if (!bbox) return null;
+    
+    const topCenter = transformPoint(
+      { x: bbox.x + bbox.width / 2, y: bbox.y },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
+    
+    return (
+      <SelectionPropertiesPanel
+        elements={elements}
+        selectedIds={selectedIds}
+        position={topCenter}
+        onElementUpdate={onElementUpdateWithHistory}
+      />
+    );
+  };
+
  return (
     <>
       {/* Invisible overlay for wheel events only */}
@@ -689,6 +725,7 @@ export function SelectTool({
       )}
 
       {renderTextToolbar()}
+      {renderPropertiesPanel()}
       {renderSelectionBox()}
     </>
   );

@@ -48,7 +48,9 @@ export function EraserTool({
 }: EraserToolProps) {
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState<Point | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const deletedDuringDrag = useRef<Set<string>>(new Set());
 
   // Wheel events dla pan/zoom
   useEffect(() => {
@@ -179,19 +181,39 @@ export function EraserTool({
     // Podświetl element pod kursorem
     const elementId = findElementUnderCursor(worldPoint);
     setHoveredElementId(elementId);
-  }, [viewport, canvasWidth, canvasHeight, findElementUnderCursor]);
+    
+    // Jeśli przeciągamy i jest element pod kursorem - usuń go
+    if (isDragging && elementId && !deletedDuringDrag.current.has(elementId)) {
+      deletedDuringDrag.current.add(elementId);
+      onElementDelete(elementId);
+    }
+  }, [viewport, canvasWidth, canvasHeight, findElementUnderCursor, isDragging, onElementDelete]);
 
   const handleMouseLeave = useCallback(() => {
     setHoveredElementId(null);
     setCursorPosition(null);
   }, []);
 
-  const handleClick = useCallback(() => {
+  const handleMouseDown = useCallback(() => {
+    setIsDragging(true);
+    deletedDuringDrag.current.clear();
+    
+    // Usuń element pod kursorem natychmiast przy kliknięciu
     if (hoveredElementId) {
+      deletedDuringDrag.current.add(hoveredElementId);
       onElementDelete(hoveredElementId);
       setHoveredElementId(null);
     }
   }, [hoveredElementId, onElementDelete]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    deletedDuringDrag.current.clear();
+  }, []);
+
+  const handleClick = useCallback(() => {
+    // Click jest już obsłużony przez mouseDown
+  }, []);
 
   // Renderuj highlight dla hovered element
   const renderHighlight = () => {
@@ -285,6 +307,8 @@ export function EraserTool({
         }}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onMouseDown={handleMouseDown}
+        onMouseUp={handleMouseUp}
         onClick={handleClick}
       />
 

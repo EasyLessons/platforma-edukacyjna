@@ -224,34 +224,34 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll }: S
       <div ref={containerRef} className="relative">
         {/* Search Button / Input */}
         {!isOpen ? (
-          <button
-            onClick={() => {
-              setIsOpen(true);
-              setTimeout(() => inputRef.current?.focus(), 50);
-            }}
-            className="flex items-center gap-3 px-6 py-4 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 transition-all duration-300 shadow-2xl hover:shadow-blue-200/50 hover:scale-[1.02]"
-            style={{ width: '500px', height: '64px' }}
-            title="Szukaj wzorów (Ctrl+K)"
-          >
-            <Search className="w-5 h-5 text-gray-400" />
-            <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
-            <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
-              Ctrl+K
-            </kbd>
+          <>
+            <button
+              onClick={() => {
+                setIsOpen(true);
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
+              className="flex items-center gap-3 px-6 py-4 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 transition-all duration-300 shadow-2xl hover:shadow-blue-200/50 hover:scale-[1.02]"
+              style={{ width: '500px', height: '64px' }}
+              title="Szukaj wzorów (Ctrl+K)"
+            >
+              <Search className="w-5 h-5 text-gray-400" />
+              <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
+              <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
+                Ctrl+K
+              </kbd>
+            </button>
             
-            {/* Separator + ikonka wzorów */}
-            <div className="w-px h-8 bg-gray-200/50 ml-2" />
-            <div className="relative group ml-2">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onBrowseAll?.();
-                }}
-                className="p-2 hover:bg-blue-50/80 rounded-xl transition-all duration-200 hover:scale-110"
-                title="Przeglądaj wszystkie wzory"
-              >
-                <Library className="w-5 h-5 text-blue-500" />
-              </button>
+            {/* Separator + ikonka wzorów - POZA głównym buttonem */}
+            <div className="absolute right-16 top-1/2 -translate-y-1/2 w-px h-8 bg-gray-200/50 pointer-events-none" />
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onBrowseAll?.();
+              }}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-blue-50/80 rounded-xl transition-all duration-200 hover:scale-110 group"
+              title="Przeglądaj wszystkie wzory"
+            >
+              <Library className="w-5 h-5 text-blue-500" />
               
               {/* Tooltip */}
               <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
@@ -260,8 +260,8 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll }: S
                   <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
                 </div>
               </div>
-            </div>
-          </button>
+            </button>
+          </>
         ) : (
           <div 
             className="flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-2xl px-6 transition-all duration-300 ease-out"

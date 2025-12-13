@@ -30,7 +30,7 @@ import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
-  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen
+  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -38,6 +38,7 @@ interface ToolbarUIProps {
   // Tool state
   tool: Tool;
   selectedShape: ShapeType;
+  polygonSides: number;
   
   // Properties state
   color: string;
@@ -55,6 +56,7 @@ interface ToolbarUIProps {
   // Handlers
   onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
+  onPolygonSidesChange: (sides: number) => void;
   onColorChange: (color: string) => void;
   onLineWidthChange: (width: number) => void;
   onFontSizeChange: (size: number) => void;
@@ -95,23 +97,24 @@ const ToolButton = ({
     disabled={disabled}
     title={title}
     className={`
-      relative p-2.5 rounded-lg transition-colors group
+      relative p-1.5 rounded-md transition-colors group
       ${active ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'}
       ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
     `}
   >
-    <Icon className="w-6 h-6" />
+    <Icon className="w-4 h-4" />
     <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
       {title}
     </span>
   </button>
 );
 
-const Divider = () => <div className="h-px w-7 bg-gray-200 my-1.5" />;
+const Divider = () => <div className="h-px w-6 bg-gray-200 my-1" />;
 
 export function ToolbarUI({
   tool,
   selectedShape,
+  polygonSides,
   color,
   lineWidth,
   fontSize,
@@ -121,6 +124,7 @@ export function ToolbarUI({
   hasSelection,
   onToolChange,
   onShapeChange,
+  onPolygonSidesChange,
   onColorChange,
   onLineWidthChange,
   onFontSizeChange,
@@ -146,6 +150,8 @@ export function ToolbarUI({
         return Minus;
       case 'arrow':
         return ArrowRight;
+      case 'polygon':
+        return Hexagon;
       default:
         return Square;
     }
@@ -155,12 +161,13 @@ export function ToolbarUI({
   // - select, pan: brak properties
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image' || tool === 'eraser';
+  // - eraser: brak właściwości do edycji
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
 
   return (
     <>
       {/* MOBILE: Hamburger Menu Button */}
-      <div className="md:hidden">
+      <div className="md:hidden pointer-events-auto">
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 hover:bg-gray-50 transition-colors"
@@ -171,7 +178,7 @@ export function ToolbarUI({
       </div>
 
       {/* DESKTOP: GŁÓWNY TOOLBAR - PIONOWY */}
-      <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200">
+      <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
         <div className="flex flex-col items-center gap-1.5 p-2">
           {/* Main Tools */}
           <ToolButton
@@ -508,24 +515,24 @@ export function ToolbarUI({
         </div>
       )}
 
-      {/* PROPERTIES PANEL - tylko desktop i tylko gdy hasProperties - obok toolbara */}
+      {/* PROPERTIES PANEL - tylko desktop i tylko gdy hasProperties - osobny blok obok toolbara */}
       {hasProperties && (
-        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-3 ml-2">
-          <div className="flex flex-col gap-3">
+        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-3 pointer-events-auto">
+          <div className="flex flex-col gap-2 min-w-[80px]">
             {/* PEN */}
             {tool === 'pen' && (
               <>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => onColorChange(e.target.value)}
-                    className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+                    className="w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
                   />
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
                   <input
                     type="range"
@@ -533,7 +540,7 @@ export function ToolbarUI({
                     max="20"
                     value={lineWidth}
                     onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
                   <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
                 </div>
@@ -549,63 +556,87 @@ export function ToolbarUI({
                   <div className="flex flex-col gap-1 bg-gray-100 rounded-lg p-1">
                     <button
                       onClick={() => onShapeChange('rectangle')}
-                      className={`p-2 rounded-lg transition-all ${
+                      className={`p-1.5 rounded-md transition-all ${
                         selectedShape === 'rectangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Prostokąt"
                     >
-                      <Square className="w-5 h-5" />
+                      <Square className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onShapeChange('circle')}
-                      className={`p-2 rounded-lg transition-all ${
+                      className={`p-1.5 rounded-md transition-all ${
                         selectedShape === 'circle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Koło"
                     >
-                      <Circle className="w-5 h-5" />
+                      <Circle className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onShapeChange('triangle')}
-                      className={`p-2 rounded-lg transition-all ${
+                      className={`p-1.5 rounded-md transition-all ${
                         selectedShape === 'triangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Trójkąt"
                     >
-                      <Triangle className="w-5 h-5" />
+                      <Triangle className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onShapeChange('polygon')}
+                      className={`p-1.5 rounded-md transition-all ${
+                        selectedShape === 'polygon' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                      }`}
+                      title={`Wielokąt (${polygonSides} boków)`}
+                    >
+                      <Hexagon className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onShapeChange('line')}
-                      className={`p-2 rounded-lg transition-all ${
+                      className={`p-1.5 rounded-md transition-all ${
                         selectedShape === 'line' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Linia"
                     >
-                      <Minus className="w-5 h-5" />
+                      <Minus className="w-4 h-4" />
                     </button>
                     <button
                       onClick={() => onShapeChange('arrow')}
-                      className={`p-2 rounded-lg transition-all ${
+                      className={`p-1.5 rounded-md transition-all ${
                         selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Strzałka"
                     >
-                      <ArrowRight className="w-5 h-5" />
+                      <ArrowRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2">
+                {/* Input na liczbę boków wielokąta */}
+                {selectedShape === 'polygon' && (
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Boki</label>
+                    <input
+                      type="number"
+                      min="3"
+                      max="20"
+                      value={polygonSides}
+                      onChange={(e) => onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))}
+                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    />
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
                   <input
                     type="color"
                     value={color}
                     onChange={(e) => onColorChange(e.target.value)}
-                    className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+                    className="w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
                   />
                 </div>
                 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
                   <input
                     type="range"
@@ -613,7 +644,7 @@ export function ToolbarUI({
                     max="20"
                     value={lineWidth}
                     onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="w-24 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                    className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                   />
                   <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
                 </div>
@@ -621,7 +652,7 @@ export function ToolbarUI({
                 {selectedShape !== 'line' && selectedShape !== 'arrow' && (
                   <button
                     onClick={() => onFillShapeChange(!fillShape)}
-                    className={`px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                    className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
                       fillShape ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
@@ -638,22 +669,22 @@ export function ToolbarUI({
             
             {/* 🖼️ IMAGE */}
             {tool === 'image' && (
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5">
                 <button
                   onClick={onImagePaste}
-                  className="flex items-center gap-2 px-3 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-2 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-xs"
                   title="Wklej obraz ze schowka (Ctrl+V)"
                 >
-                  <ClipboardIcon className="w-4 h-4" />
+                  <ClipboardIcon className="w-3.5 h-3.5" />
                   <span className="font-medium">Wklej</span>
                 </button>
 
                 <button
                   onClick={onImageUpload}
-                  className="flex items-center gap-2 px-3 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors text-sm"
+                  className="flex items-center gap-1.5 px-2 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-xs"
                   title="Wybierz plik z dysku"
                 >
-                  <Upload className="w-4 h-4" />
+                  <Upload className="w-3.5 h-3.5" />
                   <span className="font-medium">Upload</span>
                 </button>
               </div>
@@ -664,4 +695,3 @@ export function ToolbarUI({
     </>
   );
 }
-

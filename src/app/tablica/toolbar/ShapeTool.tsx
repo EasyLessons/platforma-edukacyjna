@@ -42,6 +42,7 @@ interface ShapeToolProps {
   canvasWidth: number;
   canvasHeight: number;
   selectedShape: ShapeType;
+  polygonSides?: number;
   color: string;
   lineWidth: number;
   fillShape: boolean;
@@ -54,6 +55,7 @@ export function ShapeTool({
   canvasWidth,
   canvasHeight,
   selectedShape,
+  polygonSides = 5,
   color,
   lineWidth,
   fillShape,
@@ -97,6 +99,7 @@ export function ShapeTool({
       color,
       strokeWidth: lineWidth,
       fill: fillShape,
+      sides: selectedShape === 'polygon' ? polygonSides : undefined,
     };
 
     setCurrentShape(newShape);
@@ -269,6 +272,33 @@ export function ShapeTool({
               fill={currentShape.color}
             />
           </>
+        );
+        break;
+      }
+
+      case 'polygon': {
+        // Generuj wierzchołki wielokąta
+        const sides = currentShape.sides || 6;
+        const polygonRadiusX = Math.abs(end.x - start.x) / 2;
+        const polygonRadiusY = Math.abs(end.y - start.y) / 2;
+        const polygonCenterX = (start.x + end.x) / 2;
+        const polygonCenterY = (start.y + end.y) / 2;
+        
+        const polygonPoints: string[] = [];
+        for (let i = 0; i < sides; i++) {
+          const polygonAngle = (i * 2 * Math.PI) / sides - Math.PI / 2;
+          const px = polygonCenterX + polygonRadiusX * Math.cos(polygonAngle);
+          const py = polygonCenterY + polygonRadiusY * Math.sin(polygonAngle);
+          polygonPoints.push(`${px},${py}`);
+        }
+        
+        shapeElement = (
+          <polygon
+            points={polygonPoints.join(' ')}
+            stroke={currentShape.color}
+            strokeWidth={currentShape.strokeWidth}
+            fill={currentShape.fill ? currentShape.color : 'none'}
+          />
         );
         break;
       }

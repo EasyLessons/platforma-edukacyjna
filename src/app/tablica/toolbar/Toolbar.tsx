@@ -36,7 +36,7 @@ import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
 export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser';
-export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow';
+export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';
 
 
 
@@ -45,6 +45,8 @@ interface ToolbarProps {
   setTool: (tool: Tool) => void;
   selectedShape: ShapeType;
   setSelectedShape: (shape: ShapeType) => void;
+  polygonSides: number;
+  setPolygonSides: (sides: number) => void;
   color: string;
   setColor: (color: string) => void;
   lineWidth: number;
@@ -75,6 +77,8 @@ function Toolbar({
   setTool,
   selectedShape,
   setSelectedShape,
+  polygonSides,
+  setPolygonSides,
   color,
   setColor,
   lineWidth,
@@ -102,10 +106,11 @@ function Toolbar({
   // FunctionTool sam tworzy funkcje i ma własny input
 
   return (
-    <div className="absolute top-20 left-4 z-50 pointer-events-auto flex flex-row items-start gap-2">
+    <div className="absolute top-28 left-4 z-50 pointer-events-none flex flex-row items-start gap-2">
       <ToolbarUI
         tool={tool}
         selectedShape={selectedShape}
+        polygonSides={polygonSides}
         color={color}
         lineWidth={lineWidth}
         fontSize={fontSize}
@@ -115,6 +120,7 @@ function Toolbar({
         hasSelection={hasSelection}
         onToolChange={setTool}
         onShapeChange={setSelectedShape}
+        onPolygonSidesChange={setPolygonSides}
         onColorChange={setColor}
         onLineWidthChange={setLineWidth}
         onFontSizeChange={setFontSize}
@@ -138,6 +144,7 @@ const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
   return (
     prevProps.tool === nextProps.tool &&
     prevProps.selectedShape === nextProps.selectedShape &&
+    prevProps.polygonSides === nextProps.polygonSides &&
     prevProps.color === nextProps.color &&
     prevProps.lineWidth === nextProps.lineWidth &&
     prevProps.fontSize === nextProps.fontSize &&

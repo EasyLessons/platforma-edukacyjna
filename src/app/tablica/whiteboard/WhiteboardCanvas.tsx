@@ -123,6 +123,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   // Drawing state
   const [tool, setTool] = useState<Tool>('select');
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
+  const [polygonSides, setPolygonSides] = useState(5); // Liczba boków dla wielokąta
   const [color, setColor] = useState('#000000');
   const [lineWidth, setLineWidth] = useState(3);
   const [fontSize, setFontSize] = useState(24);
@@ -521,13 +522,14 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [tool, selectedElementIds, broadcastElementDeleted]);
 
-  // Canvas setup (bez zmian)
+  // Canvas setup - z obsługą zoom przeglądarki
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
     if (!canvas || !container) return;
     
     let resizeTimeout: NodeJS.Timeout | null = null;
+    let lastDpr = window.devicePixelRatio || 1;
     
     const updateCanvasSize = () => {
       const dpr = window.devicePixelRatio || 1;
@@ -537,10 +539,11 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
       
       const currentWidth = canvas.width / dpr;
       const currentHeight = canvas.height / dpr;
-      if (Math.abs(width - currentWidth) < 2 && Math.abs(height - currentHeight) < 2) {
+      if (Math.abs(width - currentWidth) < 2 && Math.abs(height - currentHeight) < 2 && dpr === lastDpr) {
         return;
       }
       
+      lastDpr = dpr;
       canvas.width = width * dpr;
       canvas.height = height * dpr;
       canvas.style.width = `${width}px`;
@@ -563,6 +566,21 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     updateCanvasSize();
     window.addEventListener('resize', debouncedUpdateCanvasSize);
     
+    // Nasłuchuj na zmiany zoom przeglądarki (Ctrl +/-)
+    const mediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    const handleZoomChange = () => {
+      console.log('🔍 Zoom przeglądarki zmieniony, aktualizuję canvas...');
+      debouncedUpdateCanvasSize();
+    };
+    
+    // Nowoczesne API
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleZoomChange);
+    } else {
+      // Fallback dla starszych przeglądarek
+      mediaQuery.addListener(handleZoomChange);
+    }
+    
     const resizeObserver = new ResizeObserver(() => {
       debouncedUpdateCanvasSize();
     });
@@ -573,6 +591,13 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
         clearTimeout(resizeTimeout);
       }
       window.removeEventListener('resize', debouncedUpdateCanvasSize);
+      
+      if (mediaQuery.removeEventListener) {
+        mediaQuery.removeEventListener('change', handleZoomChange);
+      } else {
+        mediaQuery.removeListener(handleZoomChange);
+      }
+      
       resizeObserver.disconnect();
     };
   }, []);
@@ -1592,6 +1617,8 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           setTool={handleToolChange}
           selectedShape={selectedShape}
           setSelectedShape={handleShapeChange}
+          polygonSides={polygonSides}
+          setPolygonSides={setPolygonSides}
           color={color}
           setColor={handleColorChange}
           lineWidth={lineWidth}
@@ -1688,6 +1715,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             selectedShape={selectedShape}
+            polygonSides={polygonSides}
             color={color}
             lineWidth={lineWidth}
             fillShape={fillShape}

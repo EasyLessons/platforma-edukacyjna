@@ -53,7 +53,7 @@ export interface DrawingPath {
 export interface Shape {
   id: string;
   type: 'shape';
-  shapeType: 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow';
+  shapeType: 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';
   startX: number;
   startY: number;
   endX: number;
@@ -61,6 +61,7 @@ export interface Shape {
   color: string;
   strokeWidth: number;
   fill: boolean;
+  sides?: number; // Liczba boków dla polygon (3+)
 }
 
 export interface TextElement {

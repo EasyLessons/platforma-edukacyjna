@@ -170,6 +170,36 @@ export function drawShape(
       );
       ctx.stroke();
       break;
+    
+    case 'polygon':
+      // Wielokąt foremny z n bokami
+      const sides = shape.sides || 5; // domyślnie pięciokąt
+      const polyCenterX = (start.x + end.x) / 2;
+      const polyCenterY = (start.y + end.y) / 2;
+      const polyRadiusX = Math.abs(end.x - start.x) / 2;
+      const polyRadiusY = Math.abs(end.y - start.y) / 2;
+      
+      ctx.beginPath();
+      for (let i = 0; i < sides; i++) {
+        // Zaczynamy od góry (-90 stopni = -PI/2)
+        const polyAngle = (i * 2 * Math.PI / sides) - Math.PI / 2;
+        const px = polyCenterX + polyRadiusX * Math.cos(polyAngle);
+        const py = polyCenterY + polyRadiusY * Math.sin(polyAngle);
+        
+        if (i === 0) {
+          ctx.moveTo(px, py);
+        } else {
+          ctx.lineTo(px, py);
+        }
+      }
+      ctx.closePath();
+      
+      if (shape.fill) {
+        ctx.fill();
+      } else {
+        ctx.stroke();
+      }
+      break;
   }
 }
 
