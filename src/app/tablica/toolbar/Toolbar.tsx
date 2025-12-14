@@ -35,7 +35,7 @@ import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
-export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser';
+export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser' | 'markdown' | 'table' | 'calculator';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';
 
 
@@ -70,6 +70,12 @@ interface ToolbarProps {
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
+  // 🧮 Calculator toggle
+  isCalculatorOpen?: boolean;
+  onCalculatorToggle?: () => void;
+  // 🤖 Chatbot toggle
+  isChatbotOpen?: boolean;
+  onChatbotToggle?: () => void;
 }
 
 function Toolbar({
@@ -99,6 +105,10 @@ function Toolbar({
   onImport,
   onImagePaste,
   onImageUpload,
+  isCalculatorOpen,
+  onCalculatorToggle,
+  isChatbotOpen,
+  onChatbotToggle,
 }: ToolbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -135,6 +145,10 @@ function Toolbar({
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         onImagePaste={onImagePaste}
         onImageUpload={onImageUpload}
+        isCalculatorOpen={isCalculatorOpen}
+        onCalculatorToggle={onCalculatorToggle}
+        isChatbotOpen={isChatbotOpen}
+        onChatbotToggle={onChatbotToggle}
       />
     </div>
   );
@@ -151,7 +165,9 @@ const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
     prevProps.fillShape === nextProps.fillShape &&
     prevProps.canUndo === nextProps.canUndo &&
     prevProps.canRedo === nextProps.canRedo &&
-    prevProps.hasSelection === nextProps.hasSelection
+    prevProps.hasSelection === nextProps.hasSelection &&
+    prevProps.isCalculatorOpen === nextProps.isCalculatorOpen &&
+    prevProps.isChatbotOpen === nextProps.isChatbotOpen
   );
 };
 

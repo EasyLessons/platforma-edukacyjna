@@ -102,7 +102,38 @@ export interface ImageElement {
   alt?: string;
 }
 
-export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement;
+// 🆕 Notatka Markdown - dla chatbota i notatek użytkownika
+export interface MarkdownNote {
+  id: string;
+  type: 'markdown';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  content: string; // Treść w formacie Markdown
+  backgroundColor?: string; // Domyślnie biały
+  borderColor?: string; // Kolor ramki
+  isFromChatbot?: boolean; // Czy wygenerowane przez chatbota
+}
+
+// 🆕 Tabelka - edytowalna tabela
+export interface TableElement {
+  id: string;
+  type: 'table';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rows: number;
+  cols: number;
+  cells: string[][]; // Tablica 2D z treścią komórek
+  headerRow?: boolean; // Czy pierwszy wiersz to nagłówek
+  headerCol?: boolean; // Czy pierwsza kolumna to nagłówek
+  borderColor?: string;
+  headerBgColor?: string;
+}
+
+export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement | MarkdownNote | TableElement;
 
 export interface MomentumState {
   velocityX: number;

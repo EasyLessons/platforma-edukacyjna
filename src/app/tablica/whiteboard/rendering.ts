@@ -37,6 +37,8 @@ import {
   TextElement,
   FunctionPlot,
   ImageElement,
+  MarkdownNote,
+  TableElement,
   ViewportTransform
 } from './types';
 import { transformPoint } from './viewport';
@@ -562,5 +564,108 @@ export function drawElement(
     drawFunction(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'image' && loadedImages) {
     drawImage(ctx, element, viewport, canvasWidth, canvasHeight, loadedImages);
+  } else if (element.type === 'markdown') {
+    drawMarkdownNote(ctx, element, viewport, canvasWidth, canvasHeight);
+  } else if (element.type === 'table') {
+    drawTable(ctx, element, viewport, canvasWidth, canvasHeight);
+  }
+}
+
+/**
+ * Rysuje notatkę Markdown (prostokąt z ramką - treść renderowana przez React)
+ * Canvas rysuje tylko kontener, treść Markdown jest renderowana przez overlay
+ */
+export function drawMarkdownNote(
+  ctx: CanvasRenderingContext2D,
+  note: MarkdownNote,
+  viewport: ViewportTransform,
+  canvasWidth: number,
+  canvasHeight: number
+): void {
+  const topLeft = transformPoint({ x: note.x, y: note.y }, viewport, canvasWidth, canvasHeight);
+  const bottomRight = transformPoint(
+    { x: note.x + note.width, y: note.y + note.height },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
+  
+  const screenWidth = bottomRight.x - topLeft.x;
+  const screenHeight = bottomRight.y - topLeft.y;
+  
+  // Tło
+  ctx.fillStyle = note.backgroundColor || '#ffffff';
+  ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  
+  // Ramka
+  ctx.strokeStyle = note.borderColor || '#e5e7eb';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  
+  // Ikona notatki w rogu (opcjonalnie)
+  if (note.isFromChatbot) {
+    ctx.fillStyle = '#3b82f6';
+    ctx.beginPath();
+    ctx.arc(topLeft.x + 12, topLeft.y + 12, 6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+/**
+ * Rysuje tabelę (linie siatki - treść komórek renderowana przez React overlay)
+ */
+export function drawTable(
+  ctx: CanvasRenderingContext2D,
+  table: TableElement,
+  viewport: ViewportTransform,
+  canvasWidth: number,
+  canvasHeight: number
+): void {
+  const topLeft = transformPoint({ x: table.x, y: table.y }, viewport, canvasWidth, canvasHeight);
+  const bottomRight = transformPoint(
+    { x: table.x + table.width, y: table.y + table.height },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
+  
+  const screenWidth = bottomRight.x - topLeft.x;
+  const screenHeight = bottomRight.y - topLeft.y;
+  const cellWidth = screenWidth / table.cols;
+  const cellHeight = screenHeight / table.rows;
+  
+  // Tło całej tabeli
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  
+  // Tło nagłówka
+  if (table.headerRow) {
+    ctx.fillStyle = table.headerBgColor || '#f3f4f6';
+    ctx.fillRect(topLeft.x, topLeft.y, screenWidth, cellHeight);
+  }
+  
+  // Linie siatki
+  ctx.strokeStyle = table.borderColor || '#d1d5db';
+  ctx.lineWidth = 1;
+  
+  // Zewnętrzna ramka
+  ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  
+  // Linie poziome
+  for (let r = 1; r < table.rows; r++) {
+    const y = topLeft.y + r * cellHeight;
+    ctx.beginPath();
+    ctx.moveTo(topLeft.x, y);
+    ctx.lineTo(topLeft.x + screenWidth, y);
+    ctx.stroke();
+  }
+  
+  // Linie pionowe
+  for (let c = 1; c < table.cols; c++) {
+    const x = topLeft.x + c * cellWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, topLeft.y);
+    ctx.lineTo(x, topLeft.y + screenHeight);
+    ctx.stroke();
   }
 }

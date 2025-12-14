@@ -34,6 +34,10 @@ import { PanTool } from '../toolbar/PanTool';
 import { FunctionTool } from '../toolbar/FunctionTool';
 import { ImageTool, ImageToolRef } from '../toolbar/ImageTool';
 import { EraserTool } from '../toolbar/EraserTool';
+import { MarkdownNoteTool, MarkdownNoteView } from '../toolbar/MarkdownNoteTool';
+import { TableTool, TableView } from '../toolbar/TableTool';
+import { CalculatorTool } from '../toolbar/CalculatorTool';
+import { MathChatbot } from '../toolbar/MathChatbot';
 import { OnlineUsers } from './OnlineUsers';
 import { RemoteCursors } from './RemoteCursors';
 
@@ -55,6 +59,8 @@ import {
   TextElement,
   FunctionPlot,
   ImageElement,
+  MarkdownNote,
+  TableElement,
   MomentumState 
 } from './types';
 
@@ -64,6 +70,7 @@ import {
   zoomViewport,
   constrainViewport,
   inverseTransformPoint,
+  transformPoint,
   updateMomentum,   
   startMomentum,     
   stopMomentum     
@@ -129,12 +136,17 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const [fontSize, setFontSize] = useState(24);
   const [fillShape, setFillShape] = useState(false);
   
-
+  // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+  
+  // 🤖 CHATBOT - osobny state (zawsze aktywny po włączeniu)
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
   const [debugMode, setDebugMode] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   
@@ -602,7 +614,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     };
   }, []);
   
-  // Wheel/Touchpad handling (bez zmian)
+  // Wheel/Touchpad handling - NAPRAWIONE: używamy ref zamiast viewport w dependencies
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -616,18 +628,21 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
       const width = rect.width;
       const height = rect.height;
       
+      // NAPRAWIONE: używamy viewportRef.current zamiast viewport z closure
+      const currentViewport = viewportRef.current;
+      
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, mouseX, mouseY, width, height);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [viewport]);
+  }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
@@ -646,25 +661,49 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     });
   }, []);
 
-  // Redraw canvas (bez zmian)
+  // Redraw canvas - ZOPTYMALIZOWANE z requestAnimationFrame
+  const rafIdRef = useRef<number | null>(null);
+  
   const redrawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+    // Anuluj poprzedni zaplanowany frame
+    if (rafIdRef.current !== null) {
+      cancelAnimationFrame(rafIdRef.current);
+    }
     
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const width = canvas.width / (window.devicePixelRatio || 1);
-    const height = canvas.height / (window.devicePixelRatio || 1);
-    
-    ctx.clearRect(0, 0, width, height);
-    drawGrid(ctx, viewport, width, height);
-    
-    elements.forEach(element => {
-      if (element.id === editingTextId) return;
-      drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
+    rafIdRef.current = requestAnimationFrame(() => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      
+      const dpr = window.devicePixelRatio || 1;
+      const width = canvas.width / dpr;
+      const height = canvas.height / dpr;
+      
+      // Reset transform i ustaw nową skalę DPR
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, width, height);
+      
+      drawGrid(ctx, viewport, width, height);
+      
+      elements.forEach(element => {
+        if (element.id === editingTextId) return;
+        drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
+      });
+      
+      rafIdRef.current = null;
     });
   }, [elements, viewport, editingTextId, debugMode, handleAutoExpand, loadedImages]);
+  
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
@@ -955,6 +994,109 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
       };
     }
   }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  // 🆕 MARKDOWN NOTE - tworzenie notatki
+  const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
+    const newElements = [...elements, note];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    broadcastElementCreated(note);
+    setUnsavedElements(prev => new Set(prev).add(note.id));
+    if (boardIdState) debouncedSave(boardIdState);
+    
+    // Po utworzeniu przełącz na select i od razu włącz edycję
+    setTool('select');
+    setSelectedElementIds(new Set([note.id]));
+    setEditingMarkdownId(note.id);
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
+  const handleChatbotAddToBoard = useCallback((content: string) => {
+    // Tworzymy notatkę w centrum widocznego obszaru
+    const newNote: MarkdownNote = {
+      id: `chatbot-note-${Date.now()}`,
+      type: 'markdown',
+      x: viewport.x - 2, // Na lewo od środka (notatka szeroka)
+      y: viewport.y - 1.5, // Wyżej od środka
+      width: 4, // 4 jednostki szerokości
+      height: 3, // 3 jednostki wysokości
+      content: content,
+      backgroundColor: '#f0f9ff', // Jasnoniebieski - wyróżnia się jako od AI
+      borderColor: '#3b82f6', // Niebieski border
+      isFromChatbot: true,
+    };
+    
+    const newElements = [...elements, newNote];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    broadcastElementCreated(newNote);
+    setUnsavedElements(prev => new Set(prev).add(newNote.id));
+    if (boardIdState) debouncedSave(boardIdState);
+    
+    // Przełącz na select i zaznacz notatkę
+    setTool('select');
+    setSelectedElementIds(new Set([newNote.id]));
+  }, [elements, viewport, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  // 🆕 TABLE - tworzenie tabeli
+  const handleTableCreate = useCallback((table: TableElement) => {
+    const newElements = [...elements, table];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    broadcastElementCreated(table);
+    setUnsavedElements(prev => new Set(prev).add(table.id));
+    if (boardIdState) debouncedSave(boardIdState);
+    
+    // Po utworzeniu przełącz na select żeby można było edytować
+    setTool('select');
+    setSelectedElementIds(new Set([table.id]));
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  // 🆕 TABLE - zmiana komórki tabeli
+  const handleTableCellChange = useCallback((tableId: string, row: number, col: number, value: string) => {
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === tableId && el.type === 'table') {
+          const table = el as TableElement;
+          const newCells = table.cells.map((r, ri) => 
+            ri === row ? r.map((c, ci) => ci === col ? value : c) : [...r]
+          );
+          return { ...table, cells: newCells };
+        }
+        return el;
+      });
+      
+      // Zapisz do historii
+      saveToHistory(newElements);
+      
+      // Oznacz jako niezapisane
+      setUnsavedElements(prevSet => new Set(prevSet).add(tableId));
+      if (boardIdState) debouncedSave(boardIdState);
+      
+      return newElements;
+    });
+  }, [saveToHistory, boardIdState, debouncedSave]);
+
+  // 🆕 MARKDOWN - zmiana treści notatki
+  const handleMarkdownContentChange = useCallback((noteId: string, content: string) => {
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === noteId && el.type === 'markdown') {
+          return { ...el, content };
+        }
+        return el;
+      });
+      
+      saveToHistory(newElements);
+      setUnsavedElements(prevSet => new Set(prevSet).add(noteId));
+      if (boardIdState) debouncedSave(boardIdState);
+      
+      return newElements;
+    });
+  }, [saveToHistory, boardIdState, debouncedSave]);
 
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
@@ -1639,6 +1781,10 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           onImport={handleImport}
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
+          isCalculatorOpen={isCalculatorOpen}
+          onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
+          isChatbotOpen={isChatbotOpen}
+          onChatbotToggle={() => setIsChatbotOpen(!isChatbotOpen)}
         />
         
         {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
@@ -1693,6 +1839,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             onElementsUpdate={handleElementsUpdate}
             onOperationFinish={handleSelectionFinish}
             onTextEdit={handleTextEdit}
+            onMarkdownEdit={(id) => setEditingMarkdownId(id)}
             onViewportChange={handleViewportChange}
           />
         )}
@@ -1768,6 +1915,137 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             onViewportChange={handleViewportChange}
           />
         )}
+
+        {tool === 'markdown' && canvasWidth > 0 && (
+          <MarkdownNoteTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onNoteCreate={handleMarkdownNoteCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'table' && canvasWidth > 0 && (
+          <TableTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onTableCreate={handleTableCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* 🧮 KALKULATOR - zawsze dostępny gdy isCalculatorOpen */}
+        {isCalculatorOpen && (
+          <CalculatorTool
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onViewportChange={handleViewportChange}
+            onClose={() => setIsCalculatorOpen(false)}
+          />
+        )}
+
+        {/* 🤖 MATH CHATBOT - zawsze dostępny gdy isChatbotOpen */}
+        {isChatbotOpen && (
+          <MathChatbot
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onClose={() => setIsChatbotOpen(false)}
+            onAddToBoard={handleChatbotAddToBoard}
+          />
+        )}
+
+        {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}
+        {elements.filter(el => el.type === 'markdown').map(el => {
+          const note = el as MarkdownNote;
+          const topLeft = transformPoint({ x: note.x, y: note.y }, viewport, canvasWidth, canvasHeight);
+          const bottomRight = transformPoint(
+            { x: note.x + note.width, y: note.y + note.height },
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+          const screenWidth = bottomRight.x - topLeft.x;
+          const screenHeight = bottomRight.y - topLeft.y;
+          
+          // Nie renderuj jeśli poza ekranem lub za małe
+          if (screenWidth < 30 || screenHeight < 30) return null;
+          if (topLeft.x + screenWidth < 0 || topLeft.x > canvasWidth) return null;
+          if (topLeft.y + screenHeight < 0 || topLeft.y > canvasHeight) return null;
+          
+          const isSelected = selectedElementIds.has(note.id);
+          const isBeingEdited = editingMarkdownId === note.id;
+          
+          return (
+            <div
+              key={note.id}
+              className="absolute overflow-hidden rounded-lg shadow-md border"
+              style={{
+                left: topLeft.x,
+                top: topLeft.y,
+                width: screenWidth,
+                height: screenHeight,
+                backgroundColor: note.backgroundColor || '#fffde7',
+                borderColor: note.borderColor || '#fbc02d',
+                pointerEvents: isBeingEdited ? 'auto' : 'none',
+                zIndex: isBeingEdited ? 50 : 10,
+              }}
+            >
+              <MarkdownNoteView
+                note={note}
+                isEditing={editingMarkdownId === note.id}
+                onContentChange={(content) => handleMarkdownContentChange(note.id, content)}
+                onEditStart={() => setEditingMarkdownId(note.id)}
+                onEditEnd={() => setEditingMarkdownId(null)}
+                scale={viewport.scale}
+              />
+            </div>
+          );
+        })}
+
+        {/* 🆕 INTERACTIVE TABLE OVERLAYS - Nakładki dla edycji tabel */}
+        {elements.filter(el => el.type === 'table').map(el => {
+          const table = el as TableElement;
+          const topLeft = transformPoint({ x: table.x, y: table.y }, viewport, canvasWidth, canvasHeight);
+          const bottomRight = transformPoint(
+            { x: table.x + table.width, y: table.y + table.height },
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+          const screenWidth = bottomRight.x - topLeft.x;
+          const screenHeight = bottomRight.y - topLeft.y;
+          
+          // Nie renderuj jeśli poza ekranem lub za małe
+          if (screenWidth < 20 || screenHeight < 20) return null;
+          if (topLeft.x + screenWidth < 0 || topLeft.x > canvasWidth) return null;
+          if (topLeft.y + screenHeight < 0 || topLeft.y > canvasHeight) return null;
+          
+          const isSelected = selectedElementIds.has(table.id);
+          
+          return (
+            <div
+              key={table.id}
+              className="absolute overflow-hidden"
+              style={{
+                left: topLeft.x,
+                top: topLeft.y,
+                width: screenWidth,
+                height: screenHeight,
+                pointerEvents: isSelected ? 'auto' : 'none',
+                zIndex: isSelected ? 35 : 10,
+              }}
+            >
+              <TableView
+                table={table}
+                onCellChange={(row, col, value) => handleTableCellChange(table.id, row, col, value)}
+                scale={viewport.scale}
+              />
+            </div>
+          );
+        })}
         
         <canvas
           ref={canvasRef}

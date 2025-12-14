@@ -30,7 +30,8 @@ import React from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
-  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon
+  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon,
+  StickyNote, Table, Calculator, MessageCircle
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -45,6 +46,14 @@ interface ToolbarUIProps {
   lineWidth: number;
   fontSize: number;
   fillShape: boolean;
+  
+  // 🆕 Kalkulator state
+  isCalculatorOpen?: boolean;
+  onCalculatorToggle?: () => void;
+  
+  // 🤖 Chatbot state
+  isChatbotOpen?: boolean;
+  onChatbotToggle?: () => void;
   
   // History state
   canUndo: boolean;
@@ -139,6 +148,10 @@ export function ToolbarUI({
   setIsMobileMenuOpen,
   onImagePaste,
   onImageUpload,
+  isCalculatorOpen,
+  onCalculatorToggle,
+  isChatbotOpen,
+  onChatbotToggle,
 }: ToolbarUIProps) {
   const getShapeIcon = () => {
     switch (selectedShape) {
@@ -180,6 +193,29 @@ export function ToolbarUI({
       {/* DESKTOP: GŁÓWNY TOOLBAR - PIONOWY */}
       <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
         <div className="flex flex-col items-center gap-1.5 p-2">
+          
+          {/* 🤖 AI CHATBOT - wyróżniony przycisk na górze */}
+          <button
+            onClick={() => onChatbotToggle?.()}
+            title="Math Tutor - AI Asystent Matematyczny"
+            className={`
+              relative w-full p-2 rounded-lg transition-all group mb-1
+              ${isChatbotOpen 
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
+                : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:shadow-md'}
+            `}
+          >
+            <div className="flex items-center justify-center gap-1.5">
+              <MessageCircle className="w-4 h-4" />
+              <span className="text-xs font-semibold">AI</span>
+            </div>
+            <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              Math Tutor AI
+            </span>
+          </button>
+          
+          <Divider />
+          
           {/* Main Tools */}
           <ToolButton
             icon={MousePointer2}
@@ -228,6 +264,28 @@ export function ToolbarUI({
             active={tool === 'eraser'}
             onClick={() => onToolChange('eraser')}
             title="Gumka (E)"
+          />
+
+          <Divider />
+
+          {/* Nowe narzędzia */}
+          <ToolButton
+            icon={StickyNote}
+            active={tool === 'markdown'}
+            onClick={() => onToolChange('markdown')}
+            title="Notatka Markdown (M)"
+          />
+          <ToolButton
+            icon={Table}
+            active={tool === 'table'}
+            onClick={() => onToolChange('table')}
+            title="Tabelka"
+          />
+          <ToolButton
+            icon={Calculator}
+            active={isCalculatorOpen}
+            onClick={() => onCalculatorToggle?.()}
+            title="Kalkulator (zawsze dostępny)"
           />
 
           <Divider />
@@ -621,7 +679,7 @@ export function ToolbarUI({
                       max="20"
                       value={polygonSides}
                       onChange={(e) => onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))}
-                      className="w-14 px-2 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      className="w-14 px-2 py-1 text-sm text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
                   </div>
                 )}

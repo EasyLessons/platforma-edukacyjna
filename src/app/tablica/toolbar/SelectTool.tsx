@@ -31,6 +31,7 @@ interface SelectToolProps {
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
   onOperationFinish?: () => void;
   onTextEdit?: (id: string) => void;
+  onMarkdownEdit?: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
 }
 
@@ -60,6 +61,7 @@ export function SelectTool({
   onElementsUpdate,
   onOperationFinish,
   onTextEdit,
+  onMarkdownEdit,
   onViewportChange,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
@@ -219,6 +221,19 @@ export function SelectTool({
             }));
 
             updates.set(id, { points: newPoints });
+          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+            // 🆕 Resize dla markdown i table
+            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
+            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
+            const newWidth = originalEl.width * scaleX;
+            const newHeight = originalEl.height * scaleY;
+
+            updates.set(id, {
+              x: newX,
+              y: newY,
+              width: Math.max(MIN_SIZE, newWidth),
+              height: Math.max(MIN_SIZE, newHeight),
+            });
           }
         });
 
@@ -249,6 +264,12 @@ export function SelectTool({
               y: originalEl.y + dy,
             });
           } else if (originalEl.type === 'image') {
+            updates.set(id, {
+              x: originalEl.x + dx,
+              y: originalEl.y + dy,
+            });
+          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+            // 🆕 Drag dla markdown i table
             updates.set(id, {
               x: originalEl.x + dx,
               y: originalEl.y + dy,
@@ -322,8 +343,19 @@ export function SelectTool({
         minY = Math.min(minY, el.y);
         maxX = Math.max(maxX, el.x + el.width);
         maxY = Math.max(maxY, el.y + el.height);
+      } else if (el.type === 'markdown' || el.type === 'table') {
+        // 🆕 Obsługa markdown i table - mają x, y, width, height
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.width);
+        maxY = Math.max(maxY, el.y + el.height);
       }
     });
+
+    // 🛡️ Walidacja - jeśli nie znaleziono żadnych współrzędnych
+    if (!isFinite(minX) || !isFinite(minY) || !isFinite(maxX) || !isFinite(maxY)) {
+      return null;
+    }
 
     return {
       x: minX,
@@ -376,6 +408,14 @@ export function SelectTool({
         worldPoint.y >= minY &&
         worldPoint.y <= maxY
       );
+    } else if (element.type === 'markdown' || element.type === 'table') {
+      // 🆕 Obsługa markdown i table - mają x, y, width, height
+      return (
+        worldPoint.x >= element.x &&
+        worldPoint.x <= element.x + element.width &&
+        worldPoint.y >= element.y &&
+        worldPoint.y <= element.y + element.height
+      );
     }
 
     return false;
@@ -420,8 +460,6 @@ export function SelectTool({
   };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
-    if (!onTextEdit) return;
-    
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -429,7 +467,13 @@ export function SelectTool({
       const el = elements[i];
       
       if (el.type === 'text' && isPointInElement(worldPoint, el)) {
-        onTextEdit(el.id);
+        if (onTextEdit) onTextEdit(el.id);
+        return;
+      }
+      
+      // 🆕 Obsługa doubleClick dla markdown
+      if (el.type === 'markdown' && isPointInElement(worldPoint, el)) {
+        if (onMarkdownEdit) onMarkdownEdit(el.id);
         return;
       }
     }
@@ -547,6 +591,14 @@ export function SelectTool({
             (p: Point) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
           );
           if (allInside) {
+            newSelection.add(el.id);
+          }
+        } else if (el.type === 'markdown' || el.type === 'table') {
+          // 🆕 Area selection dla markdown i table
+          const elMaxX = el.x + el.width;
+          const elMaxY = el.y + el.height;
+
+          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
             newSelection.add(el.id);
           }
         }
