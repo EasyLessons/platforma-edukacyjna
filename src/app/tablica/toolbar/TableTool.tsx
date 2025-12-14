@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, TableElement } from '../whiteboard/types';
 import { inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { Plus, Minus } from 'lucide-react';
@@ -36,8 +36,14 @@ export function TableTool({
   const [cols, setCols] = useState(3);
   const [headerRow, setHeaderRow] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // Ref do viewport żeby uniknąć re-subscribe wheel listenera
+  const viewportRef = useRef(viewport);
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
 
-  // Wheel events dla pan/zoom
+  // Wheel events dla pan/zoom - używa viewportRef
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay || !onViewportChange) return;
@@ -46,19 +52,21 @@ export function TableTool({
       if (showConfig) return; // Nie obsługuj scroll gdy jest popup
       e.preventDefault();
       e.stopPropagation();
+      
+      const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
         onViewportChange(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
     };
 
     overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
     return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange, showConfig]);
+  }, [canvasWidth, canvasHeight, onViewportChange, showConfig]);
 
   const handleClick = (e: React.MouseEvent) => {
     if (showConfig) {
@@ -221,14 +229,14 @@ export function TableTool({
   );
 }
 
-// 🆕 Komponent do wyświetlania i edycji tabeli (używany w renderowaniu)
+// Komponent do wyświetlania i edycji tabeli (używany w renderowaniu)
+// MEMOIZOWANY - nie re-renderuje się gdy zmienia się tylko viewport
 interface TableViewProps {
   table: TableElement;
   onCellChange: (row: number, col: number, value: string) => void;
-  scale: number; // viewport scale - już nie używamy do skalowania tekstu
 }
 
-export function TableView({ table, onCellChange, scale }: TableViewProps) {
+export const TableView = memo(function TableView({ table, onCellChange }: TableViewProps) {
   const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -270,12 +278,8 @@ export function TableView({ table, onCellChange, scale }: TableViewProps) {
     }
   };
 
-  // 🆕 Skalowanie tekstu względem rozmiaru tabeli (nie viewport!)
-  // Bazowa wielkość tabeli to 2x1 jednostki (domyślna przy kliknięciu)
-  // Tekst bazowy: 14px przy width=2
-  const baseWidth = 2;
-  const textScale = table.width / baseWidth;
-  const fontSize = Math.max(10, Math.min(28, 14 * textScale));
+  // Stały rozmiar czcionki - bez dynamicznego skalowania dla lepszej wydajności
+  const fontSize = 14;
 
   return (
     <table
@@ -295,7 +299,10 @@ export function TableView({ table, onCellChange, scale }: TableViewProps) {
               <td
                 key={colIndex}
                 className="border px-2 py-1 cursor-pointer"
-                style={{ borderColor: table.borderColor || '#d1d5db' }}
+                style={{ 
+                  borderColor: table.borderColor || '#d1d5db',
+                  wordBreak: 'break-word',
+                }}
                 onDoubleClick={() => handleCellClick(rowIndex, colIndex)}
               >
                 {editingCell?.row === rowIndex && editingCell?.col === colIndex ? (
@@ -306,11 +313,11 @@ export function TableView({ table, onCellChange, scale }: TableViewProps) {
                     onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
                     onBlur={handleCellBlur}
                     onKeyDown={handleKeyDown}
-                    className="w-full border-none outline-none bg-blue-50 px-1"
+                    className="w-full border-none outline-none bg-blue-50 px-1 text-black"
                     style={{ fontSize }}
                   />
                 ) : (
-                  <span className="block min-h-[1.2em]">{cell || '\u00A0'}</span>
+                  <span className="block min-h-[1.2em] text-black" style={{ wordBreak: 'break-word' }}>{cell || '\u00A0'}</span>
                 )}
               </td>
             ))}
@@ -319,4 +326,11 @@ export function TableView({ table, onCellChange, scale }: TableViewProps) {
       </tbody>
     </table>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison - re-render only when table data changes
+  return (
+    prevProps.table.id === nextProps.table.id &&
+    prevProps.table.cells === nextProps.table.cells &&
+    prevProps.table.headerRow === nextProps.table.headerRow
+  );
+});

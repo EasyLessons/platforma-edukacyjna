@@ -36,7 +36,7 @@ import rehypeKatex from 'rehype-katex';
 // ==========================================
 // 📝 TYPY
 // ==========================================
-interface Message {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
@@ -48,7 +48,9 @@ interface MathChatbotProps {
   canvasHeight: number;
   onClose: () => void;
   boardContext?: string;
-  onAddToBoard?: (content: string) => void; // 🆕 Callback do dodania odpowiedzi na tablicę
+  onAddToBoard?: (content: string) => void;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
 // ==========================================
@@ -69,23 +71,9 @@ export function MathChatbot({
   onClose,
   boardContext,
   onAddToBoard,
+  messages,
+  setMessages,
 }: MathChatbotProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      content: `Cześć! 👋 Jestem **Math Tutor**!
-
-Mogę Ci pomóc z:
-• 📐 Rozwiązywaniem zadań
-• 💡 Podpowiedziami  
-• ✅ Sprawdzaniem rozwiązań
-• 📚 Wyjaśnianiem wzorów
-
-Zadaj pytanie! 🤔`,
-      timestamp: new Date(),
-    }
-  ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -107,7 +95,7 @@ Zadaj pytanie! 🤔`,
     const messageText = customMessage || input.trim();
     if (!messageText || isLoading) return;
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: messageText,
@@ -130,7 +118,7 @@ Zadaj pytanie! 🤔`,
 
       const data = await response.json();
 
-      const assistantMessage: Message = {
+      const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: response.ok 

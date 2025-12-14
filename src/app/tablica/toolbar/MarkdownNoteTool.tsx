@@ -10,7 +10,7 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
 import { Point, ViewportTransform, MarkdownNote } from '../whiteboard/types';
 import { inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import ReactMarkdown from 'react-markdown';
@@ -37,8 +37,14 @@ export function MarkdownNoteTool({
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // Ref do viewport żeby uniknąć re-subscribe wheel listenera
+  const viewportRef = useRef(viewport);
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
 
-  // Wheel events dla pan/zoom
+  // Wheel events dla pan/zoom - używa viewportRef
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay || !onViewportChange) return;
@@ -46,19 +52,21 @@ export function MarkdownNoteTool({
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
         onViewportChange(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
     };
 
     overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
     return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  }, [canvasWidth, canvasHeight, onViewportChange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     const screenPoint = { x: e.clientX, y: e.clientY };
@@ -88,35 +96,26 @@ export function MarkdownNoteTool({
     const width = Math.abs(currentPoint.x - startPoint.x);
     const height = Math.abs(currentPoint.y - startPoint.y);
 
-    // Minimalna wielkość
+    // Minimalna wielkość - jeśli za mały, nie twórz (wymaga przeciągnięcia)
     if (width < 0.3 || height < 0.2) {
-      // Jeśli za mały, utwórz z domyślnym małym rozmiarem
-      const newNote: MarkdownNote = {
-        id: Date.now().toString(),
-        type: 'markdown',
-        x: startPoint.x,
-        y: startPoint.y,
-        width: 1.5,
-        height: 1,
-        content: '',
-        backgroundColor: '#ffffff',
-        borderColor: '#e5e7eb',
-      };
-      onNoteCreate(newNote);
-    } else {
-      const newNote: MarkdownNote = {
-        id: Date.now().toString(),
-        type: 'markdown',
-        x: minX,
-        y: minY,
-        width,
-        height,
-        content: '',
-        backgroundColor: '#ffffff',
-        borderColor: '#e5e7eb',
-      };
-      onNoteCreate(newNote);
+      setIsCreating(false);
+      setStartPoint(null);
+      setCurrentPoint(null);
+      return;
     }
+
+    const newNote: MarkdownNote = {
+      id: Date.now().toString(),
+      type: 'markdown',
+      x: minX,
+      y: minY,
+      width,
+      height,
+      content: '',
+      backgroundColor: '#ffffff',
+      borderColor: '#e5e7eb',
+    };
+    onNoteCreate(newNote);
 
     setIsCreating(false);
     setStartPoint(null);
@@ -146,18 +145,14 @@ export function MarkdownNoteTool({
 
     return (
       <div
-        className="absolute pointer-events-none border-2 border-dashed border-blue-500 bg-blue-50/30 rounded-lg"
+        className="absolute pointer-events-none border-2 border-dashed border-blue-500 bg-blue-50/30 rounded-lg z-40"
         style={{
           left: screenX,
           top: screenY,
           width: Math.max(0, screenWidth),
           height: Math.max(0, screenHeight),
         }}
-      >
-        <div className="absolute top-2 left-2 text-xs text-blue-600 font-medium">
-          Notatka Markdown
-        </div>
-      </div>
+      />
     );
   };
 
@@ -177,26 +172,29 @@ export function MarkdownNoteTool({
   );
 }
 
-// 🆕 Komponent do wyświetlania i edycji notatki Markdown (używany w renderowaniu)
+// Komponent do wyświetlania i edycji notatki Markdown (używany w renderowaniu)
+// MEMOIZOWANY - nie re-renderuje się gdy zmienia się tylko viewport
 interface MarkdownNoteViewProps {
   note: MarkdownNote;
   isEditing: boolean;
   onContentChange: (content: string) => void;
   onEditStart: () => void;
   onEditEnd: () => void;
-  scale: number; // viewport scale - już nie używamy do skalowania tekstu
+  onHeightChange?: (newHeight: number) => void; // Callback gdy treść wymaga więcej miejsca
 }
 
-export function MarkdownNoteView({
+export const MarkdownNoteView = memo(function MarkdownNoteView({
   note,
   isEditing,
   onContentChange,
   onEditStart,
   onEditEnd,
-  scale,
+  onHeightChange,
 }: MarkdownNoteViewProps) {
   const [editContent, setEditContent] = useState(note.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const lastReportedHeightRef = useRef<number>(0); // Zapobiegamy wielokrotnym wywołaniom
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
@@ -207,6 +205,40 @@ export function MarkdownNoteView({
   useEffect(() => {
     setEditContent(note.content);
   }, [note.content]);
+
+  // Mierz wysokość treści po renderze i rozszerz notatkę jeśli potrzeba
+  // TYLKO gdy zmienia się content - nie containerHeight!
+  useLayoutEffect(() => {
+    if (!isEditing && contentRef.current && onHeightChange) {
+      // Daj moment na render ReactMarkdown i KaTeX
+      const timer = setTimeout(() => {
+        if (contentRef.current) {
+          const contentHeight = contentRef.current.scrollHeight;
+          // Wywołuj tylko jeśli wysokość ZNACZNIE się zmieniła (>20px różnicy)
+          // i nie jest taka sama jak ostatnio zgłoszona
+          if (Math.abs(contentHeight - lastReportedHeightRef.current) > 20) {
+            lastReportedHeightRef.current = contentHeight;
+            onHeightChange(contentHeight);
+          }
+        }
+      }, 100); // Dłuższy delay żeby KaTeX się wyrenderował
+      return () => clearTimeout(timer);
+    }
+  }, [note.content, isEditing, onHeightChange]); // BEZ containerHeight!
+
+  // Auto-resize textarea podczas edycji
+  useEffect(() => {
+    if (isEditing && textareaRef.current && onHeightChange) {
+      const textarea = textareaRef.current;
+      textarea.style.height = 'auto';
+      const scrollHeight = textarea.scrollHeight;
+      // Wywołuj tylko jeśli znaczna różnica
+      if (Math.abs(scrollHeight - lastReportedHeightRef.current) > 20) {
+        lastReportedHeightRef.current = scrollHeight;
+        onHeightChange(scrollHeight);
+      }
+    }
+  }, [editContent, isEditing, onHeightChange]);
 
   const handleBlur = () => {
     onContentChange(editContent);
@@ -220,13 +252,8 @@ export function MarkdownNoteView({
     }
   };
 
-  // 🆕 Skalowanie tekstu względem rozmiaru notatki (nie viewport!)
-  // Bazowa wielkość notatki to 1.5x1 jednostki (domyślna przy kliknięciu)
-  // Tekst bazowy: 14px przy width=1.5
-  const baseWidth = 1.5;
-  const textScale = note.width / baseWidth;
-  const baseFontSize = 14;
-  const scaledFontSize = Math.max(10, Math.min(32, baseFontSize * textScale));
+  // Stały rozmiar czcionki - bez dynamicznego skalowania dla lepszej wydajności
+  const fontSize = 14;
 
   if (isEditing) {
     return (
@@ -236,8 +263,12 @@ export function MarkdownNoteView({
         onChange={(e) => setEditContent(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="w-full h-full p-3 resize-none border-none outline-none bg-transparent font-mono text-sm text-black"
-        style={{ fontSize: `${scaledFontSize}px` }}
+        className="w-full p-3 resize-none border-none outline-none bg-transparent font-mono text-sm text-black"
+        style={{ 
+          fontSize: `${fontSize}px`,
+          minHeight: '100%',
+          height: 'auto',
+        }}
         placeholder="Wpisz tekst..."
       />
     );
@@ -245,29 +276,50 @@ export function MarkdownNoteView({
 
   return (
     <div
-      className="w-full h-full p-2 overflow-auto cursor-pointer text-black markdown-note"
-      style={{ fontSize: `${scaledFontSize}px` }}
+      ref={contentRef}
+      className="w-full p-2 cursor-pointer text-black"
+      style={{ 
+        fontSize: `${fontSize}px`,
+        wordBreak: 'break-word',
+        overflowWrap: 'break-word',
+        minHeight: '100%',
+      }}
       onDoubleClick={onEditStart}
     >
-      <style jsx>{`
-        .markdown-note h1 { font-size: 1.5em; font-weight: bold; margin: 0.3em 0; }
-        .markdown-note h2 { font-size: 1.3em; font-weight: bold; margin: 0.3em 0; }
-        .markdown-note h3 { font-size: 1.1em; font-weight: bold; margin: 0.2em 0; }
-        .markdown-note p { margin: 0.2em 0; }
-        .markdown-note strong { font-weight: bold; }
-        .markdown-note em { font-style: italic; }
-        .markdown-note ul, .markdown-note ol { padding-left: 1.2em; margin: 0.2em 0; }
-        .markdown-note li { margin: 0.1em 0; }
-        .markdown-note code { background: #f3f4f6; padding: 0.1em 0.3em; border-radius: 3px; font-family: monospace; }
-        .markdown-note pre { background: #f3f4f6; padding: 0.5em; border-radius: 4px; overflow-x: auto; }
-        .markdown-note blockquote { border-left: 3px solid #d1d5db; padding-left: 0.5em; margin: 0.3em 0; color: #6b7280; }
-      `}</style>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
+        components={{
+          h1: ({children}) => <h1 className="text-2xl font-bold my-2">{children}</h1>,
+          h2: ({children}) => <h2 className="text-xl font-bold my-2">{children}</h2>,
+          h3: ({children}) => <h3 className="text-lg font-semibold my-1">{children}</h3>,
+          h4: ({children}) => <h4 className="text-base font-semibold my-1">{children}</h4>,
+          p: ({children}) => <p className="my-1">{children}</p>,
+          strong: ({children}) => <strong className="font-bold">{children}</strong>,
+          em: ({children}) => <em className="italic">{children}</em>,
+          ul: ({children}) => <ul className="list-disc pl-5 my-1">{children}</ul>,
+          ol: ({children}) => <ol className="list-decimal pl-5 my-1">{children}</ol>,
+          li: ({children}) => <li className="my-0.5">{children}</li>,
+          code: ({children, className}) => {
+            const isBlock = className?.includes('language-');
+            if (isBlock) {
+              return <code className={`block bg-gray-100 p-2 rounded text-sm font-mono overflow-x-auto ${className}`}>{children}</code>;
+            }
+            return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+          },
+          pre: ({children}) => <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto">{children}</pre>,
+          blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-3 my-2 text-gray-600 italic">{children}</blockquote>,
+        }}
       >
         {note.content || 'Kliknij 2x...'}
       </ReactMarkdown>
     </div>
   );
-}
+}, (prevProps, nextProps) => {
+  // Custom comparison - re-render only when these change
+  return (
+    prevProps.note.id === nextProps.note.id &&
+    prevProps.note.content === nextProps.note.content &&
+    prevProps.isEditing === nextProps.isEditing
+  );
+});

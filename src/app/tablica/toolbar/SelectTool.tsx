@@ -78,8 +78,14 @@ export function SelectTool({
   const [resizeOriginalElements, setResizeOriginalElements] = useState<Map<string, DrawingElement>>(new Map());
 
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // Ref do viewport żeby uniknąć re-subscribe wheel listenera
+  const viewportRef = useRef(viewport);
+  useEffect(() => {
+    viewportRef.current = viewport;
+  }, [viewport]);
 
-  // 🆕 Natywny wheel listener z { passive: false }
+  // 🆕 Natywny wheel listener z { passive: false } - używa viewportRef
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay || !onViewportChange) return;
@@ -87,19 +93,21 @@ export function SelectTool({
     const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
         onViewportChange(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
     };
 
     overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
     return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  }, [canvasWidth, canvasHeight, onViewportChange]);
 
   // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag
   useEffect(() => {
@@ -107,7 +115,7 @@ export function SelectTool({
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
       const screenPoint = { x: e.clientX, y: e.clientY };
-      const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+      const worldPoint = inverseTransformPoint(screenPoint, viewportRef.current, canvasWidth, canvasHeight);
 
       if (isResizing && resizeHandle && resizeOriginalBox) {
         const currentWorldX = worldPoint.x;
@@ -307,7 +315,7 @@ export function SelectTool({
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, viewport, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish]);
+  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish]);
 
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedIds.size === 0) return null;

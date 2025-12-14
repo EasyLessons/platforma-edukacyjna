@@ -141,6 +141,27 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   
   // 🤖 CHATBOT - osobny state (zawsze aktywny po włączeniu)
   const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+  }>>([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: `Cześć! 👋 Jestem **Math Tutor**!
+
+Mogę Ci pomóc z:
+• 📐 Rozwiązywaniem zadań
+• 💡 Podpowiedziami  
+• ✅ Sprawdzaniem rozwiązań
+• 📚 Wyjaśnianiem wzorów
+
+Zadaj pytanie! 🤔`,
+      timestamp: new Date(),
+    }
+  ]);
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
@@ -997,9 +1018,12 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
-    const newElements = [...elements, note];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => [...prev, note]);
+    
+    // Opóźnione zapisanie do historii żeby nie blokować renderowania
+    requestAnimationFrame(() => {
+      saveToHistoryRef.current([...elementsRef.current]);
+    });
     
     broadcastElementCreated(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
@@ -1009,36 +1033,50 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     setTool('select');
     setSelectedElementIds(new Set([note.id]));
     setEditingMarkdownId(note.id);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, boardIdState, debouncedSave]);
 
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
-    // Tworzymy notatkę w centrum widocznego obszaru
+    // Używamy viewportRef zamiast viewport, żeby uniknąć re-renderów
+    const currentViewport = viewportRef.current;
+    
+    // Lepsze szacowanie rozmiaru na podstawie treści
+    const contentLines = content.split('\n');
+    const lines = contentLines.length;
+    const maxLineLength = Math.max(...contentLines.map(l => l.length));
+    
+    // Większe wymiary - każda linia ~0.25 jednostki, szerokość ~1 znak = 0.02 jednostki
+    const estimatedWidth = Math.max(4, Math.min(8, maxLineLength * 0.025 + 0.5));
+    const estimatedHeight = Math.max(2.5, Math.min(12, lines * 0.25 + 0.5));
+    
+    // Tworzymy notatkę w centrum widocznego obszaru - białe tło jak zwykła notatka
     const newNote: MarkdownNote = {
       id: `chatbot-note-${Date.now()}`,
       type: 'markdown',
-      x: viewport.x - 2, // Na lewo od środka (notatka szeroka)
-      y: viewport.y - 1.5, // Wyżej od środka
-      width: 4, // 4 jednostki szerokości
-      height: 3, // 3 jednostki wysokości
+      x: -currentViewport.x - estimatedWidth / 2,
+      y: -currentViewport.y - estimatedHeight / 2,
+      width: estimatedWidth,
+      height: estimatedHeight,
       content: content,
-      backgroundColor: '#f0f9ff', // Jasnoniebieski - wyróżnia się jako od AI
-      borderColor: '#3b82f6', // Niebieski border
-      isFromChatbot: true,
+      backgroundColor: '#ffffff',
+      borderColor: '#e5e7eb',
     };
     
-    const newElements = [...elements, newNote];
-    setElements(newElements);
-    saveToHistory(newElements);
+    // Najpierw aktualizujemy elements, potem zapisujemy do historii osobno
+    setElements(prev => [...prev, newNote]);
+    
+    // Opóźnione zapisanie do historii żeby nie blokować renderowania
+    requestAnimationFrame(() => {
+      saveToHistoryRef.current([...elementsRef.current]);
+    });
     
     broadcastElementCreated(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
     if (boardIdState) debouncedSave(boardIdState);
     
-    // Przełącz na select i zaznacz notatkę
-    setTool('select');
-    setSelectedElementIds(new Set([newNote.id]));
-  }, [elements, viewport, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+    // NIE zaznaczamy notatki - to powodowało przeskoki
+    // Użytkownik może ją zaznczyć ręcznie jeśli chce
+  }, [broadcastElementCreated, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - tworzenie tabeli
   const handleTableCreate = useCallback((table: TableElement) => {
@@ -1097,6 +1135,28 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
       return newElements;
     });
   }, [saveToHistory, boardIdState, debouncedSave]);
+
+  // 🆕 MARKDOWN - zmiana wysokości notatki (auto-resize gdy treść wymaga więcej miejsca)
+  const handleMarkdownHeightChange = useCallback((noteId: string, newScreenHeight: number) => {
+    setElements(prev => {
+      return prev.map(el => {
+        if (el.id === noteId && el.type === 'markdown') {
+          // Konwertuj wysokość ekranową na wysokość świata
+          const newWorldHeight = newScreenHeight / (viewportRef.current.scale * 100);
+          const currentHeight = (el as MarkdownNote).height;
+          
+          // Zmień tylko jeśli różnica jest znacząca (>0.1 jednostki świata)
+          // To zapobiega ciągłym drobnym aktualizacjom
+          if (Math.abs(newWorldHeight - currentHeight) < 0.1) {
+            return el;
+          }
+          
+          return { ...el, height: newWorldHeight };
+        }
+        return el;
+      });
+    });
+  }, []);
 
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
@@ -1954,6 +2014,8 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
             canvasHeight={canvasHeight}
             onClose={() => setIsChatbotOpen(false)}
             onAddToBoard={handleChatbotAddToBoard}
+            messages={chatMessages}
+            setMessages={setChatMessages}
           />
         )}
 
@@ -1981,16 +2043,17 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           return (
             <div
               key={note.id}
-              className="absolute overflow-hidden rounded-lg shadow-md border"
+              className="absolute rounded-lg shadow-md border"
               style={{
                 left: topLeft.x,
                 top: topLeft.y,
                 width: screenWidth,
-                height: screenHeight,
+                minHeight: screenHeight,
                 backgroundColor: note.backgroundColor || '#fffde7',
                 borderColor: note.borderColor || '#fbc02d',
                 pointerEvents: isBeingEdited ? 'auto' : 'none',
                 zIndex: isBeingEdited ? 50 : 10,
+                overflow: 'visible',
               }}
             >
               <MarkdownNoteView
@@ -1999,7 +2062,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
                 onContentChange={(content) => handleMarkdownContentChange(note.id, content)}
                 onEditStart={() => setEditingMarkdownId(note.id)}
                 onEditEnd={() => setEditingMarkdownId(null)}
-                scale={viewport.scale}
+                onHeightChange={(newHeight) => handleMarkdownHeightChange(note.id, newHeight)}
               />
             </div>
           );
@@ -2028,20 +2091,20 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
           return (
             <div
               key={table.id}
-              className="absolute overflow-hidden"
+              className="absolute"
               style={{
                 left: topLeft.x,
                 top: topLeft.y,
                 width: screenWidth,
-                height: screenHeight,
+                minHeight: screenHeight,
                 pointerEvents: isSelected ? 'auto' : 'none',
                 zIndex: isSelected ? 35 : 10,
+                overflow: 'visible',
               }}
             >
               <TableView
                 table={table}
                 onCellChange={(row, col, value) => handleTableCellChange(table.id, row, col, value)}
-                scale={viewport.scale}
               />
             </div>
           );
