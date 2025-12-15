@@ -139,8 +139,19 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
   
+
   // 🤖 CHATBOT - osobny state (zawsze aktywny po włączeniu)
-  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+
+// 🆕 STABILNE CALLBACKI dla chatbota (żeby nie łamać memo!)
+const handleChatbotClose = useCallback(() => {
+  setIsChatbotOpen(false);
+}, []);
+
+const handleChatbotToggle = useCallback(() => {
+  setIsChatbotOpen(prev => !prev);
+}, []);
+
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
     role: 'user' | 'assistant';
@@ -1821,7 +1832,7 @@ Zadaj pytanie! 🤔`,
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
           isChatbotOpen={isChatbotOpen}
-          onChatbotToggle={() => setIsChatbotOpen(!isChatbotOpen)}
+          onChatbotToggle={handleChatbotToggle}
         />
         
         {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
@@ -1984,17 +1995,17 @@ Zadaj pytanie! 🤔`,
           />
         )}
 
-        {/* 🤖 MATH CHATBOT - zawsze dostępny gdy isChatbotOpen */}
-        {isChatbotOpen && (
-          <MathChatbot
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onClose={() => setIsChatbotOpen(false)}
-            onAddToBoard={handleChatbotAddToBoard}
-            messages={chatMessages}
-            setMessages={setChatMessages}
-          />
-        )}
+    {/* 🤖 MATH CHATBOT - zawsze dostępny gdy isChatbotOpen */}
+    {isChatbotOpen && (
+      <MathChatbot
+        canvasWidth={canvasWidth}
+        canvasHeight={canvasHeight}
+        onClose={handleChatbotClose}
+        onAddToBoard={handleChatbotAddToBoard}
+        messages={chatMessages}
+        setMessages={setChatMessages}
+      />
+    )}
 
         {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}
         {elements.filter(el => el.type === 'markdown').map(el => {

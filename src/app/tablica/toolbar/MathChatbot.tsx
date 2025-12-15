@@ -8,12 +8,16 @@
  * Chatbot matematyczny jako sidebar z prawej strony tablicy.
  * Pomaga uczniom z zadaniami, wyjaśnia koncepcje, daje podpowiedzi.
  * Zawsze aktywny - nie blokuje rysowania na tablicy.
+ * 
+ * ✅ POPRAWKI WYDAJNOŚCI:
+ * - ChatMessageView jest MEMOIZOWANY - ReactMarkdown nie re-renderuje się
+ * - Cały komponent jest MEMOIZOWANY
  * ============================================================================
  */
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { 
   X, 
   Send, 
@@ -54,6 +58,59 @@ interface MathChatbotProps {
 }
 
 // ==========================================
+// 🧩 MEMOIZED MESSAGE COMPONENT
+// ReactMarkdown + KaTeX jest BARDZO kosztowne
+// Musi być memoizowane żeby nie re-renderować przy każdym renderze rodzica
+// ==========================================
+
+interface ChatMessageViewProps {
+  msg: ChatMessage;
+  onAddToBoard?: (content: string) => void;
+}
+
+const ChatMessageView = memo(function ChatMessageView({ msg, onAddToBoard }: ChatMessageViewProps) {
+  if (msg.role === 'user') {
+    return (
+      <div className="flex justify-end">
+        <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-br-md">
+          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-white border border-gray-200 text-gray-800 rounded-bl-md shadow-sm">
+        <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+          >
+            {msg.content}
+          </ReactMarkdown>
+        </div>
+        {/* Przycisk "Dodaj do tablicy" */}
+        {onAddToBoard && msg.id !== 'welcome' && msg.id !== 'welcome-new' && (
+          <button
+            onClick={() => onAddToBoard(msg.content)}
+            className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-xs font-medium rounded-lg transition-all active:scale-95 shadow-sm"
+            title="Dodaj tę odpowiedź jako notatkę na tablicy"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            Dodaj do tablicy
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}, (prevProps, nextProps) => {
+  // Re-render tylko gdy zmieni się wiadomość
+  return prevProps.msg.id === nextProps.msg.id && 
+         prevProps.msg.content === nextProps.msg.content;
+});
+
+// ==========================================
 // 🎨 QUICK PROMPTS
 // ==========================================
 const QUICK_PROMPTS = [
@@ -63,9 +120,9 @@ const QUICK_PROMPTS = [
 ];
 
 // ==========================================
-// 🤖 GŁÓWNY KOMPONENT - SIDEBAR
+// 🤖 GŁÓWNY KOMPONENT - SIDEBAR (MEMOIZOWANY)
 // ==========================================
-export function MathChatbot({
+function MathChatbotInner({
   canvasWidth,
   canvasHeight,
   onClose,
@@ -91,7 +148,7 @@ export function MathChatbot({
   }, [messages, scrollToBottom]);
 
   // Send message
-  const sendMessage = async (customMessage?: string) => {
+  const sendMessage = useCallback(async (customMessage?: string) => {
     const messageText = customMessage || input.trim();
     if (!messageText || isLoading) return;
 
@@ -139,23 +196,28 @@ export function MathChatbot({
     }
 
     setIsLoading(false);
-  };
+  }, [input, isLoading, boardContext, setMessages]);
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
-  };
+  }, [sendMessage]);
 
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     setMessages([{
       id: 'welcome-new',
       role: 'assistant',
       content: 'Nowa rozmowa! Jak mogę Ci pomóc? 🚀',
       timestamp: new Date(),
     }]);
-  };
+  }, [setMessages]);
+
+  const handleQuickPrompt = useCallback((prompt: string) => {
+    setInput(prompt);
+    inputRef.current?.focus();
+  }, []);
 
   // Collapsed state - mini przycisk z boku
   if (isCollapsed) {
@@ -237,47 +299,14 @@ export function MathChatbot({
         </div>
       </div>
 
-      {/* 💬 MESSAGES */}
+      {/* 💬 MESSAGES - używamy memoizowanego komponentu */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-[90%] rounded-2xl px-4 py-2.5 ${
-                msg.role === 'user'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-br-md'
-                  : 'bg-white border border-gray-200 text-gray-800 rounded-bl-md shadow-sm'
-              }`}
-            >
-              {msg.role === 'assistant' ? (
-                <div>
-                  <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
-                    <ReactMarkdown
-                      remarkPlugins={[remarkGfm, remarkMath]}
-                      rehypePlugins={[rehypeKatex]}
-                    >
-                      {msg.content}
-                    </ReactMarkdown>
-                  </div>
-                  {/* 🆕 Przycisk "Dodaj do tablicy" */}
-                  {onAddToBoard && msg.id !== 'welcome' && msg.id !== 'welcome-new' && (
-                    <button
-                      onClick={() => onAddToBoard(msg.content)}
-                      className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-xs font-medium rounded-lg transition-all active:scale-95 shadow-sm"
-                      title="Dodaj tę odpowiedź jako notatkę na tablicy"
-                    >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      Dodaj do tablicy
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-              )}
-            </div>
-          </div>
+          <ChatMessageView 
+            key={msg.id} 
+            msg={msg} 
+            onAddToBoard={onAddToBoard} 
+          />
         ))}
 
         {isLoading && (
@@ -299,10 +328,7 @@ export function MathChatbot({
         {QUICK_PROMPTS.map((item, idx) => (
           <button
             key={idx}
-            onClick={() => {
-              setInput(item.prompt);
-              inputRef.current?.focus();
-            }}
+            onClick={() => handleQuickPrompt(item.prompt)}
             className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-xs text-gray-700 transition-colors"
             disabled={isLoading}
           >
@@ -349,5 +375,19 @@ export function MathChatbot({
     </div>
   );
 }
+
+// ==========================================
+// 🎯 MEMOIZOWANY EXPORT
+// ==========================================
+export const MathChatbot = memo(MathChatbotInner, (prevProps, nextProps) => {
+  // Re-render tylko gdy zmieni się:
+  // - messages (referencja)
+  // - isChatbotOpen (implicit przez renderowanie)
+  return (
+    prevProps.messages === nextProps.messages &&
+    prevProps.canvasWidth === nextProps.canvasWidth &&
+    prevProps.canvasHeight === nextProps.canvasHeight
+  );
+});
 
 export default MathChatbot;
