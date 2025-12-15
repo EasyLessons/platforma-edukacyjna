@@ -283,7 +283,7 @@ export function ToolbarUI({
           />
           <ToolButton
             icon={Calculator}
-            active={isCalculatorOpen}
+            active={isCalculatorOpen ?? false}
             onClick={() => onCalculatorToggle?.()}
             title="Kalkulator (zawsze dostępny)"
           />
