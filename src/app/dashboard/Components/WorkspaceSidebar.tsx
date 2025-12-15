@@ -25,7 +25,9 @@ import {
   Users,
   Calendar,
   FileText,
-  Settings
+  Settings,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
@@ -104,6 +106,10 @@ export default function WorkspaceSidebar() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState<number | null>(null);
   const [hoveredSpace, setHoveredSpace] = useState<number | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showTooltip, setShowTooltip] = useState<{visible: boolean, text: string, x: number, y: number}>({
+    visible: false, text: '', x: 0, y: 0
+  });
   
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -156,6 +162,23 @@ export default function WorkspaceSidebar() {
       const errorMsg = err instanceof Error ? err.message : 'Nie udało się zmienić statusu';
       console.error('❌ Błąd zmiany ulubionego:', errorMsg);
     }
+  };
+
+  // Tooltip functions for collapsed workspace names
+  const showWorkspaceTooltip = (e: React.MouseEvent, workspaceName: string) => {
+    if (!isCollapsed) return; // Only show in collapsed mode
+    
+    const rect = e.currentTarget.getBoundingClientRect();
+    setShowTooltip({
+      visible: true,
+      text: workspaceName,
+      x: rect.right + 8, // Position tooltip to the right of the element
+      y: rect.top + rect.height / 2 // Center vertically
+    });
+  };
+
+  const hideWorkspaceTooltip = () => {
+    setShowTooltip({visible: false, text: '', x: 0, y: 0});
   };
 
   const handleDeleteSpace = async (id: number) => {
@@ -225,29 +248,47 @@ export default function WorkspaceSidebar() {
 
   if (loading) {
     return (
-      <div className="w-[350px] h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px]">
+      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
         
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-              Przestrzenie
-            </h2>
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
-              {workspaces.length}
-            </span>
+            {!isCollapsed && (
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                  Przestrzenie
+                </h2>
+                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
+                  {workspaces.length}
+                </span>
+              </div>
+            )}
+            
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+              title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+            >
+              {isCollapsed ? (
+                <PanelLeftOpen size={18} className="text-gray-600" />
+              ) : (
+                <PanelLeftClose size={18} className="text-gray-600" />
+              )}
+            </button>
           </div>
 
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Wyszukaj przestrzenie..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
-            />
-          </div>
+          {!isCollapsed && (
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Wyszukaj przestrzenie..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
+              />
+            </div>
+          )}
         </div>
 
         {/* WORKSPACE SKELETONS */}
@@ -258,34 +299,45 @@ export default function WorkspaceSidebar() {
                 {/* IKONA SKELETON */}
                 <div className="w-10 h-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded-xl animate-shimmer bg-[length:200%_100%]"></div>
                 
-                {/* NAZWA SKELETON */}
-                <div className="flex-1">
-                  <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]" 
-                      style={{ width: `${60 + Math.random() * 30}%` }}>
+                {/* NAZWA SKELETON - tylko gdy nie zwinięty */}
+                {!isCollapsed && (
+                  <div className="flex-1">
+                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]" 
+                        style={{ width: `${60 + Math.random() * 30}%` }}>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </div>
           ))}
         </div>
 
         {/* FOOTER SKELETON */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="flex items-center justify-between mb-3">
-            <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
-            <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
+        {!isCollapsed && (
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
+              <div className="h-3 bg-gray-300 rounded w-16 animate-pulse"></div>
+            </div>
+            <div className="w-full h-10 bg-gray-300 rounded-lg animate-pulse"></div>
           </div>
-          <div className="w-full h-10 bg-gray-300 rounded-lg animate-pulse"></div>
-        </div>
+        )}
+
+        {/* COLLAPSED FOOTER */}
+        {isCollapsed && (
+          <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-center">
+            <div className="w-10 h-10 bg-gray-300 rounded-lg animate-pulse"></div>
+          </div>
+        )}
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="w-[350px] h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex items-center justify-center">
+      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex items-center justify-center transition-all duration-300`}>
         <div className="text-red-500 text-center p-4">
-          Błąd: {error}
+          {isCollapsed ? '❌' : `Błąd: ${error}`}
         </div>
       </div>
     );
@@ -295,73 +347,104 @@ export default function WorkspaceSidebar() {
   if (workspaces.length === 0) {
     return (
       <>
-        <div className="w-[350px] h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px]">
+        <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
           
           {/* HEADER */}
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-                Przestrzenie
-              </h2>
-              <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
-                0
-              </span>
+              {!isCollapsed && (
+                <div className="flex items-center gap-2">
+                  <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                    Przestrzenie
+                  </h2>
+                  <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
+                    0
+                  </span>
+                </div>
+              )}
+              
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+                title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+              >
+                {isCollapsed ? (
+                  <PanelLeftOpen size={18} className="text-gray-600" />
+                ) : (
+                  <PanelLeftClose size={18} className="text-gray-600" />
+                )}
+              </button>
             </div>
 
-            <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-              <input
-                type="text"
-                placeholder="Wyszukaj przestrzenie..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
-                disabled
-              />
-            </div>
+            {!isCollapsed && (
+              <div className="relative">
+                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                <input
+                  type="text"
+                  placeholder="Wyszukaj przestrzenie..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
+                  disabled
+                />
+              </div>
+            )}
           </div>
 
           {/* EKRAN PUSTY - ZACHĘTA DO UTWORZENIA PIERWSZEGO WORKSPACE */}
-          <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
-              <Users size={32} className="text-green-600" />
-            </div>
-            
-            <h3 className="text-xl font-bold text-gray-800 mb-3">
-              Stwórz swoją pierwszą przestrzeń
-            </h3>
-            
-            <p className="text-gray-600 mb-2">
-              Przestrzenie pomagają organizować Twoją pracę i współpracować z innymi.
-            </p>
-            
-            <div className="flex items-center gap-4 mt-6 mb-8">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Calendar size={16} />
-                <span>Planuj</span>
+          {!isCollapsed ? (
+            <div className="flex-1 flex flex-col items-center justify-center px-8 text-center">
+              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                <Users size={32} className="text-green-600" />
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <FileText size={16} />
-                <span>Organizuj</span>
+              
+              <h3 className="text-xl font-bold text-gray-800 mb-3">
+                Stwórz swoją pierwszą przestrzeń
+              </h3>
+              
+              <p className="text-gray-600 mb-2">
+                Przestrzenie pomagają organizować Twoją pracę i współpracować z innymi.
+              </p>
+              
+              <div className="flex items-center gap-4 mt-6 mb-8">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Calendar size={16} />
+                  <span>Planuj</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <FileText size={16} />
+                  <span>Organizuj</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Users size={16} />
+                  <span>Współpracuj</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Users size={16} />
-                <span>Współpracuj</span>
-              </div>
-            </div>
 
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer transform hover:scale-105"
-            >
-              <Plus size={24} />
-              <span className="text-lg">Stwórz pierwszą przestrzeń</span>
-            </button>
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer transform hover:scale-105"
+              >
+                <Plus size={24} />
+                <span className="text-lg">Stwórz pierwszą przestrzeń</span>
+              </button>
 
-            <p className="text-xs text-gray-500 mt-4 max-w-xs">
-              Możesz później zaprosić członków zespołu i dodawać tablice
-            </p>
-          </div>
+              <p className="text-xs text-gray-500 mt-4 max-w-xs">
+                Możesz później zaprosić członków zespołu i dodawać tablice
+              </p>
+            </div>
+          ) : (
+            // Collapsed version - tylko plusik
+            <div className="flex-1 flex items-center justify-center">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-sm"
+                title="Dodaj przestrzeń"
+              >
+                <Plus size={20} />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Modal tworzenia przestrzeni */}
@@ -378,34 +461,65 @@ export default function WorkspaceSidebar() {
   // ✅ NORMALNY EKRAN GDY SĄ WORKSPACE'E
   return (
     <>
-      <div className="w-[350px] h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px]">
+      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
         
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
-              Przestrzenie
-            </h2>
-            <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
-              {workspaces.length}
-            </span>
+            {!isCollapsed && (
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                  Przestrzenie
+                </h2>
+                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
+                  {workspaces.length}
+                </span>
+              </div>
+            )}
+            
+            <button
+              onClick={() => setIsCollapsed(!isCollapsed)}
+              className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+              title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+            >
+              {isCollapsed ? (
+                <PanelLeftOpen size={18} className="text-gray-600" />
+              ) : (
+                <PanelLeftClose size={18} className="text-gray-600" />
+              )}
+            </button>
           </div>
 
-          <div className="relative">
-            <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Wyszukaj przestrzenie..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
-            />
-          </div>
+          {!isCollapsed && (
+            <div className="relative">
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Wyszukaj przestrzenie..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-white border-2 border-gray-300 rounded-lg text-sm text-gray-900 font-medium focus:outline-none focus:border-green-500 focus:ring-2 focus:ring-green-100 transition-all cursor-text placeholder:text-gray-500"
+              />
+            </div>
+          )}
+
+          {/* COLLAPSED SEARCH - tylko ikona lupy */}
+          {isCollapsed && (
+            <div className="flex justify-center mt-2">
+              <button
+                onClick={() => setIsCollapsed(false)}
+                className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+                title="Rozwiń aby wyszukać"
+              >
+                <Search size={18} className="text-gray-600" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* SCROLLUJĄCA LISTA */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
-          {sortedSpaces.filter(s => s.is_favourite).length > 0 && (
+          {!isCollapsed && sortedSpaces.filter(s => s.is_favourite).length > 0 && (
             <div className="px-4 pt-4 pb-2">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                 <Star size={14} className="text-yellow-500 fill-yellow-500" />
@@ -433,7 +547,7 @@ export default function WorkspaceSidebar() {
                   />
 
                   <div
-                    className={`flex items-center gap-3 px-3 py-2.5 ml-2 rounded-lg transition-all duration-200 cursor-pointer group ${
+                    className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 ml-2 rounded-lg transition-all duration-200 cursor-pointer group ${
                       isActive 
                         ? 'bg-green-100 border-2 border-green-300' 
                         : isHovered
@@ -443,72 +557,78 @@ export default function WorkspaceSidebar() {
                             : ''
                     }`}
                     onClick={() => handleWorkspaceClick(space.id)}
+                    onMouseEnter={(e) => showWorkspaceTooltip(e, space.name)}
+                    onMouseLeave={hideWorkspaceTooltip}
                   >
                     <div className={`w-10 h-10 ${getColorClass(space.bg_color)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
                       <IconComponent size={20} className="text-white" />
                     </div>
 
-                    <span className={`text-sm font-medium flex-1 truncate ${
-                      isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
-                    }`}>
-                      {space.name}
-                    </span>
+                    {!isCollapsed && (
+                      <>
+                        <span className={`text-sm font-medium flex-1 truncate ${
+                          isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
+                        }`}>
+                          {space.name}
+                        </span>
 
-                    {isHovered && (
-                      <div className="flex items-center gap-1">
-                        {/* Przycisk ustawień (edycja ikony, koloru, nazwy) - tylko dla właściciela */}
-                        {space.is_owner && (
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenEditModal(space);
-                            }}
-                            className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                            title="Ustawienia przestrzeni"
-                          >
-                            <Settings size={14} className="text-gray-600 hover:text-blue-600" />
-                          </button>
+                        {isHovered && (
+                          <div className="flex items-center gap-1">
+                            {/* Przycisk ustawień (edycja ikony, koloru, nazwy) - tylko dla właściciela */}
+                            {space.is_owner && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenEditModal(space);
+                                }}
+                                className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                                title="Ustawienia przestrzeni"
+                              >
+                                <Settings size={14} className="text-gray-600 hover:text-blue-600" />
+                              </button>
+                            )}
+
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleFavorite(space.id);
+                              }}
+                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                                space.is_favourite 
+                                  ? 'bg-yellow-100 hover:bg-yellow-200' 
+                                  : 'bg-gray-200 hover:bg-gray-300'
+                              }`}
+                              title={space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+                            >
+                              <Star 
+                                size={14} 
+                                className={space.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'} 
+                              />
+                            </button>
+
+                            {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (space.is_owner) {
+                                  setShowDeleteConfirm(space.id);
+                                } else {
+                                  setShowLeaveConfirm(space.id);
+                                }
+                              }}
+                              className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                              title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
+                            >
+                              <X size={14} className="text-gray-600 hover:text-red-600" />
+                            </button>
+                          </div>
                         )}
-
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleFavorite(space.id);
-                          }}
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                            space.is_favourite 
-                              ? 'bg-yellow-100 hover:bg-yellow-200' 
-                              : 'bg-gray-200 hover:bg-gray-300'
-                          }`}
-                          title={space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
-                        >
-                          <Star 
-                            size={14} 
-                            className={space.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'} 
-                          />
-                        </button>
-
-                        {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (space.is_owner) {
-                              setShowDeleteConfirm(space.id);
-                            } else {
-                              setShowLeaveConfirm(space.id);
-                            }
-                          }}
-                          className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                          title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
-                        >
-                          <X size={14} className="text-gray-600 hover:text-red-600" />
-                        </button>
-                      </div>
+                      </>
                     )}
                   </div>
                 </div>
 
-                {space.is_favourite && 
+                {!isCollapsed && space.is_favourite && 
                  sortedSpaces.indexOf(space) === sortedSpaces.filter(s => s.is_favourite).length - 1 && (
                   <div className="h-px bg-gray-300 my-3 mx-4"></div>
                 )}
@@ -516,7 +636,7 @@ export default function WorkspaceSidebar() {
             );
           })}
 
-          {sortedSpaces.length === 0 && searchQuery && (
+          {!isCollapsed && sortedSpaces.length === 0 && searchQuery && (
             <div className="text-center py-8 px-4">
               <p className="text-gray-500 text-sm">Nie znaleziono przestrzeni</p>
             </div>
@@ -524,20 +644,35 @@ export default function WorkspaceSidebar() {
         </div>
 
         {/* FOOTER */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
-          <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
-            <span>Ulubione: {workspaces.filter(s => s.is_favourite).length}</span>
-            <span>Wszystkie: {workspaces.length}</span>
-          </div>
+        {!isCollapsed && (
+          <div className="border-t border-gray-200 p-4 bg-gray-50">
+            <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
+              <span>Ulubione: {workspaces.filter(s => s.is_favourite).length}</span>
+              <span>Wszystkie: {workspaces.length}</span>
+            </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
-          >
-            <Plus size={20} />
-            <span>Dodaj przestrzeń</span>
-          </button>
-        </div>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+            >
+              <Plus size={20} />
+              <span>Dodaj przestrzeń</span>
+            </button>
+          </div>
+        )}
+
+        {/* COLLAPSED FOOTER */}
+        {isCollapsed && (
+          <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-center">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-sm"
+              title="Dodaj przestrzeń"
+            >
+              <Plus size={20} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Modal tworzenia przestrzeni */}
@@ -633,6 +768,21 @@ export default function WorkspaceSidebar() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Tooltip for collapsed workspace names */}
+      {showTooltip.visible && (
+        <div 
+          className="fixed z-[9999] bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none transform -translate-y-1/2"
+          style={{
+            left: `${showTooltip.x}px`,
+            top: `${showTooltip.y}px`
+          }}
+        >
+          {showTooltip.text}
+          {/* Arrow pointing left */}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 w-0 h-0 border-t-4 border-b-4 border-r-4 border-transparent border-r-gray-800"></div>
         </div>
       )}
     </>

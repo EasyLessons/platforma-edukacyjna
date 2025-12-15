@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Bell, Gift, Crown, UserPlus, ChevronDown } from "lucide-react";
+import { Search, Bell, Gift, Crown, UserPlus, ChevronDown, Menu, X } from "lucide-react";
 
 // Import funkcji API
 import { getUser, isAuthenticated, type User } from "@/auth_api/api";
@@ -33,6 +33,7 @@ export default function DashboardHeader() {
   const [showGiftPopup, setShowGiftPopup] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [inviteCount, setInviteCount] = useState(0);
 
   // State dla danych użytkownika
@@ -108,8 +109,10 @@ export default function DashboardHeader() {
   if (loading) {
     return (
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="w-full px-6 py-3">
-          <div className="grid grid-cols-3 gap-4 items-center">
+        <div className="w-full px-4 lg:px-6 py-3">
+          
+          {/* DESKTOP LOADING */}
+          <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
                 <Image
@@ -129,6 +132,21 @@ export default function DashboardHeader() {
               <div className="w-8 h-8 bg-gray-200 animate-pulse rounded-lg"></div>
             </div>
           </div>
+
+          {/* MOBILE LOADING */}
+          <div className="min-[1550px]:hidden flex items-center justify-between">
+            <Link href="/" className="flex items-center cursor-pointer">
+              <Image
+                src="/resources/LogoEasyLesson.webp"
+                alt="EasyLesson Logo"
+                width={120}
+                height={31}
+                className="h-8 w-auto"
+                priority
+              />
+            </Link>
+            <div className="w-6 h-6 bg-gray-200 animate-pulse rounded"></div>
+          </div>
         </div>
       </header>
     );
@@ -137,8 +155,10 @@ export default function DashboardHeader() {
   return (
     <>
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="w-full px-6 py-3">
-          <div className="grid grid-cols-3 gap-4 items-center">
+        <div className="w-full px-4 lg:px-6 py-3">
+          
+          {/* DESKTOP VERSION */}
+          <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
             {/* LEWA STRONA - Logo + Badge */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
@@ -268,6 +288,142 @@ export default function DashboardHeader() {
               )}
             </div>
           </div>
+
+          {/* MOBILE VERSION */}
+          <div className="min-[1550px]:hidden flex items-center justify-between">
+            {/* Logo */}
+            <Link href="/" className="flex items-center cursor-pointer">
+              <Image
+                src="/resources/LogoEasyLesson.webp"
+                alt="EasyLesson Logo"
+                width={120}
+                height={31}
+                className="h-8 w-auto"
+                priority
+              />
+            </Link>
+
+            {/* Hamburger Menu */}
+            <button
+              onClick={() => setShowMobileMenu(!showMobileMenu)}
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200 cursor-pointer"
+            >
+              {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
+            </button>
+          </div>
+
+          {/* MOBILE MENU DROPDOWN */}
+          {showMobileMenu && (
+            <div className="min-[1550px]:hidden mt-4 pb-4 border-t border-gray-200">
+              <div className="space-y-3 pt-4">
+                {/* Search Mobile */}
+                <button className="w-full px-4 py-3 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer">
+                  <Search
+                    size={18}
+                    className="text-gray-400 group-hover:text-green-600 transition-colors"
+                  />
+                  <span className="flex-1 text-left text-sm text-gray-500 group-hover:text-gray-700 font-medium">
+                    Wyszukaj wszystko...
+                  </span>
+                </button>
+
+                {/* User Info Mobile */}
+                {user && (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
+                    <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
+                      <span className="text-white font-semibold text-base">
+                        {user.avatar}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{user.name}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Menu Items Mobile */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      if (currentWorkspace) {
+                        setShowInvitePopup(true);
+                        setShowMobileMenu(false);
+                      } else {
+                        alert("Najpierw wybierz workspace");
+                      }
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                  >
+                    <UserPlus size={20} />
+                    <span>Zaproś uczestników</span>
+                  </button>
+
+                  {/* Premium Mobile */}
+                  {user && !user.isPremium && (
+                    <Link href="/#pricing">
+                      <button 
+                        onClick={() => setShowMobileMenu(false)}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-left bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-all duration-200"
+                      >
+                        <Crown size={20} />
+                        <span>Przejdź na Premium</span>
+                      </button>
+                    </Link>
+                  )}
+
+                  <button
+                    onClick={() => {
+                      setShowGiftPopup(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                  >
+                    <Gift size={20} />
+                    <span>Dostań 10% zniżki</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowNotifications(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200 relative"
+                  >
+                    <Bell size={20} />
+                    <span>Powiadomienia</span>
+                    {inviteCount > 0 && (
+                      <span className="ml-auto min-w-[20px] h-[20px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                        {inviteCount > 9 ? "9+" : inviteCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setShowUserMenu(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                  >
+                    <div className="w-5 h-5 bg-gray-400 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs">⚙</span>
+                    </div>
+                    <span>Ustawienia konta</span>
+                  </button>
+                </div>
+
+                {/* Badge Free Mobile */}
+                {user && !user.isPremium && (
+                  <div className="mt-4 px-4">
+                    <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
+                      FREE PLAN
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </header>
 
