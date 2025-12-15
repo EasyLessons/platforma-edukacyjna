@@ -325,7 +325,20 @@ export async function POST(req: NextRequest) {
           
         } catch (fallbackError: any) {
           console.error('❌ Fallback model also failed:', fallbackError);
-          throw fallbackError; // Re-throw to main error handler
+          // Zamiast rzucać dalej — zwracamy przyjazny canned fallback, aby frontend
+          // mógł wyświetlić pomoc użytkownikowi i nie kończyć 500.
+          responseText = "Przepraszam, usługa AI jest tymczasowo niedostępna. Mogę zaoferować krótką podpowiedź: spróbuj podać więcej szczegółów zadania lub podziel pytanie na kroki. Jeśli chcesz, zapiszę Twoje zapytanie i spróbujemy ponownie później.";
+          usedModel = 'none';
+          // Oznacz, że odpowiedź pochodzi z trybu awaryjnego
+          setCachedResponse(trimmedMessage, responseText);
+          return NextResponse.json({
+            response: responseText,
+            cached: false,
+            apiUsed: false,
+            fallback: true,
+            model: usedModel,
+            responseTime: Date.now() - startTime
+          });
         }
       } else {
         throw primaryError; // Re-throw non-quota errors

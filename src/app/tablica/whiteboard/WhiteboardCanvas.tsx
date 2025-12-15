@@ -2010,23 +2010,25 @@ Zadaj pytanie! 🤔`,
         {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}
         {elements.filter(el => el.type === 'markdown').map(el => {
           const note = el as MarkdownNote;
+
+          // Pozycja w pikselach ekranu (stała)
           const topLeft = transformPoint({ x: note.x, y: note.y }, viewport, canvasWidth, canvasHeight);
-          const bottomRight = transformPoint(
-            { x: note.x + note.width, y: note.y + note.height },
-            viewport,
-            canvasWidth,
-            canvasHeight
-          );
-          const screenWidth = bottomRight.x - topLeft.x;
-          const screenHeight = bottomRight.y - topLeft.y;
-          
+
+          // STAŁY rozmiar bazowy (100px = 1 jednostka świata)
+          const baseWidth = note.width * 100;
+          const baseHeight = note.height * 100;
+
+          // Rozmiar po skalowaniu (używany jedynie do culling)
+          const scaledWidth = baseWidth * viewport.scale;
+          const scaledHeight = baseHeight * viewport.scale;
+
           // Nie renderuj jeśli poza ekranem lub za małe
-          if (screenWidth < 30 || screenHeight < 30) return null;
-          if (topLeft.x + screenWidth < 0 || topLeft.x > canvasWidth) return null;
-          if (topLeft.y + screenHeight < 0 || topLeft.y > canvasHeight) return null;
-          
+          if (scaledWidth < 30 || scaledHeight < 30) return null;
+          if (topLeft.x + scaledWidth < 0 || topLeft.x > canvasWidth) return null;
+          if (topLeft.y + scaledHeight < 0 || topLeft.y > canvasHeight) return null;
+
           const isBeingEdited = editingMarkdownId === note.id;
-          
+
           return (
             <div
               key={note.id}
@@ -2034,8 +2036,11 @@ Zadaj pytanie! 🤔`,
               style={{
                 left: topLeft.x,
                 top: topLeft.y,
-                width: screenWidth,
-                height: screenHeight,
+                width: baseWidth,
+                height: baseHeight,
+                transform: `scale(${viewport.scale})`,
+                transformOrigin: 'top left',
+                willChange: 'transform',
                 backgroundColor: note.backgroundColor || '#fffde7',
                 borderColor: note.borderColor || '#fbc02d',
                 pointerEvents: isBeingEdited ? 'auto' : 'none',
