@@ -114,6 +114,7 @@ export interface MarkdownNote {
   backgroundColor?: string; // Domyślnie biały
   borderColor?: string; // Kolor ramki
   isFromChatbot?: boolean; // Czy wygenerowane przez chatbota
+  contentScale?: number; // Skala zawartości (np. 1 = 100%)
 }
 
 // 🆕 Tabelka - edytowalna tabela

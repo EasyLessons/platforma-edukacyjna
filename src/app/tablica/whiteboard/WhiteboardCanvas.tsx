@@ -2028,6 +2028,8 @@ Zadaj pytanie! 🤔`,
           if (topLeft.y + scaledHeight < 0 || topLeft.y > canvasHeight) return null;
 
           const isBeingEdited = editingMarkdownId === note.id;
+          // Skala zawartości (domyślnie 1)
+          const contentScale = note.contentScale ?? 1;
 
           return (
             <div
@@ -2047,14 +2049,24 @@ Zadaj pytanie! 🤔`,
                 zIndex: isBeingEdited ? 50 : 10,
               }}
             >
-              <MarkdownNoteView
-                note={note}
-                noteId={note.id}
-                isEditing={isBeingEdited}
-                onContentChange={handleMarkdownContentChange}
-                onEditStart={handleMarkdownEditStart}
-                onEditEnd={handleMarkdownEditEnd}
-              />
+              {/* INNER WRAPPER dla contentScale */}
+              <div
+                style={{
+                  width: `${100 / contentScale}%`,
+                  height: `${100 / contentScale}%`,
+                  transform: `scale(${contentScale})`,
+                  transformOrigin: 'top left',
+                }}
+              >
+                <MarkdownNoteView
+                  note={note}
+                  noteId={note.id}
+                  isEditing={isBeingEdited}
+                  onContentChange={handleMarkdownContentChange}
+                  onEditStart={handleMarkdownEditStart}
+                  onEditEnd={handleMarkdownEditEnd}
+                />
+              </div>
             </div>
           );
         })}

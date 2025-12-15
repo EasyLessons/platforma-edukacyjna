@@ -718,31 +718,35 @@ export function SelectTool({
     );
   };
 
-  // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek
+  // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek lub markdown
   const renderPropertiesPanel = () => {
     if (selectedIds.size === 0 || !onElementUpdateWithHistory) return null;
-    
-    // Sprawdź czy są zaznaczone elementy typu shape lub path (nie text)
+
     const selectedElements = elements.filter(el => selectedIds.has(el.id));
-    const hasEditableElements = selectedElements.some(
-      el => el.type === 'shape' || el.type === 'path'
-    );
-    
-    // Nie pokazuj jeśli zaznaczony jest tylko tekst
+
+    // Czy są zaznaczone elementy typu shape/path?
+    const hasEditableElements = selectedElements.some(el => el.type === 'shape' || el.type === 'path');
+    // Czy są zaznaczone notatki markdown?
+    const hasMarkdownElements = selectedElements.some(el => el.type === 'markdown');
+
+    // Jeśli nie ma ani edytowalnych kształtów ani markdown, nie pokazuj
+    if (!hasEditableElements && !hasMarkdownElements) return null;
+
+    // Nie pokazuj jeśli zaznaczony jest tylko tekst (bez shape/path/markdown)
     const onlyText = selectedElements.every(el => el.type === 'text');
-    if (!hasEditableElements || onlyText) return null;
-    
+    if (onlyText) return null;
+
     // Oblicz pozycję panelu - nad bounding box
     const bbox = getSelectionBoundingBox();
     if (!bbox) return null;
-    
+
     const topCenter = transformPoint(
       { x: bbox.x + bbox.width / 2, y: bbox.y },
       viewport,
       canvasWidth,
       canvasHeight
     );
-    
+
     return (
       <SelectionPropertiesPanel
         elements={elements}
