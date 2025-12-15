@@ -390,7 +390,7 @@ Zadaj pytanie! 🤔`,
         }
       }
     }, 2000);  // 2 sekundy opóźnienia
-  }, [elements]);
+  }, []);  // PUSTE! - używamy elementsRef.current, nie potrzebujemy elements
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 📥 ŁADOWANIE ELEMENTÓW - Przy otwarciu tablicy
@@ -702,20 +702,24 @@ Zadaj pytanie! 🤔`,
       const width = canvas.width / dpr;
       const height = canvas.height / dpr;
       
+      // Używamy REFÓW żeby nie tworzyć nowego callbacka przy każdym renderze!
+      const currentElements = elementsRef.current;
+      const currentViewport = viewportRef.current;
+      
       // Reset transform i ustaw nową skalę DPR
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
       
-      drawGrid(ctx, viewport, width, height);
+      drawGrid(ctx, currentViewport, width, height);
       
-      elements.forEach(element => {
+      currentElements.forEach(element => {
         if (element.id === editingTextId) return;
-        drawElement(ctx, element, viewport, width, height, loadedImages, debugMode, handleAutoExpand);
+        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand);
       });
       
       rafIdRef.current = null;
     });
-  }, [elements, viewport, editingTextId, debugMode, handleAutoExpand, loadedImages]);
+  }, [editingTextId, debugMode, handleAutoExpand, loadedImages]);  // USUNIĘTO elements i viewport!
   
   // Cleanup RAF on unmount
   useEffect(() => {
@@ -730,9 +734,10 @@ Zadaj pytanie! 🤔`,
     redrawCanvasRef.current = redrawCanvas;
   }, [redrawCanvas]);
 
+  // Przerysuj canvas gdy zmieni się elements, viewport, lub inne zależności redrawCanvas
   useEffect(() => {
     redrawCanvas();
-  }, [redrawCanvas]);
+  }, [elements, viewport, redrawCanvas]);
 
   // History - uproszczona i stabilna wersja
   const MAX_HISTORY_SIZE = 50;
@@ -1018,12 +1023,8 @@ Zadaj pytanie! 🤔`,
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
+    // TYLKO setElements - bez saveToHistory (powoduje lagi)
     setElements(prev => [...prev, note]);
-    
-    // Opóźnione zapisanie do historii żeby nie blokować renderowania
-    requestAnimationFrame(() => {
-      saveToHistoryRef.current([...elementsRef.current]);
-    });
     
     broadcastElementCreated(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
@@ -1037,45 +1038,32 @@ Zadaj pytanie! 🤔`,
 
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
-    // Używamy viewportRef zamiast viewport, żeby uniknąć re-renderów
     const currentViewport = viewportRef.current;
     
-    // Lepsze szacowanie rozmiaru na podstawie treści
-    const contentLines = content.split('\n');
-    const lines = contentLines.length;
-    const maxLineLength = Math.max(...contentLines.map(l => l.length));
+    // Większy rozmiar notatki - 5x4 jednostki = 500x400px przy scale=1
+    const noteWidth = 5;
+    const noteHeight = 4;
     
-    // Większe wymiary - każda linia ~0.25 jednostki, szerokość ~1 znak = 0.02 jednostki
-    const estimatedWidth = Math.max(4, Math.min(8, maxLineLength * 0.025 + 0.5));
-    const estimatedHeight = Math.max(2.5, Math.min(12, lines * 0.25 + 0.5));
-    
-    // Tworzymy notatkę w centrum widocznego obszaru - białe tło jak zwykła notatka
     const newNote: MarkdownNote = {
       id: `chatbot-note-${Date.now()}`,
       type: 'markdown',
-      x: -currentViewport.x - estimatedWidth / 2,
-      y: -currentViewport.y - estimatedHeight / 2,
-      width: estimatedWidth,
-      height: estimatedHeight,
+      x: -currentViewport.x - noteWidth / 2,
+      y: -currentViewport.y - noteHeight / 2,
+      width: noteWidth,
+      height: noteHeight,
       content: content,
       backgroundColor: '#ffffff',
       borderColor: '#e5e7eb',
     };
     
-    // Najpierw aktualizujemy elements, potem zapisujemy do historii osobno
+    // TYLKO setElements - bez saveToHistory (to powodowało lagi)
+    // Historia zostanie zapisana przy następnej operacji lub przy zapisie do DB
     setElements(prev => [...prev, newNote]);
     
-    // Opóźnione zapisanie do historii żeby nie blokować renderowania
-    requestAnimationFrame(() => {
-      saveToHistoryRef.current([...elementsRef.current]);
-    });
-    
+    // Broadcast i zapis do DB
     broadcastElementCreated(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
     if (boardIdState) debouncedSave(boardIdState);
-    
-    // NIE zaznaczamy notatki - to powodowało przeskoki
-    // Użytkownik może ją zaznczyć ręcznie jeśli chce
   }, [broadcastElementCreated, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - tworzenie tabeli
@@ -1136,27 +1124,16 @@ Zadaj pytanie! 🤔`,
     });
   }, [saveToHistory, boardIdState, debouncedSave]);
 
-  // 🆕 MARKDOWN - zmiana wysokości notatki (auto-resize gdy treść wymaga więcej miejsca)
-  const handleMarkdownHeightChange = useCallback((noteId: string, newScreenHeight: number) => {
-    setElements(prev => {
-      return prev.map(el => {
-        if (el.id === noteId && el.type === 'markdown') {
-          // Konwertuj wysokość ekranową na wysokość świata
-          const newWorldHeight = newScreenHeight / (viewportRef.current.scale * 100);
-          const currentHeight = (el as MarkdownNote).height;
-          
-          // Zmień tylko jeśli różnica jest znacząca (>0.1 jednostki świata)
-          // To zapobiega ciągłym drobnym aktualizacjom
-          if (Math.abs(newWorldHeight - currentHeight) < 0.1) {
-            return el;
-          }
-          
-          return { ...el, height: newWorldHeight };
-        }
-        return el;
-      });
-    });
+  // 🆕 STABILNE CALLBACKI dla MarkdownNoteView (żeby nie łamać memo!)
+  const handleMarkdownEditStart = useCallback((noteId: string) => {
+    setEditingMarkdownId(noteId);
   }, []);
+
+  const handleMarkdownEditEnd = useCallback(() => {
+    setEditingMarkdownId(null);
+  }, []);
+
+  // handleMarkdownHeightChange usunięty - notatki mają stały rozmiar, user zmienia resize handlerem
 
   const handleViewportChange = useCallback((newViewport: ViewportTransform) => {
     setViewport(newViewport);
@@ -2037,32 +2014,30 @@ Zadaj pytanie! 🤔`,
           if (topLeft.x + screenWidth < 0 || topLeft.x > canvasWidth) return null;
           if (topLeft.y + screenHeight < 0 || topLeft.y > canvasHeight) return null;
           
-          const isSelected = selectedElementIds.has(note.id);
           const isBeingEdited = editingMarkdownId === note.id;
           
           return (
             <div
               key={note.id}
-              className="absolute rounded-lg shadow-md border"
+              className="absolute rounded-lg shadow-md border overflow-hidden"
               style={{
                 left: topLeft.x,
                 top: topLeft.y,
                 width: screenWidth,
-                minHeight: screenHeight,
+                height: screenHeight,
                 backgroundColor: note.backgroundColor || '#fffde7',
                 borderColor: note.borderColor || '#fbc02d',
                 pointerEvents: isBeingEdited ? 'auto' : 'none',
                 zIndex: isBeingEdited ? 50 : 10,
-                overflow: 'visible',
               }}
             >
               <MarkdownNoteView
                 note={note}
-                isEditing={editingMarkdownId === note.id}
-                onContentChange={(content) => handleMarkdownContentChange(note.id, content)}
-                onEditStart={() => setEditingMarkdownId(note.id)}
-                onEditEnd={() => setEditingMarkdownId(null)}
-                onHeightChange={(newHeight) => handleMarkdownHeightChange(note.id, newHeight)}
+                noteId={note.id}
+                isEditing={isBeingEdited}
+                onContentChange={handleMarkdownContentChange}
+                onEditStart={handleMarkdownEditStart}
+                onEditEnd={handleMarkdownEditEnd}
               />
             </div>
           );

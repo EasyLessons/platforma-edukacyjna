@@ -565,9 +565,15 @@ export function drawElement(
   } else if (element.type === 'image' && loadedImages) {
     drawImage(ctx, element, viewport, canvasWidth, canvasHeight, loadedImages);
   } else if (element.type === 'markdown') {
-    drawMarkdownNote(ctx, element, viewport, canvasWidth, canvasHeight);
+    // UWAGA: Notatki markdown NIE są rysowane na canvas!
+    // Są renderowane TYLKO jako HTML overlay przez MarkdownNoteView
+    // Rysowanie na canvas powodowało ghosting (podwójne renderowanie)
+    return;
   } else if (element.type === 'table') {
-    drawTable(ctx, element, viewport, canvasWidth, canvasHeight);
+    // UWAGA: Tabele NIE są rysowane na canvas!
+    // Są renderowane TYLKO jako HTML overlay przez TableView
+    // Rysowanie na canvas powodowało ghosting (podwójne renderowanie)
+    return;
   }
 }
 

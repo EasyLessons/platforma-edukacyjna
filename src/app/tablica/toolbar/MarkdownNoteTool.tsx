@@ -10,7 +10,7 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { Point, ViewportTransform, MarkdownNote } from '../whiteboard/types';
 import { inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import ReactMarkdown from 'react-markdown';
@@ -132,11 +132,16 @@ export function MarkdownNoteTool({
     const width = Math.abs(currentPoint.x - startPoint.x);
     const height = Math.abs(currentPoint.y - startPoint.y);
 
-    // Transformuj do współrzędnych ekranu
-    const screenX = (minX + viewport.x) * viewport.scale + canvasWidth / 2;
-    const screenY = (minY + viewport.y) * viewport.scale + canvasHeight / 2;
-    const screenWidth = width * viewport.scale;
-    const screenHeight = height * viewport.scale;
+    // Używaj tej samej formuły co transformPoint!
+    // scale = viewport.scale * 100 (100px = 1 jednostka)
+    const scale = viewport.scale * 100;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
+    
+    const screenX = (minX - viewport.x) * scale + centerX;
+    const screenY = (minY - viewport.y) * scale + centerY;
+    const screenWidth = width * scale;
+    const screenHeight = height * scale;
 
     // Sprawdź czy wartości są poprawne
     if (!isFinite(screenX) || !isFinite(screenY) || !isFinite(screenWidth) || !isFinite(screenHeight)) {
@@ -145,7 +150,7 @@ export function MarkdownNoteTool({
 
     return (
       <div
-        className="absolute pointer-events-none border-2 border-dashed border-blue-500 bg-blue-50/30 rounded-lg z-40"
+        className="absolute pointer-events-none border-2 border-dashed border-yellow-500 bg-yellow-50/30 rounded-lg z-40"
         style={{
           left: screenX,
           top: screenY,
@@ -173,32 +178,36 @@ export function MarkdownNoteTool({
 }
 
 // Komponent do wyświetlania i edycji notatki Markdown (używany w renderowaniu)
-// MEMOIZOWANY - nie re-renderuje się gdy zmienia się tylko viewport
+// PROSTA ARCHITEKTURA:
+// - Notatka ma STAŁY rozmiar (user zmienia resize handlerem)
+// - Font STAŁY 14px - notatka skaluje się z viewport (CSS transform)
+// - Overflow scroll dla długich treści
+// - ZERO re-renderów przy pan/zoom - tylko przy zmianie content/editing
+// - WAŻNE: używamy noteId + stabilnych callbacków zamiast inline funkcji żeby nie łamać memo!
 interface MarkdownNoteViewProps {
   note: MarkdownNote;
   isEditing: boolean;
-  onContentChange: (content: string) => void;
-  onEditStart: () => void;
-  onEditEnd: () => void;
-  onHeightChange?: (newHeight: number) => void; // Callback gdy treść wymaga więcej miejsca
+  noteId: string;  // ID notatki - używane zamiast closure w callbackach
+  onContentChange: (noteId: string, content: string) => void;  // Stabilny callback z noteId
+  onEditStart: (noteId: string) => void;  // Stabilny callback z noteId
+  onEditEnd: () => void;  // Stabilny callback bez argumentów
 }
 
 export const MarkdownNoteView = memo(function MarkdownNoteView({
   note,
   isEditing,
+  noteId,
   onContentChange,
   onEditStart,
   onEditEnd,
-  onHeightChange,
 }: MarkdownNoteViewProps) {
   const [editContent, setEditContent] = useState(note.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const lastReportedHeightRef = useRef<number>(0); // Zapobiegamy wielokrotnym wywołaniom
 
   useEffect(() => {
     if (isEditing && textareaRef.current) {
       textareaRef.current.focus();
+      textareaRef.current.select();
     }
   }, [isEditing]);
 
@@ -206,42 +215,8 @@ export const MarkdownNoteView = memo(function MarkdownNoteView({
     setEditContent(note.content);
   }, [note.content]);
 
-  // Mierz wysokość treści po renderze i rozszerz notatkę jeśli potrzeba
-  // TYLKO gdy zmienia się content - nie containerHeight!
-  useLayoutEffect(() => {
-    if (!isEditing && contentRef.current && onHeightChange) {
-      // Daj moment na render ReactMarkdown i KaTeX
-      const timer = setTimeout(() => {
-        if (contentRef.current) {
-          const contentHeight = contentRef.current.scrollHeight;
-          // Wywołuj tylko jeśli wysokość ZNACZNIE się zmieniła (>20px różnicy)
-          // i nie jest taka sama jak ostatnio zgłoszona
-          if (Math.abs(contentHeight - lastReportedHeightRef.current) > 20) {
-            lastReportedHeightRef.current = contentHeight;
-            onHeightChange(contentHeight);
-          }
-        }
-      }, 100); // Dłuższy delay żeby KaTeX się wyrenderował
-      return () => clearTimeout(timer);
-    }
-  }, [note.content, isEditing, onHeightChange]); // BEZ containerHeight!
-
-  // Auto-resize textarea podczas edycji
-  useEffect(() => {
-    if (isEditing && textareaRef.current && onHeightChange) {
-      const textarea = textareaRef.current;
-      textarea.style.height = 'auto';
-      const scrollHeight = textarea.scrollHeight;
-      // Wywołuj tylko jeśli znaczna różnica
-      if (Math.abs(scrollHeight - lastReportedHeightRef.current) > 20) {
-        lastReportedHeightRef.current = scrollHeight;
-        onHeightChange(scrollHeight);
-      }
-    }
-  }, [editContent, isEditing, onHeightChange]);
-
   const handleBlur = () => {
-    onContentChange(editContent);
+    onContentChange(noteId, editContent);
     onEditEnd();
   };
 
@@ -252,7 +227,7 @@ export const MarkdownNoteView = memo(function MarkdownNoteView({
     }
   };
 
-  // Stały rozmiar czcionki - bez dynamicznego skalowania dla lepszej wydajności
+  // Stały rozmiar czcionki - notatka skaluje się przez CSS transform kontenera
   const fontSize = 14;
 
   if (isEditing) {
@@ -263,62 +238,57 @@ export const MarkdownNoteView = memo(function MarkdownNoteView({
         onChange={(e) => setEditContent(e.target.value)}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="w-full p-3 resize-none border-none outline-none bg-transparent font-mono text-sm text-black"
-        style={{ 
-          fontSize: `${fontSize}px`,
-          minHeight: '100%',
-          height: 'auto',
-        }}
-        placeholder="Wpisz tekst..."
+        className="w-full h-full p-2 resize-none border-none outline-none bg-white/50 font-mono text-black"
+        style={{ fontSize: `${fontSize}px` }}
+        placeholder="Wpisz tekst markdown..."
       />
     );
   }
 
   return (
     <div
-      ref={contentRef}
-      className="w-full p-2 cursor-pointer text-black"
-      style={{ 
-        fontSize: `${fontSize}px`,
-        wordBreak: 'break-word',
-        overflowWrap: 'break-word',
-        minHeight: '100%',
-      }}
-      onDoubleClick={onEditStart}
+      className="w-full h-full p-2 overflow-auto cursor-pointer text-black"
+      style={{ fontSize: `${fontSize}px` }}
+      onDoubleClick={() => onEditStart(noteId)}
     >
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
-          h1: ({children}) => <h1 className="text-2xl font-bold my-2">{children}</h1>,
-          h2: ({children}) => <h2 className="text-xl font-bold my-2">{children}</h2>,
-          h3: ({children}) => <h3 className="text-lg font-semibold my-1">{children}</h3>,
-          h4: ({children}) => <h4 className="text-base font-semibold my-1">{children}</h4>,
-          p: ({children}) => <p className="my-1">{children}</p>,
+          h1: ({children}) => <h1 className="text-xl font-bold my-1">{children}</h1>,
+          h2: ({children}) => <h2 className="text-lg font-bold my-1">{children}</h2>,
+          h3: ({children}) => <h3 className="text-base font-semibold my-0.5">{children}</h3>,
+          h4: ({children}) => <h4 className="font-semibold my-0.5">{children}</h4>,
+          p: ({children}) => <p className="my-0.5">{children}</p>,
           strong: ({children}) => <strong className="font-bold">{children}</strong>,
           em: ({children}) => <em className="italic">{children}</em>,
-          ul: ({children}) => <ul className="list-disc pl-5 my-1">{children}</ul>,
-          ol: ({children}) => <ol className="list-decimal pl-5 my-1">{children}</ol>,
-          li: ({children}) => <li className="my-0.5">{children}</li>,
+          ul: ({children}) => <ul className="list-disc pl-4 my-0.5">{children}</ul>,
+          ol: ({children}) => <ol className="list-decimal pl-4 my-0.5">{children}</ol>,
+          li: ({children}) => <li className="my-0">{children}</li>,
           code: ({children, className}) => {
             const isBlock = className?.includes('language-');
             if (isBlock) {
-              return <code className={`block bg-gray-100 p-2 rounded text-sm font-mono overflow-x-auto ${className}`}>{children}</code>;
+              return <code className={`block bg-gray-100 p-1 rounded text-xs font-mono overflow-x-auto ${className}`}>{children}</code>;
             }
-            return <code className="bg-gray-100 px-1 py-0.5 rounded text-sm font-mono">{children}</code>;
+            return <code className="bg-gray-100 px-0.5 rounded text-xs font-mono">{children}</code>;
           },
-          pre: ({children}) => <pre className="bg-gray-100 p-2 rounded my-2 overflow-x-auto">{children}</pre>,
-          blockquote: ({children}) => <blockquote className="border-l-4 border-gray-300 pl-3 my-2 text-gray-600 italic">{children}</blockquote>,
+          pre: ({children}) => <pre className="bg-gray-100 p-1 rounded my-1 overflow-x-auto text-xs">{children}</pre>,
+          blockquote: ({children}) => <blockquote className="border-l-2 border-gray-300 pl-2 my-1 text-gray-600 italic text-sm">{children}</blockquote>,
+          table: ({children}) => <table className="border-collapse my-1 text-xs">{children}</table>,
+          th: ({children}) => <th className="border border-gray-300 px-1 py-0.5 bg-gray-100 font-semibold">{children}</th>,
+          td: ({children}) => <td className="border border-gray-300 px-1 py-0.5">{children}</td>,
         }}
       >
-        {note.content || 'Kliknij 2x...'}
+        {note.content || 'Kliknij 2x aby edytować...'}
       </ReactMarkdown>
     </div>
   );
 }, (prevProps, nextProps) => {
-  // Custom comparison - re-render only when these change
+  // Re-render TYLKO gdy zmienia się content lub edycja
+  // NIE przy pan/zoom - to eliminuje ghosting
+  // WAŻNE: NIE porównujemy callbacków bo są teraz stabilne (useCallback w parent)
   return (
-    prevProps.note.id === nextProps.note.id &&
+    prevProps.noteId === nextProps.noteId &&
     prevProps.note.content === nextProps.note.content &&
     prevProps.isEditing === nextProps.isEditing
   );
