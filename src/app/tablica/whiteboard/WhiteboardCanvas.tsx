@@ -648,13 +648,14 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - ZOOM na scroll, PAN na Shift+scroll
+  // Wheel/Touchpad handling - inteligentne rozpoznawanie gestów
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
       console.log('🖱️ Wheel:', { 
+        deltaX: e.deltaX,
         deltaY: e.deltaY, 
         ctrlKey: e.ctrlKey, 
         shiftKey: e.shiftKey,
@@ -678,17 +679,38 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // ZMIENIONE: normalny scroll = zoom, Shift+scroll = pan
-      if (e.shiftKey) {
+      // NOWA LOGIKA - rozpoznawanie gestów:
+      // 1. Ctrl+Wheel (pinch na touchpadzie) = ZOOM
+      // 2. Shift+Wheel = PAN
+      // 3. Duży ruch (touchpad swipe dwoma palcami) = PAN
+      // 4. Mały ruch (mysz scroll) = ZOOM
+      
+      if (e.ctrlKey) {
+        // Pinch to zoom na touchpadzie lub Ctrl+scroll na myszce
+        console.log('🔍 Executing ZOOM (Ctrl/Pinch)');
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+        setViewport(constrainViewport(newViewport));
+      } else if (e.shiftKey) {
         // Shift+scroll - przesuwanie tablicy
-        console.log('📐 Executing PAN');
+        console.log('📐 Executing PAN (Shift)');
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       } else {
-        // Normalny scroll - zoom in/out
-        console.log('🔍 Executing ZOOM');
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
+        // Wykryj czy to touchpad swipe (duże delty) czy mysz (małe delty)
+        const absDeltaX = Math.abs(e.deltaX);
+        const absDeltaY = Math.abs(e.deltaY);
+        
+        // Touchpad swipe wysyła większe wartości - jeśli którakolwiek delta > 10, to touchpad
+        if (absDeltaX > 10 || absDeltaY > 10) {
+          console.log('📐 Executing PAN (touchpad swipe)');
+          const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+          setViewport(constrainViewport(newViewport));
+        } else {
+          // Mały ruch - mysz scroll - ZOOM
+          console.log('🔍 Executing ZOOM (mouse scroll)');
+          const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+          setViewport(constrainViewport(newViewport));
+        }
       }
     };
     
