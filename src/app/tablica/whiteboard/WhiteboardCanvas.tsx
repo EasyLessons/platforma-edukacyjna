@@ -47,6 +47,9 @@ import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../sm
 // 🆕 Import hooka Realtime
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
+// 🆕 Import snap utilities
+import { GuideLine, collectGuidelinesFromImages } from '../utils/snapUtils';
+
 // 🆕 Import API dla elementów tablicy
 import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement } from '@/boards_api/api';
 
@@ -138,6 +141,9 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   
   // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // 🆕 SNAP GUIDES - aktywne linie prowadzące
+  const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
 
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
@@ -1909,6 +1915,7 @@ Zadaj pytanie! 🤔`,
             onTextEdit={handleTextEdit}
             onMarkdownEdit={(id) => setEditingMarkdownId(id)}
             onViewportChange={handleViewportChange}
+            onActiveGuidesChange={setActiveGuides}
           />
         )}
 
@@ -2188,6 +2195,95 @@ Zadaj pytanie! 🤔`,
               <span className="text-sm text-yellow-800">Reconnecting...</span>
             </div>
           </div>
+        )}
+
+        {/* 🆕 SNAP GUIDES - Niebieskie przerywane linie */}
+        {activeGuides.length > 0 && (
+          <svg className="absolute inset-0 pointer-events-none" 
+          style={{ 
+            zIndex: 1000, 
+            pointerEvents: 'none',
+            width: '100%',
+            height: '100%',
+            strokeWidth: "10",
+            opacity: "1"
+          }}>
+            {activeGuides.map((guide, idx) => {
+              // ✅ POPRAWKA: Użyj transformPoint żeby przeliczyć world → screen
+              
+              if (guide.orientation === 'vertical') {
+                // Pionowa linia - stała X w world space
+                const worldX = guide.value;
+                
+                // Przelicz 2 punkty na ekran (góra i dół canvas)
+                const topPoint = transformPoint(
+                  { x: worldX, y: viewport.y - 100 }, // punkt bardzo wysoko
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                const bottomPoint = transformPoint(
+                  { x: worldX, y: viewport.y + 100 }, // punkt bardzo nisko
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                // Linia przez cały ekran pionowo
+                const screenX = topPoint.x;
+                
+                return (
+                  <line
+                    key={`${guide.sourceId}-v-${idx}`}
+                    x1={screenX}
+                    y1={0}
+                    x2={screenX}
+                    y2={canvasHeight}
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    strokeDasharray="8 4"
+                    opacity="1"
+                  />
+                );
+              } else {
+                // Pozioma linia - stała Y w world space
+                const worldY = guide.value;
+                
+                // Przelicz 2 punkty na ekran (lewy i prawy brzeg)
+                const leftPoint = transformPoint(
+                  { x: viewport.x - 100, y: worldY }, // punkt bardzo z lewej
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                const rightPoint = transformPoint(
+                  { x: viewport.x + 100, y: worldY }, // punkt bardzo z prawej
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                // Linia przez cały ekran poziomo
+                const screenY = leftPoint.y;
+                
+                return (
+                  <line
+                    key={`${guide.sourceId}-h-${idx}`}
+                    x1={0}
+                    y1={screenY}
+                    x2={canvasWidth}
+                    y2={screenY}
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    strokeDasharray="8 4"
+                    opacity="0.8"
+                  />
+                );
+              }
+            })}
+          </svg>
         )}
       </div>
     </div>

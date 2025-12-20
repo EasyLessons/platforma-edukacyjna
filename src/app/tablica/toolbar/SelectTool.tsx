@@ -18,6 +18,7 @@ import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { TextMiniToolbar } from './TextMiniToolbar';
 import { SelectionPropertiesPanel } from './SelectionPropertiesPanel';
+import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '../utils/snapUtils';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -33,6 +34,7 @@ interface SelectToolProps {
   onTextEdit?: (id: string) => void;
   onMarkdownEdit?: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  onActiveGuidesChange?: (guides: GuideLine[]) => void;
 }
 
 type ResizeHandle =
@@ -63,6 +65,7 @@ export function SelectTool({
   onTextEdit,
   onMarkdownEdit,
   onViewportChange,
+  onActiveGuidesChange,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -131,27 +134,139 @@ export function SelectTool({
         // Zachowaj oryginalne proporcje (aspect ratio)
         const aspectRatio = resizeOriginalBox.width / resizeOriginalBox.height;
         
+        // 🆕 Zbierz guidelines dla snap podczas resize
+        const guidelines = collectGuidelinesFromImages(elements);
+        const excludeIds = Array.from(resizeOriginalElements.keys());
+        const SNAP_THRESHOLD = 0.1;
+        
+        // Filtruj guidelines (wykluczamy źródłowe obiekty)
+        const validGuidelines = guidelines.filter(g => !excludeIds.includes(g.sourceId));
+        const verticalGuides = validGuidelines.filter(g => g.orientation === 'vertical');
+        const horizontalGuides = validGuidelines.filter(g => g.orientation === 'horizontal');
+        
+        const activeGuides: any[] = [];
+        
         if (resizeHandle === 'se') {
-          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          // Prawy dolny róg - snapujemy right i bottom edge
+          let targetRight = currentWorldX;
+          let targetBottom = currentWorldY;
+          
+          // Snap right edge do vertical guidelines
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetRight - guide.value) < SNAP_THRESHOLD) {
+              targetRight = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, targetRight - resizeOriginalBox.x);
           newBoxHeight = newBoxWidth / aspectRatio;
+          
+          // Snap bottom edge do horizontal guidelines  
+          const calculatedBottom = resizeOriginalBox.y + newBoxHeight;
+          for (const guide of horizontalGuides) {
+            if (Math.abs(calculatedBottom - guide.value) < SNAP_THRESHOLD) {
+              newBoxHeight = guide.value - resizeOriginalBox.y;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'sw') {
+          // Lewy dolny róg - snapujemy left i bottom edge
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
-          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          let targetLeft = currentWorldX;
+          
+          // Snap left edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetLeft - guide.value) < SNAP_THRESHOLD) {
+              targetLeft = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - targetLeft);
           newBoxX = originalRight - newBoxWidth;
           newBoxHeight = newBoxWidth / aspectRatio;
+          
+          // Snap bottom edge
+          const calculatedBottom = resizeOriginalBox.y + newBoxHeight;
+          for (const guide of horizontalGuides) {
+            if (Math.abs(calculatedBottom - guide.value) < SNAP_THRESHOLD) {
+              newBoxHeight = guide.value - resizeOriginalBox.y;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              newBoxX = originalRight - newBoxWidth;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'ne') {
-          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
-          newBoxHeight = newBoxWidth / aspectRatio;
+          // Prawy górny róg - snapujemy right i top edge
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
+          let targetRight = currentWorldX;
+          let targetTop = currentWorldY;
+          
+          // Snap right edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetRight - guide.value) < SNAP_THRESHOLD) {
+              targetRight = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, targetRight - resizeOriginalBox.x);
+          newBoxHeight = newBoxWidth / aspectRatio;
           newBoxY = originalBottom - newBoxHeight;
+          
+          // Snap top edge
+          for (const guide of horizontalGuides) {
+            if (Math.abs(newBoxY - guide.value) < SNAP_THRESHOLD) {
+              newBoxY = guide.value;
+              newBoxHeight = originalBottom - newBoxY;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'nw') {
+          // Lewy górny róg - snapujemy left i top edge
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
-          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          let targetLeft = currentWorldX;
+          let targetTop = currentWorldY;
+          
+          // Snap left edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetLeft - guide.value) < SNAP_THRESHOLD) {
+              targetLeft = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - targetLeft);
           newBoxX = originalRight - newBoxWidth;
           newBoxHeight = newBoxWidth / aspectRatio;
           newBoxY = originalBottom - newBoxHeight;
+          
+          // Snap top edge
+          for (const guide of horizontalGuides) {
+            if (Math.abs(newBoxY - guide.value) < SNAP_THRESHOLD) {
+              newBoxY = guide.value;
+              newBoxHeight = originalBottom - newBoxY;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              newBoxX = originalRight - newBoxWidth;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         }
+        
+        // Zaktualizuj active guides dla wizualizacji
+        onActiveGuidesChange?.(activeGuides);
         
         const scaleX = newBoxWidth / resizeOriginalBox.width;
         const scaleY = newBoxHeight / resizeOriginalBox.height;
@@ -253,42 +368,93 @@ export function SelectTool({
         const dx = worldPoint.x - dragStart.x;
         const dy = worldPoint.y - dragStart.y;
 
-        const updates = new Map<string, Partial<DrawingElement>>();
+        // Zbierz guide lines z obrazków
+        const guidelines = collectGuidelinesFromImages(elements);
+        
+        // Oblicz bounding box przeciąganych elementów
+        const draggedElements = Array.from(draggedElementsOriginal.values());
+        if (draggedElements.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          
+          draggedElements.forEach((el) => {
+            if (el.type === 'path') {
+              el.points.forEach((p: Point) => {
+                const px = p.x + dx;
+                const py = p.y + dy;
+                minX = Math.min(minX, px);
+                minY = Math.min(minY, py);
+                maxX = Math.max(maxX, px);
+                maxY = Math.max(maxY, py);
+              });
+            } else if (el.type === 'shape') {
+              const x1 = el.startX + dx;
+              const y1 = el.startY + dy;
+              const x2 = el.endX + dx;
+              const y2 = el.endY + dy;
+              minX = Math.min(minX, x1, x2);
+              minY = Math.min(minY, y1, y2);
+              maxX = Math.max(maxX, x1, x2);
+              maxY = Math.max(maxY, y1, y2);
+            } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table') {
+              const x = el.x + dx;
+              const y = el.y + dy;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x + (el.width || 0));
+              maxY = Math.max(maxY, y + (el.height || 0));
+            }
+          });
 
-        draggedElementsOriginal.forEach((originalEl, id) => {
-          if (originalEl.type === 'path') {
-            const newPoints = originalEl.points.map((p: Point) => ({
-              x: p.x + dx,
-              y: p.y + dy,
-            }));
-            updates.set(id, { points: newPoints });
-          } else if (originalEl.type === 'shape') {
-            updates.set(id, {
-              startX: originalEl.startX + dx,
-              startY: originalEl.startY + dy,
-              endX: originalEl.endX + dx,
-              endY: originalEl.endY + dy,
-            });
-          } else if (originalEl.type === 'text') {
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          } else if (originalEl.type === 'image') {
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
-            // 🆕 Drag dla markdown i table
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          }
-        });
+          const width = maxX - minX;
+          const height = maxY - minY;
+          
+          // Snap do guidelines
+          const excludeIds = Array.from(draggedElementsOriginal.keys());
+          const snapResult = snapToGuidelines(minX, minY, width, height, guidelines, excludeIds);
+          
+          // Oblicz adjustment snapu
+          const snapDx = snapResult.x - minX;
+          const snapDy = snapResult.y - minY;
+          
+          // Zaktualizuj active guides dla wizualizacji
+          onActiveGuidesChange?.(snapResult.activeGuides);
 
-        onElementsUpdate(updates);
+          const updates = new Map<string, Partial<DrawingElement>>();
+
+          draggedElementsOriginal.forEach((originalEl, id) => {
+            if (originalEl.type === 'path') {
+              const newPoints = originalEl.points.map((p: Point) => ({
+                x: p.x + dx + snapDx,
+                y: p.y + dy + snapDy,
+              }));
+              updates.set(id, { points: newPoints });
+            } else if (originalEl.type === 'shape') {
+              updates.set(id, {
+                startX: originalEl.startX + dx + snapDx,
+                startY: originalEl.startY + dy + snapDy,
+                endX: originalEl.endX + dx + snapDx,
+                endY: originalEl.endY + dy + snapDy,
+              });
+            } else if (originalEl.type === 'text') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            } else if (originalEl.type === 'image') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            }
+          });
+
+          onElementsUpdate(updates);
+        }
       }
     };
 
@@ -309,6 +475,9 @@ export function SelectTool({
       setResizeHandle(null);
       setResizeOriginalBox(null);
       setResizeOriginalElements(new Map());
+      
+      // Wyczyść active guides po zakończeniu operacji
+      onActiveGuidesChange?.([]);
     };
 
     window.addEventListener('mousemove', handleGlobalMouseMove);
@@ -318,7 +487,7 @@ export function SelectTool({
       window.removeEventListener('mousemove', handleGlobalMouseMove);
       window.removeEventListener('mouseup', handleGlobalMouseUp);
     };
-  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish]);
+  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish, elements, onActiveGuidesChange]);
 
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedIds.size === 0) return null;
