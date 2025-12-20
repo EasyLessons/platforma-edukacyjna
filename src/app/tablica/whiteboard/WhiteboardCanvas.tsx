@@ -648,14 +648,13 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - inteligentne rozpoznawanie gestów
+  // Wheel/Touchpad handling - ZOOM na scroll, PAN na Shift+scroll
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
       console.log('🖱️ Wheel:', { 
-        deltaX: e.deltaX,
         deltaY: e.deltaY, 
         ctrlKey: e.ctrlKey, 
         shiftKey: e.shiftKey,
@@ -679,23 +678,16 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // PROSTA LOGIKA:
-      // Ctrl = ZOOM (pinch na touchpadzie)
-      // Shift = PAN
-      // Nic = PAN (przesuwanie na touchpadzie)
-      
-      if (e.ctrlKey) {
-        // ZOOM - pinch na touchpadzie
-        const scaledDeltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50);
-        const newViewport = zoomViewport(currentViewport, scaledDeltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
-      } else if (e.shiftKey) {
-        // PAN - Shift+scroll
+      // ZMIENIONE: normalny scroll = zoom, Shift+scroll = pan
+      if (e.shiftKey) {
+        // Shift+scroll - przesuwanie tablicy
+        console.log('📐 Executing PAN');
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       } else {
-        // PAN - zwykłe przesuwanie dwoma palcami
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        // Normalny scroll - zoom in/out
+        console.log('🔍 Executing ZOOM');
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       }
     };
