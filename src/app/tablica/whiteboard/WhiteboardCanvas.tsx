@@ -678,16 +678,21 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // ZMIENIONE: normalny scroll = zoom, Shift+scroll = pan
-      if (e.shiftKey) {
-        // Shift+scroll - przesuwanie tablicy
-        console.log('📐 Executing PAN');
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+      // STARA SPRAWDZONA LOGIKA:
+      // Ctrl+scroll (pinch) = ZOOM
+      // Normalny scroll/przesuwanie = PAN
+      // Shift+scroll = PAN
+      
+      if (e.ctrlKey) {
+        // Ctrl+scroll lub pinch - ZOOM
+        console.log('🔍 Executing ZOOM (Ctrl/Pinch)');
+        const scaledDeltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50);
+        const newViewport = zoomViewport(currentViewport, scaledDeltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // Normalny scroll - zoom in/out
-        console.log('🔍 Executing ZOOM');
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+        // Normalny scroll lub Shift+scroll - PAN
+        console.log('📐 Executing PAN');
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
     };
