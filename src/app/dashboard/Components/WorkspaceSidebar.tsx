@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Search, 
   Plus, 
@@ -27,7 +27,8 @@ import {
   FileText,
   Settings,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  GripVertical
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
@@ -111,10 +112,48 @@ export default function WorkspaceSidebar() {
     visible: false, text: '', x: 0, y: 0
   });
   
+  // Drag & Drop states
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [customOrder, setCustomOrder] = useState<number[]>([]);
+  
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<{ id: number; name: string; icon: string; bg_color: string } | null>(null);
+
+  // Wczytaj kolejność z localStorage przy starcie
+  useEffect(() => {
+    const saved = localStorage.getItem('workspace-order');
+    if (saved) {
+      try {
+        setCustomOrder(JSON.parse(saved));
+      } catch (e) {
+        console.error('Błąd wczytywania kolejności workspace:', e);
+      }
+    }
+  }, []);
+
+  // Aktualizuj customOrder gdy zmienią się workspace (nowe zostały dodane)
+  useEffect(() => {
+    if (workspaces.length > 0) {
+      setCustomOrder(prevOrder => {
+        const workspaceIds = workspaces.map(w => w.id);
+        // Dodaj nowe workspace na koniec
+        const newIds = workspaceIds.filter(id => !prevOrder.includes(id));
+        // Usuń nieistniejące workspace
+        const filteredOrder = prevOrder.filter(id => workspaceIds.includes(id));
+        return [...filteredOrder, ...newIds];
+      });
+    }
+  }, [workspaces]);
+
+  // Zapisz kolejność do localStorage przy każdej zmianie
+  useEffect(() => {
+    if (customOrder.length > 0) {
+      localStorage.setItem('workspace-order', JSON.stringify(customOrder));
+    }
+  }, [customOrder]);
 
   // Tworzenie workspace przez modal
   const handleCreateWorkspace = async (data: { name: string; icon: string; bg_color: string }) => {
@@ -235,14 +274,78 @@ export default function WorkspaceSidebar() {
     }
   };
 
-  // Filtrowanie i sortowanie workspace'ów z backendu
+  // Drag & Drop handlers
+  const handleDragStart = (e: React.DragEvent, id: number) => {
+    setDraggedId(id);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/html', e.currentTarget.innerHTML);
+    // Dodaj lekką przezroczystość do przeciąganego elementu
+    (e.target as HTMLElement).style.opacity = '1';
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    (e.target as HTMLElement).style.opacity = '1';
+    setDraggedId(null);
+    setDragOverId(null);
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    
+    if (draggedId && draggedId !== id) {
+      setDragOverId(id);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverId(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetId: number) => {
+    e.preventDefault();
+    
+    if (!draggedId || draggedId === targetId) {
+      setDragOverId(null);
+      return;
+    }
+
+    // Znajdź indeksy
+    const draggedIndex = customOrder.indexOf(draggedId);
+    const targetIndex = customOrder.indexOf(targetId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Stwórz nową tablicę z przesunięciem
+    const newOrder = [...customOrder];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedId);
+
+    setCustomOrder(newOrder);
+    setDragOverId(null);
+    
+    console.log('✅ Zaktualizowano kolejność workspace w localStorage');
+  };
+
+  // Filtrowanie i sortowanie workspace'ów z backendu + custom order z localStorage
   const filteredSpaces = workspaces.filter(space =>
     space.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const sortedSpaces = [...filteredSpaces].sort((a, b) => {
+    // Najpierw ulubione na górze
     if (a.is_favourite && !b.is_favourite) return -1;
     if (!a.is_favourite && b.is_favourite) return 1;
+    
+    // Potem według customOrder z localStorage
+    const aIndex = customOrder.indexOf(a.id);
+    const bIndex = customOrder.indexOf(b.id);
+    
+    if (aIndex !== -1 && bIndex !== -1) {
+      return aIndex - bIndex;
+    }
+    
+    // Jeśli nie ma w customOrder, zostaw domyślną kolejność
     return 0;
   });
 
@@ -546,16 +649,27 @@ export default function WorkspaceSidebar() {
                     }`}
                   />
 
+                  {/* Indicator gdy przeciągamy nad tym elementem */}
+                  {dragOverId === space.id && (
+                    <div className="absolute left-2 right-2 top-0 h-0.5 bg-green-500 rounded-full z-10" />
+                  )}
+
                   <div
+                    draggable={true}
+                    onDragStart={(e) => handleDragStart(e, space.id)}
+                    onDragEnd={handleDragEnd}
+                    onDragOver={(e) => handleDragOver(e, space.id)}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, space.id)}
                     className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 ml-2 rounded-lg transition-all duration-200 cursor-pointer group ${
                       isActive 
                         ? 'bg-green-100 border-2 border-green-300' 
                         : isHovered
-                          ? 'bg-gray-100'
+                          ? 'bg-gray-200/50 '
                           : space.is_favourite 
                             ? 'bg-yellow-50' 
                             : ''
-                    }`}
+                    } ${draggedId === space.id ? 'opacity-100' : ''}`}
                     onClick={() => handleWorkspaceClick(space.id)}
                     onMouseEnter={(e) => showWorkspaceTooltip(e, space.name)}
                     onMouseLeave={hideWorkspaceTooltip}
@@ -566,6 +680,15 @@ export default function WorkspaceSidebar() {
 
                     {!isCollapsed && (
                       <>
+                        {/* Ikona przeciągania przy hover */}
+                        {isHovered && (
+                          <div 
+                            className="flex items-center text-gray-400 cursor-move"
+                          >
+                            <GripVertical size={16} />
+                          </div>
+                        )}
+
                         <span className={`text-sm font-medium flex-1 truncate ${
                           isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
                         }`}>

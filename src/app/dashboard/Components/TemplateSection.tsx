@@ -227,11 +227,11 @@ export default function TemplatesSection() {
             <button
               key={template.id}
               onClick={() => handleTemplateClick(template.route, template.name)}
-              className="group relative bg-white rounded-lg md:rounded-2xl p-3 md:p-6 border-2 border-gray-100 hover:border-green-300 hover:shadow-lg transition-all duration-300 cursor-pointer text-left flex-shrink-0 min-w-[140px] max-w-[180px] md:min-w-[200px] md:max-w-[280px]"
+              className="group relative bg-gray-200/25 rounded-lg md:rounded-2xl p-3 md:p-6 border-3 border-gray-200/50 hover:bg-gray-200/50 hover:shadow-lg transition-all duration-300 cursor-pointer text-left flex-shrink-0 min-w-[140px] max-w-[180px] md:min-w-[200px] md:max-w-[280px]"
             >
               {/* Desktop Layout */}
               <div className="hidden md:block">
-                <div className={`w-14 h-14 flex-shrink-0 rounded-xl bg-gradient-to-br ${template.gradient} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                <div className={`w-14 h-14 flex-shrink-0 rounded-xl ${template.color} flex items-center justify-center mb-4 group-hover:scale-100 transition-transform duration-300 shadow-md`}>
                   <IconComponent size={26} className="text-white" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-1 text-sm">
@@ -244,7 +244,7 @@ export default function TemplatesSection() {
 
               {/* Mobile Layout - ikonka po lewej, nazwa po prawej */}
               <div className="md:hidden flex items-center gap-3">
-                <div className={`w-8 h-8 flex-shrink-0 rounded-lg bg-gradient-to-br ${template.gradient} flex items-center justify-center group-hover:scale-110 transition-transform duration-300 shadow-md`}>
+                <div className={`w-8 h-8 flex-shrink-0 rounded-lg ${template.color} flex items-center justify-center group-hover:scale-100 transition-transform duration-300 shadow-md`}>
                   <IconComponent size={16} className="text-white" />
                 </div>
                 <h3 className="font-medium text-gray-900 text-xs leading-tight flex-1">

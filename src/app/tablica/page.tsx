@@ -133,7 +133,7 @@ function TablicaContent() {
             position: 'relative'
           }}
           onMouseOver={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0px)';
             (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
           }}
           onMouseOut={(e) => {
@@ -202,7 +202,7 @@ function TablicaContent() {
         @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: translateX(-50%) translateY(-8px);
+            transform: translateX(-50%) translateY(0px);
           }
           to {
             opacity: 1;

@@ -191,6 +191,8 @@ Zadaj pytanie! 🤔`,
   
   // 🆕 SMARTSEARCH - state
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
+  const [isSearchActive, setIsSearchActive] = useState(false); // Blokuje zoom gdy search otwarty
+  const [isCardViewerActive, setIsCardViewerActive] = useState(false); // Blokuje canvas gdy CardViewer otwarty
   
   // History state
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
@@ -646,12 +648,26 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - NAPRAWIONE: używamy ref zamiast viewport w dependencies
+  // Wheel/Touchpad handling - ZOOM na scroll, PAN na Shift+scroll
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
+      console.log('🖱️ Wheel:', { 
+        deltaY: e.deltaY, 
+        ctrlKey: e.ctrlKey, 
+        shiftKey: e.shiftKey,
+        isSearchActive,
+        isCardViewerActive
+      });
+      
+      // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
+      if (isSearchActive || isCardViewerActive) {
+        console.log('🚫 Zoom zablokowany - modal aktywny');
+        return;
+      }
+      
       e.preventDefault();
       
       const rect = container.getBoundingClientRect();
@@ -660,21 +676,25 @@ Zadaj pytanie! 🤔`,
       const width = rect.width;
       const height = rect.height;
       
-      // NAPRAWIONE: używamy viewportRef.current zamiast viewport z closure
       const currentViewport = viewportRef.current;
       
-      if (e.ctrlKey) {
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+      // ZMIENIONE: normalny scroll = zoom, Shift+scroll = pan
+      if (e.shiftKey) {
+        // Shift+scroll - przesuwanie tablicy
+        console.log('📐 Executing PAN');
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        // Normalny scroll - zoom in/out
+        console.log('🔍 Executing ZOOM');
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
+  }, [isSearchActive, isCardViewerActive]);
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
@@ -1840,6 +1860,7 @@ Zadaj pytanie! 🤔`,
           <SmartSearchBar
             onFormulaSelect={handleFormulaSelect}
             onCardSelect={handleCardSelect}
+            onActiveChange={setIsSearchActive}
           />
         </div>
         
@@ -1849,6 +1870,7 @@ Zadaj pytanie! 🤔`,
             card={activeCard}
             onClose={() => setActiveCard(null)}
             onAddFormulas={handleAddFormulasFromCard}
+            onActiveChange={setIsCardViewerActive}
           />
         )}
         
@@ -1859,7 +1881,8 @@ Zadaj pytanie! 🤔`,
           onResetView={resetView}
         />
         
-        {tool === 'text' && canvasWidth > 0 && (
+        {/* NARZĘDZIA - BLOKOWANE gdy modal aktywny */}
+        {!isSearchActive && tool === 'text' && canvasWidth > 0 && (
           <TextTool
             viewport={viewport}
             canvasWidth={canvasWidth}
@@ -1874,7 +1897,7 @@ Zadaj pytanie! 🤔`,
           />
         )}
 
-        {tool === 'select' && canvasWidth > 0 && (
+        {!isSearchActive && tool === 'select' && canvasWidth > 0 && (
           <SelectTool
             viewport={viewport}
             canvasWidth={canvasWidth}
@@ -2004,6 +2027,7 @@ Zadaj pytanie! 🤔`,
         onAddToBoard={handleChatbotAddToBoard}
         messages={chatMessages}
         setMessages={setChatMessages}
+        onActiveChange={setIsSearchActive}
       />
     )}
 

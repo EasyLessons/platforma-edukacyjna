@@ -91,6 +91,14 @@ export interface BoardListResponse {
   offset: number;
 }
 
+/**
+ * Użytkownik online na tablicy
+ */
+export interface OnlineUser {
+  user_id: number;
+  username: string;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 📡 API FUNKCJE
 // ═══════════════════════════════════════════════════════════════════════════
@@ -597,7 +605,112 @@ export const deleteBoardElement = async (
 
 /**
  * ───────────────────────────────────────────────────────────────────────────
- * 🔗 DOŁĄCZENIE DO WORKSPACE PRZEZ TABLICĘ
+ * � POBIERANIE UŻYTKOWNIKÓW ONLINE NA TABLICY
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Pobiera listę użytkowników którzy są obecnie online na danej tablicy
+ * 
+ * ENDPOINT:
+ * GET /api/boards/{boardId}/online-users?limit={limit}&offset={offset}
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany
+ * - Użytkownik MUSI mieć dostęp do tablicy
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number)
+ * - limit: Limit wyników (domyślnie 50)
+ * - offset: Offset dla paginacji (domyślnie 0)
+ * 
+ * ZWRACA:
+ * OnlineUser[] - tablica użytkowników z user_id i username
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * const users = await fetchBoardOnlineUsers(1);
+ * console.log(users); // [{ user_id: 5, username: "mati" }, ...]
+ */
+export const fetchBoardOnlineUsers = async (
+  boardId: number,
+  limit: number = 50,
+  offset: number = 0
+): Promise<OnlineUser[]> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/online-users?limit=${limit}&offset=${offset}`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────── * ✅ OZNACZENIE UŻYTKOWNIKA JAKO ONLINE NA TABLICY
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Wywołaj gdy użytkownik otwiera tablicę
+ */
+export const markUserOnline = async (boardId: number): Promise<void> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/online`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * ❌ OZNACZENIE UŻYTKOWNIKA JAKO OFFLINE NA TABLICY
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Wywołaj gdy użytkownik zamyka tablicę
+ */
+export const markUserOffline = async (boardId: number): Promise<void> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/online`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * ─────────────────────────────────────────────────────────────────────────── * �🔗 DOŁĄCZENIE DO WORKSPACE PRZEZ TABLICĘ
  * ───────────────────────────────────────────────────────────────────────────
  * 
  * Automatyczne dołączenie do workspace przez link do tablicy.
@@ -637,6 +750,7 @@ export const joinBoardWorkspace = async (boardId: number): Promise<{
  * ✅ createBoard(data) - nowa tablica
  * ✅ deleteBoard(boardId) - usunięcie tablicy
  * ✅ toggleBoardFavourite(boardId, isFavourite) - ulubiona
+ * ✅ fetchBoardOnlineUsers(boardId, limit, offset) - użytkownicy online
  * ✅ joinBoardWorkspace(boardId) - dołączenie do workspace przez tablicę
  * 
  * BOARD ELEMENTS:

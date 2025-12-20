@@ -147,7 +147,7 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
               placeholder="Wyszukaj po nazwie użytkownika lub emailu..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-400 focus:outline-none"
+              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-400 focus:outline-none text-black"
               autoFocus
             />
           </div>

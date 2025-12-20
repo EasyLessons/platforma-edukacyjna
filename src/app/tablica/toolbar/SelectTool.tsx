@@ -128,25 +128,28 @@ export function SelectTool({
         
         const MIN_SIZE = 0.1;
         
+        // Zachowaj oryginalne proporcje (aspect ratio)
+        const aspectRatio = resizeOriginalBox.width / resizeOriginalBox.height;
+        
         if (resizeHandle === 'se') {
           newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
-          newBoxHeight = Math.max(MIN_SIZE, currentWorldY - resizeOriginalBox.y);
+          newBoxHeight = newBoxWidth / aspectRatio;
         } else if (resizeHandle === 'sw') {
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
           newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
           newBoxX = originalRight - newBoxWidth;
-          newBoxHeight = Math.max(MIN_SIZE, currentWorldY - resizeOriginalBox.y);
+          newBoxHeight = newBoxWidth / aspectRatio;
         } else if (resizeHandle === 'ne') {
           newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          newBoxHeight = newBoxWidth / aspectRatio;
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
-          newBoxHeight = Math.max(MIN_SIZE, originalBottom - currentWorldY);
           newBoxY = originalBottom - newBoxHeight;
         } else if (resizeHandle === 'nw') {
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
           newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
           newBoxX = originalRight - newBoxWidth;
-          newBoxHeight = Math.max(MIN_SIZE, originalBottom - currentWorldY);
+          newBoxHeight = newBoxWidth / aspectRatio;
           newBoxY = originalBottom - newBoxHeight;
         }
         

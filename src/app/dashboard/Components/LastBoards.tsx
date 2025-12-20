@@ -51,9 +51,14 @@ import {
   MessageCircle,
   Bell
 } from 'lucide-react';
-import { fetchBoards, createBoard, updateBoard, deleteBoard, Board as APIBoard } from '@/boards_api/api';
+import { fetchBoards, createBoard, updateBoard, deleteBoard, Board as APIBoard, fetchBoardOnlineUsers, OnlineUser as APIOnlineUser } from '@/boards_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import BoardSettingsModal from './BoardSettingsModal';
+
+interface OnlineUser {
+  user_id: number;
+  username: string;
+}
 
 interface Board {
   id: number;  // ← ZMIANA: number zamiast string
@@ -67,7 +72,7 @@ interface Board {
   lastOpened: string;  // Sformatowana data do wyświetlania
   lastOpenedRaw: string | null;  // Surowa data ISO do sortowania
   owner: string;
-  onlineUsers: number;
+  onlineUsers: OnlineUser[];  // Lista użytkowników online
   isFavorite: boolean;
 }
 
@@ -96,6 +101,28 @@ const allIcons = [
   PenTool, Calculator, Globe, Lightbulb, Target, Rocket, BookOpen, Presentation,
   Zap, Compass, Cpu
 ];
+
+// Kolory awatarów (zgodnie z OnlineUsers.tsx)
+const AVATAR_COLORS = [
+  'bg-blue-500',
+  'bg-green-500',
+  'bg-yellow-500',
+  'bg-red-500',
+  'bg-purple-500',
+  'bg-pink-500',
+  'bg-indigo-500',
+  'bg-teal-500',
+  'bg-orange-500',
+  'bg-cyan-500'
+];
+
+const getAvatarColor = (userId: number) => {
+  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
+};
+
+const getInitials = (username: string) => {
+  return username.slice(0, 2).toUpperCase();
+};
 
 export default function LastBoards() {
   const router = useRouter();
@@ -168,22 +195,38 @@ export default function LastBoards() {
         setError(null);
         const data = await fetchBoards(activeWorkspace.id);
         
+        // Wczytaj ulubione z localStorage
+        const savedFavorites = localStorage.getItem('board-favorites');
+        const favoritesMap: Record<number, boolean> = savedFavorites ? JSON.parse(savedFavorites) : {};
+        
+        // Wczytaj czasy ostatniego otwarcia z localStorage
+        const savedOpenedTimes = localStorage.getItem('board-opened-times');
+        const openedTimesMap: Record<number, string> = savedOpenedTimes ? JSON.parse(savedOpenedTimes) : {};
+        
         // Mapuj API Board → UI Board
-        const mappedBoards: Board[] = data.boards.map((b: APIBoard) => ({
-          id: b.id,
-          name: b.name,
-          icon: getIconComponent(b.icon),
-          iconName: b.icon,  // Zachowaj nazwę ikony do edycji
-          bgColor: b.bg_color,  // Zachowaj kolor do edycji
-          lastModified: formatDate(b.last_modified),
-          lastModifiedRaw: b.last_modified,  // Surowa data do sortowania
-          lastModifiedBy: b.last_modified_by || b.created_by,
-          lastOpened: formatDate(b.last_opened || b.created_at),
-          lastOpenedRaw: b.last_opened || b.created_at,  // Surowa data do sortowania
-          owner: b.owner_username,
-          onlineUsers: 0,  // TODO: WebSocket
-          isFavorite: b.is_favourite
-        }));
+        const mappedBoards: Board[] = data.boards.map((b: APIBoard) => {
+          // Użyj czasu z localStorage jeśli istnieje, w przeciwnym razie z API
+          const lastOpenedTime = openedTimesMap[b.id] || b.last_opened || b.created_at;
+          
+          // TODO: WebSocket - online users będą pobierani przez WebSocket
+          // Na razie pusta lista (placeholder)
+          
+          return {
+            id: b.id,
+            name: b.name,
+            icon: getIconComponent(b.icon),
+            iconName: b.icon,  // Zachowaj nazwę ikony do edycji
+            bgColor: b.bg_color,  // Zachowaj kolor do edycji
+            lastModified: formatDate(b.last_modified),
+            lastModifiedRaw: b.last_modified,  // Surowa data do sortowania
+            lastModifiedBy: b.last_modified_by || b.created_by,
+            lastOpened: formatDate(lastOpenedTime),
+            lastOpenedRaw: lastOpenedTime,  // Surowa data do sortowania
+            owner: b.owner_username,
+            onlineUsers: [],  // TODO: WebSocket - pusta lista (placeholder)
+            isFavorite: favoritesMap[b.id] !== undefined ? favoritesMap[b.id] : b.is_favourite
+          };
+        });
         
         setBoards(mappedBoards);
       } catch (err) {
@@ -196,6 +239,17 @@ export default function LastBoards() {
     
     loadBoards();
   }, [activeWorkspace?.id]);
+
+  // Zapisuj ulubione do localStorage przy każdej zmianie
+  useEffect(() => {
+    if (boards.length > 0) {
+      const favoritesMap: Record<number, boolean> = {};
+      boards.forEach(board => {
+        favoritesMap[board.id] = board.isFavorite;
+      });
+      localStorage.setItem('board-favorites', JSON.stringify(favoritesMap));
+    }
+  }, [boards]);
 
   // Zamknij dropdown przy kliknięciu poza nim
   useEffect(() => {
@@ -316,6 +370,25 @@ export default function LastBoards() {
   };
 
   const handleBoardClick = (boardId: number) => {
+    // Aktualizuj czas ostatniego otwarcia w localStorage
+    const now = new Date().toISOString();
+    const openedTimes = JSON.parse(localStorage.getItem('board-opened-times') || '{}');
+    openedTimes[boardId] = now;
+    localStorage.setItem('board-opened-times', JSON.stringify(openedTimes));
+    
+    // Aktualizuj lokalnie
+    setBoards(prev =>
+      prev.map(b =>
+        b.id === boardId
+          ? {
+              ...b,
+              lastOpened: formatDate(now),
+              lastOpenedRaw: now
+            }
+          : b
+      )
+    );
+    
     router.push(`/tablica?boardId=${boardId}`);
   };
   
@@ -552,14 +625,14 @@ export default function LastBoards() {
               <div
                 key={board.id}
                 onClick={() => handleBoardClick(board.id)}
-                className={`group bg-white rounded-xl md:rounded-2xl p-3 md:p-5 border-2 border-transparent hover:border-green-400 hover:shadow-lg transition-all duration-300 cursor-pointer backdrop-blur-sm relative ${openDropdownId === board.id ? 'z-50' : 'z-0'}`}
+                className={`group relative bg-gray-200/25 rounded-xl md:rounded-2xl p-3 md:p-5 border-2 border-gray-200/50 hover:bg-gray-200/50 hover:shadow-lg transition-all duration-300 cursor-pointer relative ${openDropdownId === board.id ? 'z-50' : 'z-0'}`}
               >
                 {/* Mobile Layout */}
                 <div className="lg:hidden">
                   {/* Top: Icon + Name + Actions */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`w-10 h-10 flex-shrink-0 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                      <div className={`w-10 h-10 flex-shrink-0 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}>
                         <Icon size={20} className="text-white drop-shadow-sm" />
                       </div>
                       <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate flex-1">{board.name}</h3>
@@ -594,7 +667,7 @@ export default function LastBoards() {
                 <div className="hidden lg:grid grid-cols-12 gap-4 items-center">
                   {/* Nazwa + ikona */}
                   <div className="col-span-4 flex items-center gap-3">
-                    <div className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-110 transition-transform duration-300`}>
+                    <div className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}>
                       <Icon size={24} className="text-white drop-shadow-sm" />
                     </div>
                     <div className="min-w-0 flex-1">
@@ -622,11 +695,32 @@ export default function LastBoards() {
                   </div>
 
                   {/* Osoby online */}
-                  <div className="col-span-2 text-center">
-                    {board.onlineUsers > 0 ? (
-                      <div className="inline-flex items-center gap-1.5 bg-green-50 text-green-700 px-3 py-1 rounded-full">
-                        <Users size={16} />
-                        <span className="font-bold text-sm">{board.onlineUsers}</span>
+                  <div className="col-span-2 flex justify-center">
+                    {board.onlineUsers.length > 0 ? (
+                      <div className="flex items-center -space-x-2">
+                        {board.onlineUsers.slice(0, 3).map((user, index) => {
+                          const color = getAvatarColor(user.user_id);
+                          const initials = getInitials(user.username);
+                          
+                          return (
+                            <div
+                              key={`${user.user_id}-${index}`}
+                              className={`w-8 h-8 ${color} rounded-full flex items-center justify-center text-white text-xs font-semibold border-2 border-white shadow-sm hover:scale-110 transition-transform cursor-pointer`}
+                              title={user.username}
+                              style={{ zIndex: board.onlineUsers.length - index }}
+                            >
+                              {initials}
+                            </div>
+                          );
+                        })}
+                        {board.onlineUsers.length > 3 && (
+                          <div
+                            className="w-8 h-8 bg-gray-400 rounded-full flex items-center justify-center text-white text-xs font-semibold border-2 border-white shadow-sm"
+                            title={`+${board.onlineUsers.length - 3} więcej`}
+                          >
+                            +{board.onlineUsers.length - 3}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <span className="text-gray-400 text-xs font-medium">—</span>

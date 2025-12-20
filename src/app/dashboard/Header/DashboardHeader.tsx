@@ -4,11 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, Bell, Gift, Crown, UserPlus, ChevronDown, Menu, X } from "lucide-react";
+import { Search, Bell, Gift, Crown, UserPlus, ChevronDown, Menu, X, LogOut, User as UserIcon } from "lucide-react";
 
 // Import funkcji API
 import { getUser, isAuthenticated, type User } from "@/auth_api/api";
 import { fetchPendingInvites } from "@/workspace_api/api";
+import { useAuth } from "@/app/context/AuthContext";
 
 // Import popupów
 import InvitePopup from "./popups/InvitePopup";
@@ -27,6 +28,7 @@ interface ExtendedUser extends User {
 
 export default function DashboardHeader() {
   const router = useRouter();
+  const { logout } = useAuth();
 
   // State dla popupów
   const [showInvitePopup, setShowInvitePopup] = useState(false);
@@ -312,17 +314,30 @@ export default function DashboardHeader() {
             </button>
           </div>
 
-          {/* MOBILE MENU DROPDOWN */}
+          {/* MOBILE MENU DRAWER */}
           {showMobileMenu && (
-            <div className="min-[1550px]:hidden mt-4 pb-4 border-t border-gray-200">
-              <div className="space-y-3 pt-4">
+            <>
+              {/* Drawer */}
+              <div className="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-200">
+                {/* Header drawera */}
+                <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+                  <span className="font-semibold text-gray-800">Menu</span>
+                  <button
+                    onClick={() => setShowMobileMenu(false)}
+                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-4 space-y-3">
                 {/* Search Mobile */}
                 <button className="w-full px-4 py-3 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer">
                   <Search
                     size={18}
                     className="text-gray-400 group-hover:text-green-600 transition-colors"
                   />
-                  <span className="flex-1 text-left text-sm text-gray-500 group-hover:text-gray-700 font-medium">
+                  <span className="flex-1 text-left text-sm text-black group-hover:text-gray-700 font-medium">
                     Wyszukaj wszystko...
                   </span>
                 </button>
@@ -401,15 +416,30 @@ export default function DashboardHeader() {
 
                   <button
                     onClick={() => {
-                      setShowUserMenu(true);
+                      router.push('/clientPanel');
                       setShowMobileMenu(false);
                     }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
                   >
-                    <div className="w-5 h-5 bg-gray-400 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs">⚙</span>
-                    </div>
-                    <span>Ustawienia konta</span>
+                    <UserIcon size={20} />
+                    <span>Profil</span>
+                  </button>
+
+                  {/* Separator */}
+                  <div className="border-t border-gray-200 my-2"></div>
+
+                  {/* Wyloguj */}
+                  <button
+                    onClick={() => {
+                      console.log('🚪 Wylogowywanie z mobile menu...');
+                      logout();
+                      setShowMobileMenu(false);
+                      router.push('/');
+                    }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                  >
+                    <LogOut size={20} />
+                    <span className="font-medium">Wyloguj się</span>
                   </button>
                 </div>
 
@@ -423,6 +453,7 @@ export default function DashboardHeader() {
                 )}
               </div>
             </div>
+            </>
           )}
         </div>
       </header>

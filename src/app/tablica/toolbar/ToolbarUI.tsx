@@ -199,15 +199,15 @@ export function ToolbarUI({
             onClick={() => onChatbotToggle?.()}
             title="Math Tutor - AI Asystent Matematyczny"
             className={`
-              relative w-full p-2 rounded-lg transition-all group mb-1
+              relative w-full p-4 py-3 rounded-lg transition-all group mb-1 cursor-pointer
               ${isChatbotOpen 
                 ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg' 
                 : 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600 hover:shadow-md'}
             `}
           >
             <div className="flex items-center justify-center gap-1.5">
-              <MessageCircle className="w-4 h-4" />
-              <span className="text-xs font-semibold">AI</span>
+              {/* <MessageCircle className="w-4 h-4" /> */}
+              <span className="text-base font-semibold">AI</span>
             </div>
             <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
               Math Tutor AI

@@ -116,7 +116,7 @@ function Toolbar({
   // FunctionTool sam tworzy funkcje i ma własny input
 
   return (
-    <div className="absolute top-28 left-4 z-50 pointer-events-none flex flex-row items-start gap-2">
+    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-none flex flex-row items-start gap-2">
       <ToolbarUI
         tool={tool}
         selectedShape={selectedShape}

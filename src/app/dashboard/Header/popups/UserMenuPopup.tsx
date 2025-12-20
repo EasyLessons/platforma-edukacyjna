@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { User, Settings, Crown, LogOut } from 'lucide-react';
 // 🔥 DODAJ TEN IMPORT - 3 poziomy w górę do app/, potem context/
@@ -20,6 +21,21 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   const router = useRouter();
   // 🔥 DODAJ TO - pobierz funkcję logout z contextu
   const { logout } = useAuth();
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  // Zamknij popup gdy klikniemy poza nim
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [onClose]);
 
   const handleNavigation = (path: string) => {
     router.push(path);
@@ -36,8 +52,7 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   };
 
   return (
-    <div className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50">
-      
+    <div ref={popupRef} className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50">
       {/* Info użytkownika */}
       <div className="px-4 py-4 border-b border-gray-100 bg-gray-50">
         <div className="flex items-center gap-3">
@@ -74,7 +89,7 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
       {/* Menu opcje */}
       <div className="py-2">
         <button
-          onClick={() => handleNavigation('/dashboard/profile')}
+          onClick={() => handleNavigation('/clientPanel')}
           className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors cursor-pointer group"
         >
           <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
@@ -82,18 +97,8 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
           </div>
           <span className="text-gray-700 font-medium text-sm">Profil</span>
         </button>
-        
-        <button
-          onClick={() => handleNavigation('/dashboard/settings')}
-          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors cursor-pointer group"
-        >
-          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-gray-200 transition-colors">
-            <Settings size={16} className="text-gray-600" />
-          </div>
-          <span className="text-gray-700 font-medium text-sm">Ustawienia</span>
-        </button>
 
-        {/* Przejdź na Premium */}
+        
         {!user.isPremium && (
           <>
             <div className="my-2 border-t border-gray-100"></div>

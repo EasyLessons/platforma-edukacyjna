@@ -288,17 +288,26 @@ export function BoardRealtimeProvider({
     // 🚀 SUBSKRYPCJA
     // ═══════════════════════════════════════════════════════════════════════
     
+    let presenceHeartbeat: NodeJS.Timeout | null = null
+    
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         setIsConnected(true)
         console.log('✅ Połączono z kanałem tablicy')
         
         // Wyślij swoją obecność (Presence)
-        await channel.track({
-          user_id: user.id,
-          username: user.username,
-          online_at: new Date().toISOString()
-        })
+        const trackPresence = async () => {
+          await channel.track({
+            user_id: user.id,
+            username: user.username,
+            online_at: new Date().toISOString()
+          })
+        }
+        
+        await trackPresence()
+        
+        // Heartbeat co 15 sekund żeby utrzymać obecność
+        presenceHeartbeat = setInterval(trackPresence, 15000)
       } else if (status === 'CHANNEL_ERROR') {
         setIsConnected(false)
         console.error('❌ Błąd połączenia z kanałem')
@@ -311,14 +320,16 @@ export function BoardRealtimeProvider({
     channelRef.current = channel
     
     // ═══════════════════════════════════════════════════════════════════════
-    // ⏰ CLEANUP NIEAKTYWNYCH KURSORÓW (co 3 sekundy)
+    // ⏰ CLEANUP NIEAKTYWNYCH KURSORÓW - WYŁĄCZONY
     // ═══════════════════════════════════════════════════════════════════════
+    // Kursory są czyszczone tylko gdy użytkownik opuści tablicę (presence.leave)
+    // Nie używamy timeoutu bo kursor ma być widoczny cały czas gdy user jest online
     
-    const cursorCleanupInterval = setInterval(() => {
-      const now = Date.now()
-      const CURSOR_TIMEOUT = 5000 // 5 sekund
-      setRemoteCursors(prev => prev.filter(c => now - c.lastUpdate < CURSOR_TIMEOUT))
-    }, 3000)
+    // const cursorCleanupInterval = setInterval(() => {
+    //   const now = Date.now()
+    //   const CURSOR_TIMEOUT = 600000 // 10 minut
+    //   setRemoteCursors(prev => prev.filter(c => now - c.lastUpdate < CURSOR_TIMEOUT))
+    // }, 60000)
     
     // ═══════════════════════════════════════════════════════════════════════
     // 🧹 CLEANUP
@@ -326,8 +337,9 @@ export function BoardRealtimeProvider({
     
     return () => {
       console.log('🔌 Rozłączanie z kanału tablicy')
+      if (presenceHeartbeat) clearInterval(presenceHeartbeat)
       channel.unsubscribe()
-      clearInterval(cursorCleanupInterval)
+      // clearInterval(cursorCleanupInterval)
       setIsConnected(false)
       setRemoteCursors([])
     }

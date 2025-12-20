@@ -18,6 +18,7 @@ from dashboard.boards.schemas import (
 )
 from dashboard.boards.service import BoardService
 from dashboard.boards.utils import get_current_user_id
+from dashboard.boards.online import set_user_online, set_user_offline
 
 router = APIRouter(prefix="/api/boards", tags=["dashboard", "boards"])
 
@@ -75,6 +76,40 @@ async def get_online_users(
     """Pobieranie użytkowników online na tablicy"""
     service = BoardService(db)
     return await service.get_online_users(board_id, limit, offset)
+
+@router.post("/{board_id}/online")
+async def mark_user_online(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Oznacz użytkownika jako online na tablicy"""
+    success = set_user_online(db, board_id, user_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona lub brak dostępu"
+        )
+    
+    return {"status": "online", "board_id": board_id, "user_id": user_id}
+
+@router.delete("/{board_id}/online")
+async def mark_user_offline(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Oznacz użytkownika jako offline na tablicy"""
+    success = set_user_offline(db, board_id, user_id)
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tablica nie znaleziona lub brak dostępu"
+        )
+    
+    return {"status": "offline", "board_id": board_id, "user_id": user_id}
 
 @router.delete("/{board_id}")
 async def delete_board(
