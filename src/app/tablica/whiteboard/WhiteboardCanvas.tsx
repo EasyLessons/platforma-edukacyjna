@@ -682,13 +682,18 @@ Zadaj pytanie! 🤔`,
       // NOWA LOGIKA - rozpoznawanie gestów:
       // 1. Ctrl+Wheel (pinch na touchpadzie) = ZOOM
       // 2. Shift+Wheel = PAN
-      // 3. Duży ruch (touchpad swipe dwoma palcami) = PAN
-      // 4. Mały ruch (mysz scroll) = ZOOM
+      // 3. Touchpad swipe (duże delty bez Ctrl) = PAN
+      // 4. Mysz scroll (małe delty) = ZOOM
       
       if (e.ctrlKey) {
         // Pinch to zoom na touchpadzie lub Ctrl+scroll na myszce
-        console.log('🔍 Executing ZOOM (Ctrl/Pinch)');
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+        console.log('🔍 Executing ZOOM (Ctrl/Pinch)', { deltaY: e.deltaY });
+        
+        // SKALOWANIE: touchpad wysyła większe wartości niż mysz
+        // Ogranicz deltaY żeby zoom nie był za szybki
+        const scaledDeltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50);
+        
+        const newViewport = zoomViewport(currentViewport, scaledDeltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else if (e.shiftKey) {
         // Shift+scroll - przesuwanie tablicy
@@ -699,15 +704,16 @@ Zadaj pytanie! 🤔`,
         // Wykryj czy to touchpad swipe (duże delty) czy mysz (małe delty)
         const absDeltaX = Math.abs(e.deltaX);
         const absDeltaY = Math.abs(e.deltaY);
+        const totalDelta = Math.max(absDeltaX, absDeltaY);
         
-        // Touchpad swipe wysyła większe wartości - jeśli którakolwiek delta > 10, to touchpad
-        if (absDeltaX > 10 || absDeltaY > 10) {
-          console.log('📐 Executing PAN (touchpad swipe)');
+        // Touchpad swipe wysyła większe wartości - próg 30 dla pewności
+        if (totalDelta > 30) {
+          console.log('📐 Executing PAN (touchpad swipe)', { deltaX: e.deltaX, deltaY: e.deltaY, totalDelta });
           const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
           setViewport(constrainViewport(newViewport));
         } else {
           // Mały ruch - mysz scroll - ZOOM
-          console.log('🔍 Executing ZOOM (mouse scroll)');
+          console.log('🔍 Executing ZOOM (mouse scroll)', { deltaY: e.deltaY, totalDelta });
           const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
           setViewport(constrainViewport(newViewport));
         }
