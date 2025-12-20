@@ -138,19 +138,6 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   
   // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
-  
-
-  // 🤖 CHATBOT - osobny state (zawsze aktywny po włączeniu)
-const [isChatbotOpen, setIsChatbotOpen] = useState(false);
-
-// 🆕 STABILNE CALLBACKI dla chatbota (żeby nie łamać memo!)
-const handleChatbotClose = useCallback(() => {
-  setIsChatbotOpen(false);
-}, []);
-
-const handleChatbotToggle = useCallback(() => {
-  setIsChatbotOpen(prev => !prev);
-}, []);
 
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
@@ -1075,16 +1062,23 @@ Zadaj pytanie! 🤔`,
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
     const currentViewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     
     // Większy rozmiar notatki - 5x4 jednostki = 500x400px przy scale=1
     const noteWidth = 5;
     const noteHeight = 4;
     
+    // 🆕 Środek widocznego ekranu (canvas center) w jednostkach świata
+    const rect = canvas.getBoundingClientRect();
+    const centerScreen = { x: rect.width / 2, y: rect.height / 2 };
+    const centerWorld = inverseTransformPoint(centerScreen, currentViewport, rect.width, rect.height);
+    
     const newNote: MarkdownNote = {
       id: `chatbot-note-${Date.now()}`,
       type: 'markdown',
-      x: -currentViewport.x - noteWidth / 2,
-      y: -currentViewport.y - noteHeight / 2,
+      x: centerWorld.x - noteWidth / 2,
+      y: centerWorld.y - noteHeight / 2,
       width: noteWidth,
       height: noteHeight,
       content: content,
@@ -1856,8 +1850,6 @@ Zadaj pytanie! 🤔`,
           onImageUpload={handleImageToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
-          isChatbotOpen={isChatbotOpen}
-          onChatbotToggle={handleChatbotToggle}
         />
         
         {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
@@ -2023,18 +2015,15 @@ Zadaj pytanie! 🤔`,
           />
         )}
 
-    {/* 🤖 MATH CHATBOT - zawsze dostępny gdy isChatbotOpen */}
-    {isChatbotOpen && (
-      <MathChatbot
-        canvasWidth={canvasWidth}
-        canvasHeight={canvasHeight}
-        onClose={handleChatbotClose}
-        onAddToBoard={handleChatbotAddToBoard}
-        messages={chatMessages}
-        setMessages={setChatMessages}
-        onActiveChange={setIsSearchActive}
-      />
-    )}
+    {/* 🤖 MATH CHATBOT - zawsze widoczny jako bąbelek */}
+    <MathChatbot
+      canvasWidth={canvasWidth}
+      canvasHeight={canvasHeight}
+      onAddToBoard={handleChatbotAddToBoard}
+      messages={chatMessages}
+      setMessages={setChatMessages}
+      onActiveChange={setIsSearchActive}
+    />
 
         {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}
         {elements.filter(el => el.type === 'markdown').map(el => {

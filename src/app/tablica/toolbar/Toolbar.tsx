@@ -73,9 +73,6 @@ interface ToolbarProps {
   // 🧮 Calculator toggle
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
-  // 🤖 Chatbot toggle
-  isChatbotOpen?: boolean;
-  onChatbotToggle?: () => void;
 }
 
 function Toolbar({
@@ -107,8 +104,6 @@ function Toolbar({
   onImageUpload,
   isCalculatorOpen,
   onCalculatorToggle,
-  isChatbotOpen,
-  onChatbotToggle,
 }: ToolbarProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -147,8 +142,6 @@ function Toolbar({
         onImageUpload={onImageUpload}
         isCalculatorOpen={isCalculatorOpen}
         onCalculatorToggle={onCalculatorToggle}
-        isChatbotOpen={isChatbotOpen}
-        onChatbotToggle={onChatbotToggle}
       />
     </div>
   );
@@ -166,8 +159,7 @@ const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
     prevProps.canUndo === nextProps.canUndo &&
     prevProps.canRedo === nextProps.canRedo &&
     prevProps.hasSelection === nextProps.hasSelection &&
-    prevProps.isCalculatorOpen === nextProps.isCalculatorOpen &&
-    prevProps.isChatbotOpen === nextProps.isChatbotOpen
+    prevProps.isCalculatorOpen === nextProps.isCalculatorOpen
   );
 };
 

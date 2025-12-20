@@ -20,6 +20,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   X, 
   Send, 
@@ -43,6 +44,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import Link from 'next/link';
 
 // ==========================================
 // 📝 TYPY
@@ -57,7 +59,6 @@ export interface ChatMessage {
 interface MathChatbotProps {
   canvasWidth: number;
   canvasHeight: number;
-  onClose: () => void;
   boardContext?: string;
   onAddToBoard?: (content: string) => void;
   messages: ChatMessage[];
@@ -132,16 +133,16 @@ const CHATBOT_WIDTH_KEY = 'mathChatbotWidth';
 function MathChatbotInner({
   canvasWidth,
   canvasHeight,
-  onClose,
   boardContext,
   onAddToBoard,
   messages,
   setMessages,
   onActiveChange,
 }: MathChatbotProps) {
+  const router = useRouter();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // 🆕 Domyślnie zwinięty - pokazuje bąbelek
   const [isExiting, setIsExiting] = useState(false);
   const [width, setWidth] = useState(() => {
     // Załaduj z localStorage
@@ -277,6 +278,17 @@ function MathChatbotInner({
     inputRef.current?.focus();
   }, []);
 
+  // Handler do przekierowania na stronę główną + scroll
+  const handlePricingClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    router.push('/#pricing');
+    // Czekamy na załadowanie strony i scrollujemy
+    setTimeout(() => {
+      const element = document.getElementById('pricing');
+      element?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  }, [router]);
+
   // Funkcja zwijania z animacją
   const handleCollapse = useCallback(() => {
     setIsExiting(true);
@@ -299,34 +311,34 @@ function MathChatbotInner({
     }
   }, [isCollapsed, onActiveChange]);
 
-  // Obsługa kliknięcia poza chatbotem - tylko lewy/prawy przycisk zamyka
+  // Obsługa kliknięcia poza chatbotem - zwija chatbot
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       // Środkowy przycisk (button === 1) - ignoruj
       if (e.button === 1) return;
       
-      // Lewy (button === 0) lub prawy (button === 2) - zamknij
+      // Lewy (button === 0) lub prawy (button === 2) - zwiń
       if (!isCollapsed && overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
-        onClose();
+        handleCollapse();
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isCollapsed, onClose]);
+  }, [isCollapsed, handleCollapse]);
 
   // Oblicz wysokość z marginesami
   const chatbotHeight = typeof window !== 'undefined' ? window.innerHeight - 5 : canvasHeight - 5;
 
   // Collapsed state - latająca chmurka
-  if (isCollapsed) {
+  if (isCollapsed && !isExiting) {
     return (
       <div 
         className="fixed z-50 pointer-events-auto"
         style={{
           right: '20px',
           bottom: '20px',
-          animation: 'slideInFromRight 0.3s ease-out',
+          animation: 'slideInFromBottom 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
       >
         <button
@@ -337,7 +349,7 @@ function MathChatbotInner({
            <GraduationCap className="w-6 h-6" />
           <span className="text-sm font-semibold">Tutor AI</span>
           
-          <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" />
+          {/* <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" /> */}
         </button>
       </div>
     );
@@ -346,6 +358,23 @@ function MathChatbotInner({
   // Full sidebar
   return (
     <>
+      {/* Bąbelek podczas collapse - wyjeżdża od dołu równocześnie z zwijaniem */}
+      {isExiting && (
+        <div 
+          className="fixed z-50 pointer-events-none"
+          style={{
+            right: '20px',
+            bottom: '20px',
+            animation: 'slideInFromBottom 0.4s cubic-bezier(0.16, 1, 0.3, 1)',
+          }}
+        >
+          <div className="bg-gradient-to-r from-blue-500 to-blue-500 text-white p-4 px-6 rounded-full shadow-2xl flex items-center gap-2">
+            <GraduationCap className="w-6 h-6" />
+            <span className="text-sm font-semibold">Tutor AI</span>
+          </div>
+        </div>
+      )}
+
       {/* CSS Animations */}
       <style jsx>{`
         @keyframes slideInFromRight {
@@ -366,6 +395,16 @@ function MathChatbotInner({
           100% {
             transform: translate(100%, 100%) scale(0.95);
             opacity: 0;
+          }
+        }
+        @keyframes slideInFromBottom {
+          0% {
+            transform: translateY(100px);
+            opacity: 0;
+          }
+          100% {
+            transform: translateY(0);
+            opacity: 1;
           }
         }
       `}</style>
@@ -438,13 +477,6 @@ function MathChatbotInner({
               >
                 <Minimize2 className="w-4 h-4 text-gray-600" />
               </button>
-              <button
-                onClick={onClose}
-                className="p-2 hover:bg-red-100 rounded-lg transition-colors cursor-pointer"
-                title="Zamknij"
-              >
-                <X className="w-4 h-4 text-red-600" />
-              </button>
             </div>
           </div>
 
@@ -496,14 +528,12 @@ function MathChatbotInner({
               <Crown className="w-4 h-4 text-amber-600 shrink-0" />
               <p className="text-amber-900 flex-1">
                 Jesteś na planie <span className="font-semibold">Free</span>.{' '}
-                <a 
-                  href="/#pricing" 
-                  className="underline hover:text-amber-950 font-medium cursor-pointer"
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  onClick={handlePricingClick}
+                  className="underline hover:text-amber-950 font-medium cursor-pointer bg-transparent border-none p-0"
                 >
                   Wykup Premium
-                </a>
+                </button>
                 {' '}po większe limity AI Tutora
               </p>
             </div>
