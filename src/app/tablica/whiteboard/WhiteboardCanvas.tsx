@@ -649,6 +649,24 @@ Zadaj pytanie! 🤔`,
     const container = containerRef.current;
     if (!container) return;
     
+    // Zbieraj wszystkie wheel eventy w jednej klatce animacji
+    let accumulatedDeltaX = 0;
+    let accumulatedDeltaY = 0;
+    let rafId: number | null = null;
+    
+    const applyAccumulatedPan = () => {
+      if (accumulatedDeltaX !== 0 || accumulatedDeltaY !== 0) {
+        const currentViewport = viewportRef.current;
+        const newViewport = panViewportWithWheel(currentViewport, accumulatedDeltaX, accumulatedDeltaY);
+        setViewport(constrainViewport(newViewport));
+        
+        // Reset
+        accumulatedDeltaX = 0;
+        accumulatedDeltaY = 0;
+      }
+      rafId = null;
+    };
+    
     const handleWheel = (e: WheelEvent) => {
       // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
       if (isSearchActive || isCardViewerActive) {
@@ -658,28 +676,34 @@ Zadaj pytanie! 🤔`,
       
       e.preventDefault();
       
-      const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const width = rect.width;
-      const height = rect.height;
-      
-      const currentViewport = viewportRef.current;
-      
       if (e.ctrlKey) {
-        // ZOOM
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+        // ZOOM - aplikuj natychmiast
+        const rect = container.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const currentViewport = viewportRef.current;
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, rect.width, rect.height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // PAN - zawsze aplikuj ZARÓWNO deltaX JAK I deltaY natychmiast, bez filtrowania
-        // To eliminuje "axis lock" - przyklejanie się do jednej osi
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
+        // PAN - akumuluj i aplikuj w requestAnimationFrame
+        // To zbiera wszystkie eventy z jednej klatki (deltaX i deltaY osobno) i łączy je
+        accumulatedDeltaX += e.deltaX;
+        accumulatedDeltaY += e.deltaY;
+        
+        // Jeśli nie ma zaplanowanego RAF, zaplanuj
+        if (rafId === null) {
+          rafId = requestAnimationFrame(applyAccumulatedPan);
+        }
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      if (rafId !== null) {
+        cancelAnimationFrame(rafId);
+      }
+    };
   }, [isSearchActive, isCardViewerActive]);
 
   // Auto-expand (bez zmian)
