@@ -649,10 +649,10 @@ Zadaj pytanie! 🤔`,
     const container = containerRef.current;
     if (!container) return;
     
-    // Zbieraj wszystkie wheel eventy w jednej klatce animacji
+    // Zbieraj wszystkie wheel eventy przez krótki czas (15ms) i aplikuj razem
     let accumulatedDeltaX = 0;
     let accumulatedDeltaY = 0;
-    let rafId: number | null = null;
+    let applyTimeout: NodeJS.Timeout | null = null;
     
     const applyAccumulatedPan = () => {
       if (accumulatedDeltaX !== 0 || accumulatedDeltaY !== 0) {
@@ -664,7 +664,7 @@ Zadaj pytanie! 🤔`,
         accumulatedDeltaX = 0;
         accumulatedDeltaY = 0;
       }
-      rafId = null;
+      applyTimeout = null;
     };
     
     const handleWheel = (e: WheelEvent) => {
@@ -677,7 +677,14 @@ Zadaj pytanie! 🤔`,
       e.preventDefault();
       
       if (e.ctrlKey) {
-        // ZOOM - aplikuj natychmiast
+        // ZOOM - aplikuj natychmiast, wyczyść akumulator pana
+        if (applyTimeout) {
+          clearTimeout(applyTimeout);
+          applyTimeout = null;
+        }
+        accumulatedDeltaX = 0;
+        accumulatedDeltaY = 0;
+        
         const rect = container.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -685,23 +692,25 @@ Zadaj pytanie! 🤔`,
         const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, rect.width, rect.height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // PAN - akumuluj i aplikuj w requestAnimationFrame
-        // To zbiera wszystkie eventy z jednej klatki (deltaX i deltaY osobno) i łączy je
+        // PAN - akumuluj deltaX i deltaY przez 15ms
+        // Windows touchpad wysyła osobne eventy dla X i Y, więc musimy je zbierać
         accumulatedDeltaX += e.deltaX;
         accumulatedDeltaY += e.deltaY;
         
-        // Jeśli nie ma zaplanowanego RAF, zaplanuj
-        if (rafId === null) {
-          rafId = requestAnimationFrame(applyAccumulatedPan);
+        // Wyczyść poprzedni timeout i ustaw nowy
+        // To daje 15ms na zebranie wszystkich eventów z jednego gestu
+        if (applyTimeout) {
+          clearTimeout(applyTimeout);
         }
+        applyTimeout = setTimeout(applyAccumulatedPan, 15);
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => {
       container.removeEventListener('wheel', handleWheel);
-      if (rafId !== null) {
-        cancelAnimationFrame(rafId);
+      if (applyTimeout) {
+        clearTimeout(applyTimeout);
       }
     };
   }, [isSearchActive, isCardViewerActive]);
