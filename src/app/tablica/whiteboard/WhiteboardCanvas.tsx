@@ -702,7 +702,7 @@ Zadaj pytanie! 🤔`,
         if (applyTimeout) {
           clearTimeout(applyTimeout);
         }
-        applyTimeout = setTimeout(applyAccumulatedPan, 15);
+        applyTimeout = setTimeout(applyAccumulatedPan, 1);
       }
     };
     
