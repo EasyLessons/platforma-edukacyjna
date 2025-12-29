@@ -649,12 +649,6 @@ Zadaj pytanie! 🤔`,
     const container = containerRef.current;
     if (!container) return;
     
-    // Accumulator dla smooth touchpad scrolling
-    let accumulatedDeltaX = 0;
-    let accumulatedDeltaY = 0;
-    let lastWheelTime = 0;
-    let wheelTimeout: NodeJS.Timeout | null = null;
-    
     const handleWheel = (e: WheelEvent) => {
       // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
       if (isSearchActive || isCardViewerActive) {
@@ -663,17 +657,6 @@ Zadaj pytanie! 🤔`,
       }
       
       e.preventDefault();
-      
-      const now = performance.now();
-      const timeSinceLastWheel = now - lastWheelTime;
-      
-      // Reset accumulated deltas jeśli minęło więcej niż 100ms
-      if (timeSinceLastWheel > 100) {
-        accumulatedDeltaX = 0;
-        accumulatedDeltaY = 0;
-      }
-      
-      lastWheelTime = now;
       
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -684,36 +667,19 @@ Zadaj pytanie! 🤔`,
       const currentViewport = viewportRef.current;
       
       if (e.ctrlKey) {
-        // ZOOM - bezpośrednio bez akumulacji
+        // ZOOM
         const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // PAN - akumuluj delty i aplikuj po małym opóźnieniu
-        accumulatedDeltaX += e.deltaX;
-        accumulatedDeltaY += e.deltaY;
-        
-        // Clear poprzedni timeout
-        if (wheelTimeout) {
-          clearTimeout(wheelTimeout);
-        }
-        
-        // Zastosuj ruch natychmiast (bez czekania na timeout)
-        const newViewport = panViewportWithWheel(currentViewport, accumulatedDeltaX, accumulatedDeltaY);
+        // PAN - zawsze aplikuj ZARÓWNO deltaX JAK I deltaY natychmiast, bez filtrowania
+        // To eliminuje "axis lock" - przyklejanie się do jednej osi
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
-        
-        // Reset accumulated deltas
-        accumulatedDeltaX = 0;
-        accumulatedDeltaY = 0;
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-      if (wheelTimeout) {
-        clearTimeout(wheelTimeout);
-      }
-    };
+    return () => container.removeEventListener('wheel', handleWheel);
   }, [isSearchActive, isCardViewerActive]);
 
   // Auto-expand (bez zmian)
