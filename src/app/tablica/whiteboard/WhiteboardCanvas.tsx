@@ -62,6 +62,7 @@ import {
   TextElement,
   FunctionPlot,
   ImageElement,
+  PDFElement,
   MarkdownNote,
   TableElement,
   MomentumState 
@@ -91,6 +92,7 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
+  const pdfToolRef = useRef<PDFToolRef>(null);
   
   // 🆕 boardId pochodzi z props (przekazany z page.tsx)
   // Automatycznie aktualizuje się gdy URL się zmienia
@@ -174,6 +176,7 @@ Zadaj pytanie! 🤔`,
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
   const [debugMode, setDebugMode] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
+  const [loadedPDFPages, setLoadedPDFPages] = useState<Map<string, HTMLCanvasElement>>(new Map());
   
   // 🆕 ZAPISYWANIE - state i refs
   const [unsavedElements, setUnsavedElements] = useState<Set<string>>(new Set());
@@ -647,17 +650,9 @@ Zadaj pytanie! 🤔`,
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
-      console.log('🖱️ Wheel:', { 
-        deltaY: e.deltaY, 
-        ctrlKey: e.ctrlKey, 
-        shiftKey: e.shiftKey,
-        isSearchActive,
-        isCardViewerActive
-      });
-      
       // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
       if (isSearchActive || isCardViewerActive) {
-        console.log('🚫 Zoom zablokowany - modal aktywny');
+        e.preventDefault();
         return;
       }
       
@@ -671,20 +666,10 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // STARA SPRAWDZONA LOGIKA:
-      // Ctrl+scroll (pinch) = ZOOM
-      // Normalny scroll/przesuwanie = PAN
-      // Shift+scroll = PAN
-      
       if (e.ctrlKey) {
-        // Ctrl+scroll lub pinch - ZOOM
-        console.log('🔍 Executing ZOOM (Ctrl/Pinch)');
-        const scaledDeltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50);
-        const newViewport = zoomViewport(currentViewport, scaledDeltaY, mouseX, mouseY, width, height);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // Normalny scroll lub Shift+scroll - PAN
-        console.log('📐 Executing PAN');
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
@@ -692,7 +677,7 @@ Zadaj pytanie! 🤔`,
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [isSearchActive, isCardViewerActive]);
+  }, []);
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
@@ -743,12 +728,12 @@ Zadaj pytanie! 🤔`,
       
       currentElements.forEach(element => {
         if (element.id === editingTextId) return;
-        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand);
+        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand, loadedPDFPages);
       });
       
       rafIdRef.current = null;
     });
-  }, [editingTextId, debugMode, handleAutoExpand, loadedImages]);  // USUNIĘTO elements i viewport!
+  }, [editingTextId, debugMode, handleAutoExpand, loadedImages, loadedPDFPages]);  // USUNIĘTO elements i viewport!
   
   // Cleanup RAF on unmount
   useEffect(() => {
@@ -1048,6 +1033,23 @@ Zadaj pytanie! 🤔`,
         console.error('Failed to load image:', image.id);
       };
     }
+  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
+  // 🆕 PDF - tworzenie dokumentu PDF
+  const handlePDFCreate = useCallback((pdf: PDFElement) => {
+    const newElements = [...elements, pdf];
+    setElements(newElements);
+    saveToHistory(newElements);
+    
+    // BROADCAST
+    broadcastElementCreated(pdf);
+    
+    // ZAPISYWANIE
+    setUnsavedElements(prev => new Set(prev).add(pdf.id));
+    if (boardIdState) debouncedSave(boardIdState);
+    
+    // TODO: Load PDF using pdfjs-dist and render to canvas
+    console.log('PDF utworzony:', pdf.fileName);
   }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
@@ -1605,40 +1607,81 @@ Zadaj pytanie! 🤔`,
     e.stopPropagation();
 
     const file = e.dataTransfer.files?.[0];
-    if (!file || !file.type.startsWith('image/')) {
-      return;
+    if (!file) return;
+
+    // Obsługa obrazów
+    if (file.type.startsWith('image/')) {
+      setImageProcessing(true);
+
+      try {
+        const { data, width, height } = await fileToBase64(file);
+        
+        const dropScreen = { x: e.clientX, y: e.clientY };
+        const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+        
+        const aspectRatio = height / width;
+        const worldWidth = 3;
+        const worldHeight = worldWidth * aspectRatio;
+        
+        const newImage: ImageElement = {
+          id: Date.now().toString(),
+          type: 'image',
+          x: dropWorld.x - worldWidth / 2,
+          y: dropWorld.y - worldHeight / 2,
+          width: worldWidth,
+          height: worldHeight,
+          src: data,
+          alt: 'Dropped image',
+        };
+
+        handleImageCreate(newImage);
+      } catch (err) {
+        console.error('Drop error:', err);
+      } finally {
+        setImageProcessing(false);
+      }
+    } 
+    // Obsługa PDFów
+    else if (file.type === 'application/pdf') {
+      setImageProcessing(true);
+
+      try {
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+          const pdfDataUrl = evt.target?.result as string;
+          
+          const dropScreen = { x: e.clientX, y: e.clientY };
+          const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+          
+          const worldWidth = 4;
+          const worldHeight = worldWidth * 1.414; // A4 aspect ratio
+          
+          const newPDF: PDFElement = {
+            id: `pdf-${Date.now()}`,
+            type: 'pdf',
+            x: dropWorld.x - worldWidth / 2,
+            y: dropWorld.y - worldHeight / 2,
+            width: worldWidth,
+            height: worldHeight,
+            src: pdfDataUrl,
+            fileName: file.name,
+            currentPage: 1,
+            totalPages: 1,
+          };
+
+          handlePDFCreate(newPDF);
+        };
+        reader.onerror = () => {
+          console.error('Failed to read PDF file');
+        };
+        reader.readAsDataURL(file);
+      } catch (err) {
+        console.error('PDF drop error:', err);
+      } finally {
+        setImageProcessing(false);
+      }
     }
-
-    setImageProcessing(true);
-
-    try {
-      const { data, width, height } = await fileToBase64(file);
-      
-      const dropScreen = { x: e.clientX, y: e.clientY };
-      const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
-      
-      const aspectRatio = height / width;
-      const worldWidth = 3;
-      const worldHeight = worldWidth * aspectRatio;
-      
-      const newImage: ImageElement = {
-        id: Date.now().toString(),
-        type: 'image',
-        x: dropWorld.x - worldWidth / 2,
-        y: dropWorld.y - worldHeight / 2,
-        width: worldWidth,
-        height: worldHeight,
-        src: data,
-        alt: 'Dropped image',
-      };
-
-      handleImageCreate(newImage);
-    } catch (err) {
-      console.error('Drop error:', err);
-    } finally {
-      setImageProcessing(false);
-    }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, handlePDFCreate]);
   
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
@@ -1650,6 +1693,10 @@ Zadaj pytanie! 🤔`,
   
   const handleImageToolUpload = useCallback(() => {
     imageToolRef.current?.triggerFileUpload();
+  }, []);
+  
+  const handlePDFToolUpload = useCallback(() => {
+    pdfToolRef.current?.triggerFileUpload();
   }, []);
   
   // Middle button pan (bez zmian)
@@ -1854,6 +1901,7 @@ Zadaj pytanie! 🤔`,
           onImport={handleImport}
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
+          onPDFUpload={handlePDFToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
         />
@@ -1976,6 +2024,17 @@ Zadaj pytanie! 🤔`,
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onImageCreate={handleImageCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'pdf' && canvasWidth > 0 && (
+          <PDFTool
+            ref={pdfToolRef}
+            viewport={viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onPDFCreate={handlePDFCreate}
             onViewportChange={handleViewportChange}
           />
         )}
