@@ -35,7 +35,7 @@ import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
-export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'eraser' | 'markdown' | 'table' | 'calculator';
+export type Tool = 'select' | 'pan' | 'pen' | 'text' | 'shape' | 'function' | 'image' | 'pdf' | 'eraser' | 'markdown' | 'table' | 'calculator';
 export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';
 
 
@@ -70,6 +70,8 @@ interface ToolbarProps {
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
+  // 📄 PDFTool handlers
+  onPDFUpload?: () => void;
   // 🧮 Calculator toggle
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
@@ -102,6 +104,7 @@ function Toolbar({
   onImport,
   onImagePaste,
   onImageUpload,
+  onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
 }: ToolbarProps) {
@@ -140,6 +143,7 @@ function Toolbar({
         setIsMobileMenuOpen={setIsMobileMenuOpen}
         onImagePaste={onImagePaste}
         onImageUpload={onImageUpload}
+        onPDFUpload={onPDFUpload}
         isCalculatorOpen={isCalculatorOpen}
         onCalculatorToggle={onCalculatorToggle}
       />

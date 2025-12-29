@@ -31,7 +31,7 @@ import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
   Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon,
-  StickyNote, Table, Calculator, MessageCircle
+  StickyNote, Table, Calculator, MessageCircle, FileText
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -82,6 +82,8 @@ interface ToolbarUIProps {
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
+  // 📄 PDFTool handlers
+  onPDFUpload?: () => void;
 }
 
 const ToolButton = ({
@@ -144,6 +146,7 @@ export function ToolbarUI({
   setIsMobileMenuOpen,
   onImagePaste,
   onImageUpload,
+  onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
 }: ToolbarUIProps) {
@@ -169,7 +172,7 @@ export function ToolbarUI({
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
   // - eraser: brak właściwości do edycji
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image' || tool === 'pdf';
 
   return (
     <>
@@ -230,6 +233,12 @@ export function ToolbarUI({
             active={tool === 'image'}
             onClick={() => onToolChange('image')}
             title="Obraz (I)"
+          />
+          <ToolButton
+            icon={FileText}
+            active={tool === 'pdf'}
+            onClick={() => onToolChange('pdf')}
+            title="PDF (Shift+P)"
           />
           <ToolButton
             icon={Eraser}
@@ -401,6 +410,19 @@ export function ToolbarUI({
 
                 <button
                   onClick={() => {
+                    onToolChange('pdf');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
+                    tool === 'pdf' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <FileText className="w-5 h-5" />
+                  <span className="text-xs font-medium">PDF</span>
+                </button>
+
+                <button
+                  onClick={() => {
                     onToolChange('eraser');
                     setIsMobileMenuOpen(false);
                   }}
@@ -458,6 +480,55 @@ export function ToolbarUI({
                     >
                       <ArrowRight className="w-5 h-5" />
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Image Properties */}
+              {tool === 'image' && (
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Opcje:</p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        onImagePaste?.();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full p-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors flex items-center gap-2 justify-center"
+                    >
+                      <ClipboardIcon className="w-4 h-4" />
+                      <span className="text-sm font-medium">Wklej obraz (Ctrl+V)</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onImageUpload?.();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full p-2 rounded-lg bg-green-500 text-white hover:bg-green-600 transition-colors flex items-center gap-2 justify-center"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm font-medium">Wczytaj obraz</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PDF Properties */}
+              {tool === 'pdf' && (
+                <div className="pt-2 border-t border-gray-200">
+                  <p className="text-xs font-semibold text-gray-600 mb-2">Opcje:</p>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        onPDFUpload?.();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="w-full p-2 rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors flex items-center gap-2 justify-center"
+                    >
+                      <Upload className="w-4 h-4" />
+                      <span className="text-sm font-medium">Wczytaj PDF</span>
+                    </button>
+                    <p className="text-xs text-gray-500 text-center">Drag & Drop również działa</p>
                   </div>
                 </div>
               )}
@@ -717,6 +788,23 @@ export function ToolbarUI({
                   <Upload className="w-3.5 h-3.5" />
                   <span className="font-medium">Upload</span>
                 </button>
+              </div>
+            )}
+
+            {/* 📄 PDF */}
+            {tool === 'pdf' && (
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={onPDFUpload}
+                  className="flex items-center gap-1.5 px-2 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs"
+                  title="Wybierz plik PDF z dysku"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="font-medium">Wczytaj PDF</span>
+                </button>
+                <div className="text-[10px] text-gray-500 text-center px-2">
+                  Drag & Drop również działa
+                </div>
               </div>
             )}
           </div>
