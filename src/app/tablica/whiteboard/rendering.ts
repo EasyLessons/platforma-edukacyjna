@@ -37,7 +37,6 @@ import {
   TextElement,
   FunctionPlot,
   ImageElement,
-  PDFElement,
   MarkdownNote,
   TableElement,
   ViewportTransform
@@ -537,59 +536,6 @@ export function drawImage(
 }
 
 /**
- * 🆕 Rysuje dokument PDF
- * Renderuje placeholder - faktyczne renderowanie PDF odbywa się przez Canvas API w overlay
- */
-export function drawPDF(
-  ctx: CanvasRenderingContext2D,
-  pdf: PDFElement,
-  viewport: ViewportTransform,
-  canvasWidth: number,
-  canvasHeight: number,
-  loadedPDFPages?: Map<string, HTMLCanvasElement>
-): void {
-  const topLeft = transformPoint({ x: pdf.x, y: pdf.y }, viewport, canvasWidth, canvasHeight);
-  const bottomRight = transformPoint(
-    { x: pdf.x + pdf.width, y: pdf.y + pdf.height },
-    viewport,
-    canvasWidth,
-    canvasHeight
-  );
-  
-  const screenWidth = bottomRight.x - topLeft.x;
-  const screenHeight = bottomRight.y - topLeft.y;
-  
-  // Sprawdź czy PDF jest załadowany
-  const pdfCanvas = loadedPDFPages?.get(pdf.id);
-  if (pdfCanvas) {
-    ctx.drawImage(pdfCanvas, topLeft.x, topLeft.y, screenWidth, screenHeight);
-  } else {
-    // Placeholder podczas ładowania
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-    
-    // Ramka
-    ctx.strokeStyle = '#dc2626';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-    
-    // Ikona PDF
-    ctx.fillStyle = '#dc2626';
-    ctx.font = `${Math.min(screenWidth, screenHeight) * 0.3}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('PDF', topLeft.x + screenWidth / 2, topLeft.y + screenHeight / 2);
-    
-    // Nazwa pliku (jeśli jest)
-    if (pdf.fileName) {
-      ctx.font = `${Math.min(screenWidth, screenHeight) * 0.1}px Arial`;
-      ctx.fillStyle = '#666';
-      ctx.fillText(pdf.fileName, topLeft.x + screenWidth / 2, topLeft.y + screenHeight * 0.7);
-    }
-  }
-}
-
-/**
  * Rysuje pojedynczy element (dispatcher)
  * Wybiera odpowiednią funkcję w zależności od typu
  */
@@ -601,8 +547,7 @@ export function drawElement(
   canvasHeight: number,
   loadedImages?: Map<string, HTMLImageElement>,
   debug?: boolean,
-  onAutoExpand?: (elementId: string, newHeight: number) => void,
-  loadedPDFPages?: Map<string, HTMLCanvasElement>
+  onAutoExpand?: (elementId: string, newHeight: number) => void
 ): void {
   if (element.type === 'path') {
     drawPath(ctx, element, viewport, canvasWidth, canvasHeight);
@@ -619,8 +564,6 @@ export function drawElement(
     drawFunction(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'image' && loadedImages) {
     drawImage(ctx, element, viewport, canvasWidth, canvasHeight, loadedImages);
-  } else if (element.type === 'pdf' && loadedPDFPages) {
-    drawPDF(ctx, element, viewport, canvasWidth, canvasHeight, loadedPDFPages);
   } else if (element.type === 'markdown') {
     // UWAGA: Notatki markdown NIE są rysowane na canvas!
     // Są renderowane TYLKO jako HTML overlay przez MarkdownNoteView

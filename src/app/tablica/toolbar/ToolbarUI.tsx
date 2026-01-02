@@ -234,12 +234,13 @@ export function ToolbarUI({
             onClick={() => onToolChange('image')}
             title="Obraz (I)"
           />
-          <ToolButton
+          {/* PDF tool tymczasowo wyłączony  */}
+          {/* <ToolButton
             icon={FileText}
             active={tool === 'pdf'}
             onClick={() => onToolChange('pdf')}
             title="PDF (Shift+P)"
-          />
+          /> */}
           <ToolButton
             icon={Eraser}
             active={tool === 'eraser'}

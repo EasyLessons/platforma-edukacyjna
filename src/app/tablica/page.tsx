@@ -33,7 +33,7 @@ import { joinBoardWorkspace } from '@/boards_api/api';
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function TablicaContent() {
+export function TablicaContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);

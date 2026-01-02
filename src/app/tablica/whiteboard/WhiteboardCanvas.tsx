@@ -24,6 +24,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import NextImage from 'next/image';
 import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
 import { ZoomControls } from '../toolbar/ZoomControls';
 import { TextTool } from '../toolbar/TextTool';
@@ -62,7 +63,6 @@ import {
   TextElement,
   FunctionPlot,
   ImageElement,
-  PDFElement,
   MarkdownNote,
   TableElement,
   MomentumState 
@@ -88,7 +88,7 @@ interface WhiteboardCanvasProps {
   boardId: string; // 🆕 boardId z URL params (page.tsx)
 }
 
-export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasProps) {
+export default function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
@@ -140,6 +140,10 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const [fontSize, setFontSize] = useState(24);
   const [fillShape, setFillShape] = useState(false);
   
+  // 🆕 LOADING STATE - wyświetlanie overlay podczas ładowania
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
   // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
@@ -175,7 +179,6 @@ Zadaj pytanie! 🤔`,
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
   const [debugMode, setDebugMode] = useState(false);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
-  const [loadedPDFPages, setLoadedPDFPages] = useState<Map<string, HTMLCanvasElement>>(new Map());
   
   // 🆕 ZAPISYWANIE - state i refs
   const [unsavedElements, setUnsavedElements] = useState<Set<string>>(new Set());
@@ -406,43 +409,78 @@ Zadaj pytanie! 🤔`,
   
   useEffect(() => {
     const loadElements = async () => {
-      if (!boardIdState) return;
+      if (!boardIdState) {
+        setIsLoading(false);
+        return;
+      }
       
       // Walidacja boardId
       const boardIdNum = parseInt(boardIdState);
       if (isNaN(boardIdNum)) {
         console.warn('⚠️ Nieprawidłowy boardId, pomijam ładowanie');
+        setIsLoading(false);
         return;
       }
       
       try {
+        setIsLoading(true);
+        setLoadingProgress(10);
         console.log(`📥 Ładowanie elementów dla board ${boardIdNum}...`);
         
         const data = await loadBoardElements(boardIdNum);
+        setLoadingProgress(50);
         
         // Ustaw elementy (mapuj data → element)
         const loadedElements = data.elements.map(e => e.data);
         setElements(loadedElements);
+        setLoadingProgress(70);
         
         // 🆕 Ustaw początkową historię na załadowane elementy
         setHistory([loadedElements]);
         setHistoryIndex(0);
         
         console.log(`✅ Załadowano ${loadedElements.length} elementów`);
+        setLoadingProgress(90);
         
         // Załaduj obrazy
-        loadedElements.forEach((el: DrawingElement) => {
-          if (el.type === 'image' && (el as ImageElement).src) {
-            const img = new Image();
-            img.src = (el as ImageElement).src;
-            img.onload = () => {
-              setLoadedImages(prev => new Map(prev).set(el.id, img));
-            };
-          }
-        });
+        let loadedImagesCount = 0;
+        const imageElements = loadedElements.filter(el => el.type === 'image');
+        
+        if (imageElements.length === 0) {
+          setLoadingProgress(100);
+          setTimeout(() => setIsLoading(false), 300);
+        } else {
+          const imagePromises = imageElements.map((el: DrawingElement) => {
+            return new Promise<void>((resolve) => {
+              if (el.type === 'image' && (el as ImageElement).src) {
+                const img = new Image();
+                img.src = (el as ImageElement).src;
+                img.onload = () => {
+                  setLoadedImages(prev => new Map(prev).set(el.id, img));
+                  loadedImagesCount++;
+                  setLoadingProgress(90 + (loadedImagesCount / imageElements.length) * 10);
+                  resolve();
+                };
+                img.onerror = () => {
+                  console.error('Failed to load image:', el.id);
+                  loadedImagesCount++;
+                  setLoadingProgress(90 + (loadedImagesCount / imageElements.length) * 10);
+                  resolve();
+                };
+              } else {
+                resolve();
+              }
+            });
+          });
+          
+          await Promise.all(imagePromises);
+          setLoadingProgress(100);
+          setTimeout(() => setIsLoading(false), 300);
+        }
         
       } catch (err) {
         console.error('❌ Błąd ładowania elementów:', err);
+        setIsLoading(false);
       }
     };
     
@@ -534,6 +572,25 @@ Zadaj pytanie! 🤔`,
           setElements(newElements);
           saveToHistoryRef.current(newElements);
           setSelectedElementIds(new Set());
+          
+          // Najpierw zapisz niezapisane elementy
+          const unsavedToDelete = currentElements.filter(el => 
+            currentSelectedIds.has(el.id) && unsavedElementsRef.current.has(el.id)
+          );
+          
+          if (unsavedToDelete.length > 0 && boardIdStateRef.current) {
+            const numericBoardId = parseInt(boardIdStateRef.current);
+            if (!isNaN(numericBoardId)) {
+              const elementsToSave = unsavedToDelete.map(el => ({
+                element_id: el.id,
+                type: el.type,
+                data: el
+              }));
+              saveBoardElementsBatch(numericBoardId, elementsToSave)
+                .then(() => console.log('✅ Zapisano przed usunięciem:', unsavedToDelete.length))
+                .catch(err => console.error('❌ Błąd zapisywania przed usunięciem:', err));
+            }
+          }
           
           // 🆕 BROADCAST DELETE + API DELETE
           currentSelectedIds.forEach(id => {
@@ -649,6 +706,11 @@ Zadaj pytanie! 🤔`,
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
+      // 🚫 Blokada gdy SmartSearch lub CardViewer są otwarte
+      if (isSearchActive || isCardViewerActive) {
+        return; // Pozwól przeglądarce obsłużyć scroll w tych komponentach
+      }
+      
       e.preventDefault();
       
       const rect = container.getBoundingClientRect();
@@ -672,7 +734,7 @@ Zadaj pytanie! 🤔`,
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
+  }, [isSearchActive, isCardViewerActive]); // 🚫 Re-attach gdy się zmienia status blokady
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
@@ -723,12 +785,12 @@ Zadaj pytanie! 🤔`,
       
       currentElements.forEach(element => {
         if (element.id === editingTextId) return;
-        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand, loadedPDFPages);
+        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand);
       });
       
       rafIdRef.current = null;
     });
-  }, [editingTextId, debugMode, handleAutoExpand, loadedImages, loadedPDFPages]);  // USUNIĘTO elements i viewport!
+  }, [editingTextId, debugMode, handleAutoExpand, loadedImages]);  // USUNIĘTO elements i viewport!
   
   // Cleanup RAF on unmount
   useEffect(() => {
@@ -803,10 +865,27 @@ Zadaj pytanie! 🤔`,
     }
   }, []);
 
-  const clearCanvas = useCallback(() => {
+  const clearCanvas = useCallback(async () => {
     // Usuń wszystkie elementy z bazy danych
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Najpierw zapisz wszystkie niezapisane
+      const unsavedToDelete = elements.filter(el => unsavedElements.has(el.id));
+      if (unsavedToDelete.length > 0) {
+        try {
+          const elementsToSave = unsavedToDelete.map(el => ({
+            element_id: el.id,
+            type: el.type,
+            data: el
+          }));
+          await saveBoardElementsBatch(numericBoardId, elementsToSave);
+          console.log('✅ Zapisano niezapisane elementy przed wyczyszczeniem:', unsavedToDelete.length);
+        } catch (err) {
+          console.error('❌ Błąd zapisywania przed wyczyszczeniem:', err);
+        }
+      }
+      
+      // Teraz usuń
       elements.forEach(el => {
         deleteBoardElement(numericBoardId, el.id).catch(err => {
           console.error('❌ Błąd usuwania elementu:', el.id, err);
@@ -818,7 +897,7 @@ Zadaj pytanie! 🤔`,
     saveToHistory([]);
     setSelectedElementIds(new Set());
     setLoadedImages(new Map()); // Wyczyść też załadowane obrazy
-  }, [saveToHistory, boardIdState, elements]);
+  }, [saveToHistory, boardIdState, elements, unsavedElements]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 📦 EKSPORT/IMPORT TABLICY
@@ -981,7 +1060,7 @@ Zadaj pytanie! 🤔`,
     if (boardIdState) debouncedSave(boardIdState);
   }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
-  const handleTextDelete = useCallback((id: string) => {
+  const handleTextDelete = useCallback(async (id: string) => {
     const newElements = elements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
@@ -990,11 +1069,27 @@ Zadaj pytanie! 🤔`,
     broadcastElementDeleted(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Zapisz jeśli unsaved
+      if (unsavedElements.has(id)) {
+        const elementToSave = elements.find(el => el.id === id);
+        if (elementToSave) {
+          try {
+            await saveBoardElementsBatch(numericBoardId, [{
+              element_id: elementToSave.id,
+              type: elementToSave.type,
+              data: elementToSave
+            }]);
+          } catch (err) {
+            console.error('❌ Błąd zapisywania przed usunięciem:', err);
+          }
+        }
+      }
+      
       deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
 
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
@@ -1157,7 +1252,7 @@ Zadaj pytanie! 🤔`,
     setViewport(newViewport);
   }, []);
 
-  const handleElementDelete = useCallback((id: string) => {
+  const handleElementDelete = useCallback(async (id: string) => {
     const newElements = elements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
@@ -1166,11 +1261,29 @@ Zadaj pytanie! 🤔`,
     broadcastElementDeleted(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Jeśli element jest niezapisany, najpierw go zapisz
+      if (unsavedElements.has(id)) {
+        const elementToSave = elements.find(el => el.id === id);
+        if (elementToSave) {
+          try {
+            await saveBoardElementsBatch(numericBoardId, [{
+              element_id: elementToSave.id,
+              type: elementToSave.type,
+              data: elementToSave
+            }]);
+            console.log('✅ Zapisano element przed usunięciem:', id);
+          } catch (err) {
+            console.error('❌ Błąd zapisywania przed usunięciem:', id, err);
+          }
+        }
+      }
+      
+      // Teraz usuń z bazy
       deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
 
   // 🆕 PARTIAL ERASE - usuwa fragment ścieżki i tworzy nowe
   const handlePathPartialErase = useCallback((pathId: string, newPaths: DrawingPath[]) => {
@@ -1188,6 +1301,19 @@ Zadaj pytanie! 🤔`,
     // API: Usuń oryginalną ścieżkę
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Zapisz jeśli unsaved
+      if (unsavedElements.has(pathId)) {
+        const pathToSave = elements.find(el => el.id === pathId);
+        if (pathToSave) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: pathToSave.id,
+            type: pathToSave.type,
+            data: pathToSave
+          }])
+            .catch(err => console.error('❌ Błąd zapisywania przed usunięciem:', err));
+        }
+      }
+      
       deleteBoardElement(numericBoardId, pathId).catch(err => {
         console.error('❌ Błąd usuwania ścieżki:', pathId, err);
       });
@@ -1260,7 +1386,7 @@ Zadaj pytanie! 🤔`,
     if (boardIdState) debouncedSave(boardIdState);
   }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
-  const deleteSelectedElements = useCallback(() => {
+  const deleteSelectedElements = useCallback(async () => {
     if (selectedElementIds.size === 0) return;
     
     const newElements = elements.filter(el => !selectedElementIds.has(el.id));
@@ -1269,6 +1395,27 @@ Zadaj pytanie! 🤔`,
     
     // 🆕 BROADCAST DELETE + API DELETE dla każdego
     const numericBoardId = parseInt(boardIdState);
+    
+    // Najpierw zapisz wszystkie niezapisane elementy
+    const unsavedToDelete = elements.filter(el => 
+      selectedElementIds.has(el.id) && unsavedElements.has(el.id)
+    );
+    
+    if (unsavedToDelete.length > 0 && !isNaN(numericBoardId)) {
+      try {
+        const elementsToSave = unsavedToDelete.map(el => ({
+          element_id: el.id,
+          type: el.type,
+          data: el
+        }));
+        await saveBoardElementsBatch(numericBoardId, elementsToSave);
+        console.log('✅ Zapisano niezapisane elementy przed usunięciem:', unsavedToDelete.length);
+      } catch (err) {
+        console.error('❌ Błąd zapisywania przed usunięciem:', err);
+      }
+    }
+    
+    // Teraz usuń z bazy i broadcast
     selectedElementIds.forEach(id => {
       broadcastElementDeleted(id);
       if (!isNaN(numericBoardId)) {
@@ -1279,7 +1426,7 @@ Zadaj pytanie! 🤔`,
     });
     
     setSelectedElementIds(new Set());
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
 
   // Zoom functions (bez zmian)
   const zoomInRef = useRef(() => {
@@ -1582,22 +1729,144 @@ Zadaj pytanie! 🤔`,
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
 
+  // 🆕 Konwersja PDF → obrazki (wszystkie strony) dla drag&drop
+  const convertPDFToImages = async (file: File): Promise<string[]> => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+
+    // Konwertuj wszystkie strony
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const pdfViewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Cannot get canvas context');
+
+      canvas.width = pdfViewport.width;
+      canvas.height = pdfViewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport: pdfViewport,
+        canvas: canvas,
+      }).promise;
+
+      images.push(canvas.toDataURL('image/jpeg', 0.9));
+    }
+
+    console.log(`✅ Skonwertowano ${images.length} stron PDF`);
+    return images;
+  };
+
   const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
+    console.log('🎯 handleGlobalDropImage called');
     const file = e.dataTransfer.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('❌ No file dropped');
+      return;
+    }
 
-    // Obsługa obrazów
-    if (file.type.startsWith('image/')) {
-      setImageProcessing(true);
+    console.log('📁 Dropped file:', file.name, 'type:', file.type);
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
 
-      try {
-        const { data, width, height } = await fileToBase64(file);
+    if (!isImage && !isPDF) {
+      console.log('❌ Not an image or PDF');
+      return;
+    }
+
+    console.log('✅ File accepted, starting processing...');
+    setImageProcessing(true);
+
+    try {
+      let data: string;
+      let width: number;
+      let height: number;
+
+      const dropScreen = { x: e.clientX, y: e.clientY };
+      const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+      
+      // 🆕 Obsługa PDF → konwersja wszystkich stron do obrazków
+      if (isPDF) {
+        console.log('📄 Converting dropped PDF to images...');
+        const images = await convertPDFToImages(file);
         
-        const dropScreen = { x: e.clientX, y: e.clientY };
-        const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
+        const worldWidth = 3;
+        const padding = 0.1; // Odstęp między stronami
+        let currentY = dropWorld.y;
+        
+        const newImages: ImageElement[] = [];
+        
+        // Stwórz wszystkie strony jako ImageElement[]
+        for (let i = 0; i < images.length; i++) {
+          const dataUrl = images[i];
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          
+          const aspectRatio = img.height / img.width;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-page-${i + 1}`,
+            type: 'image',
+            x: dropWorld.x - worldWidth / 2,
+            y: currentY,
+            width: worldWidth,
+            height: worldHeight,
+            src: dataUrl,
+            alt: `${file.name} - Strona ${i + 1}/${images.length}`,
+          };
+
+          console.log(`✅ Creating page ${i + 1}/${images.length}, ID: ${newImage.id}`);
+          newImages.push(newImage);
+          currentY += worldHeight + padding; // Następna strona niżej
+          
+          // Małe opóźnienie żeby ID były unikalne
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // Dodaj wszystkie strony naraz
+        const newElements = [...elements, ...newImages];
+        setElements(newElements);
+        saveToHistory(newElements);
+        
+        // Broadcast i zapisywanie dla wszystkich stron
+        newImages.forEach(image => {
+          broadcastElementCreated(image);
+          setUnsavedElements(prev => new Set(prev).add(image.id));
+          
+          // Załaduj obrazek do pamięci
+          if (image.src) {
+            const img = new Image();
+            img.src = image.src;
+            img.onload = () => {
+              setLoadedImages(prev => new Map(prev).set(image.id, img));
+            };
+          }
+        });
+        
+        if (boardIdState) debouncedSave(boardIdState);
+        
+        console.log(`✅ Dodano ${newImages.length} stron z PDF`);
+        setImageProcessing(false);
+        return;
+      } else {
+        // Zwykły obrazek
+        const result = await fileToBase64(file);
+        data = result.data;
+        width = result.width;
+        height = result.height;
         
         const aspectRatio = height / width;
         const worldWidth = 3;
@@ -1615,11 +1884,12 @@ Zadaj pytanie! 🤔`,
         };
 
         handleImageCreate(newImage);
-      } catch (err) {
-        console.error('Drop error:', err);
-      } finally {
-        setImageProcessing(false);
+        console.log('✅ Image created from dropped image');
       }
+    } catch (err) {
+      console.error('Drop error:', err);
+    } finally {
+      setImageProcessing(false);
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
   
@@ -1806,6 +2076,35 @@ Zadaj pytanie! 🤔`,
         e.stopPropagation();
       }}
     >
+      {/* 🆕 LOADING OVERLAY */}
+      {isLoading && (
+        <div className="absolute inset-0 z-[9999] bg-white/20 backdrop-blur-md flex flex-col items-center justify-center">
+          {/* Logo */}
+          <div className="mb-8">
+            <NextImage 
+              src="/resources/LogoEasyLesson.webp" 
+              alt="EasyLesson" 
+              width={200} 
+              height={80}
+              priority
+            />
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300 ease-out"
+              style={{ width: `${loadingProgress}%` }}
+            />
+          </div>
+          
+          {/* Progress Text */}
+          <p className="mt-4 text-sm text-gray-600">
+            Ładowanie tablicy... {Math.round(loadingProgress)}%
+          </p>
+        </div>
+      )}
+      
       <div ref={containerRef} className="absolute inset-0 overflow-hidden touch-none overscroll-none">
         {/* 🆕 KOMPONENT ONLINE USERS */}
         <OnlineUsers />
@@ -2272,5 +2571,3 @@ Zadaj pytanie! 🤔`,
     </div>
   );
 }
-
-export default WhiteboardCanvas;
