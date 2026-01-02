@@ -643,36 +643,70 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - NAPRAWIONE: używamy ref zamiast viewport w dependencies
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+  // Wheel/Touchpad handling - Zoptymalizowany pod kątem Windows i płynności (rAF)
+useEffect(() => {
+  const container = containerRef.current;
+  if (!container) return;
+
+  const pendingDeltas = { x: 0, y: 0 };
+  let rAFId: number | null = null;
+
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+
     
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
+
+    if (e.ctrlKey) {
+      // ZOOM - Natychmiastowy dla precyzji
+      if (rAFId !== null) {
+        cancelAnimationFrame(rAFId);
+        rAFId = null;
+      }
       
       const rect = container.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
-      const width = rect.width;
-      const height = rect.height;
-      
       const currentViewport = viewportRef.current;
+      const newViewport = zoomViewport(
+        currentViewport, 
+        e.deltaY, 
+        e.clientX - rect.left, 
+        e.clientY - rect.top, 
+        rect.width, 
+        rect.height
+      );
       
-      if (e.ctrlKey) {
-        // Ctrl+scroll = zoom
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
-      } else {
-        // Normalny scroll = przesuwanie (pan)
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
+      setViewport(constrainViewport(newViewport));
+      pendingDeltas.x = 0;
+      pendingDeltas.y = 0;
+    } else {
+      // PAN - Akumulacja delty (rozwiązuje problem blokowania osi X/Y na Windows)
+      pendingDeltas.x += e.deltaX;
+      pendingDeltas.y += e.deltaY;
+
+      if (rAFId === null) {
+        rAFId = requestAnimationFrame(() => {
+          const currentViewport = viewportRef.current;
+          const newViewport = panViewportWithWheel(
+            currentViewport,
+            pendingDeltas.x,
+            pendingDeltas.y
+          );
+
+          setViewport(constrainViewport(newViewport));
+
+          pendingDeltas.x = 0;
+          pendingDeltas.y = 0;
+          rAFId = null;
+        });
       }
-    };
-    
-    container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => container.removeEventListener('wheel', handleWheel);
-  }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
+    }
+  };
+
+  container.addEventListener('wheel', handleWheel, { passive: false });
+  return () => {
+    container.removeEventListener('wheel', handleWheel);
+    if (rAFId !== null) cancelAnimationFrame(rAFId);
+  };
+}, []); // Pusta tablica zapewnia stabilność listenera
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {

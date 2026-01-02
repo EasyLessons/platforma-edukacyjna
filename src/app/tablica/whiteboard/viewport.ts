@@ -179,8 +179,8 @@ export function panViewportWithWheel(
   
   return {
     ...viewport,
-    x: viewport.x + dx / (viewport.scale),
-    y: viewport.y + dy / (viewport.scale)
+    x: viewport.x + dx / (viewport.scale * 100),
+    y: viewport.y + dy / (viewport.scale * 100)
   };
 }
 
