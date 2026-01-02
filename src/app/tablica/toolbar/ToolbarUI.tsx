@@ -611,6 +611,7 @@ export function ToolbarUI({
                   <span className="text-sm font-medium">Wyczyść wszystko</span>
                 </button>
               </div>
+              
             </div>
           </div>
         </div>

@@ -649,6 +649,11 @@ Zadaj pytanie! 🤔`,
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
+      // BLOKADA: nie zoomuj/panuj gdy SmartSearch lub CardViewer jest aktywny
+      if (isSearchActive || isCardViewerActive) {
+        return;
+      }
+      
       e.preventDefault();
       
       const rect = container.getBoundingClientRect();
@@ -657,13 +662,14 @@ Zadaj pytanie! 🤔`,
       const width = rect.width;
       const height = rect.height;
       
-      // NAPRAWIONE: używamy viewportRef.current zamiast viewport z closure
       const currentViewport = viewportRef.current;
       
       if (e.ctrlKey) {
+        // Ctrl+scroll = zoom
         const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
+        // Normalny scroll = przesuwanie (pan)
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
