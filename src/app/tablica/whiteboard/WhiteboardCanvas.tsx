@@ -195,16 +195,6 @@ Zadaj pytanie! 🤔`,
   
   const [imageProcessing, setImageProcessing] = useState(false);
   
-  const wheelBufferRef = useRef<{
-    deltaX: number;
-    deltaY: number;
-    lastUpdate: number;
-  }>({
-    deltaX: 0,
-    deltaY: 0,
-    lastUpdate: 0
-  });
-
   const redrawCanvasRef = useRef<() => void>(() => {});
   const handleGlobalPasteImageRef = useRef<() => void>(() => {});
   
@@ -658,37 +648,6 @@ Zadaj pytanie! 🤔`,
     const container = containerRef.current;
     if (!container) return;
     
-    const BUFFER_TIMEOUT = 50; // ms - jak długo zbieramy ruchy razem
-    let applyTimeoutId: NodeJS.Timeout | null = null;
-    
-    const applyBufferedMovement = () => {
-      const buffer = wheelBufferRef.current;
-      const currentViewport = viewportRef.current;
-      
-      // Jeśli są jakieś zgromadzone ruchy, zastosuj je
-      if (Math.abs(buffer.deltaX) > 0.1 || Math.abs(buffer.deltaY) > 0.1) {
-        console.log('🎯 Applying buffered movement:', {
-          deltaX: buffer.deltaX.toFixed(2),
-          deltaY: buffer.deltaY.toFixed(2),
-          isDiagonal: Math.abs(buffer.deltaX) > 5 && Math.abs(buffer.deltaY) > 5
-        });
-        
-        const newViewport = panViewportWithWheel(
-          currentViewport, 
-          buffer.deltaX, 
-          buffer.deltaY
-        );
-        
-        setViewport(constrainViewport(newViewport));
-        
-        // Reset bufora
-        buffer.deltaX = 0;
-        buffer.deltaY = 0;
-      }
-      
-      applyTimeoutId = null;
-    };
-    
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       
@@ -700,53 +659,19 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // ZOOM - bez zmian
       if (e.ctrlKey) {
+        // Ctrl+scroll = zoom
         const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
-        return;
+      } else {
+        // Normalny scroll = przesuwanie (pan)
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        setViewport(constrainViewport(newViewport));
       }
-      
-      // PAN - NOWA LOGIKA Z BUFOREM
-      const now = performance.now();
-      const buffer = wheelBufferRef.current;
-      
-      // Reset bufora jeśli minęło za dużo czasu (nowy gest)
-      if (now - buffer.lastUpdate > BUFFER_TIMEOUT * 2) {
-        console.log('🔄 Buffer reset (timeout)');
-        buffer.deltaX = 0;
-        buffer.deltaY = 0;
-      }
-      
-      // Dodaj nowe delty do bufora (akumulacja)
-      buffer.deltaX += e.deltaX;
-      buffer.deltaY += e.deltaY;
-      buffer.lastUpdate = now;
-      
-      console.log('📥 Wheel event:', {
-        raw_deltaX: e.deltaX.toFixed(2),
-        raw_deltaY: e.deltaY.toFixed(2),
-        buffered_deltaX: buffer.deltaX.toFixed(2),
-        buffered_deltaY: buffer.deltaY.toFixed(2)
-      });
-      
-      // Anuluj poprzedni timer
-      if (applyTimeoutId) {
-        clearTimeout(applyTimeoutId);
-      }
-      
-      // Zaplanuj zastosowanie bufora za BUFFER_TIMEOUT ms
-      applyTimeoutId = setTimeout(applyBufferedMovement, BUFFER_TIMEOUT);
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
-    
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-      if (applyTimeoutId) {
-        clearTimeout(applyTimeoutId);
-      }
-    };
+    return () => container.removeEventListener('wheel', handleWheel);
   }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
 
   // Auto-expand (bez zmian)
@@ -1881,7 +1806,7 @@ Zadaj pytanie! 🤔`,
         e.stopPropagation();
       }}
     >
-      <div ref={containerRef} className="absolute inset-0 overflow-hidden">
+      <div ref={containerRef} className="absolute inset-0 overflow-hidden touch-none overscroll-none">
         {/* 🆕 KOMPONENT ONLINE USERS */}
         <OnlineUsers />
         
