@@ -649,11 +649,6 @@ Zadaj pytanie! 🤔`,
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
-      // BLOKADA: nie zoomuj/panuj gdy SmartSearch lub CardViewer jest aktywny
-      if (isSearchActive || isCardViewerActive) {
-        return;
-      }
-      
       e.preventDefault();
       
       const rect = container.getBoundingClientRect();
@@ -670,7 +665,8 @@ Zadaj pytanie! 🤔`,
         setViewport(constrainViewport(newViewport));
       } else {
         // Normalny scroll = przesuwanie (pan)
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        //const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(currentViewport, mouseX, mouseY);
         setViewport(constrainViewport(newViewport));
       }
     };
