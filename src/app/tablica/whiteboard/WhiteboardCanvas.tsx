@@ -643,76 +643,35 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - ZOOM na scroll, PAN na Shift+scroll
+  // Wheel/Touchpad handling - NAPRAWIONE: używamy ref zamiast viewport w dependencies
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
-    // Zbieraj wszystkie wheel eventy przez krótki czas (15ms) i aplikuj razem
-    let accumulatedDeltaX = 0;
-    let accumulatedDeltaY = 0;
-    let applyTimeout: NodeJS.Timeout | null = null;
-    
-    const applyAccumulatedPan = () => {
-      if (accumulatedDeltaX !== 0 || accumulatedDeltaY !== 0) {
-        const currentViewport = viewportRef.current;
-        const newViewport = panViewportWithWheel(currentViewport, accumulatedDeltaX, accumulatedDeltaY);
-        setViewport(constrainViewport(newViewport));
-        
-        // Reset
-        accumulatedDeltaX = 0;
-        accumulatedDeltaY = 0;
-      }
-      applyTimeout = null;
-    };
-    
     const handleWheel = (e: WheelEvent) => {
-      // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
-      if (isSearchActive || isCardViewerActive) {
-        e.preventDefault();
-        return;
-      }
-      
       e.preventDefault();
       
+      const rect = container.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+      const width = rect.width;
+      const height = rect.height;
+      
+      // NAPRAWIONE: używamy viewportRef.current zamiast viewport z closure
+      const currentViewport = viewportRef.current;
+      
       if (e.ctrlKey) {
-        // ZOOM - aplikuj natychmiast, wyczyść akumulator pana
-        if (applyTimeout) {
-          clearTimeout(applyTimeout);
-          applyTimeout = null;
-        }
-        accumulatedDeltaX = 0;
-        accumulatedDeltaY = 0;
-        
-        const rect = container.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const currentViewport = viewportRef.current;
-        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, rect.width, rect.height);
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
         setViewport(constrainViewport(newViewport));
       } else {
-        // PAN - akumuluj deltaX i deltaY przez 15ms
-        // Windows touchpad wysyła osobne eventy dla X i Y, więc musimy je zbierać
-        accumulatedDeltaX += e.deltaX;
-        accumulatedDeltaY += e.deltaY;
-        
-        // Wyczyść poprzedni timeout i ustaw nowy
-        // To daje 15ms na zebranie wszystkich eventów z jednego gestu
-        if (applyTimeout) {
-          clearTimeout(applyTimeout);
-        }
-        applyTimeout = setTimeout(applyAccumulatedPan, 1);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
+        setViewport(constrainViewport(newViewport));
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
-    return () => {
-      container.removeEventListener('wheel', handleWheel);
-      if (applyTimeout) {
-        clearTimeout(applyTimeout);
-      }
-    };
-  }, [isSearchActive, isCardViewerActive]);
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []); // NAPRAWIONE: pusta tablica dependencies - event listener jest dodawany tylko raz
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
