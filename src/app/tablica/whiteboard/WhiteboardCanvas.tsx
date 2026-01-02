@@ -92,7 +92,6 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
-  const pdfToolRef = useRef<PDFToolRef>(null);
   
   // 🆕 boardId pochodzi z props (przekazany z page.tsx)
   // Automatycznie aktualizuje się gdy URL się zmienia
@@ -1071,22 +1070,7 @@ Zadaj pytanie! 🤔`,
     }
   }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
 
-  // 🆕 PDF - tworzenie dokumentu PDF
-  const handlePDFCreate = useCallback((pdf: PDFElement) => {
-    const newElements = [...elements, pdf];
-    setElements(newElements);
-    saveToHistory(newElements);
-    
-    // BROADCAST
-    broadcastElementCreated(pdf);
-    
-    // ZAPISYWANIE
-    setUnsavedElements(prev => new Set(prev).add(pdf.id));
-    if (boardIdState) debouncedSave(boardIdState);
-    
-    // TODO: Load PDF using pdfjs-dist and render to canvas
-    console.log('PDF utworzony:', pdf.fileName);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
@@ -1676,48 +1660,8 @@ Zadaj pytanie! 🤔`,
       } finally {
         setImageProcessing(false);
       }
-    } 
-    // Obsługa PDFów
-    else if (file.type === 'application/pdf') {
-      setImageProcessing(true);
-
-      try {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const pdfDataUrl = evt.target?.result as string;
-          
-          const dropScreen = { x: e.clientX, y: e.clientY };
-          const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
-          
-          const worldWidth = 4;
-          const worldHeight = worldWidth * 1.414; // A4 aspect ratio
-          
-          const newPDF: PDFElement = {
-            id: `pdf-${Date.now()}`,
-            type: 'pdf',
-            x: dropWorld.x - worldWidth / 2,
-            y: dropWorld.y - worldHeight / 2,
-            width: worldWidth,
-            height: worldHeight,
-            src: pdfDataUrl,
-            fileName: file.name,
-            currentPage: 1,
-            totalPages: 1,
-          };
-
-          handlePDFCreate(newPDF);
-        };
-        reader.onerror = () => {
-          console.error('Failed to read PDF file');
-        };
-        reader.readAsDataURL(file);
-      } catch (err) {
-        console.error('PDF drop error:', err);
-      } finally {
-        setImageProcessing(false);
-      }
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, handlePDFCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
   
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
@@ -1729,10 +1673,6 @@ Zadaj pytanie! 🤔`,
   
   const handleImageToolUpload = useCallback(() => {
     imageToolRef.current?.triggerFileUpload();
-  }, []);
-  
-  const handlePDFToolUpload = useCallback(() => {
-    pdfToolRef.current?.triggerFileUpload();
   }, []);
   
   // Middle button pan (bez zmian)
@@ -1937,7 +1877,6 @@ Zadaj pytanie! 🤔`,
           onImport={handleImport}
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
-          onPDFUpload={handlePDFToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
         />
@@ -2060,17 +1999,6 @@ Zadaj pytanie! 🤔`,
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onImageCreate={handleImageCreate}
-            onViewportChange={handleViewportChange}
-          />
-        )}
-
-        {tool === 'pdf' && canvasWidth > 0 && (
-          <PDFTool
-            ref={pdfToolRef}
-            viewport={viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onPDFCreate={handlePDFCreate}
             onViewportChange={handleViewportChange}
           />
         )}
