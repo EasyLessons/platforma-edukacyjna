@@ -665,8 +665,7 @@ Zadaj pytanie! 🤔`,
         setViewport(constrainViewport(newViewport));
       } else {
         // Normalny scroll = przesuwanie (pan)
-        //const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        const newViewport = panViewportWithWheel(currentViewport, mouseX, mouseY);
+        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
         setViewport(constrainViewport(newViewport));
       }
     };

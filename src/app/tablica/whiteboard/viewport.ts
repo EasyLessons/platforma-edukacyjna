@@ -173,14 +173,13 @@ export function panViewportWithWheel(
   deltaX: number,
   deltaY: number
 ): ViewportTransform {
+  // Taka sama logika jak panViewportWithMouse
   const panSpeed = 1.0;
-  const dx = deltaX * panSpeed;
-  const dy = deltaY * panSpeed;
   
   return {
     ...viewport,
-    x: viewport.x + dx / (viewport.scale * 100),
-    y: viewport.y + dy / (viewport.scale * 100)
+    x: viewport.x - (deltaX * panSpeed) / (viewport.scale * 100),
+    y: viewport.y - (deltaY * panSpeed) / (viewport.scale * 100)
   };
 }
 
