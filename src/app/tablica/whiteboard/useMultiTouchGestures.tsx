@@ -140,10 +140,7 @@ export function useMultiTouchGestures({
 
           onViewportChange(constrainViewport(newViewport));
           
-          // ✅ Aktualizuj distance TYLKO co większy ruch (40px)
-          if (Math.abs(distanceChange) > 40) {
-            lastDistanceRef.current = newDistance;
-          }
+          lastDistanceRef.current = newDistance;
         }
       }
 
@@ -154,8 +151,8 @@ export function useMultiTouchGestures({
         
         const newViewport: ViewportTransform = {
           ...viewport,
-          x: viewport.x + (deltaX / viewport.scale) * panSensitivity,
-          y: viewport.y + (deltaY / viewport.scale) * panSensitivity,
+          x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
+          y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
         };
 
         onViewportChange(constrainViewport(newViewport));
