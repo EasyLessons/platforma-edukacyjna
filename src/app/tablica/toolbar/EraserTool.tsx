@@ -208,7 +208,7 @@ export function EraserTool({
 
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-    setCursorPosition(worldPoint);
+    setCursorPosition(screenPoint); // ✅ Zapisz screen position dla kursora
 
     // Znajdź element pod kursorem
     const element = findElementAtPoint(worldPoint);
