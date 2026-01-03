@@ -146,36 +146,6 @@ export function ShapeTool({
     setCurrentShape(null);
   };
 
-  // Touch events - obsługa dotykowa
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseDown(mouseEvent);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseMove(mouseEvent);
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleMouseUp();
-  };
-
   // Render preview shape (rysowanie w trakcie)
   const renderPreviewShape = () => {
     if (!currentShape) return null;
