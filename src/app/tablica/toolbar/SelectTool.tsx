@@ -125,7 +125,13 @@ export function SelectTool({
   useEffect(() => {
     if (!isResizing && !isDragging) return;
 
-    const handleGlobalMouseMove = (e: MouseEvent) => {
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch - blokuj drag/resize podczas gestów
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerMove(e);
+        if (gestures.isGestureActive()) return;
+      }
+      
       const screenPoint = { x: e.clientX, y: e.clientY };
       const worldPoint = inverseTransformPoint(screenPoint, viewportRef.current, canvasWidth, canvasHeight);
 
@@ -467,7 +473,12 @@ export function SelectTool({
       }
     };
 
-    const handleGlobalMouseUp = () => {
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerUp(e);
+      }
+      
       if (isDragging && draggedElementsOriginal.size > 0) {
         onOperationFinish?.();
       }
@@ -489,12 +500,21 @@ export function SelectTool({
       onActiveGuidesChange?.([]);
     };
 
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
+    const handleGlobalPointerCancel = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch przy cancel
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerCancel(e);
+      }
+    };
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerCancel);
 
     return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerCancel);
     };
   }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish, elements, onActiveGuidesChange]);
 
