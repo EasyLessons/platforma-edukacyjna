@@ -141,7 +141,7 @@ export function useMultiTouchGestures({
           onViewportChange(constrainViewport(newViewport));
           
           // ✅ Aktualizuj distance TYLKO co większy ruch (40px)
-          if (Math.abs(distanceChange) > 100) {
+          if (Math.abs(distanceChange) > 35) {
             lastDistanceRef.current = newDistance;
           }
         }
