@@ -114,11 +114,14 @@ export function useMultiTouchGestures({
         const deltaX = newCenter.x - lastCenterRef.current.x;
         const deltaY = newCenter.y - lastCenterRef.current.y;
 
-        // Oblicz nową pozycję viewport (inverse delta bo przesuwamy "świat")
+        // ✅ POPRAWKA 1: Odwrócony kierunek pan (minus zamiast plus)
+        // ✅ POPRAWKA 2: Zmniejszona czułość pan (mnożenie przez 0.6)
+        const panSensitivity = 0.6; // ← Dostosuj: 0.5 = spokojniejsze, 1.0 = szybsze
+        
         const newViewport: ViewportTransform = {
           ...viewport,
-          x: viewport.x + deltaX / viewport.scale,
-          y: viewport.y + deltaY / viewport.scale,
+          x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
+          y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
         };
 
         // PINCH ZOOM - tylko jeśli dokładnie 2 palce
@@ -126,12 +129,11 @@ export function useMultiTouchGestures({
           const newDistance = getDistance(pointers[0], pointers[1]);
           const distanceChange = newDistance - lastDistanceRef.current;
           
-          // 🔥 THRESHOLD: ignoruj małe zmiany (< 10px) - to prawdopodobnie pan, nie zoom
-          if (Math.abs(distanceChange) > 10) {
+          // ✅ POPRAWKA 3: Większy threshold dla zoom (80px zamiast 10px)
+          if (Math.abs(distanceChange) > 80) {
             const distanceRatio = newDistance / lastDistanceRef.current;
             
             // 🔥 ZMNIEJSZ CZUŁOŚĆ: zamiast pełnego ratio, użyj bardziej subtelnej zmiany
-            // Jeśli ratio = 1.2 (20% wzrost), to zoomFactor będzie tylko 1.02 (2% wzrost)
             const zoomFactor = 1 + (distanceRatio - 1) / 10;
             const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
 
