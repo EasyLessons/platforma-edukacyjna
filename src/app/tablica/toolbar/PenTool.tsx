@@ -89,6 +89,13 @@ export function PenTool({
     // Ignoruj środkowy (button === 1) i prawy przycisk (button === 2)
     if (e.button !== 0) return;
     
+    // 🆕 WAŻNE dla iPad Pencil: ignoruj hover events (pressure === 0)
+    // Tylko rzeczywisty kontakt z ekranem ma pressure > 0
+    if (e.pointerType === 'pen' && e.pressure === 0) return;
+    
+    // 🆕 Dodatkowo sprawdź buttons - musi być wciśnięty
+    if (e.buttons === 0) return;
+    
     e.preventDefault();
     e.stopPropagation();
     
