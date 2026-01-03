@@ -97,10 +97,6 @@ export function PenTool({
 
   // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerDown = (e: React.PointerEvent) => {
-    // ✅ WCZEŚNIEJ preventDefault - zanim przeglądarka wykryje double click!
-    e.preventDefault();
-    e.stopPropagation();
-    
     // 🆕 Wykryj czy to pióro i aktywuj pen mode (jak Excalidraw)
     if (e.pointerType === 'pen') {
       isPenModeRef.current = true;
@@ -111,13 +107,6 @@ export function PenTool({
       return;
     }
     
-    // ✅ KLUCZOWE dla Apple Pencil: ignoruj hover events (pressure === 0)
-    // Gdy pióro jest blisko ekranu ale nie dotyka - ignoruj!
-    if (e.pointerType === 'pen' && e.pressure === 0) return;
-    
-    // ✅ Sprawdź czy przycisk wciśnięty
-    if (e.buttons === 0) return;
-    
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerDown(e);
 
@@ -126,6 +115,9 @@ export function PenTool({
 
     // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
     if (e.button !== 0 && e.button !== -1) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
     
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -200,13 +192,12 @@ export function PenTool({
     currentPathRef.current = null;
     pointsRef.current = [];
     
-    // 🆕 Wyłącz pen mode po 50ms - szybsze reagowanie na kolejne linie!
-    // (było 1000ms - za wolne dla szybkiego rysowania)
+    // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
     setTimeout(() => {
       if (!isDrawingRef.current) {
         isPenModeRef.current = false;
       }
-    }, 50);
+    }, 1000);
   };
 
   // Pointer cancel - anuluj rysowanie
@@ -264,7 +255,6 @@ export function PenTool({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerCancel}
-        onDoubleClick={(e) => { e.preventDefault(); e.stopPropagation(); }} // ✅ WYŁĄCZ DOUBLE CLICK!
       />
 
       {/* Preview path */}

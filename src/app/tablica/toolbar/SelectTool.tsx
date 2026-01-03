@@ -689,6 +689,9 @@ export function SelectTool({
   };
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
+    if (e.button === 1 || e.button === 2) return;
+    
     // 🆕 Obsługa gestów multitouch
     gestures.handlePointerDown(e);
     if (gestures.isGestureActive()) return;
