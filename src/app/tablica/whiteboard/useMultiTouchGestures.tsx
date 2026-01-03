@@ -109,56 +109,48 @@ export function useMultiTouchGestures({
 
       const newCenter = getCenter(pointers);
 
-      if (lastCenterRef.current) {
+      if (lastCenterRef.current && pointers.length === 2 && lastDistanceRef.current) {
         const deltaX = newCenter.x - lastCenterRef.current.x;
         const deltaY = newCenter.y - lastCenterRef.current.y;
+        const panDistance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-        // PINCH ZOOM - sprawdź NAJPIERW czy to zoom (priorytet!)
-        let isZooming = false;
-        
-        if (pointers.length === 2 && lastDistanceRef.current) {
-          const newDistance = getDistance(pointers[0], pointers[1]);
-          const distanceChange = newDistance - lastDistanceRef.current;
-          
-          // ✅ ZMNIEJSZONY THRESHOLD dla zoom (20px zamiast 40px)
-          if (Math.abs(distanceChange) > 15) {
-            isZooming = true; // ← Flaga że zoomujemy
-            
-            const distanceRatio = newDistance / lastDistanceRef.current;
-            
-            // ✅ ZWIĘKSZONA CZUŁOŚĆ ZOOM (dzielnik 5 zamiast 10)
-            const zoomFactor = 1 + (distanceRatio - 1) / 5;
-            const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
+        const newDistance = getDistance(pointers[0], pointers[1]);
+        const distanceChange = Math.abs(newDistance - lastDistanceRef.current);
 
-            // Oblicz przesunięcie viewportu aby zoom był wokół środka gestów
-            const centerWorldX = (newCenter.x - canvasWidth / 2) / viewport.scale - viewport.x;
-            const centerWorldY = (newCenter.y - canvasHeight / 2) / viewport.scale - viewport.y;
+        // 🔥 WYKRYJ INTENCJĘ: co dominuje - zoom czy pan?
+        // Jeśli zmiana dystansu (zoom) > 2x większa niż ruch centrum (pan) → ZOOM
+        // W przeciwnym razie → PAN
+        const isZoomDominant = distanceChange > panDistance * 2;
 
-            const newViewport: ViewportTransform = {
-              ...viewport,
-              scale: newScale,
-              x: (newCenter.x - canvasWidth / 2) / newScale - centerWorldX,
-              y: (newCenter.y - canvasHeight / 2) / newScale - centerWorldY,
-            };
+        if (isZoomDominant && distanceChange > 5) {
+          // ═══ TRYB ZOOM ═══
+          const distanceRatio = newDistance / lastDistanceRef.current;
+          const zoomFactor = 1 + (distanceRatio - 1) / 3; // Średnia czułość
+          const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
 
-            onViewportChange(constrainViewport(newViewport));
-            lastDistanceRef.current = newDistance;
-          }
-        }
+          // Zoom wokół środka między palcami
+          const centerWorldX = (newCenter.x - canvasWidth / 2) / viewport.scale - viewport.x;
+          const centerWorldY = (newCenter.y - canvasHeight / 2) / viewport.scale - viewport.y;
 
-        // PAN - TYLKO jeśli NIE zoomujemy
-        if (!isZooming) {
-          // ✅ ODWRÓCONY KIERUNEK (minus zamiast plus)
-          // ✅ ZWIĘKSZONA CZUŁOŚĆ PAN (0.8 zamiast 0.05)
-          const panSensitivity = 0.05;
-          
           const newViewport: ViewportTransform = {
             ...viewport,
-            x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
-            y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
+            scale: newScale,
+            x: (newCenter.x - canvasWidth / 2) / newScale - centerWorldX,
+            y: (newCenter.y - canvasHeight / 2) / newScale - centerWorldY,
           };
 
           onViewportChange(constrainViewport(newViewport));
+          lastDistanceRef.current = newDistance;
+        } else if (panDistance > 1) {
+          // ═══ TRYB PAN ═══
+          const newViewport: ViewportTransform = {
+            ...viewport,
+            x: viewport.x - deltaX / viewport.scale,
+            y: viewport.y - deltaY / viewport.scale,
+          };
+
+          onViewportChange(constrainViewport(newViewport));
+          // NIE aktualizuj lastDistanceRef - pozwól na drobne fluktuacje
         }
       }
 
