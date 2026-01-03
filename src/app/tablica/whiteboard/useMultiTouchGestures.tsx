@@ -121,7 +121,7 @@ export function useMultiTouchGestures({
           const distanceChange = newDistance - lastDistanceRef.current;
           
           // ✅ ZMNIEJSZONY THRESHOLD dla zoom (20px zamiast 40px)
-          if (Math.abs(distanceChange) > 20) {
+          if (Math.abs(distanceChange) > 15) {
             isZooming = true; // ← Flaga że zoomujemy
             
             const distanceRatio = newDistance / lastDistanceRef.current;
@@ -150,7 +150,7 @@ export function useMultiTouchGestures({
         if (!isZooming) {
           // ✅ ODWRÓCONY KIERUNEK (minus zamiast plus)
           // ✅ ZWIĘKSZONA CZUŁOŚĆ PAN (0.8 zamiast 0.05)
-          const panSensitivity = 0.8;
+          const panSensitivity = 0.05;
           
           const newViewport: ViewportTransform = {
             ...viewport,
