@@ -295,6 +295,9 @@ export function PenTool({
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRef = useRef<SVGPathElement>(null);
   const pointsRef = useRef<Point[]>([]);
+  
+  // 🎯 Throttling dla Apple Pencil (120 events/s!)
+  const lastMoveTimeRef = useRef(0);
 
   const gestures = useMultiTouchGestures({
     viewport,
@@ -371,6 +374,11 @@ export function PenTool({
     };
 
     const handleMove = (e: PointerEvent) => {
+      // 🎯 THROTTLING - Apple Pencil wysyła 120 events/s, ograniczamy do ~120fps (8ms)
+      const now = performance.now();
+      if (now - lastMoveTimeRef.current < 8) return;
+      lastMoveTimeRef.current = now;
+      
       gestures.handlePointerMove(e as any);
       if (gestures.isGestureActive()) return;
       if (!isDrawingRef.current) return;
