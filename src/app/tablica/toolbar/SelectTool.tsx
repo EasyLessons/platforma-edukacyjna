@@ -128,7 +128,7 @@ export function SelectTool({
     const handleGlobalPointerMove = (e: PointerEvent) => {
       // 🆕 Obsługa gestów multitouch - blokuj drag/resize podczas gestów
       if (e.pointerType === 'touch') {
-        gestures.handlePointerMove(e);
+        gestures.handlePointerMove(e as any);
         if (gestures.isGestureActive()) return;
       }
       
@@ -476,7 +476,7 @@ export function SelectTool({
     const handleGlobalPointerUp = (e: PointerEvent) => {
       // 🆕 Obsługa gestów multitouch
       if (e.pointerType === 'touch') {
-        gestures.handlePointerUp(e);
+        gestures.handlePointerUp(e as any);
       }
       
       if (isDragging && draggedElementsOriginal.size > 0) {
@@ -503,7 +503,7 @@ export function SelectTool({
     const handleGlobalPointerCancel = (e: PointerEvent) => {
       // 🆕 Obsługa gestów multitouch przy cancel
       if (e.pointerType === 'touch') {
-        gestures.handlePointerCancel(e);
+        gestures.handlePointerCancel(e as any);
       }
     };
 
