@@ -54,6 +54,9 @@ interface OnlineUser {
   online_at: string
   cursor_x?: number // Opcjonalnie: pozycja kursora
   cursor_y?: number
+  viewport_x?: number // 🆕 Viewport pozycja
+  viewport_y?: number
+  viewport_scale?: number
 }
 
 /**
@@ -295,19 +298,33 @@ export function BoardRealtimeProvider({
         setIsConnected(true)
         console.log('✅ Połączono z kanałem tablicy')
         
-        // Wyślij swoją obecność (Presence)
-        const trackPresence = async () => {
-          await channel.track({
+        // Wyślij swoją obecność (Presence) z viewport
+        const trackPresence = async (viewport?: { x: number; y: number; scale: number }) => {
+          const presenceData: any = {
             user_id: user.id,
             username: user.username,
             online_at: new Date().toISOString()
-          })
+          }
+          
+          // Dodaj viewport jeśli jest dostępny
+          if (viewport) {
+            presenceData.viewport_x = viewport.x
+            presenceData.viewport_y = viewport.y
+            presenceData.viewport_scale = viewport.scale
+          }
+          
+          await channel.track(presenceData)
         }
         
         await trackPresence()
         
+        // Funkcja do update viewport (może być wywołana z zewnątrz)
+        ;(window as any).__updateViewportPresence = (x: number, y: number, scale: number) => {
+          trackPresence({ x, y, scale })
+        }
+        
         // Heartbeat co 15 sekund żeby utrzymać obecność
-        presenceHeartbeat = setInterval(trackPresence, 15000)
+        presenceHeartbeat = setInterval(() => trackPresence(), 15000)
       } else if (status === 'CHANNEL_ERROR') {
         setIsConnected(false)
         console.error('❌ Błąd połączenia z kanałem')

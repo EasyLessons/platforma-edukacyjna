@@ -178,6 +178,9 @@ Zadaj pytanie! 🤔`,
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
   const [debugMode, setDebugMode] = useState(false);
+  
+  // 🆕 Szerokość okna dla responsywności
+  const [windowWidth, setWindowWidth] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   
   // 🆕 ZAPISYWANIE - state i refs
@@ -238,6 +241,14 @@ Zadaj pytanie! 🤔`,
   useEffect(() => {
     unsavedElementsRef.current = unsavedElements;
   }, [unsavedElements]);
+
+  // 🆕 Śledzenie szerokości okna dla responsywności
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    handleResize(); // Inicjalne ustawienie
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 REALTIME - ODBIERANIE ZMIAN OD INNYCH UŻYTKOWNIKÓW
@@ -839,6 +850,19 @@ Zadaj pytanie! 🤔`,
     saveToHistoryRef.current = saveToHistory;
   }, [saveToHistory]);
 
+  // 🆕 BROADCAST VIEWPORT - throttled update viewport presence
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).__updateViewportPresence) {
+      const throttleDelay = 500; // 500ms throttle
+      const timeoutId = setTimeout(() => {
+        (window as any).__updateViewportPresence(viewport.x, viewport.y, viewport.scale);
+        console.log('📡 Viewport updated in presence:', viewport);
+      }, throttleDelay);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [viewport.x, viewport.y, viewport.scale]);
+
   const undo = useCallback(() => {
     const currentIndex = historyIndexRef.current;
     const currentHistory = historyRef.current;
@@ -863,6 +887,16 @@ Zadaj pytanie! 🤔`,
       setElements([...currentHistory[newIndex]]);
       setSelectedElementIds(new Set());
     }
+  }, []);
+
+  // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika
+  const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
+    console.log('👁️ Follow user:', userId, 'viewport:', userViewportX, userViewportY, userViewportScale);
+    setViewport({
+      x: userViewportX,
+      y: userViewportY,
+      scale: userViewportScale
+    });
   }, []);
 
   const clearCanvas = useCallback(async () => {
@@ -2107,7 +2141,7 @@ Zadaj pytanie! 🤔`,
       
       <div ref={containerRef} className="absolute inset-0 overflow-hidden touch-none overscroll-none">
         {/* 🆕 KOMPONENT ONLINE USERS */}
-        <OnlineUsers />
+        <OnlineUsers onFollowUser={handleFollowUser} />
         
         <Toolbar
           tool={tool}
@@ -2140,8 +2174,14 @@ Zadaj pytanie! 🤔`,
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
         />
         
-        {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+        {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany, responsywny */}
+        <div className="absolute top-4 z-50 pointer-events-auto" style={{
+          left: windowWidth <= 760 ? '90px' : windowWidth <= 1550 ? '90px' : '50%',
+          transform: windowWidth <= 760 ? 'none' : windowWidth <= 1550 ? 'none' : 'translateX(-50%)',
+          right: windowWidth <= 760 ? '16px' : windowWidth <= 1550 ? '330px' : 'auto',
+          width: windowWidth <= 760 ? 'auto' : windowWidth <= 1550 ? 'auto' : 'auto',
+          maxWidth: windowWidth <= 760 ? 'calc(100vw - 90px - 16px)' : windowWidth <= 1550 ? 'calc(100vw - 90px - 330px)' : '900px'
+        }}>
           <SmartSearchBar
             onFormulaSelect={handleFormulaSelect}
             onCardSelect={handleCardSelect}

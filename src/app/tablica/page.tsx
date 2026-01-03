@@ -27,7 +27,9 @@ import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
-import { joinBoardWorkspace } from '@/boards_api/api';
+import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
+import { BoardHeader } from './components/BoardHeader';
+import { HomeButton } from './components/HomeButton';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
@@ -38,6 +40,7 @@ export function TablicaContent() {
   const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [boardName, setBoardName] = useState<string>('Moja tablica');
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
@@ -46,6 +49,21 @@ export function TablicaContent() {
     const id = searchParams.get('boardId') || 'demo-board';
     setBoardId(id);
     console.log('📋 Board ID:', id);
+    
+    // Pobierz dane tablicy z bazy
+    const loadBoardData = async () => {
+      try {
+        const board = await fetchBoardById(id);
+        if (board) {
+          setBoardName(board.name);
+          console.log('✅ Załadowano dane tablicy:', board.name);
+        }
+      } catch (error) {
+        console.error('❌ Błąd ładowania danych tablicy:', error);
+      }
+    };
+    
+    loadBoardData();
     
     // Automatyczne dołączenie do workspace przy wejściu przez link
     const joinWorkspace = async () => {
@@ -107,90 +125,11 @@ export function TablicaContent() {
         </div>
       )}
       
-      {/* Logo powrotu - lewy górny róg */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '16px',
-          zIndex: 100,
-        }}
-      >
-        <button
-          onClick={() => router.push('/dashboard')}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: 'white',
-            border: '2px solid #e0e0e0',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            position: 'relative'
-          }}
-          onMouseOver={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0px)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-          }}
-          onMouseOut={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-          }}
-        >
-          <Image
-            src="/resources/LogoEasyLesson.webp"
-            alt="EasyLesson Logo"
-            width={160}
-            height={50}
-            className="h-11 w-auto"
-            priority
-          />
-        </button>
+      {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
+      <HomeButton />
 
-        {/* Tooltip POD logo */}
-        {showTooltip && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              marginTop: '8px',
-              backgroundColor: '#1f2937',
-              color: 'white',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              pointerEvents: 'none',
-              zIndex: 101,
-              animation: 'fadeIn 0.2s ease-in-out'
-            }}
-          >
-            Wróć do panelu
-            {/* Strzałka tooltipa */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '-6px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 0,
-                height: 0,
-                borderLeft: '6px solid transparent',
-                borderRight: '6px solid transparent',
-                borderBottom: '6px solid #1f2937'
-              }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Nagłówek z logo, nazwą tablicy i przyciskiem premium */}
+      <BoardHeader boardName={boardName} boardId={boardId} />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>

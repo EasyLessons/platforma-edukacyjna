@@ -108,8 +108,6 @@ function Toolbar({
   isCalculatorOpen,
   onCalculatorToggle,
 }: ToolbarProps) {
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-
   // 🔴 USUNIĘTE - handleGenerateFunction i functionExpression nie są już potrzebne
   // FunctionTool sam tworzy funkcje i ma własny input
 
@@ -139,8 +137,6 @@ function Toolbar({
         onDeleteSelected={onDeleteSelected}
         onExport={onExport}
         onImport={onImport}
-        isMobileMenuOpen={isMobileMenuOpen}
-        setIsMobileMenuOpen={setIsMobileMenuOpen}
         onImagePaste={onImagePaste}
         onImageUpload={onImageUpload}
         onPDFUpload={onPDFUpload}
