@@ -311,7 +311,6 @@ export function ShapeTool({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
-        onWheel={handleWheel}
       />
 
       {/* Preview shape */}
