@@ -131,7 +131,12 @@ export function PenTool({
 
   // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (isDrawing && currentPath && pointsRef.current.length >= 1) {
+    if (!isDrawing) return;
+    
+    // Zwolnij pointer capture
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    if (currentPath && pointsRef.current.length >= 1) {
       // Utwórz finalną ścieżkę z kopiami punktów
       const finalPath: DrawingPath = {
         ...currentPath,
@@ -140,6 +145,18 @@ export function PenTool({
       onPathCreate(finalPath);
     }
 
+    setIsDrawing(false);
+    setCurrentPath(null);
+    pointsRef.current = [];
+  };
+
+  // Pointer cancel - anuluj rysowanie
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    if (!isDrawing) return;
+    
+    // Zwolnij pointer capture
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
     setIsDrawing(false);
     setCurrentPath(null);
     pointsRef.current = [];
@@ -184,8 +201,7 @@ export function PenTool({
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       />
 
       {/* Preview path */}
