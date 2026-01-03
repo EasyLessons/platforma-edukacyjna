@@ -109,95 +109,59 @@ export function useMultiTouchGestures({
 
       const newCenter = getCenter(pointers);
 
-      // PAN - przesuwanie na podstawie ruchu środka
       if (lastCenterRef.current) {
         const deltaX = newCenter.x - lastCenterRef.current.x;
         const deltaY = newCenter.y - lastCenterRef.current.y;
 
-        // ✅ POPRAWKA 1: Odwrócony kierunek pan (minus zamiast plus)
-        // ✅ POPRAWKA 2: Zmniejszona czułość pan (mnożenie przez 0.6)
-        const panSensitivity = 0.1; // ← Dostosuj: 0.5 = spokojniejsze, 1.0 = szybsze
+        // PINCH ZOOM - sprawdź NAJPIERW czy to zoom (priorytet!)
+        let isZooming = false;
         
-        const newViewport: ViewportTransform = {
-          ...viewport,
-          x: viewport.x + (deltaX / viewport.scale) * panSensitivity,
-          y: viewport.y + (deltaY / viewport.scale) * panSensitivity,
-        };
-
-        // PINCH ZOOM - tylko jeśli dokładnie 2 palce
         if (pointers.length === 2 && lastDistanceRef.current) {
           const newDistance = getDistance(pointers[0], pointers[1]);
           const distanceChange = newDistance - lastDistanceRef.current;
           
-          // ✅ POPRAWKA 3: Większy threshold dla zoom (80px zamiast 10px)
-          if (Math.abs(distanceChange) > 40) {
+          // ✅ ZMNIEJSZONY THRESHOLD dla zoom (20px zamiast 40px)
+          if (Math.abs(distanceChange) > 20) {
+            isZooming = true; // ← Flaga że zoomujemy
+            
             const distanceRatio = newDistance / lastDistanceRef.current;
             
-            // 🔥 ZMNIEJSZ CZUŁOŚĆ: zamiast pełnego ratio, użyj bardziej subtelnej zmiany
-            const zoomFactor = 1 + (distanceRatio - 1) / 10;
+            // ✅ ZWIĘKSZONA CZUŁOŚĆ ZOOM (dzielnik 5 zamiast 10)
+            const zoomFactor = 1 + (distanceRatio - 1) / 5;
             const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
 
             // Oblicz przesunięcie viewportu aby zoom był wokół środka gestów
             const centerWorldX = (newCenter.x - canvasWidth / 2) / viewport.scale - viewport.x;
             const centerWorldY = (newCenter.y - canvasHeight / 2) / viewport.scale - viewport.y;
 
-            newViewport.scale = newScale;
-            newViewport.x = (newCenter.x - canvasWidth / 2) / newScale - centerWorldX;
-            newViewport.y = (newCenter.y - canvasHeight / 2) / newScale - centerWorldY;
+            const newViewport: ViewportTransform = {
+              ...viewport,
+              scale: newScale,
+              x: (newCenter.x - canvasWidth / 2) / newScale - centerWorldX,
+              y: (newCenter.y - canvasHeight / 2) / newScale - centerWorldY,
+            };
 
+            onViewportChange(constrainViewport(newViewport));
             lastDistanceRef.current = newDistance;
           }
         }
 
-        onViewportChange(constrainViewport(newViewport));
+        // PAN - TYLKO jeśli NIE zoomujemy
+        if (!isZooming) {
+          // ✅ ODWRÓCONY KIERUNEK (minus zamiast plus)
+          // ✅ ZWIĘKSZONA CZUŁOŚĆ PAN (0.8 zamiast 0.05)
+          const panSensitivity = 0.8;
+          
+          const newViewport: ViewportTransform = {
+            ...viewport,
+            x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
+            y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
+          };
+
+          onViewportChange(constrainViewport(newViewport));
+        }
       }
 
       lastCenterRef.current = newCenter;
     }
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch
-    if (e.pointerType !== 'touch') return;
-
-    // Usuń pointer z mapy
-    activePointersRef.current.delete(e.pointerId);
-
-    const pointers = Array.from(activePointersRef.current.values());
-
-    // Jeśli zostało mniej niż 2 palce → wyłącz tryb gestów
-    if (pointers.length < 2) {
-      isGestureActiveRef.current = false;
-      lastCenterRef.current = null;
-      lastDistanceRef.current = null;
-    } else {
-      // Zaktualizuj centrum i dystans dla pozostałych palców
-      lastCenterRef.current = getCenter(pointers);
-      if (pointers.length === 2) {
-        lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
-      }
-    }
-  }, []);
-
-  const handlePointerCancel = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch
-    if (e.pointerType !== 'touch') return;
-
-    // Wyczyść wszystko
-    activePointersRef.current.clear();
-    isGestureActiveRef.current = false;
-    lastCenterRef.current = null;
-    lastDistanceRef.current = null;
-  }, []);
-
-  // Zwróć czy gesty są aktywne (do blokowania rysowania)
-  const isGestureActive = () => isGestureActiveRef.current;
-
-  return {
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
-    handlePointerCancel,
-    isGestureActive,
-  };
-}
+  }, [viewport, canvasWidth, canvasHeig
