@@ -36,6 +36,7 @@ import React, { useState } from 'react';
 import { Point, ViewportTransform, Shape } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { ShapeType } from '../toolbar/Toolbar';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
@@ -65,6 +66,13 @@ export function ShapeTool({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
 
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
+
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = (e: React.WheelEvent) => {
     if (!onViewportChange) return;
@@ -83,8 +91,11 @@ export function ShapeTool({
     }
   };
 
-  // Mouse down - rozpocznij rysowanie kształtu
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Pointer down - rozpocznij rysowanie kształtu
+  const handlePointerDown = (e: React.PointerEvent) => {
+    gestures.handlePointerDown(e);
+    if (gestures.isGestureActive()) return;
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -106,8 +117,11 @@ export function ShapeTool({
     setIsDrawing(true);
   };
 
-  // Mouse move - kontynuuj rysowanie kształtu
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Pointer move - kontynuuj rysowanie kształtu
+  const handlePointerMove = (e: React.PointerEvent) => {
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return;
+
     if (!isDrawing || !currentShape) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
@@ -120,8 +134,10 @@ export function ShapeTool({
     });
   };
 
-  // Mouse up - zakończ rysowanie kształtu
-  const handleMouseUp = () => {
+  // Pointer up - zakończ rysowanie kształtu
+  const handlePointerUp = (e: React.PointerEvent) => {
+    gestures.handlePointerUp(e);
+
     if (isDrawing && currentShape) {
       onShapeCreate(currentShape);
     }
@@ -316,17 +332,15 @@ export function ShapeTool({
 
   return (
     <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      {/* Overlay dla mouse events */}
+      {/* Overlay dla pointer events */}
       <div
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onWheel={handleWheel}
         onWheel={handleWheel}
       />
 

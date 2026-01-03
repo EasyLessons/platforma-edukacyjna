@@ -28,6 +28,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface EraserToolProps {
   viewport: ViewportTransform;
@@ -51,6 +52,13 @@ export function EraserTool({
   const [isDragging, setIsDragging] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const deletedDuringDrag = useRef<Set<string>>(new Set());
+
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
 
   // Wheel events dla pan/zoom
   useEffect(() => {
@@ -162,39 +170,20 @@ export function EraserTool({
   };
 
   // Znajduje element pod kursorem (od góry - ostatni rysowany)
-  const findElementUnderCursor = useCallback((worldPoint: Point): string | null => {
+  const findElementAtPoint = useCallback((worldPoint: Point) => {
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       if (isPointInElement(worldPoint, el)) {
-        return el.id;
+        return el;
       }
     }
     return null;
   }, [elements, isPointInElement]);
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-    
-    setCursorPosition(screenPoint);
-    
-    // Podświetl element pod kursorem
-    const elementId = findElementUnderCursor(worldPoint);
-    setHoveredElementId(elementId);
-    
-    // Jeśli przeciągamy i jest element pod kursorem - usuń go
-    if (isDragging && elementId && !deletedDuringDrag.current.has(elementId)) {
-      deletedDuringDrag.current.add(elementId);
-      onElementDelete(elementId);
-    }
-  }, [viewport, canvasWidth, canvasHeight, findElementUnderCursor, isDragging, onElementDelete]);
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerDown(e);
+    if (gestures.isGestureActive()) return;
 
-  const handleMouseLeave = useCallback(() => {
-    setHoveredElementId(null);
-    setCursorPosition(null);
-  }, []);
-
-  const handleMouseDown = useCallback(() => {
     setIsDragging(true);
     deletedDuringDrag.current.clear();
     
@@ -204,16 +193,34 @@ export function EraserTool({
       onElementDelete(hoveredElementId);
       setHoveredElementId(null);
     }
-  }, [hoveredElementId, onElementDelete]);
+  }, [hoveredElementId, onElementDelete, gestures]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerUp(e);
+    
     setIsDragging(false);
     deletedDuringDrag.current.clear();
-  }, []);
+  }, [gestures]);
 
-  const handleClick = useCallback(() => {
-    // Click jest już obsłużony przez mouseDown
-  }, []);
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return;
+
+    const screenPoint = { x: e.clientX, y: e.clientY };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    setCursorPosition(worldPoint);
+
+    // Znajdź element pod kursorem
+    const element = findElementAtPoint(worldPoint);
+    setHoveredElementId(element?.id || null);
+
+    // Jeśli drag aktywny i najechaliśmy na nowy element → usuń go
+    if (isDragging && element && !deletedDuringDrag.current.has(element.id)) {
+      deletedDuringDrag.current.add(element.id);
+      onElementDelete(element.id);
+      setHoveredElementId(null);
+    }
+  }, [viewport, canvasWidth, canvasHeight, isDragging, elements, onElementDelete, gestures]);
 
   // Renderuj highlight dla hovered element
   const renderHighlight = () => {
@@ -305,11 +312,10 @@ export function EraserTool({
           cursor: 'none', // Ukryj domyślny kursor - mamy własny
           touchAction: 'none' 
         }}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        onMouseDown={handleMouseDown}
-        onMouseUp={handleMouseUp}
-        onClick={handleClick}
+        onPointerMove={handlePointerMove}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
       />
 
       {/* Highlight hovered element */}

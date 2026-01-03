@@ -19,6 +19,7 @@ import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWhe
 import { TextMiniToolbar } from './TextMiniToolbar';
 import { SelectionPropertiesPanel } from './SelectionPropertiesPanel';
 import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '../utils/snapUtils';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -81,6 +82,14 @@ export function SelectTool({
   const [resizeOriginalElements, setResizeOriginalElements] = useState<Map<string, DrawingElement>>(new Map());
 
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // 🆕 Multi-touch gestures
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
   
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
@@ -660,6 +669,13 @@ export function SelectTool({
   };
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    // 🆕 Obsługa gestów multitouch (konwertuj MouseEvent na PointerEvent-like)
+    const pointerEvent = e.nativeEvent as any;
+    if (pointerEvent.pointerType) {
+      gestures.handlePointerDown(pointerEvent);
+      if (gestures.isGestureActive()) return;
+    }
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -724,13 +740,28 @@ export function SelectTool({
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
+    // 🆕 Obsługa gestów multitouch
+    const pointerEvent = e.nativeEvent as any;
+    if (pointerEvent.pointerType) {
+      gestures.handlePointerMove(pointerEvent);
+      if (gestures.isGestureActive()) return;
+    }
+
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
       setSelectionEnd({ x: e.clientX, y: e.clientY });
     }
   };
 
-  const handleMouseUp = () => {
+  const handleMouseUp = (e?: React.MouseEvent) => {
+    // 🆕 Obsługa gestów multitouch
+    if (e) {
+      const pointerEvent = e.nativeEvent as any;
+      if (pointerEvent.pointerType) {
+        gestures.handlePointerUp(pointerEvent);
+      }
+    }
+
     // Tylko dla zaznaczania obszaru - resize/drag mouseup obsługiwane przez global listener
     if (isSelecting && selectionStart && selectionEnd) {
       const worldStart = inverseTransformPoint(selectionStart, viewport, canvasWidth, canvasHeight);
