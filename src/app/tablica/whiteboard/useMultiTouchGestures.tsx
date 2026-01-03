@@ -127,7 +127,7 @@ export function useMultiTouchGestures({
           const distanceRatio = newDistance / lastDistanceRef.current;
           
           // ✅ CZUŁOŚĆ ZOOM (dzielnik 3)
-          const zoomFactor = 1 + (distanceRatio - 1) / 4.5;
+          const zoomFactor = 1 + (distanceRatio - 1) / 10;
           const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
 
           // ✅✅✅ POPRAWKA: Podczas zoom TYLKO scale się zmienia!
