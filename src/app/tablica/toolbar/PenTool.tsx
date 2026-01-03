@@ -107,6 +107,13 @@ export function PenTool({
       return;
     }
     
+    // ✅ KLUCZOWE dla Apple Pencil: ignoruj hover events (pressure === 0)
+    // Gdy pióro jest blisko ekranu ale nie dotyka - ignoruj!
+    if (e.pointerType === 'pen' && e.pressure === 0) return;
+    
+    // ✅ Sprawdź czy przycisk wciśnięty
+    if (e.buttons === 0) return;
+    
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerDown(e);
 
@@ -192,12 +199,13 @@ export function PenTool({
     currentPathRef.current = null;
     pointsRef.current = [];
     
-    // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
+    // 🆕 Wyłącz pen mode po 50ms - szybsze reagowanie na kolejne linie!
+    // (było 1000ms - za wolne dla szybkiego rysowania)
     setTimeout(() => {
       if (!isDrawingRef.current) {
         isPenModeRef.current = false;
       }
-    }, 1000);
+    }, 50);
   };
 
   // Pointer cancel - anuluj rysowanie
