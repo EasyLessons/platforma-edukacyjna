@@ -12,7 +12,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -26,6 +26,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
   const [showComparison, setShowComparison] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
   // Monitoruj szerokość okna
@@ -165,7 +166,19 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
           {/* Przycisk Premium */}
           <div style={{ position: 'relative' }}>
             <button
-              onMouseEnter={() => setShowComparison(true)}
+              onMouseEnter={() => {
+                // Anuluj zamykanie
+                if (closeTimeoutRef.current) {
+                    clearTimeout(closeTimeoutRef.current);
+                }
+                setShowComparison(true);
+                }}
+                onMouseLeave={() => {
+                // Zamknij po 200ms (czas na wjechanie na okienko)
+                closeTimeoutRef.current = setTimeout(() => {
+                    setShowComparison(false);
+                }, 200);
+                }}
               onClick={handlePremiumClick}
               style={{
                 padding: '8px 20px',
@@ -201,8 +214,16 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
             {/* Tabela porównawcza - pojawia się na hover */}
             {showComparison && (
               <div
-                onMouseEnter={() => setShowComparison(true)}
-                onMouseLeave={() => setShowComparison(false)}
+                onMouseEnter={() => {
+                // Jak wjedziemy na okienko - anuluj zamykanie
+                if (closeTimeoutRef.current) {
+                    clearTimeout(closeTimeoutRef.current);
+                }
+                }}
+                onMouseLeave={() => {
+                // Jak zjedziemy - zamknij od razu
+                setShowComparison(false);
+                }}
                 style={{
                   position: 'absolute',
                   top: '100%',
@@ -255,6 +276,40 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                   <Sparkles className="w-5 h-5 text-green-600" />
                   Dlaczego Premium?
                 </h3>
+
+                {/* Placeholder na filmik YouTube */}
+                <div style={{
+                  width: '100%',
+                  height: '200px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '12px',
+                  marginBottom: '16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '2px dashed #d1d5db',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  <div style={{
+                    textAlign: 'center',
+                    color: '#6b7280',
+                  }}>
+                    <svg 
+                      style={{ width: '48px', height: '48px', margin: '0 auto 8px' }}
+                      fill="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                    <div style={{ fontSize: '14px', fontWeight: '500' }}>
+                      Filmik YouTube
+                    </div>
+                    <div style={{ fontSize: '12px', marginTop: '4px' }}>
+                      Link do wideo zostanie dodany wkrótce
+                    </div>
+                  </div>
+                </div>
 
                 <table style={{
                   width: '100%',
