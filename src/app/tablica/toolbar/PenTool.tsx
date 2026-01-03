@@ -55,8 +55,8 @@ export function PenTool({
   onPathCreate,
   onViewportChange,
 }: PenToolProps) {
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
+  const isDrawingRef = useRef(false);
+  const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<Point[]>([]);
   const [, forceUpdate] = useState({});
@@ -90,6 +90,7 @@ export function PenTool({
     if (e.button !== 0) return;
     
     e.preventDefault();
+    e.stopPropagation();
     
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -107,17 +108,18 @@ export function PenTool({
       width: lineWidth,
     };
 
-    setCurrentPath(newPath);
-    setIsDrawing(true);
+    currentPathRef.current = newPath;
+    isDrawingRef.current = true;
     // Wymuszaj natychmiastowy render pierwszego punktu
     forceUpdate({});
   };
 
   // Pointer move - kontynuuj rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDrawing || !currentPath) return;
+    if (!isDrawingRef.current || !currentPathRef.current) return;
     
     e.preventDefault();
+    e.stopPropagation();
 
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
@@ -131,40 +133,40 @@ export function PenTool({
 
   // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!isDrawing) return;
+    if (!isDrawingRef.current) return;
     
     // Zwolnij pointer capture
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     
-    if (currentPath && pointsRef.current.length >= 1) {
+    if (currentPathRef.current && pointsRef.current.length >= 1) {
       // Utwórz finalną ścieżkę z kopiami punktów
       const finalPath: DrawingPath = {
-        ...currentPath,
+        ...currentPathRef.current,
         points: [...pointsRef.current],
       };
       onPathCreate(finalPath);
     }
 
-    setIsDrawing(false);
-    setCurrentPath(null);
+    isDrawingRef.current = false;
+    currentPathRef.current = null;
     pointsRef.current = [];
   };
 
   // Pointer cancel - anuluj rysowanie
   const handlePointerCancel = (e: React.PointerEvent) => {
-    if (!isDrawing) return;
+    if (!isDrawingRef.current) return;
     
     // Zwolnij pointer capture
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     
-    setIsDrawing(false);
-    setCurrentPath(null);
+    isDrawingRef.current = false;
+    currentPathRef.current = null;
     pointsRef.current = [];
   };
 
   // Render preview path (rysowanie w trakcie)
   const renderPreviewPath = () => {
-    if (!currentPath || pointsRef.current.length === 0) return null;
+    if (!currentPathRef.current || pointsRef.current.length === 0) return null;
 
     // Transformuj punkty ze współrzędnych świata na ekran
     const pathData = pointsRef.current
@@ -181,8 +183,8 @@ export function PenTool({
       >
         <path
           d={pathData}
-          stroke={currentPath.color}
-          strokeWidth={clampLineWidth(currentPath.width, viewport.scale)}
+          stroke={currentPathRef.current.color}
+          strokeWidth={clampLineWidth(currentPathRef.current.width, viewport.scale)}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
