@@ -688,13 +688,10 @@ export function SelectTool({
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // 🆕 Obsługa gestów multitouch (konwertuj MouseEvent na PointerEvent-like)
-    const pointerEvent = e.nativeEvent as any;
-    if (pointerEvent.pointerType) {
-      gestures.handlePointerDown(pointerEvent);
-      if (gestures.isGestureActive()) return;
-    }
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // 🆕 Obsługa gestów multitouch
+    gestures.handlePointerDown(e);
+    if (gestures.isGestureActive()) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
@@ -759,13 +756,10 @@ export function SelectTool({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     // 🆕 Obsługa gestów multitouch
-    const pointerEvent = e.nativeEvent as any;
-    if (pointerEvent.pointerType) {
-      gestures.handlePointerMove(pointerEvent);
-      if (gestures.isGestureActive()) return;
-    }
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return;
 
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
@@ -773,13 +767,10 @@ export function SelectTool({
     }
   };
 
-  const handleMouseUp = (e?: React.MouseEvent) => {
+  const handlePointerUp = (e?: React.PointerEvent) => {
     // 🆕 Obsługa gestów multitouch
     if (e) {
-      const pointerEvent = e.nativeEvent as any;
-      if (pointerEvent.pointerType) {
-        gestures.handlePointerUp(pointerEvent);
-      }
+      gestures.handlePointerUp(e);
     }
 
     // Tylko dla zaznaczania obszaru - resize/drag mouseup obsługiwane przez global listener
@@ -841,6 +832,11 @@ export function SelectTool({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    // 🆕 Obsługa gestów multitouch przy cancel
+    gestures.handlePointerCancel(e);
   };
 
   const renderTextToolbar = () => {
@@ -993,9 +989,10 @@ export function SelectTool({
       <div
         className="absolute inset-0 z-30 pointer-events-auto"
         style={{ cursor: 'default', touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
       />
       
