@@ -187,7 +187,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                 borderRadius: '10px',
                 cursor: 'pointer',
                 transition: 'all 0.2s',
-                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.25)',
+                boxShadow: '0 4px 12px rgba(174, 174, 174, 0.25)',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
@@ -397,6 +397,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                     fontWeight: '600',
                     cursor: 'pointer',
                     transition: 'all 0.2s',
+                    boxShadow: '0 4px 12px rgba(205, 205, 205, 0.3)',
                   }}
                   onMouseOver={(e) => {
                     (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)';
