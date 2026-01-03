@@ -144,6 +144,13 @@ export function PenTool({
     // 🆕 Jeśli gesty aktywne → nie rysuj
     if (gestures.isGestureActive()) return;
 
+    // 🆕 WAŻNE dla iPad Pencil: ignoruj hover events (pressure === 0)
+    // Hover blokuje szybkie rysowanie - tylko rzeczywisty dotyk!
+    if (e.pointerType === 'pen' && e.pressure === 0) return;
+    
+    // 🆕 Sprawdź czy przycisk wciśnięty
+    if (e.buttons === 0) return;
+
     if (!isDrawingRef.current || !currentPathRef.current) return;
     
     e.preventDefault();
