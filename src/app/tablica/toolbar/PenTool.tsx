@@ -61,6 +61,9 @@ export function PenTool({
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<Point[]>([]);
   const [, forceUpdate] = useState({});
+  
+  // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
+  const isPenModeRef = useRef(false);
 
   // 🆕 Multi-touch gestures (2+ palce = pan/zoom)
   const gestures = useMultiTouchGestures({
@@ -94,6 +97,16 @@ export function PenTool({
 
   // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerDown = (e: React.PointerEvent) => {
+    // 🆕 Wykryj czy to pióro i aktywuj pen mode (jak Excalidraw)
+    if (e.pointerType === 'pen') {
+      isPenModeRef.current = true;
+    }
+    
+    // 🆕 W pen mode: BLOKUJ wszystko oprócz pen (blokuje palce gdy pióro aktywne)
+    if (isPenModeRef.current && e.pointerType !== 'pen') {
+      return;
+    }
+    
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerDown(e);
 
@@ -101,15 +114,7 @@ export function PenTool({
     if (gestures.isGestureActive()) return;
 
     // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
-    // Ignoruj środkowy (button === 1) i prawy przycisk (button === 2)
-    if (e.button !== 0) return;
-    
-    // 🆕 WAŻNE dla iPad Pencil: ignoruj hover events (pressure === 0)
-    // Tylko rzeczywisty kontakt z ekranem ma pressure > 0
-    if (e.pointerType === 'pen' && e.pressure === 0) return;
-    
-    // 🆕 Dodatkowo sprawdź buttons - musi być wciśnięty
-    if (e.buttons === 0) return;
+    if (e.button !== 0 && e.button !== -1) return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -138,18 +143,16 @@ export function PenTool({
 
   // Pointer move - kontynuuj rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerMove = (e: React.PointerEvent) => {
+    // 🆕 W pen mode: BLOKUJ wszystko oprócz pen
+    if (isPenModeRef.current && e.pointerType !== 'pen') {
+      return;
+    }
+    
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerMove(e);
 
     // 🆕 Jeśli gesty aktywne → nie rysuj
     if (gestures.isGestureActive()) return;
-
-    // 🆕 WAŻNE dla iPad Pencil: ignoruj hover events (pressure === 0)
-    // Hover blokuje szybkie rysowanie - tylko rzeczywisty dotyk!
-    if (e.pointerType === 'pen' && e.pressure === 0) return;
-    
-    // 🆕 Sprawdź czy przycisk wciśnięty
-    if (e.buttons === 0) return;
 
     if (!isDrawingRef.current || !currentPathRef.current) return;
     
@@ -188,6 +191,13 @@ export function PenTool({
     isDrawingRef.current = false;
     currentPathRef.current = null;
     pointsRef.current = [];
+    
+    // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
+    setTimeout(() => {
+      if (!isDrawingRef.current) {
+        isPenModeRef.current = false;
+      }
+    }, 1000);
   };
 
   // Pointer cancel - anuluj rysowanie
