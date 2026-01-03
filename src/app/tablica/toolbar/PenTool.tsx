@@ -35,6 +35,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { clampLineWidth } from '../whiteboard/utils';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface PenToolProps {
   viewport: ViewportTransform;
@@ -61,6 +62,14 @@ export function PenTool({
   const pointsRef = useRef<Point[]>([]);
   const [, forceUpdate] = useState({});
 
+  // 🆕 Multi-touch gestures (2+ palce = pan/zoom)
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
+
   // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -85,6 +94,12 @@ export function PenTool({
 
   // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerDown = (e: React.PointerEvent) => {
+    // 🆕 Najpierw przekaż do gesture handler
+    gestures.handlePointerDown(e);
+
+    // 🆕 Jeśli gesty aktywne (2+ palce touch) → blokuj rysowanie
+    if (gestures.isGestureActive()) return;
+
     // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
     // Ignoruj środkowy (button === 1) i prawy przycisk (button === 2)
     if (e.button !== 0) return;
@@ -123,6 +138,12 @@ export function PenTool({
 
   // Pointer move - kontynuuj rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerMove = (e: React.PointerEvent) => {
+    // 🆕 Najpierw przekaż do gesture handler
+    gestures.handlePointerMove(e);
+
+    // 🆕 Jeśli gesty aktywne → nie rysuj
+    if (gestures.isGestureActive()) return;
+
     if (!isDrawingRef.current || !currentPathRef.current) return;
     
     e.preventDefault();
@@ -140,6 +161,9 @@ export function PenTool({
 
   // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerUp = (e: React.PointerEvent) => {
+    // 🆕 Przekaż do gesture handler
+    gestures.handlePointerUp(e);
+
     if (!isDrawingRef.current) return;
     
     // Zwolnij pointer capture
@@ -161,6 +185,9 @@ export function PenTool({
 
   // Pointer cancel - anuluj rysowanie
   const handlePointerCancel = (e: React.PointerEvent) => {
+    // 🆕 Przekaż do gesture handler
+    gestures.handlePointerCancel(e);
+
     if (!isDrawingRef.current) return;
     
     // Zwolnij pointer capture
