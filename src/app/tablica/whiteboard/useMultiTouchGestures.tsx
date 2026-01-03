@@ -89,88 +89,84 @@ export function useMultiTouchGestures({
   }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch
-    if (e.pointerType !== 'touch') return;
-    if (!activePointersRef.current.has(e.pointerId)) return;
+  // 🔥 IGNORUJ wszystko oprócz touch
+  if (e.pointerType !== 'touch') return;
+  if (!activePointersRef.current.has(e.pointerId)) return;
 
-    // Aktualizuj pozycję pointera
-    activePointersRef.current.set(e.pointerId, {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-    });
+  // Aktualizuj pozycję pointera
+  activePointersRef.current.set(e.pointerId, {
+    id: e.pointerId,
+    x: e.clientX,
+    y: e.clientY,
+  });
 
-    const pointers = Array.from(activePointersRef.current.values());
+  const pointers = Array.from(activePointersRef.current.values());
 
-    // Jeśli 2+ palce → obsługuj gesty
-    if (pointers.length >= 2 && isGestureActiveRef.current) {
-      e.preventDefault();
-      e.stopPropagation();
+  // Jeśli 2+ palce → obsługuj gesty
+  if (pointers.length >= 2 && isGestureActiveRef.current) {
+    e.preventDefault();
+    e.stopPropagation();
 
-      const newCenter = getCenter(pointers);
+    const newCenter = getCenter(pointers);
 
-      if (lastCenterRef.current) {
-        const deltaX = newCenter.x - lastCenterRef.current.x;
-        const deltaY = newCenter.y - lastCenterRef.current.y;
+    if (lastCenterRef.current) {
+      const deltaX = newCenter.x - lastCenterRef.current.x;
+      const deltaY = newCenter.y - lastCenterRef.current.y;
 
-        // PINCH ZOOM - sprawdź NAJPIERW czy to zoom (priorytet!)
-        let isZooming = false;
+      // PINCH ZOOM - sprawdź NAJPIERW czy to zoom (priorytet!)
+      let isZooming = false;
+      
+      if (pointers.length === 2 && lastDistanceRef.current) {
+        const newDistance = getDistance(pointers[0], pointers[1]);
+        const distanceChange = newDistance - lastDistanceRef.current;
         
-        if (pointers.length === 2 && lastDistanceRef.current) {
-          const newDistance = getDistance(pointers[0], pointers[1]);
-          const distanceChange = newDistance - lastDistanceRef.current;
+        // ✅ THRESHOLD dla zoom (30px)
+        if (Math.abs(distanceChange) > 30) {
+          isZooming = true;
           
-          // ✅ THRESHOLD dla zoom (25px)
-          if (Math.abs(distanceChange) > 25) {
-            isZooming = true;
-            
-            const distanceRatio = newDistance / lastDistanceRef.current;
-            
-            // ✅ CZUŁOŚĆ ZOOM (dzielnik 6)
-            const zoomFactor = 1 + (distanceRatio - 1) / 6;
-            const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
-
-            // ✅ STABILNY ZOOM - zoom wokół STAREGO centrum (nie nowego!)
-            const centerWorldX = (lastCenterRef.current.x - canvasWidth / 2) / viewport.scale - viewport.x;
-            const centerWorldY = (lastCenterRef.current.y - canvasHeight / 2) / viewport.scale - viewport.y;
-
-            const newViewport: ViewportTransform = {
-              ...viewport,
-              scale: newScale,
-              x: (lastCenterRef.current.x - canvasWidth / 2) / newScale - centerWorldX,
-              y: (lastCenterRef.current.y - canvasHeight / 2) / newScale - centerWorldY,
-            };
-
-            onViewportChange(constrainViewport(newViewport));
-            
-            // ✅ Aktualizuj distance TYLKO co większy ruch (40px)
-            if (Math.abs(distanceChange) > 40) {
-              lastDistanceRef.current = newDistance;
-            }
-          }
-        }
-
-        // PAN - TYLKO jeśli NIE zoomujemy
-        if (!isZooming) {
-          // ✅ PAN SENSITIVITY - spokojne przesuwanie
-          const panSensitivity = 0.04;
+          const distanceRatio = newDistance / lastDistanceRef.current;
           
+          // ✅ CZUŁOŚĆ ZOOM (dzielnik 6)
+          const zoomFactor = 1 + (distanceRatio - 1) / 6;
+          const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
+
+          // ✅✅✅ POPRAWKA: Podczas zoom TYLKO scale się zmienia!
+          // NIE zmieniaj viewport.x i viewport.y - to eliminuje przesuwanie
           const newViewport: ViewportTransform = {
             ...viewport,
-            // ⚠️ Jeśli kierunek źle, zmień znaki + na -
-            x: viewport.x + (deltaX / viewport.scale) * panSensitivity,
-            y: viewport.y + (deltaY / viewport.scale) * panSensitivity,
+            scale: newScale,
+            // x i y pozostają BEZ ZMIAN
           };
 
           onViewportChange(constrainViewport(newViewport));
           
-          // ✅ Aktualizuj center TYLKO przy pan (nie przy zoom!)
-          lastCenterRef.current = newCenter;
+          // ✅ Aktualizuj distance TYLKO co większy ruch (40px)
+          if (Math.abs(distanceChange) > 40) {
+            lastDistanceRef.current = newDistance;
+          }
         }
-        // ✅ WAŻNE: NIE aktualizuj lastCenterRef przy zoom!
       }
+
+      // PAN - TYLKO jeśli NIE zoomujemy
+      if (!isZooming) {
+        // ✅ PAN SENSITIVITY - spokojne przesuwanie
+        const panSensitivity = 0.04;
+        
+        const newViewport: ViewportTransform = {
+          ...viewport,
+          x: viewport.x + (deltaX / viewport.scale) * panSensitivity,
+          y: viewport.y + (deltaY / viewport.scale) * panSensitivity,
+        };
+
+        onViewportChange(constrainViewport(newViewport));
+        
+        // ✅ Aktualizuj center TYLKO przy pan (nie przy zoom!)
+        lastCenterRef.current = newCenter;
+      }
+      // ✅ WAŻNE: NIE aktualizuj lastCenterRef przy zoom!
     }
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  }
+}, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
     // 🔥 IGNORUJ wszystko oprócz touch
