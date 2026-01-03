@@ -124,21 +124,27 @@ export function useMultiTouchGestures({
         // PINCH ZOOM - tylko jeśli dokładnie 2 palce
         if (pointers.length === 2 && lastDistanceRef.current) {
           const newDistance = getDistance(pointers[0], pointers[1]);
-          const distanceRatio = newDistance / lastDistanceRef.current;
+          const distanceChange = newDistance - lastDistanceRef.current;
+          
+          // 🔥 THRESHOLD: ignoruj małe zmiany (< 10px) - to prawdopodobnie pan, nie zoom
+          if (Math.abs(distanceChange) > 10) {
+            const distanceRatio = newDistance / lastDistanceRef.current;
+            
+            // 🔥 ZMNIEJSZ CZUŁOŚĆ: zamiast pełnego ratio, użyj bardziej subtelnej zmiany
+            // Jeśli ratio = 1.2 (20% wzrost), to zoomFactor będzie tylko 1.02 (2% wzrost)
+            const zoomFactor = 1 + (distanceRatio - 1) / 10;
+            const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
 
-          // Zoomuj wokół środka między palcami
-          const zoomFactor = distanceRatio;
-          const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
+            // Oblicz przesunięcie viewportu aby zoom był wokół środka gestów
+            const centerWorldX = (newCenter.x - canvasWidth / 2) / viewport.scale - viewport.x;
+            const centerWorldY = (newCenter.y - canvasHeight / 2) / viewport.scale - viewport.y;
 
-          // Oblicz przesunięcie viewportu aby zoom był wokół środka gestów
-          const centerWorldX = (newCenter.x - canvasWidth / 2) / viewport.scale - viewport.x;
-          const centerWorldY = (newCenter.y - canvasHeight / 2) / viewport.scale - viewport.y;
+            newViewport.scale = newScale;
+            newViewport.x = (newCenter.x - canvasWidth / 2) / newScale - centerWorldX;
+            newViewport.y = (newCenter.y - canvasHeight / 2) / newScale - centerWorldY;
 
-          newViewport.scale = newScale;
-          newViewport.x = (newCenter.x - canvasWidth / 2) / newScale - centerWorldX;
-          newViewport.y = (newCenter.y - canvasHeight / 2) / newScale - centerWorldY;
-
-          lastDistanceRef.current = newDistance;
+            lastDistanceRef.current = newDistance;
+          }
         }
 
         onViewportChange(constrainViewport(newViewport));
