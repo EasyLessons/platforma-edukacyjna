@@ -84,7 +84,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
           {/* Logo z przyciskiem powrotu - ukrywane poniżej 1550px */}
           {showLogo && (
             <button
-              onClick={() => router.push('/dashboard')}
+              onClick={() => window.location.href = '/dashboard'}
               onMouseEnter={() => setShowTooltip(true)}
               onMouseLeave={() => setShowTooltip(false)}
               style={{

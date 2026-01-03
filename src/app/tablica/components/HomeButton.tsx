@@ -39,7 +39,7 @@ export function HomeButton() {
       }}
     >
       <button
-        onClick={() => router.push('/dashboard')}
+        onClick={() => window.location.href = '/dashboard'}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         style={{

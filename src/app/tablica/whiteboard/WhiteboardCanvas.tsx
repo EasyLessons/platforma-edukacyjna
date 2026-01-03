@@ -2139,7 +2139,17 @@ Zadaj pytanie! 🤔`,
         </div>
       )}
       
-      <div ref={containerRef} className="absolute inset-0 overflow-hidden touch-none overscroll-none">
+      <div 
+        ref={containerRef} 
+        className="absolute inset-0 overflow-hidden touch-none overscroll-none"
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          touchAction: 'none'
+        }}
+      >
         {/* 🆕 KOMPONENT ONLINE USERS */}
         <OnlineUsers onFollowUser={handleFollowUser} />
         
