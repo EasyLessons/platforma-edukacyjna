@@ -75,7 +75,7 @@ export function HomeButton() {
               left: '50%',
               transform: 'translateX(-50%)',
               marginTop: '8px',
-              backgroundColor: '#ffffff79',
+              backgroundColor: '#000000ff',
               color: 'white',
               padding: '8px 14px',
               borderRadius: '102px',

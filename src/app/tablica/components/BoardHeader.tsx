@@ -26,12 +26,16 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
   const [showComparison, setShowComparison] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
+  const [windowHeight, setWindowHeight] = useState(0);
   const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
 
-  // Monitoruj szerokość okna
+  // Monitoruj szerokość i wysokość okna
   useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
     handleResize(); // Inicjalne ustawienie
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -67,13 +71,13 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '1px',
-            padding: '8px 16px 8px 12px',
+            gap: '0px',
+            padding: '8px 12px 8px 12px',
             backgroundColor: 'white',
             border: '2px solid #e0e0e0',
             borderRadius: '16px',
             boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            minWidth: '500px',
+            minWidth: '400px',
             pointerEvents: 'auto',
           }}
         >
@@ -106,7 +110,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
               alt="EasyLesson Logo"
               width={160}
               height={50}
-              className="h-11 w-auto"
+              className="h-9 w-auto"
               priority
             />
 
@@ -154,7 +158,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
           {showLogo && (
             <div
               style={{
-              marginLeft: '-4px',
+              marginLeft: '8px',
               marginRight: '8px',
               width: '1px',
               height: '32px',
@@ -227,7 +231,7 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                 style={{
                   position: 'absolute',
                   top: '100%',
-                  right: '0',
+                  right: '1',
                   marginTop: '12px',
                   backgroundColor: 'white',
                   border: '2px solid #e5e7eb',
@@ -235,6 +239,8 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                   boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
                   padding: '20px',
                   minWidth: '420px',
+                  maxHeight: windowHeight > 0 ? `${windowHeight - 120}px` : 'none',
+                  overflowY: 'auto',
                   zIndex: 101,
                 }}
               >
