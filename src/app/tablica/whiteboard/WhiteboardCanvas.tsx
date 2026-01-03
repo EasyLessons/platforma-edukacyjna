@@ -298,26 +298,36 @@ Zadaj pytanie! 🤔`,
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 🖱️ BROADCAST CURSOR POSITION - Wysyłanie pozycji kursora do innych
+  // 🖱️ BROADCAST CURSOR POSITION - ZOPTYMALIZOWANE (cache rect, ResizeObserver)
   // ═══════════════════════════════════════════════════════════════════════════
   
   const lastCursorBroadcastRef = useRef<number>(0);
-  const CURSOR_BROADCAST_INTERVAL = 50; // ms - throttle do ~20 FPS
+  const cachedRectRef = useRef<DOMRect | null>(null);
+  const CURSOR_BROADCAST_INTERVAL = 100; // Zwiększ do 100ms (10 FPS wystarczy dla kursorów)
   
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
+    // Cache rect - aktualizuj tylko przy resize
+    const updateRect = () => {
+      cachedRectRef.current = container.getBoundingClientRect();
+    };
+    updateRect();
+    
+    const resizeObserver = new ResizeObserver(updateRect);
+    resizeObserver.observe(container);
+    
     const handlePointerMove = (e: PointerEvent) => {
-      const now = Date.now();
-      
-      // Throttle - nie wysyłaj częściej niż co CURSOR_BROADCAST_INTERVAL ms
+      // ✅ Throttle PRZED jakimikolwiek obliczeniami
+      const now = performance.now();
       if (now - lastCursorBroadcastRef.current < CURSOR_BROADCAST_INTERVAL) return;
-      
       lastCursorBroadcastRef.current = now;
       
-      // Oblicz pozycję w world coordinates
-      const rect = container.getBoundingClientRect();
+      // ✅ Użyj cached rect zamiast getBoundingClientRect()
+      const rect = cachedRectRef.current;
+      if (!rect) return;
+      
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       
@@ -332,10 +342,15 @@ Zadaj pytanie! 🤔`,
       broadcastCursorMove(worldPos.x, worldPos.y);
     };
     
-    container.addEventListener('pointermove', handlePointerMove, { passive: true });
+    // ✅ PASSIVE + CAPTURE false - pozwól innym handlerom działać
+    container.addEventListener('pointermove', handlePointerMove, { 
+      passive: true,
+      capture: false
+    });
     
     return () => {
       container.removeEventListener('pointermove', handlePointerMove);
+      resizeObserver.disconnect();
     };
   }, [broadcastCursorMove]);
 
