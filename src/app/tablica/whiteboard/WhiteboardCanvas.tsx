@@ -212,6 +212,7 @@ Zadaj pytanie! 🤔`,
   const selectedElementIdsRef = useRef(selectedElementIds);
   const viewportRef = useRef(viewport);
   const boardIdStateRef = useRef(boardIdState);
+  const loadedImagesRef = useRef(loadedImages);
   
   useEffect(() => {
     viewportRef.current = viewport;
@@ -220,6 +221,10 @@ Zadaj pytanie! 🤔`,
   useEffect(() => {
     elementsRef.current = elements;
   }, [elements]);
+
+  useEffect(() => {
+    loadedImagesRef.current = loadedImages;
+  }, [loadedImages]);
 
   useEffect(() => {
     historyRef.current = history;
@@ -269,13 +274,15 @@ Zadaj pytanie! 🤔`,
       
       // 🆕 Jeśli to obraz, załaduj go do loadedImages
       if (element.type === 'image' && (element as ImageElement).src) {
+        console.log(`🖼️ Ładowanie zdalnego obrazu ${element.id}...`);
         const img = new Image();
         img.src = (element as ImageElement).src;
         img.onload = () => {
+          console.log(`✅ Załadowano zdalny obraz ${element.id}`);
           setLoadedImages(prev => new Map(prev).set(element.id, img));
         };
         img.onerror = () => {
-          console.error('Failed to load remote image:', element.id);
+          console.error(`❌ Błąd ładowania zdalnego obrazu ${element.id}`);
         };
       }
     });
@@ -802,6 +809,7 @@ Zadaj pytanie! 🤔`,
       // Używamy REFÓW żeby nie tworzyć nowego callbacka przy każdym renderze!
       const currentElements = elementsRef.current;
       const currentViewport = viewportRef.current;
+      const currentLoadedImages = loadedImagesRef.current;
       
       // Reset transform i ustaw nową skalę DPR
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -811,12 +819,12 @@ Zadaj pytanie! 🤔`,
       
       currentElements.forEach(element => {
         if (element.id === editingTextId) return;
-        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand);
+        drawElement(ctx, element, currentViewport, width, height, currentLoadedImages, debugMode, handleAutoExpand);
       });
       
       rafIdRef.current = null;
     });
-  }, [editingTextId, debugMode, handleAutoExpand, loadedImages]);  // USUNIĘTO elements i viewport!
+  }, [editingTextId, debugMode, handleAutoExpand]);  // USUNIĘTO loadedImages!
   
   // Cleanup RAF on unmount
   useEffect(() => {
@@ -831,10 +839,10 @@ Zadaj pytanie! 🤔`,
     redrawCanvasRef.current = redrawCanvas;
   }, [redrawCanvas]);
 
-  // Przerysuj canvas gdy zmieni się elements, viewport, lub inne zależności redrawCanvas
+  // Przerysuj canvas gdy zmieni się elements, viewport, lub loadedImages
   useEffect(() => {
     redrawCanvas();
-  }, [elements, viewport, redrawCanvas]);
+  }, [elements, viewport, loadedImages, redrawCanvas]);
 
   // History - uproszczona i stabilna wersja
   const MAX_HISTORY_SIZE = 50;

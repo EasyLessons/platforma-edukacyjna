@@ -221,7 +221,7 @@ export function BoardRealtimeProvider({
         // Ignoruj własne eventy (już mamy lokalnie)
         if (userId === user.id) return
         
-        console.log(`📥 Otrzymano element-created od ${username}:`, element.id)
+        console.log(`📥 Otrzymano element-created od ${username}:`, element.id, `(typ: ${element.type})`)
         
         // Wywołaj handler (jeśli zarejestrowany)
         if (elementCreatedHandlerRef.current) {
