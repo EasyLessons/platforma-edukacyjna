@@ -82,6 +82,20 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
       return () => overlay.removeEventListener('wheel', handleNativeWheel);
     }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
+    // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+    // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+    useEffect(() => {
+      const overlay = overlayRef.current;
+      if (!overlay) return;
+
+      const handleTouchMove = (e: TouchEvent) => {
+        e.preventDefault();
+      };
+
+      overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+      return () => overlay.removeEventListener('touchmove', handleTouchMove);
+    }, []);
+
     // Expose ref methods (for toolbar buttons)
     useImperativeHandle(ref, () => ({
       handlePasteFromClipboard: () => {

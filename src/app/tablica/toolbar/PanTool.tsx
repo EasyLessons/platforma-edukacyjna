@@ -30,7 +30,7 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform } from '../whiteboard/types';
 import { panViewportWithMouse, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
@@ -50,6 +50,7 @@ export function PanTool({
 }: PanToolProps) {
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState<Point | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
 
   const gestures = useMultiTouchGestures({
     viewport,
@@ -57,6 +58,20 @@ export function PanTool({
     canvasHeight,
     onViewportChange,
   });
+
+  // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+  // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
 
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -131,6 +146,7 @@ export function PanTool({
 
       {/* Overlay dla pointer events */}
       <div
+        ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
         onPointerDown={handlePointerDown}
