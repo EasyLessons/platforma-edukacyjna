@@ -190,6 +190,9 @@ Zadaj pytanie! 🤔`,
   const isSavingRef = useRef(false);
   const unsavedElementsRef = useRef<Set<string>>(new Set());
   
+  // 🆕 MOJE ELEMENTY - śledzenie które elementy są moje (dla undo/redo)
+  const myElementsRef = useRef<Set<string>>(new Set());
+  
   // 🆕 SMARTSEARCH - state
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [isSearchActive, setIsSearchActive] = useState(false); // Blokuje zoom gdy search otwarty
@@ -622,6 +625,8 @@ Zadaj pytanie! 🤔`,
           
           // Broadcast do innych użytkowników
           newElements.forEach(el => {
+            // 🆕 Oznacz jako mój element (skopiowany element to mój nowy element)
+            myElementsRef.current.add(el.id);
             broadcastElementCreated(el);
           });
           
@@ -980,16 +985,74 @@ Zadaj pytanie! 🤔`,
       const newIndex = currentIndex - 1;
       historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
+      
+      const oldElements = [...currentHistory[currentIndex]];
       const newElements = [...currentHistory[newIndex]];
-      setElements(newElements);
+      
+      // 🆕 FILTRUJ - porównuj tylko MOJE elementy
+      const myOldElements = oldElements.filter(el => myElementsRef.current.has(el.id));
+      const myNewElements = newElements.filter(el => myElementsRef.current.has(el.id));
+      
+      // Dodaj też elementy innych użytkowników (bez zmian)
+      const otherElements = elementsRef.current.filter(el => !myElementsRef.current.has(el.id));
+      const finalElements = [...myNewElements, ...otherElements];
+      
+      setElements(finalElements);
       setSelectedElementIds(new Set());
       
-      // 🆕 Broadcast batch update (bez zapisywania do bazy - przywracamy stan który już był zapisany)
+      // Porównaj TYLKO moje elementy
+      const myOldIds = new Set(myOldElements.map(el => el.id));
+      const myNewIds = new Set(myNewElements.map(el => el.id));
+      
+      // Elementy usunięte (moje, które były w old, nie ma w new)
+      const deletedIds = myOldElements
+        .filter(el => !myNewIds.has(el.id))
+        .map(el => el.id);
+      
+      // Elementy dodane (moje, które są w new, nie było w old)
+      const addedElements = myNewElements.filter(el => !myOldIds.has(el.id));
+      
+      // Elementy zaktualizowane (moje, które są w obu, ale się różnią)
+      const updatedElements = myNewElements.filter(el => {
+        if (!myOldIds.has(el.id)) return false;
+        const oldEl = myOldElements.find(old => old.id === el.id);
+        return oldEl && JSON.stringify(oldEl) !== JSON.stringify(el);
+      });
+      
       if (boardIdStateRef.current) {
-        broadcastElementsBatch(newElements);
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        
+        if (!isNaN(numericBoardId)) {
+          // Usuń elementy z bazy i wyślij broadcast
+          deletedIds.forEach(id => {
+            broadcastElementDeleted(id);
+            // 🆕 Usuń z listy moich elementów
+            myElementsRef.current.delete(id);
+            deleteBoardElement(numericBoardId, id).catch(err => 
+              console.error('❌ Błąd usuwania (undo):', err)
+            );
+          });
+          
+          // Dodaj nowe elementy
+          addedElements.forEach(el => {
+            broadcastElementCreated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          // Zaktualizuj zmienione elementy
+          updatedElements.forEach(el => {
+            broadcastElementUpdated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          // Zapisz zmiany
+          if (addedElements.length > 0 || updatedElements.length > 0) {
+            debouncedSave(boardIdStateRef.current);
+          }
+        }
       }
     }
-  }, [broadcastElementsBatch]);
+  }, [broadcastElementDeleted, broadcastElementCreated, broadcastElementUpdated, debouncedSave]);
 
   const redo = useCallback(() => {
     const currentIndex = historyIndexRef.current;
@@ -999,16 +1062,74 @@ Zadaj pytanie! 🤔`,
       const newIndex = currentIndex + 1;
       historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
+      
+      const oldElements = [...currentHistory[currentIndex]];
       const newElements = [...currentHistory[newIndex]];
-      setElements(newElements);
+      
+      // 🆕 FILTRUJ - porównuj tylko MOJE elementy
+      const myOldElements = oldElements.filter(el => myElementsRef.current.has(el.id));
+      const myNewElements = newElements.filter(el => myElementsRef.current.has(el.id));
+      
+      // Dodaj też elementy innych użytkowników (bez zmian)
+      const otherElements = elementsRef.current.filter(el => !myElementsRef.current.has(el.id));
+      const finalElements = [...myNewElements, ...otherElements];
+      
+      setElements(finalElements);
       setSelectedElementIds(new Set());
       
-      // 🆕 Broadcast batch update (bez zapisywania do bazy - przywracamy stan który już był zapisany)
+      // Porównaj TYLKO moje elementy
+      const myOldIds = new Set(myOldElements.map(el => el.id));
+      const myNewIds = new Set(myNewElements.map(el => el.id));
+      
+      // Elementy usunięte (moje, które były w old, nie ma w new)
+      const deletedIds = myOldElements
+        .filter(el => !myNewIds.has(el.id))
+        .map(el => el.id);
+      
+      // Elementy dodane (moje, które są w new, nie było w old)
+      const addedElements = myNewElements.filter(el => !myOldIds.has(el.id));
+      
+      // Elementy zaktualizowane (moje, które są w obu, ale się różnią)
+      const updatedElements = myNewElements.filter(el => {
+        if (!myOldIds.has(el.id)) return false;
+        const oldEl = myOldElements.find(old => old.id === el.id);
+        return oldEl && JSON.stringify(oldEl) !== JSON.stringify(el);
+      });
+      
       if (boardIdStateRef.current) {
-        broadcastElementsBatch(newElements);
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        
+        if (!isNaN(numericBoardId)) {
+          // Usuń elementy z bazy i wyślij broadcast
+          deletedIds.forEach(id => {
+            broadcastElementDeleted(id);
+            // 🆕 Usuń z listy moich elementów
+            myElementsRef.current.delete(id);
+            deleteBoardElement(numericBoardId, id).catch(err => 
+              console.error('❌ Błąd usuwania (redo):', err)
+            );
+          });
+          
+          // Dodaj nowe elementy
+          addedElements.forEach(el => {
+            broadcastElementCreated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          // Zaktualizuj zmienione elementy
+          updatedElements.forEach(el => {
+            broadcastElementUpdated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          // Zapisz zmiany
+          if (addedElements.length > 0 || updatedElements.length > 0) {
+            debouncedSave(boardIdStateRef.current);
+          }
+        }
       }
     }
-  }, [broadcastElementsBatch]);
+  }, [broadcastElementDeleted, broadcastElementCreated, broadcastElementUpdated, debouncedSave]);
 
   // 🆕 Zapisz undo/redo do refów dla handleKeyDown
   useEffect(() => {
@@ -1156,6 +1277,9 @@ Zadaj pytanie! 🤔`,
     setElements(newElements);
     saveToHistory(newElements);
     
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(path.id);
+    
     // 🆕 BROADCAST
     broadcastElementCreated(path);
     
@@ -1168,6 +1292,9 @@ Zadaj pytanie! 🤔`,
     const newElements = [...elements, shape];
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(shape.id);
     
     // 🆕 BROADCAST
     broadcastElementCreated(shape);
@@ -1182,6 +1309,9 @@ Zadaj pytanie! 🤔`,
     setElements(newElements);
     saveToHistory(newElements);
     
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(func.id);
+    
     // 🆕 BROADCAST
     broadcastElementCreated(func);
     
@@ -1194,6 +1324,9 @@ Zadaj pytanie! 🤔`,
     const newElements = [...elements, text];
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(text.id);
     
     // 🆕 BROADCAST
     broadcastElementCreated(text);
@@ -1267,6 +1400,9 @@ Zadaj pytanie! 🤔`,
     setElements(newElements);
     saveToHistory(newElements);
     
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(image.id);
+    
     // 🆕 BROADCAST
     broadcastElementCreated(image);
     
@@ -1292,6 +1428,9 @@ Zadaj pytanie! 🤔`,
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
     // TYLKO setElements - bez saveToHistory (powoduje lagi)
     setElements(prev => [...prev, note]);
+    
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(note.id);
     
     broadcastElementCreated(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
@@ -1334,6 +1473,9 @@ Zadaj pytanie! 🤔`,
     // Historia zostanie zapisana przy następnej operacji lub przy zapisie do DB
     setElements(prev => [...prev, newNote]);
     
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(newNote.id);
+    
     // Broadcast i zapis do DB
     broadcastElementCreated(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
@@ -1345,6 +1487,9 @@ Zadaj pytanie! 🤔`,
     const newElements = [...elements, table];
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 Oznacz jako mój element
+    myElementsRef.current.add(table.id);
     
     broadcastElementCreated(table);
     setUnsavedElements(prev => new Set(prev).add(table.id));
