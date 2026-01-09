@@ -984,17 +984,12 @@ Zadaj pytanie! 🤔`,
       setElements(newElements);
       setSelectedElementIds(new Set());
       
-      // 🆕 Oznacz wszystkie elementy jako unsaved i wyślij broadcast
-      const elementIds = newElements.map(el => el.id);
-      setUnsavedElements(new Set(elementIds));
-      
-      // Broadcast batch update
+      // 🆕 Broadcast batch update (bez zapisywania do bazy - przywracamy stan który już był zapisany)
       if (boardIdStateRef.current) {
         broadcastElementsBatch(newElements);
-        debouncedSave(boardIdStateRef.current);
       }
     }
-  }, [broadcastElementsBatch, debouncedSave]);
+  }, [broadcastElementsBatch]);
 
   const redo = useCallback(() => {
     const currentIndex = historyIndexRef.current;
@@ -1008,17 +1003,12 @@ Zadaj pytanie! 🤔`,
       setElements(newElements);
       setSelectedElementIds(new Set());
       
-      // 🆕 Oznacz wszystkie elementy jako unsaved i wyślij broadcast
-      const elementIds = newElements.map(el => el.id);
-      setUnsavedElements(new Set(elementIds));
-      
-      // Broadcast batch update
+      // 🆕 Broadcast batch update (bez zapisywania do bazy - przywracamy stan który już był zapisany)
       if (boardIdStateRef.current) {
         broadcastElementsBatch(newElements);
-        debouncedSave(boardIdStateRef.current);
       }
     }
-  }, [broadcastElementsBatch, debouncedSave]);
+  }, [broadcastElementsBatch]);
 
   // 🆕 Zapisz undo/redo do refów dla handleKeyDown
   useEffect(() => {
