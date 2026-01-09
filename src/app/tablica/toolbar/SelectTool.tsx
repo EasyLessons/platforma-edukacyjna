@@ -644,6 +644,16 @@ export function SelectTool({
     return false;
   };
 
+  // 🆕 Sprawdza czy punkt jest w bounding box (dla przeciągania zaznaczonych elementów)
+  const isPointInBoundingBox = (worldPoint: Point, bbox: BoundingBox): boolean => {
+    return (
+      worldPoint.x >= bbox.x &&
+      worldPoint.x <= bbox.x + bbox.width &&
+      worldPoint.y >= bbox.y &&
+      worldPoint.y <= bbox.y + bbox.height
+    );
+  };
+
   const getResizeHandleAt = (screenPoint: Point, boundingBox: BoundingBox): ResizeHandle => {
     const box = boundingBox;
     const handleSize = 10;
@@ -732,12 +742,11 @@ export function SelectTool({
       }
     }
 
-    if (selectedIds.size > 0) {
-      const clickedSelected = elements.find(
-        (el) => selectedIds.has(el.id) && isPointInElement(worldPoint, el)
-      );
-
-      if (clickedSelected) {
+    // 🆕 Sprawdź czy kliknięto w bounding box zaznaczonych elementów
+    if (selectedIds.size > 0 && bbox) {
+      // Najpierw sprawdź czy kliknięto w bounding box zaznaczenia
+      if (isPointInBoundingBox(worldPoint, bbox)) {
+        // Można przeciągać - kliknięto w obszar zaznaczenia
         setIsDragging(true);
         setDragStart(worldPoint);
 
@@ -800,6 +809,14 @@ export function SelectTool({
       const minY = Math.min(worldStart.y, worldEnd.y);
       const maxY = Math.max(worldStart.y, worldEnd.y);
 
+      // 🆕 Funkcja sprawdzająca czy prostokąty się przecinają (intersection)
+      const rectanglesIntersect = (
+        ax: number, ay: number, aw: number, ah: number,
+        bx: number, by: number, bw: number, bh: number
+      ): boolean => {
+        return !(ax + aw < bx || bx + bw < ax || ay + ah < by || by + bh < ay);
+      };
+
       const newSelection = new Set<string>();
       elements.forEach((el) => {
         if (el.type === 'shape') {
@@ -808,36 +825,31 @@ export function SelectTool({
           const elMinY = Math.min(el.startY, el.endY);
           const elMaxY = Math.max(el.startY, el.endY);
 
-          if (elMinX >= minX && elMaxX <= maxX && elMinY >= minY && elMaxY <= maxY) {
+          // Sprawdź czy zaznaczenie przecina się z elementem
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, elMinX, elMinY, elMaxX - elMinX, elMaxY - elMinY)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'text') {
-          const elMaxX = el.x + (el.width || 3);
-          const elMaxY = el.y + (el.height || 1);
+          const elWidth = el.width || 3;
+          const elHeight = el.height || 1;
 
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'image') {
-          const elMaxX = el.x + el.width;
-          const elMaxY = el.y + el.height;
-
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, el.width, el.height)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'path') {
-          const allInside = el.points.every(
+          // Dla ścieżki sprawdzamy czy jakikolwiek punkt jest w zaznaczeniu
+          const anyPointInside = el.points.some(
             (p: Point) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
           );
-          if (allInside) {
+          if (anyPointInside) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'markdown' || el.type === 'table') {
-          // 🆕 Area selection dla markdown i table
-          const elMaxX = el.x + el.width;
-          const elMaxY = el.y + el.height;
-
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, el.width, el.height)) {
             newSelection.add(el.id);
           }
         }

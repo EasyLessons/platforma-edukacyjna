@@ -65,6 +65,7 @@ import {
   ImageElement,
   MarkdownNote,
   TableElement,
+  PDFElement,
   MomentumState 
 } from './types';
 
@@ -179,6 +180,10 @@ Zadaj pytanie! 🤔`,
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
   const [debugMode, setDebugMode] = useState(false);
   
+  // 🆕 COPY/PASTE - schowek dla elementów
+  const [copiedElements, setCopiedElements] = useState<DrawingElement[]>([]);
+  const [lastCopyWasInternal, setLastCopyWasInternal] = useState(false); // 🆕 Czy ostatnie Ctrl+C było w aplikacji
+  
   // 🆕 Szerokość okna dla responsywności
   const [windowWidth, setWindowWidth] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
@@ -202,7 +207,7 @@ Zadaj pytanie! 🤔`,
   const [imageProcessing, setImageProcessing] = useState(false);
   
   const redrawCanvasRef = useRef<() => void>(() => {});
-  const handleGlobalPasteImageRef = useRef<() => void>(() => {});
+  const handleGlobalPasteImageRef = useRef<() => Promise<boolean>>(async () => false);
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
@@ -253,6 +258,19 @@ Zadaj pytanie! 🤔`,
     handleResize(); // Inicjalne ustawienie
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🆕 Resetowanie flagi lastCopyWasInternal gdy użytkownik wychodzi z okna
+  // (może skopiować screenshot lub coś z zewnątrz)
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      // Gdy użytkownik wychodzi z okna, resetuj flagę
+      // (mógł zrobić screenshot lub skopiować coś z innej aplikacji)
+      setLastCopyWasInternal(false);
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
   }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -521,6 +539,175 @@ Zadaj pytanie! 🤔`,
   }, [boardIdState]);
 
   // ========================================
+  // COPY/PASTE HANDLERS
+  // ========================================
+  // 🆕 COPY - kopiowanie zaznaczonych elementów (Ctrl+C)
+  const handleCopy = useCallback(() => {
+    const selectedIds = selectedElementIdsRef.current;
+    if (selectedIds.size === 0) return;
+    
+    const elementsToCopy = elementsRef.current.filter(el => selectedIds.has(el.id));
+    setCopiedElements(elementsToCopy);
+    setLastCopyWasInternal(true); // 🆕 Oznacz że kopiowanie było w aplikacji
+    
+    console.log('📋 Skopiowano elementów:', elementsToCopy.length);
+  }, []);
+
+  // 🆕 PASTE - wklejanie skopiowanych elementów (Ctrl+V)
+  const handlePaste = useCallback(() => {
+    if (copiedElements.length === 0) return;
+    
+    const currentViewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    // Wylicz punkt wklejenia (środek ekranu)
+    const centerScreen = { x: canvas.width / 2, y: canvas.height / 2 };
+    const centerWorld = inverseTransformPoint(
+      centerScreen, 
+      currentViewport, 
+      canvas.width, 
+      canvas.height
+    );
+    
+    // Oblicz środek zaznaczenia oryginalnego
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    copiedElements.forEach(el => {
+      if (el.type === 'path') {
+        el.points.forEach(p => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
+      } else if (el.type === 'shape') {
+        minX = Math.min(minX, el.startX, el.endX);
+        minY = Math.min(minY, el.startY, el.endY);
+        maxX = Math.max(maxX, el.startX, el.endX);
+        maxY = Math.max(maxY, el.startY, el.endY);
+      } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table' || el.type === 'pdf') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + (el.width || 0));
+        maxY = Math.max(maxY, el.y + (el.height || 0));
+      } else if (el.type === 'function') {
+        // Funkcje nie mają dokładnej pozycji, pomijamy
+      }
+    });
+    
+    const originalCenterX = (minX + maxX) / 2;
+    const originalCenterY = (minY + maxY) / 2;
+    
+    // Oblicz offset (różnica między nową a starą pozycją)
+    const offsetX = centerWorld.x - originalCenterX;
+    const offsetY = centerWorld.y - originalCenterY;
+    
+    // Twórz nowe elementy z przesuniętymi pozycjami i nowymi ID
+    const newElements: DrawingElement[] = [];
+    const newIds: string[] = [];
+    
+    copiedElements.forEach(el => {
+      const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+      newIds.push(newId);
+      
+      if (el.type === 'path') {
+        const newPath: DrawingPath = {
+          ...el,
+          id: newId,
+          points: el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }))
+        };
+        newElements.push(newPath);
+      } else if (el.type === 'shape') {
+        const newShape: Shape = {
+          ...el,
+          id: newId,
+          startX: el.startX + offsetX,
+          startY: el.startY + offsetY,
+          endX: el.endX + offsetX,
+          endY: el.endY + offsetY
+        };
+        newElements.push(newShape);
+      } else if (el.type === 'text') {
+        const newText: TextElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newText);
+      } else if (el.type === 'image') {
+        const newImage: ImageElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newImage);
+        
+        // Załaduj obraz do pamięci
+        if (el.src) {
+          const img = new Image();
+          img.src = el.src;
+          img.onload = () => {
+            setLoadedImages(prev => new Map(prev).set(newId, img));
+          };
+        }
+      } else if (el.type === 'markdown') {
+        const newMarkdown: MarkdownNote = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newMarkdown);
+      } else if (el.type === 'table') {
+        const newTable: TableElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+          cells: el.cells.map(row => [...row]) // Deep copy komórek
+        };
+        newElements.push(newTable);
+      } else if (el.type === 'function') {
+        const newFunction: FunctionPlot = {
+          ...el,
+          id: newId
+        };
+        newElements.push(newFunction);
+      } else if (el.type === 'pdf') {
+        const newPDF: PDFElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newPDF);
+      }
+    });
+    
+    // Dodaj nowe elementy do tablicy
+    const allElements = [...elementsRef.current, ...newElements];
+    setElements(allElements);
+    saveToHistoryRef.current(allElements);
+    
+    // Zaznacz nowo wklejone elementy
+    setSelectedElementIds(new Set(newIds));
+    
+    // Broadcast i zapisz każdy nowy element
+    newElements.forEach(el => {
+      broadcastElementCreated(el);
+      setUnsavedElements(prev => new Set(prev).add(el.id));
+    });
+    
+    if (boardIdStateRef.current) {
+      debouncedSave(boardIdStateRef.current);
+    }
+    
+    console.log('📌 Wklejono elementów:', newElements.length);
+  }, [copiedElements, broadcastElementCreated, debouncedSave]);
+
+  // ========================================
   // KEYBOARD SHORTCUTS (bez zmian)
   // ========================================
   useEffect(() => {
@@ -530,9 +717,38 @@ Zadaj pytanie! 🤔`,
         return;
       }
       
+      // 🆕 Ctrl+C - kopiowanie zaznaczonych elementów
+      if (e.ctrlKey && e.key === 'c') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          handleCopy();
+          return;
+        }
+      }
+      
+      // 🆕 Ctrl+V - wklejanie
       if (e.ctrlKey && e.key === 'v') {
         e.preventDefault();
-        handleGlobalPasteImageRef.current();
+        
+        // 🎯 INTELIGENTNE WKLEJANIE:
+        // Jeśli ostatnie Ctrl+C było W APLIKACJI → użyj pamięci wewnętrznej
+        // Jeśli ostatnie Ctrl+C było POZA APLIKACJĄ → sprawdź schowek systemowy
+        
+        if (lastCopyWasInternal && copiedElements.length > 0) {
+          // Użytkownik skopiował element w aplikacji - wklej go
+          handlePaste();
+        } else {
+          // Użytkownik prawdopodobnie skopiował coś z zewnątrz (screenshot itp.)
+          // Sprawdź schowek systemowy
+          handleGlobalPasteImageRef.current().then((imageWasPasted: boolean) => {
+            // Jeśli NIE było obrazka w schowku I mamy skopiowane elementy, wklej je
+            if (!imageWasPasted && copiedElements.length > 0) {
+              handlePaste();
+            }
+          });
+        }
+        
         return;
       }
       
@@ -716,6 +932,128 @@ Zadaj pytanie! 🤔`,
         }
       }
       
+      // 🆕 Ctrl+D - duplikacja zaznaczonych elementów
+      if (e.ctrlKey && e.key === 'd') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          
+          // Pobierz zaznaczone elementy
+          const elementsToDuplicate = elementsRef.current.filter(el => currentSelectedIds.has(el.id));
+          
+          if (elementsToDuplicate.length === 0) return;
+          
+          // Offset dla duplikacji (lekkie przesunięcie w prawo i dół)
+          const offsetX = 0.3;
+          const offsetY = 0.3;
+          
+          // Twórz zduplikowane elementy z nowymi ID
+          const newElements: DrawingElement[] = [];
+          const newIds: string[] = [];
+          
+          elementsToDuplicate.forEach(el => {
+            const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+            newIds.push(newId);
+            
+            if (el.type === 'path') {
+              const newPath: DrawingPath = {
+                ...el,
+                id: newId,
+                points: el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }))
+              };
+              newElements.push(newPath);
+            } else if (el.type === 'shape') {
+              const newShape: Shape = {
+                ...el,
+                id: newId,
+                startX: el.startX + offsetX,
+                startY: el.startY + offsetY,
+                endX: el.endX + offsetX,
+                endY: el.endY + offsetY
+              };
+              newElements.push(newShape);
+            } else if (el.type === 'text') {
+              const newText: TextElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newText);
+            } else if (el.type === 'image') {
+              const newImage: ImageElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newImage);
+              
+              // Załaduj obraz do pamięci
+              if (el.src) {
+                const img = new Image();
+                img.src = el.src;
+                img.onload = () => {
+                  setLoadedImages(prev => new Map(prev).set(newId, img));
+                };
+              }
+            } else if (el.type === 'markdown') {
+              const newMarkdown: MarkdownNote = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newMarkdown);
+            } else if (el.type === 'table') {
+              const newTable: TableElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY,
+                cells: el.cells.map(row => [...row]) // Deep copy komórek
+              };
+              newElements.push(newTable);
+            } else if (el.type === 'function') {
+              const newFunction: FunctionPlot = {
+                ...el,
+                id: newId
+              };
+              newElements.push(newFunction);
+            } else if (el.type === 'pdf') {
+              const newPDF: PDFElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newPDF);
+            }
+          });
+          
+          // Dodaj nowe elementy
+          const allElements = [...elementsRef.current, ...newElements];
+          setElements(allElements);
+          saveToHistoryRef.current(allElements);
+          
+          // Zaznacz zduplikowane elementy
+          setSelectedElementIds(new Set(newIds));
+          
+          // Broadcast i zapisz każdy nowy element
+          newElements.forEach(el => {
+            broadcastElementCreated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          if (boardIdStateRef.current) {
+            debouncedSave(boardIdStateRef.current);
+          }
+          
+          console.log('📋 Zduplikowano elementów:', newElements.length);
+          return;
+        }
+      }
+      
       if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setDebugMode(prev => {
@@ -727,7 +1065,7 @@ Zadaj pytanie! 🤔`,
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tool, selectedElementIds, broadcastElementDeleted]);
+  }, [tool, selectedElementIds, broadcastElementDeleted, handleCopy, handlePaste, copiedElements, lastCopyWasInternal, broadcastElementCreated, debouncedSave]);
 
   // Canvas setup - z obsługą zoom przeglądarki
   useEffect(() => {
@@ -1893,7 +2231,7 @@ Zadaj pytanie! 🤔`,
     });
   }, []);
 
-  const handleGlobalPasteImage = useCallback(async () => {
+  const handleGlobalPasteImage = useCallback(async (): Promise<boolean> => {
     setImageProcessing(true);
 
     try {
@@ -1926,15 +2264,17 @@ Zadaj pytanie! 🤔`,
 
           handleImageCreate(newImage);
           setImageProcessing(false);
-          return;
+          return true; // ✅ Udało się wkleić obrazek
         }
       }
       
       console.log('No image in clipboard');
+      setImageProcessing(false);
+      return false; // ❌ Brak obrazka w schowku
     } catch (err) {
       console.error('Clipboard paste error:', err);
-    } finally {
       setImageProcessing(false);
+      return false; // ❌ Błąd
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
 
