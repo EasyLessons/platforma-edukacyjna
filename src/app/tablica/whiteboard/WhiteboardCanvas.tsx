@@ -759,16 +759,80 @@ Zadaj pytanie! 🤔`,
         setEditingTextId(null);
       }
       
-      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setTool('eraser');
+      // 🆕 Skróty klawiszowe do narzędzi (bez Ctrl/Alt/Meta)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // V = Select (Zaznacz)
+        if (e.key === 'v') {
+          e.preventDefault();
+          setTool('select');
+          return;
+        }
+        
+        // H = Pan (Przesuwaj)
+        if (e.key === 'h') {
+          e.preventDefault();
+          setTool('pan');
+          return;
+        }
+        
+        // P = Pen (Rysuj)
+        if (e.key === 'p') {
+          e.preventDefault();
+          setTool('pen');
+          return;
+        }
+        
+        // T = Text (Tekst)
+        if (e.key === 't') {
+          e.preventDefault();
+          setTool('text');
+          return;
+        }
+        
+        // S = Shape (Kształty)
+        if (e.key === 's') {
+          e.preventDefault();
+          setTool('shape');
+          return;
+        }
+        
+        // F = Function (Funkcja)
+        if (e.key === 'f') {
+          e.preventDefault();
+          setTool('function');
+          return;
+        }
+        
+        // I = Image (Obraz)
+        if (e.key === 'i') {
+          e.preventDefault();
+          setTool('image');
+          return;
+        }
+        
+        // E = Eraser (Gumka)
+        if (e.key === 'e') {
+          e.preventDefault();
+          setTool('eraser');
+          return;
+        }
+        
+        // M = Markdown (Notatka)
+        if (e.key === 'm') {
+          e.preventDefault();
+          setTool('markdown');
+          return;
+        }
       }
       
+      // Specjalna logika dla edycji tekstu (tylko dla pojedynczego zaznaczenia)
       if (
         tool === 'select' &&
         selectedElementIds.size === 1 &&
         e.key.length === 1 &&
-        !e.ctrlKey && !e.metaKey && !e.altKey
+        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        // Sprawdź czy to nie jest klawisz narzędzia
+        !['v', 'h', 'p', 't', 's', 'f', 'i', 'e', 'm'].includes(e.key.toLowerCase())
       ) {
         const selectedId = Array.from(selectedElementIds)[0];
         const selectedElement = elementsRef.current.find(el => el.id === selectedId);
