@@ -204,6 +204,13 @@ Zadaj pytanie! 🤔`,
   const redrawCanvasRef = useRef<() => void>(() => {});
   const handleGlobalPasteImageRef = useRef<() => void>(() => {});
   
+  // 🆕 Clipboard dla kopiowania/wklejania elementów
+  const copiedElementsRef = useRef<DrawingElement[]>([]);
+  
+  // 🆕 Refs dla undo/redo (żeby uniknąć problemu z kolejnością deklaracji)
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
+  
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
   const saveToHistoryRef = useRef<(els: DrawingElement[]) => void>(() => {});
@@ -530,9 +537,104 @@ Zadaj pytanie! 🤔`,
         return;
       }
       
-      if (e.ctrlKey && e.key === 'v') {
+      // 🆕 CTRL+C - Kopiuj zaznaczone elementy
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          const selectedElements = elementsRef.current.filter(el => currentSelectedIds.has(el.id));
+          copiedElementsRef.current = selectedElements;
+          console.log(`📋 Skopiowano ${selectedElements.length} elementów`);
+        }
+        return;
+      }
+      
+      // 🆕 CTRL+V - Wklej skopiowane elementy (lub obraz)
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
         e.preventDefault();
-        handleGlobalPasteImageRef.current();
+        
+        // Jeśli są skopiowane elementy, wklej je
+        if (copiedElementsRef.current.length > 0) {
+          const offset = 20; // Przesunięcie wklejonych elementów
+          const newElements = copiedElementsRef.current.map(el => {
+            const newId = `${el.type}-${Date.now()}-${Math.random()}`;
+            
+            // Skopiuj element z przesunięciem (różne typy mają różne pola pozycji)
+            let newElement: DrawingElement;
+            
+            if (el.type === 'path') {
+              // Path - przesuń wszystkie punkty
+              newElement = {
+                ...el,
+                id: newId,
+                points: el.points.map(p => ({ x: p.x + offset, y: p.y + offset }))
+              };
+            } else if (el.type === 'shape') {
+              // Shape - przesuń startX/startY i endX/endY
+              newElement = {
+                ...el,
+                id: newId,
+                startX: el.startX + offset,
+                startY: el.startY + offset,
+                endX: el.endX + offset,
+                endY: el.endY + offset
+              };
+            } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table') {
+              // Text/Image/Markdown/Table - mają x/y
+              newElement = {
+                ...el,
+                id: newId,
+                x: (el as any).x + offset,
+                y: (el as any).y + offset
+              };
+            } else {
+              // Fallback (function i inne) - skopiuj bez zmian pozycji
+              newElement = { ...el, id: newId };
+            }
+            
+            // 🆕 Dla obrazów, skopiuj także do loadedImages
+            if (el.type === 'image') {
+              const originalImage = loadedImagesRef.current.get(el.id);
+              if (originalImage) {
+                setTimeout(() => {
+                  setLoadedImages(prev => new Map(prev).set(newId, originalImage));
+                }, 0);
+              }
+            }
+            
+            return newElement;
+          });
+          
+          const updatedElements = [...elementsRef.current, ...newElements];
+          setElements(updatedElements);
+          saveToHistoryRef.current(updatedElements);
+          
+          // Zaznacz nowo wklejone elementy
+          const newIds = new Set(newElements.map(el => el.id));
+          setSelectedElementIds(newIds);
+          
+          // 🆕 Oznacz jako unsaved i broadcast
+          setUnsavedElements(prev => {
+            const newSet = new Set(prev);
+            newIds.forEach(id => newSet.add(id));
+            return newSet;
+          });
+          
+          // Broadcast do innych użytkowników
+          newElements.forEach(el => {
+            broadcastElementCreated(el);
+          });
+          
+          // Zaplanuj zapis
+          if (boardIdStateRef.current) {
+            debouncedSave(boardIdStateRef.current);
+          }
+          
+          console.log(`📥 Wklejono ${newElements.length} elementów`);
+        } else {
+          // Jeśli brak skopiowanych elementów, spróbuj wkleić obraz ze schowka
+          handleGlobalPasteImageRef.current();
+        }
         return;
       }
       
@@ -571,28 +673,12 @@ Zadaj pytanie! 🤔`,
       
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex > 0) {
-          const newIndex = currentIndex - 1;
-          setHistoryIndex(newIndex);
-          setElements(currentHistory[newIndex]);
-          setSelectedElementIds(new Set());
-        }
+        undoRef.current();
       }
       
       if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex < currentHistory.length - 1) {
-          const newIndex = currentIndex + 1;
-          setHistoryIndex(newIndex);
-          setElements(currentHistory[newIndex]);
-          setSelectedElementIds(new Set());
-        }
+        redoRef.current();
       }
       
       if (e.key === 'Delete') {
@@ -651,7 +737,7 @@ Zadaj pytanie! 🤔`,
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tool, selectedElementIds, broadcastElementDeleted]);
+  }, [tool, selectedElementIds, broadcastElementDeleted, broadcastElementCreated, debouncedSave]);
 
   // Canvas setup - z obsługą zoom przeglądarki
   useEffect(() => {
@@ -894,10 +980,21 @@ Zadaj pytanie! 🤔`,
       const newIndex = currentIndex - 1;
       historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
-      setElements([...currentHistory[newIndex]]);
+      const newElements = [...currentHistory[newIndex]];
+      setElements(newElements);
       setSelectedElementIds(new Set());
+      
+      // 🆕 Oznacz wszystkie elementy jako unsaved i wyślij broadcast
+      const elementIds = newElements.map(el => el.id);
+      setUnsavedElements(new Set(elementIds));
+      
+      // Broadcast batch update
+      if (boardIdStateRef.current) {
+        broadcastElementsBatch(newElements);
+        debouncedSave(boardIdStateRef.current);
+      }
     }
-  }, []);
+  }, [broadcastElementsBatch, debouncedSave]);
 
   const redo = useCallback(() => {
     const currentIndex = historyIndexRef.current;
@@ -907,10 +1004,27 @@ Zadaj pytanie! 🤔`,
       const newIndex = currentIndex + 1;
       historyIndexRef.current = newIndex;
       setHistoryIndex(newIndex);
-      setElements([...currentHistory[newIndex]]);
+      const newElements = [...currentHistory[newIndex]];
+      setElements(newElements);
       setSelectedElementIds(new Set());
+      
+      // 🆕 Oznacz wszystkie elementy jako unsaved i wyślij broadcast
+      const elementIds = newElements.map(el => el.id);
+      setUnsavedElements(new Set(elementIds));
+      
+      // Broadcast batch update
+      if (boardIdStateRef.current) {
+        broadcastElementsBatch(newElements);
+        debouncedSave(boardIdStateRef.current);
+      }
     }
-  }, []);
+  }, [broadcastElementsBatch, debouncedSave]);
+
+  // 🆕 Zapisz undo/redo do refów dla handleKeyDown
+  useEffect(() => {
+    undoRef.current = undo;
+    redoRef.current = redo;
+  }, [undo, redo]);
 
   // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika
   const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
