@@ -93,9 +93,10 @@ import { drawElement } from './rendering';
 interface WhiteboardCanvasProps {
   className?: string;
   boardId: string; // 🆕 boardId z URL params (page.tsx)
+  arkuszPath?: string | null; // 🆕 ścieżka do folderu z arkuszem PDF
 }
 
-export default function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasProps) {
+export default function WhiteboardCanvas({ className = '', boardId, arkuszPath }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
@@ -497,6 +498,8 @@ Zadaj pytanie! 🤔`,
     const loadElements = async () => {
       if (!boardIdState) {
         setIsLoading(false);
+        setDbElementsLoaded(true);
+        setDbWasEmpty(true);
         return;
       }
       
@@ -505,6 +508,8 @@ Zadaj pytanie! 🤔`,
       if (isNaN(boardIdNum)) {
         console.warn('⚠️ Nieprawidłowy boardId, pomijam ładowanie');
         setIsLoading(false);
+        setDbElementsLoaded(true);
+        setDbWasEmpty(true);
         return;
       }
       
@@ -525,6 +530,10 @@ Zadaj pytanie! 🤔`,
         // 🆕 Ustaw początkową historię na załadowane elementy
         setHistory([loadedElements]);
         setHistoryIndex(0);
+        
+        // 🆕 Ustaw flagi dla ładowania arkusza
+        setDbElementsLoaded(true);
+        setDbWasEmpty(loadedElements.length === 0);
         
         console.log(`✅ Załadowano ${loadedElements.length} elementów`);
         setLoadingProgress(90);
@@ -2388,6 +2397,164 @@ Zadaj pytanie! 🤔`,
     console.log(`✅ Skonwertowano ${images.length} stron PDF`);
     return images;
   };
+
+  // 🆕 Konwersja PDF z URL → obrazki (dla arkuszy egzaminacyjnych)
+  const convertPDFFromUrlToImages = async (pdfUrl: string): Promise<string[]> => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+    const pdf = await pdfjs.getDocument(pdfUrl).promise;
+    const images: string[] = [];
+
+    // Konwertuj wszystkie strony
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const pdfViewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Cannot get canvas context');
+
+      canvas.width = pdfViewport.width;
+      canvas.height = pdfViewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport: pdfViewport,
+        canvas: canvas,
+      }).promise;
+
+      images.push(canvas.toDataURL('image/jpeg', 0.9));
+    }
+
+    console.log(`✅ Skonwertowano ${images.length} stron PDF z URL`);
+    return images;
+  };
+
+  // 🆕 Ładowanie arkusza PDF z folderu (gdy arkuszPath jest podany)
+  const [arkuszLoaded, setArkuszLoaded] = useState(false);
+  const [dbElementsLoaded, setDbElementsLoaded] = useState(false);
+  const [dbWasEmpty, setDbWasEmpty] = useState(false);
+  
+  useEffect(() => {
+    // Czekaj aż elementy z bazy zostaną załadowane
+    if (!arkuszPath || arkuszLoaded || !dbElementsLoaded) return;
+    
+    // Ładuj arkusz tylko jeśli baza była pusta
+    if (!dbWasEmpty) {
+      console.log('📄 Tablica ma już elementy, pomijam ładowanie arkusza');
+      setArkuszLoaded(true);
+      return;
+    }
+    
+    const loadArkusz = async () => {
+      console.log('📄 Ładowanie arkusza z:', arkuszPath);
+      setImageProcessing(true);
+      
+      try {
+        // Pobierz listę plików z folderu (manifest.json)
+        const manifestUrl = `${arkuszPath}/manifest.json`;
+        let pdfFiles: string[] = [];
+        
+        try {
+          const manifestResponse = await fetch(manifestUrl);
+          if (manifestResponse.ok) {
+            const manifest = await manifestResponse.json();
+            pdfFiles = manifest.files || [];
+            console.log('📋 Znaleziono pliki z manifest:', pdfFiles);
+          }
+        } catch {
+          // Brak manifestu - spróbuj domyślnej nazwy
+          console.log('📋 Brak manifest.json, próbuję domyślnej nazwy arkusz.pdf');
+          pdfFiles = ['arkusz.pdf'];
+        }
+        
+        if (pdfFiles.length === 0) {
+          console.log('❌ Brak plików PDF w arkuszu');
+          setImageProcessing(false);
+          setArkuszLoaded(true);
+          return;
+        }
+        
+        // Załaduj pierwszy PDF
+        const pdfUrl = `${arkuszPath}/${pdfFiles[0]}`;
+        console.log('📄 Ładowanie PDF:', pdfUrl);
+        
+        const images = await convertPDFFromUrlToImages(pdfUrl);
+        
+        if (images.length === 0) {
+          console.log('❌ Nie udało się skonwertować PDF');
+          setImageProcessing(false);
+          setArkuszLoaded(true);
+          return;
+        }
+        
+        // Dodaj strony jako ImageElement na tablicę
+        const worldWidth = 4; // szerokość w jednostkach świata
+        const padding = 0.2; // odstęp między stronami
+        let currentY = 0;
+        
+        const newImages: ImageElement[] = [];
+        
+        for (let i = 0; i < images.length; i++) {
+          const dataUrl = images[i];
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = dataUrl;
+          });
+          
+          const aspectRatio = img.height / img.width;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: `arkusz-${Date.now()}-${i}`,
+            type: 'image',
+            x: -worldWidth / 2, // wyśrodkowane
+            y: currentY,
+            width: worldWidth,
+            height: worldHeight,
+            src: dataUrl,
+            alt: `Arkusz - strona ${i + 1}/${images.length}`,
+          };
+          
+          newImages.push(newImage);
+          currentY += worldHeight + padding;
+          
+          // Zapisz załadowany obraz
+          setLoadedImages(prev => new Map(prev).set(newImage.id, img));
+        }
+        
+        // Dodaj wszystkie strony naraz
+        setElements(newImages);
+        saveToHistory(newImages);
+        
+        // Broadcast i zapisywanie
+        newImages.forEach(image => {
+          broadcastElementCreated(image);
+          addToActivityHistory(image);
+          setUnsavedElements(prev => new Set(prev).add(image.id));
+        });
+        
+        if (boardIdState) debouncedSave(boardIdState);
+        
+        console.log(`✅ Załadowano arkusz: ${newImages.length} stron`);
+        
+        // Ustaw viewport na początek arkusza
+        setViewport({ x: 0, y: 1, scale: 0.8 });
+        
+      } catch (err) {
+        console.error('❌ Błąd ładowania arkusza:', err);
+      } finally {
+        setImageProcessing(false);
+        setArkuszLoaded(true);
+      }
+    };
+    
+    // Opóźnij ładowanie żeby dać czas na inicjalizację
+    const timer = setTimeout(loadArkusz, 500);
+    return () => clearTimeout(timer);
+  }, [arkuszPath, arkuszLoaded, dbElementsLoaded, dbWasEmpty, boardIdState, broadcastElementCreated, addToActivityHistory, debouncedSave, saveToHistory]);
 
   const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();

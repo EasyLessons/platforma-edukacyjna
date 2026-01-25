@@ -40,15 +40,23 @@ export function TablicaContent() {
   const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [arkuszPath, setArkuszPath] = useState<string | null>(null);
   const [boardName, setBoardName] = useState<string>('Moja tablica');
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
 
-  // Pobierz boardId z URL query params i dołącz do workspace
+  // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
     const id = searchParams.get('boardId') || 'demo-board';
+    const arkusz = searchParams.get('arkusz');
+    
     setBoardId(id);
+    setArkuszPath(arkusz);
+    
     console.log('📋 Board ID:', id);
+    if (arkusz) {
+      console.log('📄 Arkusz path:', arkusz);
+    }
     
     // Pobierz dane tablicy z bazy
     const loadBoardData = async () => {
@@ -133,7 +141,7 @@ export function TablicaContent() {
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>
-        <WhiteboardCanvas boardId={boardId} />
+        <WhiteboardCanvas boardId={boardId} arkuszPath={arkuszPath} />
       </BoardRealtimeProvider>
 
       {/* Style dla animacji */}
