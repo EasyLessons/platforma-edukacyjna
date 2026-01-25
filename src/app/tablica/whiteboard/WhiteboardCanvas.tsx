@@ -300,6 +300,21 @@ Zadaj pytanie! 🤔`,
         return [...prev, element];
       });
       
+      // 🆕 Aktualizuj elementsWithAuthor dla Activity History
+      setElementsWithAuthor(prev => {
+        if (prev.some(el => el.element_id === element.id)) {
+          return prev;
+        }
+        return [...prev, {
+          element_id: element.id,
+          type: element.type,
+          data: element,
+          created_by_id: userId,
+          created_by_username: username,
+          created_at: new Date().toISOString()
+        }];
+      });
+      
       // 🆕 Jeśli to obraz, załaduj go do loadedImages
       if (element.type === 'image' && (element as ImageElement).src) {
         console.log(`🖼️ Ładowanie zdalnego obrazu ${element.id}...`);
@@ -322,6 +337,11 @@ Zadaj pytanie! 🤔`,
       setElements(prev =>
         prev.map(el => (el.id === element.id ? element : el))
       );
+      
+      // 🆕 Aktualizuj elementsWithAuthor
+      setElementsWithAuthor(prev =>
+        prev.map(el => (el.element_id === element.id ? { ...el, data: element } : el))
+      );
     });
     
     // Handler: Usunięcie elementu przez innego użytkownika
@@ -329,6 +349,9 @@ Zadaj pytanie! 🤔`,
       console.log(`📥 [${username}] usunął element:`, elementId);
       
       setElements(prev => prev.filter(el => el.id !== elementId));
+      
+      // 🆕 Usuń z elementsWithAuthor
+      setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
     });
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
 
@@ -1633,57 +1656,83 @@ Zadaj pytanie! 🤔`,
   // 🆕 CALLBACKI DLA NARZĘDZI - Z BROADCAST
   // ═══════════════════════════════════════════════════════════════════════════
   
+  // 🆕 Helper: Dodaje element do Activity History (elementsWithAuthor) przy lokalnym tworzeniu
+  const addToActivityHistory = useCallback((element: DrawingElement) => {
+    setElementsWithAuthor(prev => {
+      if (prev.some(el => el.element_id === element.id)) {
+        return prev;
+      }
+      return [...prev, {
+        element_id: element.id,
+        type: element.type,
+        data: element,
+        created_by_id: user?.id || null,
+        created_by_username: user?.username || null,
+        created_at: new Date().toISOString()
+      }];
+    });
+  }, [user?.id, user?.username]);
+  
+  // 🆕 Helper: Usuwa element z Activity History
+  const removeFromActivityHistory = useCallback((elementId: string) => {
+    setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
+  }, []);
+  
   const handlePathCreate = useCallback((path: DrawingPath) => {
     const newElements = [...elements, path];
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST
+    // 🆕 BROADCAST + Activity History
     broadcastElementCreated(path);
+    addToActivityHistory(path);
     
     // 🆕 ZAPISYWANIE - oznacz jako unsaved i zaplanuj zapis
     setUnsavedElements(prev => new Set(prev).add(path.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleShapeCreate = useCallback((shape: Shape) => {
     const newElements = [...elements, shape];
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST
+    // 🆕 BROADCAST + Activity History
     broadcastElementCreated(shape);
+    addToActivityHistory(shape);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(shape.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
     const newElements = [...elements, func];
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST
+    // 🆕 BROADCAST + Activity History
     broadcastElementCreated(func);
+    addToActivityHistory(func);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(func.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleTextCreate = useCallback((text: TextElement) => {
     const newElements = [...elements, text];
     setElements(newElements);
     saveToHistory(newElements);
     
-    // 🆕 BROADCAST
+    // 🆕 BROADCAST + Activity History
     broadcastElementCreated(text);
+    addToActivityHistory(text);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(text.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
     const newElements = elements.map(el => 
@@ -1710,6 +1759,7 @@ Zadaj pytanie! 🤔`,
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
+    removeFromActivityHistory(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
       // Zapisz jeśli unsaved
@@ -1732,7 +1782,7 @@ Zadaj pytanie! 🤔`,
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
+  }, [elements, saveToHistory, broadcastElementDeleted, removeFromActivityHistory, boardIdState, unsavedElements]);
 
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
@@ -1752,6 +1802,9 @@ Zadaj pytanie! 🤔`,
     // 🆕 BROADCAST
     broadcastElementCreated(image);
     
+    // 🆕 ACTIVITY HISTORY
+    addToActivityHistory(image);
+    
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(image.id));
     if (boardIdState) debouncedSave(boardIdState);
@@ -1766,7 +1819,7 @@ Zadaj pytanie! 🤔`,
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
 
 
@@ -1776,6 +1829,7 @@ Zadaj pytanie! 🤔`,
     setElements(prev => [...prev, note]);
     
     broadcastElementCreated(note);
+    addToActivityHistory(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
     if (boardIdState) debouncedSave(boardIdState);
     
@@ -1783,7 +1837,7 @@ Zadaj pytanie! 🤔`,
     setTool('select');
     setSelectedElementIds(new Set([note.id]));
     setEditingMarkdownId(note.id);
-  }, [broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
@@ -1818,9 +1872,10 @@ Zadaj pytanie! 🤔`,
     
     // Broadcast i zapis do DB
     broadcastElementCreated(newNote);
+    addToActivityHistory(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - tworzenie tabeli
   const handleTableCreate = useCallback((table: TableElement) => {
@@ -1829,13 +1884,14 @@ Zadaj pytanie! 🤔`,
     saveToHistory(newElements);
     
     broadcastElementCreated(table);
+    addToActivityHistory(table);
     setUnsavedElements(prev => new Set(prev).add(table.id));
     if (boardIdState) debouncedSave(boardIdState);
     
     // Po utworzeniu przełącz na select żeby można było edytować
     setTool('select');
     setSelectedElementIds(new Set([table.id]));
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - zmiana komórki tabeli
   const handleTableCellChange = useCallback((tableId: string, row: number, col: number, value: string) => {
@@ -2189,6 +2245,7 @@ Zadaj pytanie! 🤔`,
       
       // Broadcast i zapis
       broadcastElementCreated(newImage);
+      addToActivityHistory(newImage);
       setUnsavedElements(prev => new Set(prev).add(newImage.id));
       if (boardIdState) debouncedSave(boardIdState);
     };
@@ -2196,7 +2253,7 @@ Zadaj pytanie! 🤔`,
     img.onerror = () => {
       console.error('❌ Nie można załadować wzoru:', formula.path);
     };
-  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleCardSelect = useCallback((card: CardResource) => {
     setActiveCard(card);
@@ -2265,6 +2322,7 @@ Zadaj pytanie! 🤔`,
         newImages.forEach(({ imageElement, loadedImg }) => {
           setLoadedImages(prev => new Map(prev).set(imageElement.id, loadedImg));
           broadcastElementCreated(imageElement);
+          addToActivityHistory(imageElement);
           setUnsavedElements(prev => new Set(prev).add(imageElement.id));
         });
         
@@ -2276,7 +2334,7 @@ Zadaj pytanie! 🤔`,
         console.error('❌ Błąd ładowania wzorów:', err);
         setActiveCard(null);
       });
-  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
   
   // Globalne obrazy (bez zmian)
   const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
@@ -2489,6 +2547,7 @@ Zadaj pytanie! 🤔`,
         // Broadcast i zapisywanie dla wszystkich stron
         newImages.forEach(image => {
           broadcastElementCreated(image);
+          addToActivityHistory(image);
           setUnsavedElements(prev => new Set(prev).add(image.id));
           
           // Załaduj obrazek do pamięci
@@ -2536,7 +2595,7 @@ Zadaj pytanie! 🤔`,
     } finally {
       setImageProcessing(false);
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
   
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
