@@ -222,6 +222,8 @@ Zadaj pytanie! 🤔`,
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
   const saveToHistoryRef = useRef<(els: DrawingElement[]) => void>(() => {});
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
   const historyRef = useRef(history);
   const historyIndexRef = useRef(historyIndex);
   const selectedElementIdsRef = useRef(selectedElementIds);
@@ -885,104 +887,14 @@ Zadaj pytanie! 🤔`,
       
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex > 0) {
-          const newIndex = currentIndex - 1;
-          setHistoryIndex(newIndex);
-          
-          const oldElements = currentHistory[currentIndex];
-          const newElements = currentHistory[newIndex];
-          
-          // Znajdź elementy które zostały usunięte (były w current, nie ma w new)
-          const oldIds = new Set(oldElements.map(el => el.id));
-          const newIds = new Set(newElements.map(el => el.id));
-          
-          const deletedElements = oldElements.filter(el => !newIds.has(el.id));
-          const addedElements = newElements.filter(el => !oldIds.has(el.id));
-          
-          // Usuń elementy z bazy danych (BEZ broadcast - to lokalna akcja historii)
-          if (deletedElements.length > 0 && boardIdStateRef.current) {
-            const numericBoardId = parseInt(boardIdStateRef.current);
-            if (!isNaN(numericBoardId)) {
-              deletedElements.forEach(el => {
-                deleteBoardElement(numericBoardId, el.id).catch(err => {
-                  console.error('❌ Błąd usuwania elementu podczas undo:', el.id, err);
-                });
-              });
-            }
-          }
-          
-          // Dodaj elementy do bazy danych (BEZ broadcast - to lokalna akcja historii)
-          if (addedElements.length > 0 && boardIdStateRef.current) {
-            const numericBoardId = parseInt(boardIdStateRef.current);
-            if (!isNaN(numericBoardId)) {
-              const elementsToSave = addedElements.map(el => ({
-                element_id: el.id,
-                type: el.type,
-                data: el
-              }));
-              saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
-                console.error('❌ Błąd zapisywania elementów podczas undo:', err);
-              });
-            }
-          }
-          
-          setElements(newElements);
-          setSelectedElementIds(new Set());
-        }
+        // Użyj nowej zsynchronizowanej funkcji undo
+        undoRef.current?.();
       }
       
       if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex < currentHistory.length - 1) {
-          const newIndex = currentIndex + 1;
-          setHistoryIndex(newIndex);
-          
-          const oldElements = currentHistory[currentIndex];
-          const newElements = currentHistory[newIndex];
-          
-          // Znajdź elementy które zostały usunięte (były w current, nie ma w new)
-          const oldIds = new Set(oldElements.map(el => el.id));
-          const newIds = new Set(newElements.map(el => el.id));
-          
-          const deletedElements = oldElements.filter(el => !newIds.has(el.id));
-          const addedElements = newElements.filter(el => !oldIds.has(el.id));
-          
-          // Usuń elementy z bazy danych (BEZ broadcast - to lokalna akcja historii)
-          if (deletedElements.length > 0 && boardIdStateRef.current) {
-            const numericBoardId = parseInt(boardIdStateRef.current);
-            if (!isNaN(numericBoardId)) {
-              deletedElements.forEach(el => {
-                deleteBoardElement(numericBoardId, el.id).catch(err => {
-                  console.error('❌ Błąd usuwania elementu podczas redo:', el.id, err);
-                });
-              });
-            }
-          }
-          
-          // Dodaj elementy do bazy danych (BEZ broadcast - to lokalna akcja historii)
-          if (addedElements.length > 0 && boardIdStateRef.current) {
-            const numericBoardId = parseInt(boardIdStateRef.current);
-            if (!isNaN(numericBoardId)) {
-              const elementsToSave = addedElements.map(el => ({
-                element_id: el.id,
-                type: el.type,
-                data: el
-              }));
-              saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
-                console.error('❌ Błąd zapisywania elementów podczas redo:', err);
-              });
-            }
-          }
-          
-          setElements(newElements);
-          setSelectedElementIds(new Set());
-        }
+        // Użyj nowej zsynchronizowanej funkcji redo
+        redoRef.current?.();
       }
       
       if (e.key === 'Delete') {
@@ -1511,6 +1423,12 @@ Zadaj pytanie! 🤔`,
       setSelectedElementIds(new Set());
     }
   }, [broadcastElementDeleted, broadcastElementCreated]);
+
+  // Aktualizuj refs dla undo/redo
+  useEffect(() => {
+    undoRef.current = undo;
+    redoRef.current = redo;
+  }, [undo, redo]);
 
   // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika
   const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
