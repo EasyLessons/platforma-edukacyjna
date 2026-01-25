@@ -239,6 +239,16 @@ const handleLogin = async (e: React.FormEvent) => {
               {errors.password}
             </span>
           )}
+          
+          {/* Forgot Password Link */}
+          <div className="mt-2 text-right">
+            <Link
+              href="/odzyskiwanie-hasla"
+              className="text-sm text-green-600 hover:text-green-700 font-medium hover:underline transition-colors duration-200"
+            >
+              Zapomniałeś hasła?
+            </Link>
+          </div>
         </div>
 
         {/* Login Button */}

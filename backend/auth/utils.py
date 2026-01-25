@@ -35,32 +35,61 @@ def generate_verification_code(length: int = 6) -> str:
 
 # === EMAIL ===
 async def send_verification_email(email: str, username: str, code: str,
-                                 resend_api_key: str, from_email: str) -> bool:
-    """Wysyła email weryfikacyjny"""
+                                 resend_api_key: str, from_email: str,
+                                 email_type: str = "verification") -> bool:
+    """Wysyła email z kodem (weryfikacja lub reset hasła)"""
     resend.api_key = resend_api_key
+    
+    # Wybierz szablon na podstawie typu
+    if email_type == "password_reset":
+        subject = "Reset hasła - Platforma Edukacyjna"
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1>🔐 Witaj, {username}!</h1>
+                <p>Otrzymaliśmy prośbę o zresetowanie hasła do Twojego konta.</p>
+                <p>Użyj poniższego kodu aby ustawić nowe hasło:</p>
+                <div style="background: white; border: 2px dashed #10b981; 
+                            padding: 20px; text-align: center; font-size: 32px;
+                            font-weight: bold; color: #10b981;">
+                    {code}
+                </div>
+                <p><strong>Kod ważny przez 15 minut.</strong></p>
+                <p style="color: #666; font-size: 14px;">
+                    Jeśli nie prosiłeś o reset hasła, zignoruj tę wiadomość.
+                </p>
+            </div>
+        </body>
+        </html>
+        """
+    else:
+        subject = "Weryfikacja konta - Platforma Edukacyjna"
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <body style="font-family: Arial;">
+            <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+                <h1>🎓 Witaj, {username}!</h1>
+                <p>Użyj poniższego kodu weryfikacyjnego:</p>
+                <div style="background: white; border: 2px dashed #667eea; 
+                            padding: 20px; text-align: center; font-size: 32px;
+                            font-weight: bold; color: #667eea;">
+                    {code}
+                </div>
+                <p><strong>Kod ważny przez 15 minut.</strong></p>
+            </div>
+        </body>
+        </html>
+        """
     
     try:
         params = {
             "from": from_email,
             "to": [email],
-            "subject": "Weryfikacja konta - Platforma Edukacyjna",
-            "html": f"""
-            <!DOCTYPE html>
-            <html>
-            <body style="font-family: Arial;">
-                <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h1>🎓 Witaj, {username}!</h1>
-                    <p>Użyj poniższego kodu weryfikacyjnego:</p>
-                    <div style="background: white; border: 2px dashed #667eea; 
-                                padding: 20px; text-align: center; font-size: 32px;
-                                font-weight: bold; color: #667eea;">
-                        {code}
-                    </div>
-                    <p><strong>Kod ważny przez 15 minut.</strong></p>
-                </div>
-            </body>
-            </html>
-            """
+            "subject": subject,
+            "html": html_content
         }
         
         response = resend.Emails.send(params)
@@ -72,5 +101,17 @@ async def send_verification_email(email: str, username: str, code: str,
         print(f"📧 API Key: {resend_api_key[:10]}... (pierwsze 10 znaków)")
         print(f"📧 From: {from_email}")
         print(f"📧 To: {email}")
-        raise  # Rzuć błąd dalej aby zobaczyć pełny traceback
-        return False
+        raise
+
+
+async def send_password_reset_email(email: str, username: str, code: str,
+                                    resend_api_key: str, from_email: str) -> bool:
+    """Wysyła email z kodem resetowania hasła - wrapper na send_verification_email"""
+    return await send_verification_email(
+        email=email,
+        username=username,
+        code=code,
+        resend_api_key=resend_api_key,
+        from_email=from_email,
+        email_type="password_reset"
+    )

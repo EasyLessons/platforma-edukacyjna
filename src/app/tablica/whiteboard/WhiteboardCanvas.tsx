@@ -48,11 +48,17 @@ import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../sm
 // 🆕 Import hooka Realtime
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
+// 🆕 Import hooka Auth (dla Activity History)
+import { useAuth } from '@/app/context/AuthContext';
+
 // 🆕 Import snap utilities
 import { GuideLine, collectGuidelinesFromImages } from '../utils/snapUtils';
 
 // 🆕 Import API dla elementów tablicy
-import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement } from '@/boards_api/api';
+import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement, BoardElementWithAuthor } from '@/boards_api/api';
+
+// 🆕 Import ActivityHistory
+import { ActivityHistory } from '../toolbar/ActivityHistory';
 
 import {
   Point,
@@ -118,6 +124,9 @@ export default function WhiteboardCanvas({ className = '', boardId }: Whiteboard
     isConnected
   } = useBoardRealtime();
   
+  // 🆕 AUTH HOOK (dla Activity History - currentUserId)
+  const { user } = useAuth();
+  
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
     x: 0,
@@ -175,6 +184,7 @@ Zadaj pytanie! 🤔`,
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
+  const [elementsWithAuthor, setElementsWithAuthor] = useState<BoardElementWithAuthor[]>([]); // 🆕 Elementy z info o autorze (dla Activity History)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
@@ -484,6 +494,7 @@ Zadaj pytanie! 🤔`,
         // Ustaw elementy (mapuj data → element)
         const loadedElements = data.elements.map(e => e.data);
         setElements(loadedElements);
+        setElementsWithAuthor(data.elements); // 🆕 Zapisz pełne dane z autorem dla Activity History
         setLoadingProgress(70);
         
         // 🆕 Ustaw początkową historię na załadowane elementy
@@ -1383,7 +1394,7 @@ Zadaj pytanie! 🤔`,
       const deletedElements = oldElements.filter(el => !newIds.has(el.id));
       const addedElements = newElements.filter(el => !oldIds.has(el.id));
       
-      // Usuń elementy z bazy danych (BEZ broadcast - to lokalna akcja historii)
+      // Usuń elementy z bazy danych + BROADCAST do innych
       if (deletedElements.length > 0 && boardIdStateRef.current) {
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
@@ -1391,11 +1402,13 @@ Zadaj pytanie! 🤔`,
             deleteBoardElement(numericBoardId, el.id).catch(err => {
               console.error('❌ Błąd usuwania elementu podczas undo:', el.id, err);
             });
+            // 🆕 Broadcast usunięcia do innych użytkowników
+            broadcastElementDeleted(el.id);
           });
         }
       }
       
-      // Dodaj elementy do bazy danych (BEZ broadcast - to lokalna akcja historii)
+      // Dodaj elementy do bazy danych + BROADCAST do innych
       if (addedElements.length > 0 && boardIdStateRef.current) {
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
@@ -1407,13 +1420,17 @@ Zadaj pytanie! 🤔`,
           saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
             console.error('❌ Błąd zapisywania elementów podczas undo:', err);
           });
+          // 🆕 Broadcast dodania do innych użytkowników
+          addedElements.forEach(el => {
+            broadcastElementCreated(el);
+          });
         }
       }
       
       setElements([...newElements]);
       setSelectedElementIds(new Set());
     }
-  }, []);
+  }, [broadcastElementDeleted, broadcastElementCreated]);
 
   const redo = useCallback(() => {
     const currentIndex = historyIndexRef.current;
@@ -1434,7 +1451,7 @@ Zadaj pytanie! 🤔`,
       const deletedElements = oldElements.filter(el => !newIds.has(el.id));
       const addedElements = newElements.filter(el => !oldIds.has(el.id));
       
-      // Usuń elementy z bazy danych (BEZ broadcast - to lokalna akcja historii)
+      // Usuń elementy z bazy danych + BROADCAST do innych
       if (deletedElements.length > 0 && boardIdStateRef.current) {
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
@@ -1442,11 +1459,13 @@ Zadaj pytanie! 🤔`,
             deleteBoardElement(numericBoardId, el.id).catch(err => {
               console.error('❌ Błąd usuwania elementu podczas redo:', el.id, err);
             });
+            // 🆕 Broadcast usunięcia do innych użytkowników
+            broadcastElementDeleted(el.id);
           });
         }
       }
       
-      // Dodaj elementy do bazy danych (BEZ broadcast - to lokalna akcja historii)
+      // Dodaj elementy do bazy danych + BROADCAST do innych
       if (addedElements.length > 0 && boardIdStateRef.current) {
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
@@ -1458,13 +1477,17 @@ Zadaj pytanie! 🤔`,
           saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
             console.error('❌ Błąd zapisywania elementów podczas redo:', err);
           });
+          // 🆕 Broadcast dodania do innych użytkowników
+          addedElements.forEach(el => {
+            broadcastElementCreated(el);
+          });
         }
       }
       
       setElements([...newElements]);
       setSelectedElementIds(new Set());
     }
-  }, []);
+  }, [broadcastElementDeleted, broadcastElementCreated]);
 
   // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika
   const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
@@ -1474,6 +1497,15 @@ Zadaj pytanie! 🤔`,
       y: userViewportY,
       scale: userViewportScale
     });
+  }, []);
+
+  // 🆕 CENTER VIEW ON ELEMENT - dla Activity History
+  const handleCenterViewOnElement = useCallback((targetX: number, targetY: number, scale?: number) => {
+    setViewport(prev => ({
+      x: targetX,
+      y: targetY,
+      scale: scale ?? prev.scale
+    }));
   }, []);
 
   const clearCanvas = useCallback(async () => {
@@ -2793,6 +2825,14 @@ Zadaj pytanie! 🤔`,
           onZoomIn={zoomIn}
           onZoomOut={zoomOut}
           onResetView={resetView}
+        />
+        
+        {/* 🆕 ACTIVITY HISTORY - historia elementów */}
+        <ActivityHistory
+          elements={elementsWithAuthor}
+          currentUserId={user?.id}
+          onCenterView={handleCenterViewOnElement}
+          viewport={viewport}
         />
         
         {/* NARZĘDZIA - BLOKOWANE gdy modal aktywny */}

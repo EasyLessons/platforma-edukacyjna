@@ -491,6 +491,15 @@ export interface BoardElement {
 }
 
 /**
+ * Element tablicy z informacją o autorze (z API GET /elements)
+ */
+export interface BoardElementWithAuthor extends BoardElement {
+  created_by_id: number | null;
+  created_by_username: string | null;
+  created_at: string | null;
+}
+
+/**
  * ───────────────────────────────────────────────────────────────────────────
  * 💾 ZAPIS BATCH - Zapisz wiele elementów naraz
  * ───────────────────────────────────────────────────────────────────────────
@@ -579,7 +588,7 @@ export const saveBoardElementsBatch = async (
  * 
  * ZWRACA:
  * {
- *   elements: BoardElement[]
+ *   elements: BoardElementWithAuthor[]
  * }
  * 
  * FILTROWANIE:
@@ -598,7 +607,7 @@ export const saveBoardElementsBatch = async (
  */
 export const loadBoardElements = async (
   boardId: number
-): Promise<{ elements: BoardElement[] }> => {
+): Promise<{ elements: BoardElementWithAuthor[] }> => {
   const token = getToken();
   if (!token) throw new Error('Brak autoryzacji');
   

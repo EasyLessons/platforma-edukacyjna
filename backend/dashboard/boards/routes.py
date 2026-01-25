@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from core.database import get_db
-from core.models import BoardElement, Board, WorkspaceMember
+from core.models import BoardElement, Board, WorkspaceMember, User
 from dashboard.boards.schemas import (
     CreateBoard, BoardResponse,
     BoardListResponse, UpdateBoard,
@@ -289,8 +289,10 @@ async def get_board_elements(
             detail="Brak dostępu do tej tablicy"
         )
     
-    # Pobierz tylko nie usunięte elementy
-    elements = db.query(BoardElement).filter(
+    # Pobierz tylko nie usunięte elementy z informacją o autorze
+    elements = db.query(BoardElement, User).outerjoin(
+        User, BoardElement.created_by == User.id
+    ).filter(
         BoardElement.board_id == board_id,
         BoardElement.is_deleted == False
     ).order_by(BoardElement.created_at.asc()).all()
@@ -298,9 +300,12 @@ async def get_board_elements(
     return {
         "elements": [
             {
-                "element_id": e.element_id,
-                "type": e.type,
-                "data": e.data
+                "element_id": e.BoardElement.element_id,
+                "type": e.BoardElement.type,
+                "data": e.BoardElement.data,
+                "created_by_id": e.BoardElement.created_by,
+                "created_by_username": e.User.username if e.User else None,
+                "created_at": e.BoardElement.created_at.isoformat() if e.BoardElement.created_at else None
             }
             for e in elements
         ]

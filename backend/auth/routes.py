@@ -10,7 +10,8 @@ from auth.schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
     VerifyEmail, ResendCode, CheckUser,
-    UserSearchResult
+    UserSearchResult,
+    RequestPasswordReset, VerifyPasswordResetCode, ResetPassword
 )
 from auth.dependencies import get_current_user
 from auth.service import AuthService
@@ -66,3 +67,26 @@ async def search_users_endpoint(
     
     service = AuthService(db)
     return service.search_users(query, current_user.id, limit)
+
+
+# === PASSWORD RESET ENDPOINTS ===
+
+@router.post("/request-password-reset")
+async def request_password_reset(reset_data: RequestPasswordReset, db: Session = Depends(get_db)):
+    """Wysyła kod resetowania hasła na email"""
+    service = AuthService(db)
+    return await service.request_password_reset(reset_data)
+
+
+@router.post("/verify-reset-code")
+async def verify_reset_code(verify_data: VerifyPasswordResetCode, db: Session = Depends(get_db)):
+    """Weryfikuje kod resetowania hasła"""
+    service = AuthService(db)
+    return await service.verify_reset_code(verify_data)
+
+
+@router.post("/reset-password")
+async def reset_password(reset_data: ResetPassword, db: Session = Depends(get_db)):
+    """Resetuje hasło użytkownika"""
+    service = AuthService(db)
+    return await service.reset_password(reset_data)

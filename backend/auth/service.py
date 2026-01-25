@@ -9,10 +9,14 @@ from core.config import get_settings
 from typing import List
 
 from core.models import User, Workspace, WorkspaceMember
-from auth.schemas import RegisterUser, LoginData, VerifyEmail, UserSearchResult
+from auth.schemas import (
+    RegisterUser, LoginData, VerifyEmail, UserSearchResult,
+    RequestPasswordReset, VerifyPasswordResetCode, ResetPassword
+)
 from auth.utils import (
     hash_password, verify_password, create_access_token,
-    generate_verification_code, send_verification_email
+    generate_verification_code, send_verification_email,
+    send_password_reset_email
 )
 
 logger = get_logger(__name__)
@@ -300,3 +304,118 @@ class AuthService:
             )
             for user in users
         ]
+    
+    # === PASSWORD RESET ===
+    
+    async def request_password_reset(self, reset_data: RequestPasswordReset) -> dict:
+        """Wysyła kod resetowania hasła na email"""
+        logger.info(f"🔐 Żądanie resetu hasła dla: {reset_data.email}")
+        
+        user = self.db.query(User).filter(User.email == reset_data.email).first()
+        
+        if not user:
+            # Z bezpieczeństwa nie ujawniamy czy email istnieje
+            logger.warning(f"⚠️ Reset dla nieistniejącego emaila: {reset_data.email}")
+            return {"message": "Jeśli email istnieje, kod został wysłany"}
+        
+        if not user.is_active:
+            logger.warning(f"⚠️ Reset dla niezweryfikowanego konta: {reset_data.email}")
+            raise HTTPException(
+                status_code=403, 
+                detail="Konto niezweryfikowane. Najpierw zweryfikuj email."
+            )
+        
+        # Generuj kod
+        reset_code = generate_verification_code()
+        code_expires = datetime.utcnow() + timedelta(minutes=15)
+        
+        user.verification_code = reset_code
+        user.verification_code_expires = code_expires
+        self.db.commit()
+        
+        logger.debug(f"🔐 Wygenerowano kod resetu dla {user.email}")
+        
+        # Wyślij email
+        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
+            try:
+                await send_password_reset_email(
+                    user.email,
+                    user.username,
+                    reset_code,
+                    self.settings.resend_api_key,
+                    self.settings.from_email
+                )
+                logger.info(f"📧 Email z kodem resetu wysłany do {user.email}")
+            except Exception as e:
+                logger.exception(f"❌ Błąd wysyłania emaila: {e}")
+        else:
+            logger.warning(f"⚠️ Email NIE wysłany (RESEND_API_KEY=SKIP) - KOD: {reset_code}")
+        
+        return {"message": "Jeśli email istnieje, kod został wysłany"}
+    
+    async def verify_reset_code(self, verify_data: VerifyPasswordResetCode) -> dict:
+        """Weryfikuje kod resetowania hasła (bez zmiany hasła)"""
+        logger.info(f"🔍 Weryfikacja kodu resetu dla: {verify_data.email}")
+        
+        user = self.db.query(User).filter(User.email == verify_data.email).first()
+        
+        if not user:
+            logger.warning(f"⚠️ User nie znaleziony: {verify_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Konto niezweryfikowane")
+        
+        if not user.verification_code:
+            logger.warning(f"⚠️ Brak kodu resetu: {verify_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        if datetime.utcnow() > user.verification_code_expires:
+            logger.warning(f"⏰ Kod wygasł: {verify_data.email}")
+            raise HTTPException(status_code=400, detail="Kod wygasł")
+        
+        if user.verification_code != verify_data.code:
+            logger.warning(f"❌ Zły kod resetu: {verify_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        logger.info(f"✅ Kod resetu zweryfikowany: {verify_data.email}")
+        return {"message": "Kod poprawny", "valid": True}
+    
+    async def reset_password(self, reset_data: ResetPassword) -> dict:
+        """Resetuje hasło użytkownika"""
+        logger.info(f"🔐 Reset hasła dla: {reset_data.email}")
+        
+        # Walidacja haseł
+        if reset_data.password != reset_data.password_confirm:
+            raise HTTPException(status_code=400, detail="Hasła nie są identyczne")
+        
+        user = self.db.query(User).filter(User.email == reset_data.email).first()
+        
+        if not user:
+            logger.warning(f"⚠️ User nie znaleziony: {reset_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Konto niezweryfikowane")
+        
+        if not user.verification_code:
+            logger.warning(f"⚠️ Brak kodu resetu: {reset_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        if datetime.utcnow() > user.verification_code_expires:
+            logger.warning(f"⏰ Kod wygasł: {reset_data.email}")
+            raise HTTPException(status_code=400, detail="Kod wygasł")
+        
+        if user.verification_code != reset_data.code:
+            logger.warning(f"❌ Zły kod resetu: {reset_data.email}")
+            raise HTTPException(status_code=400, detail="Nieprawidłowy kod")
+        
+        # Zmień hasło
+        user.hashed_password = hash_password(reset_data.password)
+        user.verification_code = None
+        user.verification_code_expires = None
+        self.db.commit()
+        
+        logger.info(f"✅ Hasło zresetowane: {user.username}")
+        
+        return {"message": "Hasło zostało zmienione"}
