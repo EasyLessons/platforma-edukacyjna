@@ -10,13 +10,14 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library, Sparkles } from 'lucide-react';
+import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library, Sparkles, Copy, Check, Plus } from 'lucide-react';
 import { loadManifest, searchResources, getResourceTypeColor } from './searchService';
-import { ResourceManifest, SearchResult, FormulaResource, CardResource } from './types';
+import { ResourceManifest, SearchResult, FormulaResource, CardResource, CalculationResult } from './types';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
   onCardSelect: (card: CardResource) => void;
+  onCalculationSelect?: (result: CalculationResult) => void; // 🆕 Opcjonalny callback dla obliczeń
   onBrowseAll?: () => void;
   onActiveChange?: (isActive: boolean) => void; // Callback gdy search się otwiera/zamyka
 }
@@ -29,7 +30,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
 };
 
-export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onActiveChange }: SmartSearchBarProps) {
+export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSelect, onBrowseAll, onActiveChange }: SmartSearchBarProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [query, setQuery] = useState('');
@@ -40,6 +41,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isAnimatingSelection, setIsAnimatingSelection] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
+  const [copiedCalculation, setCopiedCalculation] = useState(false); // 🆕 Stan kopiowania
   
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -180,10 +182,43 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
       setQuery('');
       setSelectedItemId(null);
       setIsAnimatingSelection(false);
+      setCopiedCalculation(false);
     }, 300);
   };
 
+  // 🆕 Kopiuj wynik obliczeń do schowka
+  const handleCopyCalculation = async (result: CalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(result.result);
+      setCopiedCalculation(true);
+      setTimeout(() => setCopiedCalculation(false), 2000);
+    } catch (err) {
+      console.error('Nie udało się skopiować:', err);
+    }
+  };
+
+  // 🆕 Dodaj wynik jako tekst na tablicę
+  const handleAddCalculation = (result: CalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCalculationSelect) {
+      onCalculationSelect(result);
+    }
+    handleClose();
+  };
+
   const handleSelect = (result: SearchResult) => {
+    // 🆕 Obsługa obliczeń - kopiuj do schowka
+    if (result.resultType === 'calculation') {
+      navigator.clipboard.writeText(result.result);
+      setCopiedCalculation(true);
+      setTimeout(() => {
+        setCopiedCalculation(false);
+        handleClose();
+      }, 500);
+      return;
+    }
+    
     // Rozpocznij fancy animację
     setSelectedItemId(result.id);
     setIsAnimatingSelection(true);
@@ -508,6 +543,74 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
             ) : (
               <ul className="py-2">
                 {results.map((result, index) => {
+                  // 🆕 QUICK MATH - specjalne renderowanie dla obliczeń
+                  if (result.resultType === 'calculation') {
+                    return (
+                      <li
+                        key={result.id}
+                        ref={index === selectedIndex ? selectedItemRef : null}
+                        onClick={() => handleSelect(result)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                        className={`
+                          flex items-center gap-4 px-5 py-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 relative overflow-hidden
+                          ${index === selectedIndex 
+                            ? 'bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg border-2 border-emerald-300' 
+                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200'
+                          }
+                        `}
+                        style={{
+                          animation: `slideIn 0.2s ease-out both`
+                        }}
+                      >
+                        {/* Ikona kalkulatora */}
+                        <div className="p-3 rounded-2xl bg-emerald-500 shrink-0">
+                          <Calculator className="w-6 h-6 text-white" />
+                        </div>
+                        
+                        {/* Wyrażenie i wynik */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm text-emerald-700 font-medium">Quick Math</span>
+                            <Sparkles className="w-4 h-4 text-emerald-500" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-600 font-mono text-lg">{result.expression}</span>
+                            <span className="text-emerald-600 font-bold">=</span>
+                            <span className="text-2xl font-bold text-emerald-700 font-mono">{result.result}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Przyciski akcji */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Kopiuj */}
+                          <button
+                            onClick={(e) => handleCopyCalculation(result, e)}
+                            className="p-2 rounded-xl bg-white/80 hover:bg-white shadow-sm transition-all hover:scale-110"
+                            title="Kopiuj wynik"
+                          >
+                            {copiedCalculation ? (
+                              <Check className="w-5 h-5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-5 h-5 text-emerald-600" />
+                            )}
+                          </button>
+                          
+                          {/* Dodaj do tablicy */}
+                          {onCalculationSelect && (
+                            <button
+                              onClick={(e) => handleAddCalculation(result, e)}
+                              className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-sm transition-all hover:scale-110"
+                              title="Dodaj do tablicy"
+                            >
+                              <Plus className="w-5 h-5 text-white" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+                  
+                  // Normalne renderowanie dla wzorów i kart
                   const Icon = getIcon(result.type);
                   const color = manifest ? getResourceTypeColor(manifest, result.type) : '#3B82F6';
                   const isCard = result.resultType === 'card';

@@ -3,11 +3,12 @@
  * PLIK: src/app/tablica/smartsearch/searchService.ts
  * ============================================================================
  * 
- * Serwis wyszukiwania w manifest.json
+ * Serwis wyszukiwania w manifest.json + Quick Math (obliczenia)
  * ============================================================================
  */
 
-import { ResourceManifest, FormulaResource, CardResource, SearchResult } from './types';
+import * as math from 'mathjs';
+import { ResourceManifest, FormulaResource, CardResource, SearchResult, CalculationResult } from './types';
 
 let cachedManifest: ResourceManifest | null = null;
 
@@ -23,6 +24,57 @@ export async function loadManifest(): Promise<ResourceManifest> {
   return cachedManifest!;
 }
 
+/**
+ * 🆕 QUICK MATH - próbuje obliczyć wyrażenie matematyczne
+ * Zwraca CalculationResult jeśli się uda, null jeśli nie
+ */
+export function tryCalculate(query: string): CalculationResult | null {
+  const trimmed = query.trim();
+  
+  // Pomiń jeśli wygląda jak szukanie tekstu (same litery bez operatorów)
+  if (/^[a-zA-ZąćęłńóśźżĄĆĘŁŃÓŚŹŻ\s]+$/.test(trimmed)) {
+    return null;
+  }
+  
+  // Musi zawierać przynajmniej jeden znak matematyczny lub funkcję
+  const hasMathContent = /[\d+\-*/^()%]|sqrt|sin|cos|tan|log|ln|exp|abs|pi|e\b/i.test(trimmed);
+  if (!hasMathContent) {
+    return null;
+  }
+  
+  try {
+    // Zamień polskie nazwy na angielskie
+    let expression = trimmed
+      .replace(/π/g, 'pi')
+      .replace(/×/g, '*')
+      .replace(/÷/g, '/')
+      .replace(/²/g, '^2')
+      .replace(/³/g, '^3')
+      .replace(/√/g, 'sqrt');
+    
+    const result = math.evaluate(expression);
+    
+    // Sprawdź czy wynik jest liczbą
+    if (typeof result === 'number' && isFinite(result)) {
+      // Formatuj wynik (max 10 miejsc po przecinku, usuń zbędne zera)
+      const formatted = Number(result.toFixed(10)).toString();
+      
+      return {
+        resultType: 'calculation',
+        id: 'quick-math-result',
+        expression: trimmed,
+        result: formatted,
+        numericResult: result
+      };
+    }
+    
+    return null;
+  } catch {
+    // MathJS nie potrafi obliczyć - to normalne dla zwykłych wyszukiwań
+    return null;
+  }
+}
+
 export function searchResources(
   manifest: ResourceManifest,
   query: string
@@ -33,6 +85,12 @@ export function searchResources(
   
   const results: SearchResult[] = [];
   const queryWords = normalizedQuery.split(/\s+/);
+  
+  // 🆕 QUICK MATH - spróbuj obliczyć wyrażenie
+  const calculation = tryCalculate(query);
+  if (calculation) {
+    results.push(calculation);
+  }
   
   // Szukaj w wzorach/twierdzeniach/tabelach/diagramach
   for (const formula of manifest.formulas) {
@@ -50,9 +108,13 @@ export function searchResources(
     }
   }
   
-  // Sortuj: karty najpierw (mają wyższy priorytet), potem po kolejności
+  // Sortuj: obliczenia najpierw, potem karty, potem reszta
   return results.sort((a, b) => {
-    // Karty wzorów zawsze na górze
+    // Obliczenia ZAWSZE na samej górze
+    if (a.resultType === 'calculation') return -1;
+    if (b.resultType === 'calculation') return 1;
+    
+    // Karty wzorów na drugim miejscu
     if (a.resultType === 'card' && b.resultType !== 'card') return -1;
     if (a.resultType !== 'card' && b.resultType === 'card') return 1;
     

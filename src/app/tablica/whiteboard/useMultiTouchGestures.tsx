@@ -120,15 +120,16 @@ export function useMultiTouchGestures({
         const newDistance = getDistance(pointers[0], pointers[1]);
         const distanceChange = newDistance - lastDistanceRef.current;
         
-        // ✅ THRESHOLD dla zoom (30px)
-        if (Math.abs(distanceChange) > 30) {
+        // ✅ THRESHOLD dla zoom (10px - mniejszy próg żeby reagować szybciej)
+        if (Math.abs(distanceChange) > 10) {
           isZooming = true;
           
           const distanceRatio = newDistance / lastDistanceRef.current;
           
-          // ✅ CZUŁOŚĆ ZOOM (dzielnik 3)
-          const zoomFactor = 1 + (distanceRatio - 1) / 10;
-          const newScale = Math.max(0.1, Math.min(10, viewport.scale * zoomFactor));
+          // ✅ CZUŁOŚĆ ZOOM - dzielnik 25 (wolniejszy, płynniejszy zoom)
+          // Poprzednio /10 powodowało zbyt szybkie skoki
+          const zoomFactor = 1 + (distanceRatio - 1) / 25;
+          const newScale = Math.max(0.1, Math.min(5, viewport.scale * zoomFactor));
 
           // ✅✅✅ POPRAWKA: Podczas zoom TYLKO scale się zmienia!
           // NIE zmieniaj viewport.x i viewport.y - to eliminuje przesuwanie
@@ -140,10 +141,9 @@ export function useMultiTouchGestures({
 
           onViewportChange(constrainViewport(newViewport));
           
-          // ✅ Aktualizuj distance TYLKO co większy ruch (40px)
-          if (Math.abs(distanceChange) > 200) {
-            lastDistanceRef.current = newDistance;
-          }
+          // ✅ KLUCZOWA POPRAWKA: Aktualizuj lastDistance przy KAŻDYM ruchu!
+          // Poprzednio czekało na 200px co powodowało "kumulację" i skoki
+          lastDistanceRef.current = newDistance;
         }
       }
 

@@ -40,13 +40,13 @@ import { TableTool, TableView } from '../toolbar/TableTool';
 import { CalculatorTool } from '../toolbar/CalculatorTool';
 import { MathChatbot } from '../toolbar/MathChatbot';
 import { OnlineUsers } from './OnlineUsers';
-import { RemoteCursors } from './RemoteCursors';
+import { RemoteCursorsContainer } from './RemoteCursors';
 
 // 🆕 Import SmartSearch
 import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../smartsearch';
 
-// 🆕 Import hooka Realtime
-import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
+// 🆕 Import hooka Realtime + typ TypingUser + RemoteViewport
+import { useBoardRealtime, TypingUser, RemoteViewport } from '@/app/context/BoardRealtimeContext';
 
 // 🆕 Import hooka Auth (dla Activity History)
 import { useAuth } from '@/app/context/AuthContext';
@@ -84,11 +84,53 @@ import {
   transformPoint,
   updateMomentum,   
   startMomentum,     
-  stopMomentum     
+  stopMomentum,
+  isElementInViewport
 } from './viewport';
 
 import { drawGrid } from './Grid';
 import { drawElement } from './rendering';
+
+// 🆕 Helper do obliczania bounding box elementu (dla viewport culling)
+function getElementBounds(element: DrawingElement): { x: number; y: number; width: number; height: number } {
+  switch (element.type) {
+    case 'path': {
+      if (element.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const point of element.points) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+      // Dodaj margines dla width (grubość linii)
+      const margin = (element.width || 2) / 100;
+      return { x: minX - margin, y: minY - margin, width: maxX - minX + margin * 2, height: maxY - minY + margin * 2 };
+    }
+    case 'shape': {
+      const minX = Math.min(element.startX, element.endX);
+      const minY = Math.min(element.startY, element.endY);
+      const width = Math.abs(element.endX - element.startX);
+      const height = Math.abs(element.endY - element.startY);
+      return { x: minX, y: minY, width, height };
+    }
+    case 'text':
+      return { x: element.x, y: element.y, width: element.width || 2, height: element.height || 0.5 };
+    case 'function':
+      // Funkcje są renderowane w całym zakresie - zawsze widoczne
+      return { x: -element.xRange, y: -element.yRange, width: element.xRange * 2, height: element.yRange * 2 };
+    case 'image':
+    case 'pdf':
+    case 'markdown':
+    case 'table':
+      return { x: element.x, y: element.y, width: element.width, height: element.height };
+    default:
+      return { x: 0, y: 0, width: 10, height: 10 };
+  }
+}
+
+// 🆕 Typ akcji użytkownika dla stosu undo/redo (poza komponentem dla wydajności)
+type UserAction = { type: 'create', element: DrawingElement } | { type: 'delete', element: DrawingElement };
 
 interface WhiteboardCanvasProps {
   className?: string;
@@ -118,7 +160,11 @@ export default function WhiteboardCanvas({ className = '', boardId, arkuszPath }
     broadcastElementDeleted,
     broadcastElementsBatch,
     broadcastCursorMove,
-    remoteCursors,
+    broadcastTypingStarted,
+    broadcastTypingStopped,
+    broadcastViewportChange,
+    subscribeTyping,
+    subscribeViewports,
     onRemoteElementCreated,
     onRemoteElementUpdated,
     onRemoteElementDeleted,
@@ -189,6 +235,8 @@ Zadaj pytanie! 🤔`,
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]); // 🆕 Kto edytuje jakie elementy (realtime)
+  const [followingUserId, setFollowingUserId] = useState<number | null>(null); // 🆕 FOLLOW MODE - kogo śledzimy
   const [debugMode, setDebugMode] = useState(false);
   
   // 🆕 COPY/PASTE - schowek dla elementów
@@ -211,9 +259,15 @@ Zadaj pytanie! 🤔`,
   const [isSearchActive, setIsSearchActive] = useState(false); // Blokuje zoom gdy search otwarty
   const [isCardViewerActive, setIsCardViewerActive] = useState(false); // Blokuje canvas gdy CardViewer otwarty
   
-  // History state
+  // History state (legacy - pełna historia stanów)
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  
+  // 🆕 USER ACTION STACK - stos akcji tylko dla bieżącego użytkownika (Ctrl+Z/Y)
+  const [userUndoStack, setUserUndoStack] = useState<UserAction[]>([]);
+  const [userRedoStack, setUserRedoStack] = useState<UserAction[]>([]);
+  const userUndoStackRef = useRef<UserAction[]>([]);
+  const userRedoStackRef = useRef<UserAction[]>([]);
   
   const [imageProcessing, setImageProcessing] = useState(false);
   
@@ -251,6 +305,15 @@ Zadaj pytanie! 🤔`,
   useEffect(() => {
     historyIndexRef.current = historyIndex;
   }, [historyIndex]);
+
+  // 🆕 Synchronizacja user action stack refs
+  useEffect(() => {
+    userUndoStackRef.current = userUndoStack;
+  }, [userUndoStack]);
+
+  useEffect(() => {
+    userRedoStackRef.current = userRedoStack;
+  }, [userRedoStack]);
 
   useEffect(() => {
     selectedElementIdsRef.current = selectedElementIds;
@@ -357,6 +420,58 @@ Zadaj pytanie! 🤔`,
       setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
     });
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🆕 TYPING INDICATOR SUBSCRIPTION - kto edytuje jakie elementy
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  useEffect(() => {
+    const unsubscribe = subscribeTyping((users) => {
+      setTypingUsers(users);
+    });
+    return unsubscribe;
+  }, [subscribeTyping]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🆕 VIEWPORT TRACKING FOR FOLLOW MODE - śledź viewporty innych użytkowników
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const remoteViewportsRef = useRef<RemoteViewport[]>([]);
+  
+  useEffect(() => {
+    const unsubscribe = subscribeViewports((viewports) => {
+      remoteViewportsRef.current = viewports;
+      
+      // Jeśli śledzimy użytkownika, zaktualizuj nasz viewport
+      if (followingUserId) {
+        const followedViewport = viewports.find(v => v.userId === followingUserId);
+        if (followedViewport) {
+          setViewport({
+            x: followedViewport.x,
+            y: followedViewport.y,
+            scale: followedViewport.scale
+          });
+        }
+      }
+    });
+    return unsubscribe;
+  }, [subscribeViewports, followingUserId]);
+
+  // 🆕 BROADCAST VIEWPORT CHANGE - gdy mój viewport się zmienia, wyślij do innych
+  const lastViewportBroadcastRef = useRef<number>(0);
+  const VIEWPORT_BROADCAST_INTERVAL = 50; // 50ms = 20 FPS
+  
+  useEffect(() => {
+    // Throttle broadcast żeby nie zalewać sieci
+    const now = Date.now();
+    if (now - lastViewportBroadcastRef.current < VIEWPORT_BROADCAST_INTERVAL) return;
+    lastViewportBroadcastRef.current = now;
+    
+    // Nie broadcastuj gdy jesteśmy w follow mode (bo wtedy viewport jest kopiowany)
+    if (followingUserId) return;
+    
+    broadcastViewportChange(viewport.x, viewport.y, viewport.scale);
+  }, [viewport, broadcastViewportChange, followingUserId]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🖱️ BROADCAST CURSOR POSITION - ZOPTYMALIZOWANE (cache rect, ResizeObserver)
@@ -1179,6 +1294,9 @@ Zadaj pytanie! 🤔`,
       
       e.preventDefault();
       
+      // 🆕 Wyłącz follow mode gdy user sam nawiguje
+      setFollowingUserId(null);
+      
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
       const mouseY = e.clientY - rect.top;
@@ -1190,11 +1308,15 @@ Zadaj pytanie! 🤔`,
       if (e.ctrlKey) {
         // Ctrl+scroll = zoom
         const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
+        const constrained = constrainViewport(newViewport);
+        viewportRef.current = constrained;
+        setViewport(constrained);
       } else {
         // Normalny scroll = przesuwanie (pan)
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
+        const constrained = constrainViewport(newViewport);
+        viewportRef.current = constrained;
+        setViewport(constrained);
       }
     };
     
@@ -1250,10 +1372,25 @@ Zadaj pytanie! 🤔`,
       
       drawGrid(ctx, currentViewport, width, height);
       
+      // 🆕 VIEWPORT CULLING - renderuj tylko widoczne elementy
+      let culledCount = 0;
       currentElements.forEach(element => {
         if (element.id === editingTextId) return;
+        
+        // Sprawdź czy element jest w viewport
+        const bounds = getElementBounds(element);
+        if (!isElementInViewport(bounds.x, bounds.y, bounds.width, bounds.height, currentViewport, width, height)) {
+          culledCount++;
+          return; // Pomiń renderowanie - element poza ekranem
+        }
+        
         drawElement(ctx, element, currentViewport, width, height, currentLoadedImages, debugMode, handleAutoExpand);
       });
+      
+      // Debug: pokaż ile elementów pominięto
+      if (debugMode && culledCount > 0) {
+        console.log(`🎯 Viewport Culling: pominięto ${culledCount}/${currentElements.length} elementów`);
+      }
       
       rafIdRef.current = null;
     });
@@ -1312,131 +1449,145 @@ Zadaj pytanie! 🤔`,
       const throttleDelay = 500; // 500ms throttle
       const timeoutId = setTimeout(() => {
         (window as any).__updateViewportPresence(viewport.x, viewport.y, viewport.scale);
-        console.log('📡 Viewport updated in presence:', viewport);
+        // Usunięto console.log dla wydajności
       }, throttleDelay);
       
       return () => clearTimeout(timeoutId);
     }
   }, [viewport.x, viewport.y, viewport.scale]);
 
+  // 🆕 NOWY SYSTEM UNDO - cofa tylko akcje bieżącego użytkownika
   const undo = useCallback(() => {
-    const currentIndex = historyIndexRef.current;
-    const currentHistory = historyRef.current;
+    const undoStack = userUndoStackRef.current;
     
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
-      historyIndexRef.current = newIndex;
-      setHistoryIndex(newIndex);
-      
-      const oldElements = currentHistory[currentIndex];
-      const newElements = currentHistory[newIndex];
-      
-      // Znajdź elementy które zostały usunięte (były w current, nie ma w new)
-      const oldIds = new Set(oldElements.map(el => el.id));
-      const newIds = new Set(newElements.map(el => el.id));
-      
-      const deletedElements = oldElements.filter(el => !newIds.has(el.id));
-      const addedElements = newElements.filter(el => !oldIds.has(el.id));
-      
-      // Usuń elementy z bazy danych + BROADCAST do innych
-      if (deletedElements.length > 0 && boardIdStateRef.current) {
-        const numericBoardId = parseInt(boardIdStateRef.current);
-        if (!isNaN(numericBoardId)) {
-          deletedElements.forEach(el => {
-            // Tylko usuń z bazy jeśli element był zapisany (nie jest w unsavedElements)
-            if (!unsavedElementsRef.current.has(el.id)) {
-              deleteBoardElement(numericBoardId, el.id).catch(err => {
-                console.error('❌ Błąd usuwania elementu podczas undo:', el.id, err);
-              });
-            }
-            // 🆕 Broadcast usunięcia do innych użytkowników
-            broadcastElementDeleted(el.id);
-          });
-        }
-      }
-      
-      // Dodaj elementy do bazy danych + BROADCAST do innych
-      if (addedElements.length > 0 && boardIdStateRef.current) {
-        const numericBoardId = parseInt(boardIdStateRef.current);
-        if (!isNaN(numericBoardId)) {
-          const elementsToSave = addedElements.map(el => ({
-            element_id: el.id,
-            type: el.type,
-            data: el
-          }));
-          saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
-            console.error('❌ Błąd zapisywania elementów podczas undo:', err);
-          });
-          // 🆕 Broadcast dodania do innych użytkowników
-          addedElements.forEach(el => {
-            broadcastElementCreated(el);
-          });
-        }
-      }
-      
-      setElements([...newElements]);
-      setSelectedElementIds(new Set());
+    if (undoStack.length === 0) {
+      return;
     }
+    
+    // Zdejmij ostatnią akcję ze stosu undo
+    const lastAction = undoStack[undoStack.length - 1];
+    const newUndoStack = undoStack.slice(0, -1);
+    userUndoStackRef.current = newUndoStack;
+    setUserUndoStack(newUndoStack);
+    
+    // Przenieś akcję na stos redo
+    const newRedoStack = [...userRedoStackRef.current, lastAction];
+    userRedoStackRef.current = newRedoStack;
+    setUserRedoStack(newRedoStack);
+    
+    if (lastAction.type === 'create') {
+      // Akcja 'create' = użytkownik stworzył element → cofnij = USUŃ element
+      const elementToRemove = lastAction.element;
+      
+      // Usuń z lokalnego stanu
+      setElements(prev => prev.filter(el => el.id !== elementToRemove.id));
+      
+      // Usuń z bazy danych (jeśli był zapisany)
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId) && !unsavedElementsRef.current.has(elementToRemove.id)) {
+          deleteBoardElement(numericBoardId, elementToRemove.id).catch(err => {
+            console.error('❌ Błąd usuwania elementu podczas undo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementDeleted(elementToRemove.id);
+      
+    } else if (lastAction.type === 'delete') {
+      // Akcja 'delete' = użytkownik usunął element → cofnij = PRZYWRÓĆ element
+      const elementToRestore = lastAction.element;
+      
+      // Dodaj z powrotem do lokalnego stanu
+      setElements(prev => [...prev, elementToRestore]);
+      
+      // Zapisz z powrotem do bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId)) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: elementToRestore.id,
+            type: elementToRestore.type,
+            data: elementToRestore
+          }]).catch(err => {
+            console.error('❌ Błąd przywracania elementu podczas undo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementCreated(elementToRestore);
+    }
+    
+    setSelectedElementIds(new Set());
   }, [broadcastElementDeleted, broadcastElementCreated]);
 
+  // 🆕 NOWY SYSTEM REDO - ponawia tylko akcje bieżącego użytkownika
   const redo = useCallback(() => {
-    const currentIndex = historyIndexRef.current;
-    const currentHistory = historyRef.current;
+    const redoStack = userRedoStackRef.current;
     
-    if (currentIndex < currentHistory.length - 1) {
-      const newIndex = currentIndex + 1;
-      historyIndexRef.current = newIndex;
-      setHistoryIndex(newIndex);
-      
-      const oldElements = currentHistory[currentIndex];
-      const newElements = currentHistory[newIndex];
-      
-      // Znajdź elementy które zostały usunięte (były w current, nie ma w new)
-      const oldIds = new Set(oldElements.map(el => el.id));
-      const newIds = new Set(newElements.map(el => el.id));
-      
-      const deletedElements = oldElements.filter(el => !newIds.has(el.id));
-      const addedElements = newElements.filter(el => !oldIds.has(el.id));
-      
-      // Usuń elementy z bazy danych + BROADCAST do innych
-      if (deletedElements.length > 0 && boardIdStateRef.current) {
-        const numericBoardId = parseInt(boardIdStateRef.current);
-        if (!isNaN(numericBoardId)) {
-          deletedElements.forEach(el => {
-            // Tylko usuń z bazy jeśli element był zapisany (nie jest w unsavedElements)
-            if (!unsavedElementsRef.current.has(el.id)) {
-              deleteBoardElement(numericBoardId, el.id).catch(err => {
-                console.error('❌ Błąd usuwania elementu podczas redo:', el.id, err);
-              });
-            }
-            // 🆕 Broadcast usunięcia do innych użytkowników
-            broadcastElementDeleted(el.id);
-          });
-        }
-      }
-      
-      // Dodaj elementy do bazy danych + BROADCAST do innych
-      if (addedElements.length > 0 && boardIdStateRef.current) {
-        const numericBoardId = parseInt(boardIdStateRef.current);
-        if (!isNaN(numericBoardId)) {
-          const elementsToSave = addedElements.map(el => ({
-            element_id: el.id,
-            type: el.type,
-            data: el
-          }));
-          saveBoardElementsBatch(numericBoardId, elementsToSave).catch(err => {
-            console.error('❌ Błąd zapisywania elementów podczas redo:', err);
-          });
-          // 🆕 Broadcast dodania do innych użytkowników
-          addedElements.forEach(el => {
-            broadcastElementCreated(el);
-          });
-        }
-      }
-      
-      setElements([...newElements]);
-      setSelectedElementIds(new Set());
+    if (redoStack.length === 0) {
+      return;
     }
+    
+    // Zdejmij ostatnią akcję ze stosu redo
+    const lastAction = redoStack[redoStack.length - 1];
+    const newRedoStack = redoStack.slice(0, -1);
+    userRedoStackRef.current = newRedoStack;
+    setUserRedoStack(newRedoStack);
+    
+    // Przenieś akcję na stos undo
+    const newUndoStack = [...userUndoStackRef.current, lastAction];
+    userUndoStackRef.current = newUndoStack;
+    setUserUndoStack(newUndoStack);
+    
+    if (lastAction.type === 'create') {
+      // Akcja 'create' = użytkownik stworzył element → redo = PRZYWRÓĆ element
+      const elementToRestore = lastAction.element;
+      
+      // Dodaj z powrotem do lokalnego stanu
+      setElements(prev => [...prev, elementToRestore]);
+      
+      // Zapisz do bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId)) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: elementToRestore.id,
+            type: elementToRestore.type,
+            data: elementToRestore
+          }]).catch(err => {
+            console.error('❌ Błąd przywracania elementu podczas redo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementCreated(elementToRestore);
+      
+    } else if (lastAction.type === 'delete') {
+      // Akcja 'delete' = użytkownik usunął element → redo = USUŃ element ponownie
+      const elementToRemove = lastAction.element;
+      
+      // Usuń z lokalnego stanu
+      setElements(prev => prev.filter(el => el.id !== elementToRemove.id));
+      
+      // Usuń z bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId) && !unsavedElementsRef.current.has(elementToRemove.id)) {
+          deleteBoardElement(numericBoardId, elementToRemove.id).catch(err => {
+            console.error('❌ Błąd usuwania elementu podczas redo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementDeleted(elementToRemove.id);
+    }
+    
+    setSelectedElementIds(new Set());
   }, [broadcastElementDeleted, broadcastElementCreated]);
 
   // Aktualizuj refs dla undo/redo
@@ -1445,14 +1596,23 @@ Zadaj pytanie! 🤔`,
     redoRef.current = redo;
   }, [undo, redo]);
 
-  // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika
+  // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika + włącz follow mode
   const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
     console.log('👁️ Follow user:', userId, 'viewport:', userViewportX, userViewportY, userViewportScale);
+    // Ustaw początkowy viewport
     setViewport({
       x: userViewportX,
       y: userViewportY,
       scale: userViewportScale
     });
+    // Włącz follow mode - viewport będzie podążał za kursorem użytkownika
+    setFollowingUserId(userId);
+  }, []);
+
+  // 🆕 STOP FOLLOWING - wyłącz follow mode
+  const handleStopFollowing = useCallback(() => {
+    console.log('🛑 Stop following');
+    setFollowingUserId(null);
   }, []);
 
   // 🆕 CENTER VIEW ON ELEMENT - dla Activity History
@@ -1557,10 +1717,12 @@ Zadaj pytanie! 🤔`,
           id: `${el.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         }));
         
-        // Dodaj do istniejących elementów
-        const newElements = [...elements, ...importedElements];
-        setElements(newElements);
-        saveToHistory(newElements);
+        // Dodaj do istniejących elementów - używamy functional update
+        setElements(prev => {
+          const newElements = [...prev, ...importedElements];
+          saveToHistory(newElements);
+          return newElements;
+        });
         
         // Zapisz do bazy
         if (boardIdState) {
@@ -1583,7 +1745,7 @@ Zadaj pytanie! 🤔`,
     };
     
     input.click();
-  }, [elements, saveToHistory, boardIdState, debouncedSave, broadcastElementsBatch]);
+  }, [saveToHistory, boardIdState, debouncedSave, broadcastElementsBatch]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 CALLBACKI DLA NARZĘDZI - Z BROADCAST
@@ -1611,71 +1773,110 @@ Zadaj pytanie! 🤔`,
     setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
   }, []);
   
+  // 🆕 Helper: Dodaje akcję 'create' na stos użytkownika (dla undo)
+  const pushCreateAction = useCallback((element: DrawingElement) => {
+    const action = { type: 'create' as const, element };
+    setUserUndoStack(prev => [...prev, action]);
+    userUndoStackRef.current = [...userUndoStackRef.current, action];
+    // Wyczyść stos redo przy nowej akcji
+    setUserRedoStack([]);
+    userRedoStackRef.current = [];
+  }, []);
+  
+  // 🆕 Helper: Dodaje akcję 'delete' na stos użytkownika (dla undo)
+  const pushDeleteAction = useCallback((element: DrawingElement) => {
+    const action = { type: 'delete' as const, element };
+    setUserUndoStack(prev => [...prev, action]);
+    userUndoStackRef.current = [...userUndoStackRef.current, action];
+    // Wyczyść stos redo przy nowej akcji
+    setUserRedoStack([]);
+    userRedoStackRef.current = [];
+  }, []);
+  
   const handlePathCreate = useCallback((path: DrawingPath) => {
-    const newElements = [...elements, path];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => {
+      const newElements = [...prev, path];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
-    // 🆕 BROADCAST + Activity History
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(path);
     addToActivityHistory(path);
+    pushCreateAction(path);
     
     // 🆕 ZAPISYWANIE - oznacz jako unsaved i zaplanuj zapis
     setUnsavedElements(prev => new Set(prev).add(path.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleShapeCreate = useCallback((shape: Shape) => {
-    const newElements = [...elements, shape];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => {
+      const newElements = [...prev, shape];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
-    // 🆕 BROADCAST + Activity History
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(shape);
     addToActivityHistory(shape);
+    pushCreateAction(shape);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(shape.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
-    const newElements = [...elements, func];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => {
+      const newElements = [...prev, func];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
-    // 🆕 BROADCAST + Activity History
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(func);
     addToActivityHistory(func);
+    pushCreateAction(func);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(func.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleTextCreate = useCallback((text: TextElement) => {
-    const newElements = [...elements, text];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => {
+      const newElements = [...prev, text];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
-    // 🆕 BROADCAST + Activity History
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(text);
     addToActivityHistory(text);
+    pushCreateAction(text);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(text.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
-    const newElements = elements.map(el => 
-      el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-    saveToHistory(newElements);
+    let updatedElement: DrawingElement | undefined;
     
-    // 🆕 BROADCAST UPDATE
-    const updatedElement = newElements.find(el => el.id === id);
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === id) {
+          updatedElement = { ...el, ...updates } as DrawingElement;
+          return updatedElement;
+        }
+        return el;
+      });
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST UPDATE (używamy updatedElement ustawionego w setElements)
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
@@ -1683,12 +1884,21 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleTextDelete = useCallback(async (id: string) => {
-    const newElements = elements.filter(el => el.id !== id);
+    // 🆕 Zapisz element przed usunięciem (dla undo) - używamy ref
+    const currentElements = elementsRef.current;
+    const elementToDelete = currentElements.find(el => el.id === id);
+    
+    const newElements = currentElements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 User Action Stack - zapisz akcję usunięcia
+    if (elementToDelete) {
+      pushDeleteAction(elementToDelete);
+    }
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
@@ -1696,14 +1906,13 @@ Zadaj pytanie! 🤔`,
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
       // Zapisz jeśli unsaved
-      if (unsavedElements.has(id)) {
-        const elementToSave = elements.find(el => el.id === id);
-        if (elementToSave) {
+      if (unsavedElementsRef.current.has(id)) {
+        if (elementToDelete) {
           try {
             await saveBoardElementsBatch(numericBoardId, [{
-              element_id: elementToSave.id,
-              type: elementToSave.type,
-              data: elementToSave
+              element_id: elementToDelete.id,
+              type: elementToDelete.type,
+              data: elementToDelete
             }]);
           } catch (err) {
             console.error('❌ Błąd zapisywania przed usunięciem:', err);
@@ -1715,7 +1924,7 @@ Zadaj pytanie! 🤔`,
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, removeFromActivityHistory, boardIdState, unsavedElements]);
+  }, [saveToHistory, broadcastElementDeleted, removeFromActivityHistory, pushDeleteAction, boardIdState]);
 
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
@@ -1728,15 +1937,17 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleImageCreate = useCallback((image: ImageElement) => {
-    const newElements = [...elements, image];
-    setElements(newElements);
-    saveToHistory(newElements);
+    // Używamy functional update żeby uniknąć stale closure
+    setElements(prev => {
+      const newElements = [...prev, image];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
-    // 🆕 BROADCAST
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(image);
-    
-    // 🆕 ACTIVITY HISTORY
     addToActivityHistory(image);
+    pushCreateAction(image);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(image.id));
@@ -1752,7 +1963,7 @@ Zadaj pytanie! 🤔`,
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
 
 
@@ -1761,8 +1972,10 @@ Zadaj pytanie! 🤔`,
     // TYLKO setElements - bez saveToHistory (powoduje lagi)
     setElements(prev => [...prev, note]);
     
+    // 🆕 User Action Stack
     broadcastElementCreated(note);
     addToActivityHistory(note);
+    pushCreateAction(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
     if (boardIdState) debouncedSave(boardIdState);
     
@@ -1770,7 +1983,7 @@ Zadaj pytanie! 🤔`,
     setTool('select');
     setSelectedElementIds(new Set([note.id]));
     setEditingMarkdownId(note.id);
-  }, [broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
@@ -1803,28 +2016,33 @@ Zadaj pytanie! 🤔`,
     // Historia zostanie zapisana przy następnej operacji lub przy zapisie do DB
     setElements(prev => [...prev, newNote]);
     
-    // Broadcast i zapis do DB
+    // 🆕 Broadcast, Activity History i User Action Stack + zapis do DB
     broadcastElementCreated(newNote);
     addToActivityHistory(newNote);
+    pushCreateAction(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - tworzenie tabeli
   const handleTableCreate = useCallback((table: TableElement) => {
-    const newElements = [...elements, table];
-    setElements(newElements);
-    saveToHistory(newElements);
+    setElements(prev => {
+      const newElements = [...prev, table];
+      saveToHistory(newElements);
+      return newElements;
+    });
     
+    // 🆕 Activity History + User Action Stack
     broadcastElementCreated(table);
     addToActivityHistory(table);
+    pushCreateAction(table);
     setUnsavedElements(prev => new Set(prev).add(table.id));
     if (boardIdState) debouncedSave(boardIdState);
     
     // Po utworzeniu przełącz na select żeby można było edytować
     setTool('select');
     setSelectedElementIds(new Set([table.id]));
-  }, [elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - zmiana komórki tabeli
   const handleTableCellChange = useCallback((tableId: string, row: number, col: number, value: string) => {
@@ -1856,7 +2074,10 @@ Zadaj pytanie! 🤔`,
     setElements(prev => {
       const newElements = prev.map(el => {
         if (el.id === noteId && el.type === 'markdown') {
-          return { ...el, content };
+          const updatedElement = { ...el, content };
+          // 🆕 Broadcast zmianę do innych użytkowników!
+          broadcastElementUpdated(updatedElement);
+          return updatedElement;
         }
         return el;
       });
@@ -1867,16 +2088,22 @@ Zadaj pytanie! 🤔`,
       
       return newElements;
     });
-  }, [saveToHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, boardIdState, debouncedSave, broadcastElementUpdated]);
 
   // 🆕 STABILNE CALLBACKI dla MarkdownNoteView (żeby nie łamać memo!)
   const handleMarkdownEditStart = useCallback((noteId: string) => {
     setEditingMarkdownId(noteId);
-  }, []);
+    // 🆕 Broadcast: zacząłem edytować element
+    broadcastTypingStarted(noteId);
+  }, [broadcastTypingStarted]);
 
   const handleMarkdownEditEnd = useCallback(() => {
+    // 🆕 Broadcast: skończyłem edytować element
+    if (editingMarkdownId) {
+      broadcastTypingStopped(editingMarkdownId);
+    }
     setEditingMarkdownId(null);
-  }, []);
+  }, [editingMarkdownId, broadcastTypingStopped]);
 
   // handleMarkdownHeightChange usunięty - notatki mają stały rozmiar, user zmienia resize handlerem
 
@@ -1885,23 +2112,31 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleElementDelete = useCallback(async (id: string) => {
-    const newElements = elements.filter(el => el.id !== id);
+    // 🆕 Zapisz element przed usunięciem (dla undo) - używamy ref
+    const currentElements = elementsRef.current;
+    const elementToDelete = currentElements.find(el => el.id === id);
+    
+    const newElements = currentElements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 User Action Stack - zapisz akcję usunięcia
+    if (elementToDelete) {
+      pushDeleteAction(elementToDelete);
+    }
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
       // Jeśli element jest niezapisany, najpierw go zapisz
-      if (unsavedElements.has(id)) {
-        const elementToSave = elements.find(el => el.id === id);
-        if (elementToSave) {
+      if (unsavedElementsRef.current.has(id)) {
+        if (elementToDelete) {
           try {
             await saveBoardElementsBatch(numericBoardId, [{
-              element_id: elementToSave.id,
-              type: elementToSave.type,
-              data: elementToSave
+              element_id: elementToDelete.id,
+              type: elementToDelete.type,
+              data: elementToDelete
             }]);
             console.log('✅ Zapisano element przed usunięciem:', id);
           } catch (err) {
@@ -1915,7 +2150,7 @@ Zadaj pytanie! 🤔`,
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
+  }, [saveToHistory, broadcastElementDeleted, pushDeleteAction, boardIdState]);
 
   // 🆕 PARTIAL ERASE - usuwa fragment ścieżki i tworzy nowe
   const handlePathPartialErase = useCallback((pathId: string, newPaths: DrawingPath[]) => {
@@ -1971,21 +2206,27 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
-    const newElements = elements.map(el => 
+    setElements(prev => prev.map(el => 
       el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-  }, [elements]);
+    ));
+  }, []);
 
   const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
-    const newElements = elements.map(el => 
-      el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-    saveToHistory(newElements);
+    let updatedElement: DrawingElement | undefined;
+    
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === id) {
+          updatedElement = { ...el, ...updates } as DrawingElement;
+          return updatedElement;
+        }
+        return el;
+      });
+      saveToHistory(newElements);
+      return newElements;
+    });
     
     // 🆕 BROADCAST UPDATE
-    const updatedElement = newElements.find(el => el.id === id);
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
@@ -1993,22 +2234,25 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
-    const newElements = elements.map(el => {
+    setElements(prev => prev.map(el => {
       const update = updates.get(el.id);
       return update ? { ...el, ...update } as DrawingElement : el;
-    });
-    setElements(newElements);
-  }, [elements]);
+    }));
+  }, []);
 
   const handleSelectionFinish = useCallback(() => {
-    saveToHistory(elements);
+    // Używamy ref żeby mieć aktualny stan
+    const currentElements = elementsRef.current;
+    const currentSelectedIds = selectedElementIdsRef.current;
+    
+    saveToHistory(currentElements);
     
     // 🆕 BROADCAST wszystkie zmienione elementy + zapisz do bazy
-    elements.forEach(element => {
-      if (selectedElementIds.has(element.id)) {
+    currentElements.forEach(element => {
+      if (currentSelectedIds.has(element.id)) {
         broadcastElementUpdated(element);
         setUnsavedElements(prev => new Set(prev).add(element.id));
       }
@@ -2016,12 +2260,23 @@ Zadaj pytanie! 🤔`,
     
     // Zapisz do bazy
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const deleteSelectedElements = useCallback(async () => {
-    if (selectedElementIds.size === 0) return;
+    // Używamy refs żeby mieć aktualny stan
+    const currentSelectedIds = selectedElementIdsRef.current;
+    const currentElements = elementsRef.current;
+    const currentUnsaved = unsavedElementsRef.current;
     
-    const newElements = elements.filter(el => !selectedElementIds.has(el.id));
+    if (currentSelectedIds.size === 0) return;
+    
+    // 🆕 Zapisz usuwane elementy do stosu akcji użytkownika (dla undo)
+    const elementsToDelete = currentElements.filter(el => currentSelectedIds.has(el.id));
+    elementsToDelete.forEach(el => {
+      pushDeleteAction(el);
+    });
+    
+    const newElements = currentElements.filter(el => !currentSelectedIds.has(el.id));
     setElements(newElements);
     saveToHistory(newElements);
     
@@ -2029,8 +2284,8 @@ Zadaj pytanie! 🤔`,
     const numericBoardId = parseInt(boardIdState);
     
     // Najpierw zapisz wszystkie niezapisane elementy
-    const unsavedToDelete = elements.filter(el => 
-      selectedElementIds.has(el.id) && unsavedElements.has(el.id)
+    const unsavedToDelete = currentElements.filter(el => 
+      currentSelectedIds.has(el.id) && currentUnsaved.has(el.id)
     );
     
     if (unsavedToDelete.length > 0 && !isNaN(numericBoardId)) {
@@ -2048,7 +2303,7 @@ Zadaj pytanie! 🤔`,
     }
     
     // Teraz usuń z bazy i broadcast
-    selectedElementIds.forEach(id => {
+    currentSelectedIds.forEach(id => {
       broadcastElementDeleted(id);
       if (!isNaN(numericBoardId)) {
         deleteBoardElement(numericBoardId, id).catch(err => {
@@ -2058,7 +2313,7 @@ Zadaj pytanie! 🤔`,
     });
     
     setSelectedElementIds(new Set());
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted, boardIdState, unsavedElements]);
+  }, [saveToHistory, broadcastElementDeleted, pushDeleteAction, boardIdState]);
 
   // Zoom functions (bez zmian)
   const zoomInRef = useRef(() => {
@@ -2123,8 +2378,9 @@ Zadaj pytanie! 🤔`,
     handleFillShapeChangeRef.current(fill);
   }, []);
   
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
+  // 🆕 canUndo/canRedo bazują na stosie akcji użytkownika (nie starej historii)
+  const canUndo = userUndoStack.length > 0;
+  const canRedo = userRedoStack.length > 0;
 
   const getCanvasDimensions = () => {
     const canvas = canvasRef.current;
@@ -2630,10 +2886,12 @@ Zadaj pytanie! 🤔`,
           await new Promise(resolve => setTimeout(resolve, 10));
         }
         
-        // Dodaj wszystkie strony naraz
-        const newElements = [...elements, ...newImages];
-        setElements(newElements);
-        saveToHistory(newElements);
+        // Dodaj wszystkie strony naraz - używamy functional update
+        setElements(prev => {
+          const newElements = [...prev, ...newImages];
+          saveToHistory(newElements);
+          return newElements;
+        });
         
         // Broadcast i zapisywanie dla wszystkich stron
         newImages.forEach(image => {
@@ -2686,7 +2944,7 @@ Zadaj pytanie! 🤔`,
     } finally {
       setImageProcessing(false);
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, elements, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
   
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
@@ -2755,10 +3013,15 @@ Zadaj pytanie! 🤔`,
         lastY = e.clientY;
         lastMoveTime = currentTime;
         
+        // 🆕 Wyłącz follow mode gdy user sam nawiguje
+        setFollowingUserId(null);
+        
         const currentViewport = viewportRef.current;
         const newViewport = panViewportWithMouse(currentViewport, dx, dy);
+        const constrained = constrainViewport(newViewport);
         
-        setViewport(constrainViewport(newViewport));
+        viewportRef.current = constrained;
+        setViewport(constrained);
       }
     };
 
@@ -2839,11 +3102,15 @@ Zadaj pytanie! 🤔`,
       const { momentum: newMomentum, viewport: viewportChange } = updateMomentum(momentum, currentTime);
       
       if (viewportChange) {
-        setViewport(prev => constrainViewport({
-          x: prev.x + viewportChange.x,
-          y: prev.y + viewportChange.y,
-          scale: prev.scale
-        }));
+        setViewport(prev => {
+          const newViewport = constrainViewport({
+            x: prev.x + viewportChange.x,
+            y: prev.y + viewportChange.y,
+            scale: prev.scale
+          });
+          viewportRef.current = newViewport;
+          return newViewport;
+        });
       }
       
       setMomentum(newMomentum);
@@ -2913,6 +3180,19 @@ Zadaj pytanie! 🤔`,
       >
         {/* 🆕 KOMPONENT ONLINE USERS */}
         <OnlineUsers onFollowUser={handleFollowUser} />
+        
+        {/* 🆕 FOLLOW MODE INDICATOR - pasek gdy śledzimy użytkownika */}
+        {followingUserId && (
+          <div className="absolute top-20 right-4 z-50 bg-blue-500 text-white rounded-lg shadow-lg px-4 py-2 flex items-center gap-3 animate-pulse">
+            <span className="text-sm font-medium">👁️ Śledzisz użytkownika</span>
+            <button
+              onClick={handleStopFollowing}
+              className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm font-medium transition-colors"
+            >
+              Przestań śledzić
+            </button>
+          </div>
+        )}
         
         <Toolbar
           tool={tool}
@@ -3191,6 +3471,7 @@ Zadaj pytanie! 🤔`,
                   onContentChange={handleMarkdownContentChange}
                   onEditStart={handleMarkdownEditStart}
                   onEditEnd={handleMarkdownEditEnd}
+                  remoteTypingUser={typingUsers.find(t => t.elementId === note.id)?.username}
                 />
               </div>
             </div>
@@ -3256,9 +3537,8 @@ Zadaj pytanie! 🤔`,
           }}
         />
         
-        {/* 🆕 REMOTE CURSORS - Kursory innych użytkowników */}
-        <RemoteCursors
-          cursors={remoteCursors}
+        {/* 🆕 REMOTE CURSORS - Kursory innych użytkowników (sam subskrybuje - nie powoduje re-renderów!) */}
+        <RemoteCursorsContainer
           viewport={viewport}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
