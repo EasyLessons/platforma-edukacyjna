@@ -1334,9 +1334,12 @@ Zadaj pytanie! 🤔`,
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
           deletedElements.forEach(el => {
-            deleteBoardElement(numericBoardId, el.id).catch(err => {
-              console.error('❌ Błąd usuwania elementu podczas undo:', el.id, err);
-            });
+            // Tylko usuń z bazy jeśli element był zapisany (nie jest w unsavedElements)
+            if (!unsavedElementsRef.current.has(el.id)) {
+              deleteBoardElement(numericBoardId, el.id).catch(err => {
+                console.error('❌ Błąd usuwania elementu podczas undo:', el.id, err);
+              });
+            }
             // 🆕 Broadcast usunięcia do innych użytkowników
             broadcastElementDeleted(el.id);
           });
@@ -1391,9 +1394,12 @@ Zadaj pytanie! 🤔`,
         const numericBoardId = parseInt(boardIdStateRef.current);
         if (!isNaN(numericBoardId)) {
           deletedElements.forEach(el => {
-            deleteBoardElement(numericBoardId, el.id).catch(err => {
-              console.error('❌ Błąd usuwania elementu podczas redo:', el.id, err);
-            });
+            // Tylko usuń z bazy jeśli element był zapisany (nie jest w unsavedElements)
+            if (!unsavedElementsRef.current.has(el.id)) {
+              deleteBoardElement(numericBoardId, el.id).catch(err => {
+                console.error('❌ Błąd usuwania elementu podczas redo:', el.id, err);
+              });
+            }
             // 🆕 Broadcast usunięcia do innych użytkowników
             broadcastElementDeleted(el.id);
           });
