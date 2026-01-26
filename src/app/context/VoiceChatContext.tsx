@@ -186,6 +186,22 @@ const getIceServers = async (): Promise<RTCIceServer[]> => {
               xirsysServers = [...data.v.stun, ...data.v.turn]
             } else if (data.v.urls && Array.isArray(data.v.urls)) {
               xirsysServers = data.v.urls
+            } else if (data.v.iceServers) {
+              // 🎯 XIRSYS SPECIFIC FORMAT: { iceServers: { username, urls[], credential } }
+              const xirsysData = data.v.iceServers
+              if (xirsysData.urls && Array.isArray(xirsysData.urls) && xirsysData.username && xirsysData.credential) {
+                console.log('🎤 [VOICE] 🎯 Konwertuję format Xirsys na RTCIceServer')
+                
+                // Przekształć format Xirsys: { username, urls[], credential }
+                // Na standardowy: [{ urls: url1, username, credential }, { urls: url2, username, credential }]
+                xirsysServers = xirsysData.urls.map((url: string) => ({
+                  urls: url,
+                  username: xirsysData.username,
+                  credential: xirsysData.credential
+                }))
+                
+                console.log('🎤 [VOICE] ✅ Przekształcono Xirsys serwery:', xirsysServers.length)
+              }
             } else {
               // Ostatnia próba - może to są bezpośrednio serwery ICE
               const firstValue = Object.values(data.v)[0]
