@@ -136,26 +136,56 @@ const getIceServers = (): RTCIceServer[] => {
     { urls: 'stun:stun2.l.google.com:19302' },
   ]
   
-  // Jeśli masz własny TURN server (zalecane dla produkcji)
-  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL
-  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME
-  const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL
+  // ═══════════════════════════════════════════════════════════════════════════
+  // XIRSYS TURN - niezawodny, własny TURN server
+  // ═══════════════════════════════════════════════════════════════════════════
+  const xirsysIdent = process.env.NEXT_PUBLIC_XIRSYS_IDENT
+  const xirsysSecret = process.env.NEXT_PUBLIC_XIRSYS_SECRET
+  const xirsysChannel = process.env.NEXT_PUBLIC_XIRSYS_CHANNEL
   
-  if (turnUrl && turnUsername && turnCredential) {
-    console.log('🎤 [VOICE] Używam skonfigurowanego TURN servera')
+  if (xirsysIdent && xirsysSecret && xirsysChannel) {
+    console.log('🎤 [VOICE] ✅ Używam Xirsys TURN servera')
+    
+    // Xirsys używa dynamicznych credentials - username:password format
+    const xirsysUsername = `${xirsysIdent}:${xirsysChannel}`
+    const xirsysCredential = xirsysSecret
+    
+    // Typowe Xirsys TURN URLs (możesz mieć inne w regionie)
     servers.push(
-      { urls: turnUrl, username: turnUsername, credential: turnCredential },
-      { urls: turnUrl.replace(':80', ':443'), username: turnUsername, credential: turnCredential },
-      { urls: `${turnUrl}?transport=tcp`, username: turnUsername, credential: turnCredential }
+      {
+        urls: 'turn:ss-turn1.xirsys.com:80?transport=udp',
+        username: xirsysUsername,
+        credential: xirsysCredential
+      },
+      {
+        urls: 'turn:ss-turn1.xirsys.com:3478?transport=udp',
+        username: xirsysUsername,
+        credential: xirsysCredential
+      },
+      {
+        urls: 'turn:ss-turn1.xirsys.com:80?transport=tcp',
+        username: xirsysUsername,
+        credential: xirsysCredential
+      },
+      {
+        urls: 'turn:ss-turn1.xirsys.com:443?transport=tcp',
+        username: xirsysUsername,
+        credential: xirsysCredential
+      },
+      // Backup server
+      {
+        urls: 'turn:ss-turn2.xirsys.com:80?transport=udp',
+        username: xirsysUsername,
+        credential: xirsysCredential
+      }
     )
   } else {
-    // Publiczne darmowe TURN serwery
-    console.log('🎤 [VOICE] Używam publicznych TURN serwerów')
+    // ═══════════════════════════════════════════════════════════════════════════
+    // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
+    // ═══════════════════════════════════════════════════════════════════════════
+    console.log('🎤 [VOICE] ⚠️ Brak Xirsys - używam publicznych TURN')
     servers.push(
-      // ══════════════════════════════════════════════════════════════
       // NUMB (viagenie.ca) - darmowy publiczny TURN
-      // Jeśli nie działa, zarejestruj się na https://numb.viagenie.ca/
-      // ══════════════════════════════════════════════════════════════
       {
         urls: 'turn:numb.viagenie.ca:3478',
         username: 'webrtc@live.com',
@@ -166,16 +196,9 @@ const getIceServers = (): RTCIceServer[] => {
         username: 'webrtc@live.com',
         credential: 'muazkh'
       },
-      // ══════════════════════════════════════════════════════════════
       // OpenRelay (metered.ca) - backup
-      // ══════════════════════════════════════════════════════════════
       {
         urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
         username: 'openrelayproject',
         credential: 'openrelayproject'
       },
@@ -183,14 +206,6 @@ const getIceServers = (): RTCIceServer[] => {
         urls: 'turn:openrelay.metered.ca:443?transport=tcp',
         username: 'openrelayproject',
         credential: 'openrelayproject'
-      },
-      // ══════════════════════════════════════════════════════════════
-      // Twilio TURN test (publiczne, może przestać działać)
-      // ══════════════════════════════════════════════════════════════
-      {
-        urls: 'turn:global.turn.twilio.com:3478?transport=udp',
-        username: 'demo',
-        credential: 'demo'
       }
     )
   }
