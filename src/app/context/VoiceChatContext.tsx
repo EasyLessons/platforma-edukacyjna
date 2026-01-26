@@ -128,7 +128,7 @@ const DEFAULT_SETTINGS: VoiceSettings = {
 // Ustaw credentials w env variables:
 // NEXT_PUBLIC_TURN_URL, NEXT_PUBLIC_TURN_USERNAME, NEXT_PUBLIC_TURN_CREDENTIAL
 
-const getIceServers = (): RTCIceServer[] => {
+const getIceServers = async (): Promise<RTCIceServer[]> => {
   const servers: RTCIceServer[] = [
     // STUN servers (darmowe, do odkrywania publicznego IP)
     { urls: 'stun:stun.l.google.com:19302' },
@@ -137,86 +137,96 @@ const getIceServers = (): RTCIceServer[] => {
   ]
   
   // ═══════════════════════════════════════════════════════════════════════════
-  // XIRSYS TURN - niezawodny, własny TURN server
+  // XIRSYS TURN - pobierz aktualne serwery z API
   // ═══════════════════════════════════════════════════════════════════════════
   const xirsysIdent = process.env.NEXT_PUBLIC_XIRSYS_IDENT
   const xirsysSecret = process.env.NEXT_PUBLIC_XIRSYS_SECRET
   const xirsysChannel = process.env.NEXT_PUBLIC_XIRSYS_CHANNEL
   
   if (xirsysIdent && xirsysSecret && xirsysChannel) {
-    console.log('🎤 [VOICE] ✅ Używam Xirsys TURN servera')
-    
-    // Xirsys używa dynamicznych credentials - username:password format
-    const xirsysUsername = `${xirsysIdent}:${xirsysChannel}`
-    const xirsysCredential = xirsysSecret
-    
-    // Typowe Xirsys TURN URLs (możesz mieć inne w regionie)
-    servers.push(
-      {
-        urls: 'turn:ss-turn1.xirsys.com:80?transport=udp',
-        username: xirsysUsername,
-        credential: xirsysCredential
-      },
-      {
-        urls: 'turn:ss-turn1.xirsys.com:3478?transport=udp',
-        username: xirsysUsername,
-        credential: xirsysCredential
-      },
-      {
-        urls: 'turn:ss-turn1.xirsys.com:80?transport=tcp',
-        username: xirsysUsername,
-        credential: xirsysCredential
-      },
-      {
-        urls: 'turn:ss-turn1.xirsys.com:443?transport=tcp',
-        username: xirsysUsername,
-        credential: xirsysCredential
-      },
-      // Backup server
-      {
-        urls: 'turn:ss-turn2.xirsys.com:80?transport=udp',
-        username: xirsysUsername,
-        credential: xirsysCredential
+    try {
+      console.log('🎤 [VOICE] 🔍 Pobieram serwery TURN z Xirsys API...')
+      
+      const auth = btoa(`${xirsysIdent}:${xirsysSecret}`)
+      
+      const response = await fetch(`https://global.xirsys.net/_turn/${xirsysChannel}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ format: 'urls' })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log('🎤 [VOICE] ✅ Xirsys API response:', data)
+        
+        if (data.s === 'ok' && data.v && data.v.iceServers) {
+          console.log('🎤 [VOICE] ✅ Dodaję serwery Xirsys:', data.v.iceServers.length)
+          servers.push(...data.v.iceServers)
+          return servers
+        } else {
+          console.error('🎤 [VOICE] ❌ Xirsys API error:', data)
+        }
+      } else {
+        console.error('🎤 [VOICE] ❌ Xirsys API HTTP error:', response.status, response.statusText)
       }
-    )
-  } else {
-    // ═══════════════════════════════════════════════════════════════════════════
-    // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
-    // ═══════════════════════════════════════════════════════════════════════════
-    console.log('🎤 [VOICE] ⚠️ Brak Xirsys - używam publicznych TURN')
-    servers.push(
-      // NUMB (viagenie.ca) - darmowy publiczny TURN
-      {
-        urls: 'turn:numb.viagenie.ca:3478',
-        username: 'webrtc@live.com',
-        credential: 'muazkh'
-      },
-      {
-        urls: 'turn:numb.viagenie.ca:3478?transport=tcp',
-        username: 'webrtc@live.com',
-        credential: 'muazkh'
-      },
-      // OpenRelay (metered.ca) - backup
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
-    )
+    } catch (error) {
+      console.error('🎤 [VOICE] ❌ Xirsys API fetch error:', error)
+    }
   }
+  
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('🎤 [VOICE] ⚠️ Używam fallback TURN serwerów')
+  servers.push(
+    // NUMB (viagenie.ca) - darmowy publiczny TURN
+    {
+      urls: 'turn:numb.viagenie.ca:3478',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
+    },
+    {
+      urls: 'turn:numb.viagenie.ca:3478?transport=tcp',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
+    },
+    // OpenRelay (metered.ca) - backup
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    }
+  )
   
   return servers
 }
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: getIceServers(),
+// Tymczasowy sync fallback dla inicjalizacji
+const getBasicIceServers = (): RTCIceServer[] => {
+  return [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+    // Fallback TURN
+    {
+      urls: 'turn:numb.viagenie.ca:3478',
+      username: 'webrtc@live.com',
+      credential: 'muazkh'
+    }
+  ]
+}
+
+const RTC_CONFIG_BASIC: RTCConfiguration = {
+  iceServers: getBasicIceServers(),
   iceCandidatePoolSize: 10,
-  iceTransportPolicy: 'all' // 'relay' wymusi TURN (do testowania)
+  iceTransportPolicy: 'all'
 }
 
 export function VoiceChatProvider({
@@ -432,9 +442,18 @@ export function VoiceChatProvider({
     if (!user || !localStreamRef.current) return
     
     console.log(`🎤 [VOICE] Tworzę połączenie z ${remoteUsername} (initiator: ${isInitiator})`)
-    console.log(`🎤 [VOICE] ICE Servers:`, RTC_CONFIG.iceServers?.map(s => typeof s.urls === 'string' ? s.urls : s.urls[0]))
     
-    const pc = new RTCPeerConnection(RTC_CONFIG)
+    // Pobierz aktualne ICE servers (w tym Xirsys z API)
+    const iceServers = await getIceServers()
+    const rtcConfig: RTCConfiguration = {
+      iceServers,
+      iceCandidatePoolSize: 10,
+      iceTransportPolicy: 'all'
+    }
+    
+    console.log(`🎤 [VOICE] ICE Servers:`, iceServers.map(s => s.urls))
+    
+    const pc = new RTCPeerConnection(rtcConfig)
     
     // Dodaj lokalny stream
     localStreamRef.current.getTracks().forEach(track => {
