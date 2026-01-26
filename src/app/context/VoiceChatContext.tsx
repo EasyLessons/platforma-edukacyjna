@@ -68,6 +68,7 @@ type VoiceEvent =
   | { type: 'voice-join'; userId: number; username: string }
   | { type: 'voice-leave'; userId: number }
   | { type: 'voice-sync'; userId: number; username: string; isMuted: boolean } // Odpowiedź "jestem w voice chat"
+  | { type: 'voice-request-sync'; userId: number } // Prośba o sync od nowego użytkownika
   | { type: 'voice-offer'; fromUserId: number; fromUsername: string; toUserId: number; offer: RTCSessionDescriptionInit }
   | { type: 'voice-answer'; fromUserId: number; toUserId: number; answer: RTCSessionDescriptionInit }
   | { type: 'voice-ice'; fromUserId: number; toUserId: number; candidate: RTCIceCandidateInit }
@@ -114,42 +115,93 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   echoCancellation: true
 }
 
-// WebRTC configuration (STUN + TURN servers for NAT traversal)
-// TURN jest wymagany gdy użytkownicy są za symetrycznym NAT (większość sieci domowych)
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
+// ═══════════════════════════════════════════════════════════════════════════
+// 🌐 WEBRTC ICE SERVERS CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════
+// 
+// WAŻNE: Dla produkcji potrzebujesz WŁASNEGO TURN servera!
+// Darmowe opcje:
+// 1. Metered.ca (500MB/mies free) - https://www.metered.ca/stun-turn
+// 2. Twilio (płatne ale niezawodne)
+// 3. Self-hosted coturn
+//
+// Ustaw credentials w env variables:
+// NEXT_PUBLIC_TURN_URL, NEXT_PUBLIC_TURN_USERNAME, NEXT_PUBLIC_TURN_CREDENTIAL
+
+const getIceServers = (): RTCIceServer[] => {
+  const servers: RTCIceServer[] = [
     // STUN servers (darmowe, do odkrywania publicznego IP)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    // Darmowe TURN servers od OpenRelay (relay gdy P2P nie działa)
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject'
-    },
-    // Dodatkowe publiczne TURN (backup)
-    {
-      urls: 'turn:relay.metered.ca:80',
-      username: 'e8dd65b92a6c9d5e9c8f8b1a',
-      credential: 'kxHVpGsrVxLgJLGS'
-    },
-    {
-      urls: 'turn:relay.metered.ca:443',
-      username: 'e8dd65b92a6c9d5e9c8f8b1a',
-      credential: 'kxHVpGsrVxLgJLGS'
-    }
-  ],
-  iceCandidatePoolSize: 10
+    { urls: 'stun:stun2.l.google.com:19302' },
+  ]
+  
+  // Jeśli masz własny TURN server (zalecane dla produkcji)
+  const turnUrl = process.env.NEXT_PUBLIC_TURN_URL
+  const turnUsername = process.env.NEXT_PUBLIC_TURN_USERNAME
+  const turnCredential = process.env.NEXT_PUBLIC_TURN_CREDENTIAL
+  
+  if (turnUrl && turnUsername && turnCredential) {
+    console.log('🎤 [VOICE] Używam skonfigurowanego TURN servera')
+    servers.push(
+      { urls: turnUrl, username: turnUsername, credential: turnCredential },
+      { urls: turnUrl.replace(':80', ':443'), username: turnUsername, credential: turnCredential },
+      { urls: `${turnUrl}?transport=tcp`, username: turnUsername, credential: turnCredential }
+    )
+  } else {
+    // Publiczne darmowe TURN serwery
+    console.log('🎤 [VOICE] Używam publicznych TURN serwerów')
+    servers.push(
+      // ══════════════════════════════════════════════════════════════
+      // NUMB (viagenie.ca) - darmowy publiczny TURN
+      // Jeśli nie działa, zarejestruj się na https://numb.viagenie.ca/
+      // ══════════════════════════════════════════════════════════════
+      {
+        urls: 'turn:numb.viagenie.ca:3478',
+        username: 'webrtc@live.com',
+        credential: 'muazkh'
+      },
+      {
+        urls: 'turn:numb.viagenie.ca:3478?transport=tcp',
+        username: 'webrtc@live.com',
+        credential: 'muazkh'
+      },
+      // ══════════════════════════════════════════════════════════════
+      // OpenRelay (metered.ca) - backup
+      // ══════════════════════════════════════════════════════════════
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      // ══════════════════════════════════════════════════════════════
+      // Twilio TURN test (publiczne, może przestać działać)
+      // ══════════════════════════════════════════════════════════════
+      {
+        urls: 'turn:global.turn.twilio.com:3478?transport=udp',
+        username: 'demo',
+        credential: 'demo'
+      }
+    )
+  }
+  
+  return servers
+}
+
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: getIceServers(),
+  iceCandidatePoolSize: 10,
+  iceTransportPolicy: 'all' // 'relay' wymusi TURN (do testowania)
 }
 
 export function VoiceChatProvider({
@@ -265,6 +317,27 @@ export function VoiceChatProvider({
         
         // Jeśli jeszcze nie mamy połączenia P2P, nie twórz - to initiator (voice-join) utworzy
       })
+      // Obsługa voice-request-sync - ktoś prosi o informację kto jest w voice chat
+      .on('broadcast', { event: 'voice-request-sync' }, ({ payload }) => {
+        const { userId: requestingUserId } = payload as VoiceEvent & { type: 'voice-request-sync' }
+        if (requestingUserId === user.id) return
+        
+        // Jeśli my jesteśmy w voice chat, odpowiedz voice-sync
+        if (isInVoiceChatRef.current && localStreamRef.current) {
+          console.log(`🎤 [VOICE] Odpowiadam na request-sync od user ${requestingUserId}`)
+          
+          channel.send({
+            type: 'broadcast',
+            event: 'voice-sync',
+            payload: {
+              type: 'voice-sync',
+              userId: user.id,
+              username: user.username,
+              isMuted: isMutedRef.current
+            }
+          })
+        }
+      })
       .on('broadcast', { event: 'voice-leave' }, ({ payload }) => {
         const { userId } = payload as VoiceEvent & { type: 'voice-leave' }
         if (userId === user.id) return
@@ -344,6 +417,7 @@ export function VoiceChatProvider({
     if (!user || !localStreamRef.current) return
     
     console.log(`🎤 [VOICE] Tworzę połączenie z ${remoteUsername} (initiator: ${isInitiator})`)
+    console.log(`🎤 [VOICE] ICE Servers:`, RTC_CONFIG.iceServers?.map(s => typeof s.urls === 'string' ? s.urls : s.urls[0]))
     
     const pc = new RTCPeerConnection(RTC_CONFIG)
     
@@ -367,10 +441,19 @@ export function VoiceChatProvider({
       }
     }
     
-    // ICE candidates
+    // ICE candidates - WAŻNE: relay = TURN działa!
     pc.onicecandidate = (event) => {
       if (event.candidate) {
-        console.log(`🎤 [VOICE] 🧊 ICE candidate: ${event.candidate.type} (${event.candidate.protocol})`)
+        const candidateType = event.candidate.type // host, srflx, relay
+        const protocol = event.candidate.protocol
+        
+        // relay = TURN server, to jest potrzebne dla różnych sieci!
+        if (candidateType === 'relay') {
+          console.log(`🎤 [VOICE] 🧊✅ RELAY candidate (TURN działa!): ${protocol}`)
+        } else {
+          console.log(`🎤 [VOICE] 🧊 ICE candidate: ${candidateType} (${protocol})`)
+        }
+        
         if (channelRef.current) {
           channelRef.current.send({
             type: 'broadcast',
@@ -588,6 +671,35 @@ export function VoiceChatProvider({
         ...prev,
         { odUserId: user.id, username: user.username, isSpeaking: false, isMuted: false, volume: 1 }
       ])
+      
+      // Po krótkim opóźnieniu wyślij request-sync żeby upewnić się że dostaniemy info o obecnych
+      // (voice-join może nie dotrzeć jeśli kanał nie był jeszcze w pełni gotowy)
+      setTimeout(() => {
+        console.log('🎤 [VOICE] Wysyłam voice-request-sync...')
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'voice-request-sync',
+          payload: {
+            type: 'voice-request-sync',
+            userId: user.id
+          }
+        })
+      }, 500) // 500ms opóźnienia żeby kanał był gotowy
+      
+      // Drugi request po dłuższym czasie jako backup
+      setTimeout(() => {
+        if (isInVoiceChatRef.current) {
+          console.log('🎤 [VOICE] Wysyłam ponowny voice-request-sync (backup)...')
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'voice-request-sync',
+            payload: {
+              type: 'voice-request-sync',
+              userId: user.id
+            }
+          })
+        }
+      }, 1500) // 1.5s jako backup
       
       console.log('🎤 [VOICE] Dołączono do voice chat!')
       
