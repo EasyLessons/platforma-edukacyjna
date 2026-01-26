@@ -161,11 +161,29 @@ const getIceServers = async (): Promise<RTCIceServer[]> => {
       if (response.ok) {
         const data = await response.json()
         console.log('🎤 [VOICE] ✅ Xirsys API response:', data)
+        console.log('🎤 [VOICE] 📊 data.v:', data.v)
+        console.log('🎤 [VOICE] 🏷️ typeof data.v:', typeof data.v)
         
-        if (data.s === 'ok' && data.v && data.v.iceServers) {
-          console.log('🎤 [VOICE] ✅ Dodaję serwery Xirsys:', data.v.iceServers.length)
-          servers.push(...data.v.iceServers)
-          return servers
+        if (data.s === 'ok' && data.v) {
+          // Xirsys API może zwracać różne formaty
+          let xirsysServers = []
+          
+          if (data.v.iceServers && Array.isArray(data.v.iceServers)) {
+            // Format 1: { v: { iceServers: [...] } }
+            xirsysServers = data.v.iceServers
+          } else if (Array.isArray(data.v)) {
+            // Format 2: { v: [...] } - bezpośrednio array
+            xirsysServers = data.v
+          } else {
+            console.error('🎤 [VOICE] ❌ Nieznany format Xirsys response:', data.v)
+          }
+          
+          if (xirsysServers.length > 0) {
+            console.log('🎤 [VOICE] ✅ Dodaję serwery Xirsys:', xirsysServers.length)
+            console.log('🎤 [VOICE] 📋 Xirsys servers:', xirsysServers)
+            servers.push(...xirsysServers)
+            return servers
+          }
         } else {
           console.error('🎤 [VOICE] ❌ Xirsys API error:', data)
         }
