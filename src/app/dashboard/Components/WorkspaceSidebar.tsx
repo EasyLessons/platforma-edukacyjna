@@ -34,6 +34,7 @@ import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { setActiveWorkspace } from '@/workspace_api/api';
 import WorkspaceSettingsModal from './WorkspaceSettingsModal';
+import WorkspaceMembersModal from './WorkspaceMembersModal';
 
 // Mapowanie ikon z nazw na komponenty
 const iconMap: Record<string, any> = {
@@ -697,19 +698,17 @@ export default function WorkspaceSidebar() {
 
                         {isHovered && (
                           <div className="flex items-center gap-1">
-                            {/* Przycisk ustawień (edycja ikony, koloru, nazwy) - tylko dla właściciela */}
-                            {space.is_owner && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenEditModal(space);
-                                }}
-                                className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
-                                title="Ustawienia przestrzeni"
-                              >
-                                <Settings size={14} className="text-gray-600 hover:text-blue-600" />
-                              </button>
-                            )}
+                            {/* Przycisk ustawień - dostępny dla wszystkich, ale edycja tylko dla właściciela */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenEditModal(space);
+                              }}
+                              className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                              title="Ustawienia przestrzeni"
+                            >
+                              <Settings size={14} className="text-gray-600 hover:text-blue-600" />
+                            </button>
 
                             <button
                               onClick={(e) => {
@@ -806,17 +805,20 @@ export default function WorkspaceSidebar() {
         mode="create"
       />
 
-      {/* Modal edycji przestrzeni */}
-      <WorkspaceSettingsModal
-        isOpen={showEditModal}
-        onClose={() => {
-          setShowEditModal(false);
-          setEditingWorkspace(null);
-        }}
-        onSave={handleUpdateWorkspace}
-        mode="edit"
-        initialData={editingWorkspace || undefined}
-      />
+      {/* Modal edycji przestrzeni - z zakładkami (ustawienia + uczestnicy) */}
+      {editingWorkspace && (
+        <WorkspaceMembersModal
+          isOpen={showEditModal}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingWorkspace(null);
+          }}
+          onSave={handleUpdateWorkspace}
+          workspaceId={editingWorkspace.id}
+          isOwner={workspaces.find(ws => ws.id === editingWorkspace.id)?.is_owner || false}
+          initialData={editingWorkspace}
+        />
+      )}
 
       {/* POPUP - Usuń przestrzeń (tylko dla owner) */}
       {showDeleteConfirm && (

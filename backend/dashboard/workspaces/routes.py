@@ -23,6 +23,8 @@ from .schemas import (
     InviteResponse,
     InviteCreate,
     PendingInviteResponse,
+    WorkspaceMembersListResponse,
+    UpdateMemberRoleRequest,
 )
 from .service import (
     get_user_workspaces,
@@ -35,6 +37,10 @@ from .service import (
     get_user_pending_invites,
     accept_invite,
     reject_invite,
+    get_workspace_members,
+    remove_workspace_member,
+    update_member_role,
+    get_user_role_in_workspace,
 )
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -238,3 +244,97 @@ async def check_user_membership(
         "has_pending_invite": has_pending_invite,
         "can_invite": not is_member and not has_pending_invite
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 👥 ENDPOINTY CZŁONKÓW WORKSPACE'A
+# ═══════════════════════════════════════════════════════════════════════════
+
+@router.get("/{workspace_id}/members", response_model=WorkspaceMembersListResponse)
+async def get_members(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Pobiera listę wszystkich członków workspace'a
+    
+    DOSTĘP:
+    - Każdy członek workspace'a może zobaczyć listę członków
+    
+    ZWRACA:
+    Lista członków z ich rolami i datą dołączenia
+    """
+    return get_workspace_members(db, workspace_id, current_user.id)
+
+
+@router.delete("/{workspace_id}/members/{user_id}", status_code=status.HTTP_200_OK)
+async def remove_member(
+    workspace_id: int,
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Usuwa członka z workspace'a
+    
+    DOSTĘP:
+    - Tylko WŁAŚCICIEL workspace'a może usuwać członków
+    - Właściciel NIE może usunąć samego siebie
+    
+    PARAMETRY:
+    - workspace_id: ID workspace'a
+    - user_id: ID użytkownika do usunięcia
+    """
+    return remove_workspace_member(db, workspace_id, user_id, current_user.id)
+
+
+@router.patch("/{workspace_id}/members/{user_id}/role", status_code=status.HTTP_200_OK)
+async def update_member_role_endpoint(
+    workspace_id: int,
+    user_id: int,
+    role_data: UpdateMemberRoleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Zmienia rolę członka workspace'a
+    
+    DOSTĘP:
+    - Tylko WŁAŚCICIEL workspace'a może zmieniać role
+    - Właściciel NIE może zmienić własnej roli
+    
+    PARAMETRY:
+    - workspace_id: ID workspace'a
+    - user_id: ID użytkownika którego rolę zmieniamy
+    - role_data: {"role": "owner" | "editor" | "viewer"}
+    
+    ROLE:
+    - owner: Pełne uprawnienia (twórca)
+    - editor: Może edytować tablice (rysować, dodawać elementy)
+    - viewer: Tylko przeglądanie (nie może rysować, toolbar zablokowany)
+    """
+    return update_member_role(db, workspace_id, user_id, role_data.role, current_user.id)
+
+
+@router.get("/{workspace_id}/my-role", status_code=status.HTTP_200_OK)
+async def get_my_role_in_workspace(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Pobiera własną rolę w workspace'ie
+    
+    ZWRACA:
+    {
+      "role": "editor",
+      "is_owner": false,
+      "workspace_id": 123
+    }
+    
+    UŻYWANE DO:
+    - Sprawdzenie uprawnień przed pokazaniem tablicy
+    - Blokada toolbara dla "viewer"
+    """
+    return get_user_role_in_workspace(db, workspace_id, current_user.id)

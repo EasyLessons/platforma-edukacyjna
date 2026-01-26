@@ -75,6 +75,8 @@ interface ToolbarProps {
   // 🧮 Calculator toggle
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
+  // 🔒 Read-only mode
+  isReadOnly?: boolean;
 }
 
 function Toolbar({
@@ -107,6 +109,7 @@ function Toolbar({
   onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
+  isReadOnly = false,
 }: ToolbarProps) {
   // 🔴 USUNIĘTE - handleGenerateFunction i functionExpression nie są już potrzebne
   // FunctionTool sam tworzy funkcje i ma własny input
@@ -142,6 +145,7 @@ function Toolbar({
         onPDFUpload={onPDFUpload}
         isCalculatorOpen={isCalculatorOpen}
         onCalculatorToggle={onCalculatorToggle}
+        isReadOnly={isReadOnly}
       />
     </div>
   );
@@ -159,7 +163,8 @@ const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
     prevProps.canUndo === nextProps.canUndo &&
     prevProps.canRedo === nextProps.canRedo &&
     prevProps.hasSelection === nextProps.hasSelection &&
-    prevProps.isCalculatorOpen === nextProps.isCalculatorOpen
+    prevProps.isCalculatorOpen === nextProps.isCalculatorOpen &&
+    prevProps.isReadOnly === nextProps.isReadOnly
   );
 };
 

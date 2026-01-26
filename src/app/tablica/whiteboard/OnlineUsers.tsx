@@ -23,6 +23,7 @@ import { useState } from 'react'
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext'
 import { useAuth } from '@/app/context/AuthContext'
 import { Plus, Check, Eye } from 'lucide-react'
+import VoiceChat from './VoiceChat'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)
@@ -55,9 +56,10 @@ const getInitials = (username: string) => {
 
 interface OnlineUsersProps {
   onFollowUser?: (userId: number, viewportX: number, viewportY: number, viewportScale: number) => void
+  userRole?: 'owner' | 'editor' | 'viewer' // 🆕 Rola użytkownika
 }
 
-export function OnlineUsers({ onFollowUser }: OnlineUsersProps) {
+export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
   const { onlineUsers, isConnected } = useBoardRealtime()
   const { user: currentUser } = useAuth()
   const [linkCopied, setLinkCopied] = useState(false)
@@ -87,6 +89,12 @@ export function OnlineUsers({ onFollowUser }: OnlineUsersProps) {
   return (
     <div className="absolute top-4 right-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
       <div className="flex items-center gap-3">
+        {/* 🆕 VOICE CHAT - obok listy online */}
+        <VoiceChat />
+        
+        {/* Separator */}
+        <div className="w-px h-6 bg-gray-300"></div>
+        
         {/* Status połączenia */}
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -162,7 +170,7 @@ export function OnlineUsers({ onFollowUser }: OnlineUsersProps) {
                   z-50
                 ">
                   {onlineUser.username}
-                  {isCurrentUser && ' (Ty)'}
+                  {isCurrentUser && userRole && ` (${userRole})`}
                   {!isCurrentUser && hasViewport && ' - Przejdź do widoku'}
                 </div>
               </div>

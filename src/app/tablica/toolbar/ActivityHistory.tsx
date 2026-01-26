@@ -67,7 +67,8 @@ interface ActivityGroup {
 interface ActivityHistoryProps {
   elements: BoardElementWithAuthor[];
   currentUserId?: number;
-  onCenterView: (x: number, y: number, scale?: number) => void;
+  onCenterView: (x: number, y: number, scale?: number, bounds?: {minX: number, minY: number, maxX: number, maxY: number}) => void;
+  onSelectElements?: (elementIds: string[]) => void; // 🆕 Zaznacz elementy
   viewport: ViewportTransform;
 }
 
@@ -299,7 +300,7 @@ const ActivityGroupItem = memo(({
 }: { 
   group: ActivityGroup; 
   currentUserId?: number;
-  onShow: (centerX: number, centerY: number) => void;
+  onShow: (group: ActivityGroup) => void;
 }) => {
   const isCurrentUser = currentUserId && group.authorId === currentUserId;
   
@@ -312,10 +313,10 @@ const ActivityGroupItem = memo(({
     }
     return counts;
   }, [group.elements]);
-
-  const handleShow = useCallback(() => {
-    onShow(group.bounds.centerX, group.bounds.centerY);
-  }, [onShow, group.bounds.centerX, group.bounds.centerY]);
+  
+  const handleShow = () => {
+    onShow(group);
+  };
 
   return (
     <div className="px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0">
@@ -378,6 +379,7 @@ const ActivityHistoryComponent = ({
   elements,
   currentUserId,
   onCenterView,
+  onSelectElements,
   viewport
 }: ActivityHistoryProps) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -387,13 +389,21 @@ const ActivityHistoryComponent = ({
     return groupElementsByAuthorAndTime(elements);
   }, [elements]);
 
-  // Handler "Pokaż" - centruje widok na grupie
-  const handleShow = useCallback((centerX: number, centerY: number) => {
-    // viewport.x i viewport.y to współrzędne "world" na środku ekranu
-    // Więc żeby element był na środku, ustawiamy viewport.x/y na pozycję elementu
-    onCenterView(centerX, centerY, viewport.scale);
+  // Handler "Pokaż" - centruje widok na grupie i zaznacza elementy
+  const handleShow = useCallback((group: ActivityGroup) => {
+    const { centerX, centerY, minX, minY, maxX, maxY } = group.bounds;
+    
+    // Wycentruj widok
+    onCenterView(centerX, centerY, viewport.scale, { minX, minY, maxX, maxY });
+    
+    // Zaznacz elementy z tej grupy
+    if (onSelectElements) {
+      const elementIds = group.elements.map(el => el.element_id);
+      onSelectElements(elementIds);
+    }
+    
     setIsOpen(false);
-  }, [onCenterView, viewport.scale]);
+  }, [onCenterView, onSelectElements, viewport.scale]);
 
   const toggleOpen = useCallback(() => {
     setIsOpen(prev => !prev);

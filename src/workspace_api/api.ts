@@ -726,6 +726,156 @@ export const rejectInvite = async (token: string): Promise<any> => {
   return handleResponse(response);
 };
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 👥 CZŁONKOWIE WORKSPACE'A
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * Informacje o pojedynczym członku workspace'a
+ */
+export interface WorkspaceMember {
+  id: number;           // ID członkostwa
+  user_id: number;
+  username: string;
+  email: string;
+  full_name?: string;
+  role: string;         // "owner" lub "member"
+  joined_at: string;    // ISO date string
+  is_owner: boolean;
+}
+
+/**
+ * Odpowiedź z listą członków workspace'a
+ */
+export interface WorkspaceMembersResponse {
+  members: WorkspaceMember[];
+  total: number;
+}
+
+/**
+ * Pobiera listę członków workspace'a
+ * 
+ * ENDPOINT:
+ * GET /api/workspaces/{workspace_id}/members
+ * 
+ * ZWRACA:
+ * Lista członków z ich rolami
+ */
+export const fetchWorkspaceMembers = async (workspaceId: number): Promise<WorkspaceMembersResponse> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/members`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Usuwa członka z workspace'a (tylko właściciel)
+ * 
+ * ENDPOINT:
+ * DELETE /api/workspaces/{workspace_id}/members/{user_id}
+ * 
+ * PARAMETRY:
+ * - workspaceId: ID workspace'a
+ * - userId: ID użytkownika do usunięcia
+ */
+export const removeWorkspaceMember = async (workspaceId: number, userId: number): Promise<{message: string}> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/members/${userId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Zmienia rolę członka workspace'a (tylko właściciel)
+ * 
+ * ENDPOINT:
+ * PATCH /api/workspaces/{workspace_id}/members/{user_id}/role
+ * 
+ * PARAMETRY:
+ * - workspaceId: ID workspace'a
+ * - userId: ID użytkownika
+ * - role: "owner", "editor", lub "viewer"
+ */
+export const updateMemberRole = async (workspaceId: number, userId: number, role: 'owner' | 'editor' | 'viewer'): Promise<{message: string; new_role: string}> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/members/${userId}/role`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ role })
+    }
+  );
+  
+  return handleResponse(response);
+};
+
+/**
+ * Pobiera własną rolę w workspace'ie
+ * 
+ * ENDPOINT:
+ * GET /api/workspaces/{workspace_id}/my-role
+ * 
+ * ZWRACA:
+ * { role: "editor", is_owner: false, workspace_id: 123 }
+ */
+export const getMyRoleInWorkspace = async (workspaceId: number): Promise<{role: string; is_owner: boolean; workspace_id: number}> => {
+  const token = getToken();
+  
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+  
+  const response = await fetch(
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/my-role`,
+    {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return handleResponse(response);
+};
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  * 📚 PODSUMOWANIE FUNKCJI

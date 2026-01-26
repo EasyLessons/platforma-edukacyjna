@@ -136,12 +136,18 @@ interface WhiteboardCanvasProps {
   className?: string;
   boardId: string; // 🆕 boardId z URL params (page.tsx)
   arkuszPath?: string | null; // 🆕 ścieżka do folderu z arkuszem PDF
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
-export default function WhiteboardCanvas({ className = '', boardId, arkuszPath }: WhiteboardCanvasProps) {
+export default function WhiteboardCanvas({ className = '', boardId, arkuszPath, userRole = 'editor' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
+  
+  // Debug userRole
+  useEffect(() => {
+    console.log('🔐 WhiteboardCanvas otrzymał userRole:', userRole);
+  }, [userRole]);
   
   // 🆕 boardId pochodzi z props (przekazany z page.tsx)
   // Automatycznie aktualizuje się gdy URL się zmienia
@@ -270,6 +276,14 @@ Zadaj pytanie! 🤔`,
   const userRedoStackRef = useRef<UserAction[]>([]);
   
   const [imageProcessing, setImageProcessing] = useState(false);
+  
+  // Wymuszenie pan dla viewera
+  useEffect(() => {
+    if (userRole === 'viewer' && tool !== 'pan') {
+      setTool('pan');
+      console.log('🔒 Viewer - wymuszono narzędzie pan');
+    }
+  }, [userRole, tool]);
   
   const redrawCanvasRef = useRef<() => void>(() => {});
   const handleGlobalPasteImageRef = useRef<() => Promise<boolean>>(async () => false);
@@ -1616,12 +1630,36 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   // 🆕 CENTER VIEW ON ELEMENT - dla Activity History
-  const handleCenterViewOnElement = useCallback((targetX: number, targetY: number, scale?: number) => {
+  const handleCenterViewAndSelectElements = useCallback((targetX: number, targetY: number, scale?: number, bounds?: {minX: number, minY: number, maxX: number, maxY: number}, elementIds?: string[]) => {
+    console.log('🎯 handleCenterViewAndSelectElements wywołane:', {
+      targetX,
+      targetY,
+      scale,
+      bounds,
+      elementIds,
+      currentViewport: viewport
+    });
+    
     setViewport(prev => ({
       x: targetX,
       y: targetY,
       scale: scale ?? prev.scale
     }));
+    
+    // Zaznacz elementy jeśli IDs są przekazane
+    if (elementIds && elementIds.length > 0) {
+      console.log('✅ Zaznaczam elementy:', elementIds);
+      setSelectedElementIds(new Set(elementIds));
+      // Zmień tool na select żeby pokazać zaznaczenie
+      setTool('select');
+    }
+  }, [viewport]);
+  
+  // Handler dla ActivityHistory - tylko zaznaczanie elementów
+  const handleSelectElementsFromHistory = useCallback((elementIds: string[]) => {
+    console.log('📝 Zaznaczam elementy z historii:', elementIds);
+    setSelectedElementIds(new Set(elementIds));
+    setTool('select');
   }, []);
 
   const clearCanvas = useCallback(async () => {
@@ -1794,6 +1832,8 @@ Zadaj pytanie! 🤔`,
   }, []);
   
   const handlePathCreate = useCallback((path: DrawingPath) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = [...prev, path];
       saveToHistory(newElements);
@@ -1808,9 +1848,11 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE - oznacz jako unsaved i zaplanuj zapis
     setUnsavedElements(prev => new Set(prev).add(path.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleShapeCreate = useCallback((shape: Shape) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = [...prev, shape];
       saveToHistory(newElements);
@@ -1828,6 +1870,8 @@ Zadaj pytanie! 🤔`,
   }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = [...prev, func];
       saveToHistory(newElements);
@@ -1842,9 +1886,11 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(func.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleTextCreate = useCallback((text: TextElement) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = [...prev, text];
       saveToHistory(newElements);
@@ -1937,6 +1983,8 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleImageCreate = useCallback((image: ImageElement) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     // Używamy functional update żeby uniknąć stale closure
     setElements(prev => {
       const newElements = [...prev, image];
@@ -1963,12 +2011,14 @@ Zadaj pytanie! 🤔`,
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
 
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     // TYLKO setElements - bez saveToHistory (powoduje lagi)
     setElements(prev => [...prev, note]);
     
@@ -2026,6 +2076,8 @@ Zadaj pytanie! 🤔`,
 
   // 🆕 TABLE - tworzenie tabeli
   const handleTableCreate = useCallback((table: TableElement) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = [...prev, table];
       saveToHistory(newElements);
@@ -2042,10 +2094,12 @@ Zadaj pytanie! 🤔`,
     // Po utworzeniu przełącz na select żeby można było edytować
     setTool('select');
     setSelectedElementIds(new Set([table.id]));
-  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - zmiana komórki tabeli
   const handleTableCellChange = useCallback((tableId: string, row: number, col: number, value: string) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = prev.map(el => {
         if (el.id === tableId && el.type === 'table') {
@@ -2206,12 +2260,16 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => prev.map(el => 
       el.id === id ? { ...el, ...updates } as DrawingElement : el
     ));
-  }, []);
+  }, [userRole]);
 
   const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     let updatedElement: DrawingElement | undefined;
     
     setElements(prev => {
@@ -2234,14 +2292,16 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => prev.map(el => {
       const update = updates.get(el.id);
       return update ? { ...el, ...update } as DrawingElement : el;
     }));
-  }, []);
+  }, [userRole]);
 
   const handleSelectionFinish = useCallback(() => {
     // Używamy ref żeby mieć aktualny stan
@@ -2263,6 +2323,8 @@ Zadaj pytanie! 🤔`,
   }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const deleteSelectedElements = useCallback(async () => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     // Używamy refs żeby mieć aktualny stan
     const currentSelectedIds = selectedElementIdsRef.current;
     const currentElements = elementsRef.current;
@@ -3179,7 +3241,7 @@ Zadaj pytanie! 🤔`,
         }}
       >
         {/* 🆕 KOMPONENT ONLINE USERS */}
-        <OnlineUsers onFollowUser={handleFollowUser} />
+        <OnlineUsers onFollowUser={handleFollowUser} userRole={userRole} />
         
         {/* 🆕 FOLLOW MODE INDICATOR - pasek gdy śledzimy użytkownika */}
         {followingUserId && (
@@ -3191,6 +3253,16 @@ Zadaj pytanie! 🤔`,
             >
               Przestań śledzić
             </button>
+          </div>
+        )}
+        
+        {/* 🔒 BANNER TRYBU TYLKO DO ODCZYTU */}
+        {userRole === 'viewer' && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[150] bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg shadow-md flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="font-medium">Tryb tylko do odczytu</span>
           </div>
         )}
         
@@ -3223,6 +3295,7 @@ Zadaj pytanie! 🤔`,
           onImageUpload={handleImageToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
+          isReadOnly={userRole === 'viewer'}
         />
         
         {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany, responsywny */}
@@ -3237,6 +3310,7 @@ Zadaj pytanie! 🤔`,
             onFormulaSelect={handleFormulaSelect}
             onCardSelect={handleCardSelect}
             onActiveChange={setIsSearchActive}
+            userRole={userRole}
           />
         </div>
         
@@ -3261,7 +3335,8 @@ Zadaj pytanie! 🤔`,
         <ActivityHistory
           elements={elementsWithAuthor}
           currentUserId={user?.id}
-          onCenterView={handleCenterViewOnElement}
+          onCenterView={handleCenterViewAndSelectElements}
+          onSelectElements={handleSelectElementsFromHistory}
           viewport={viewport}
         />
         
@@ -3411,6 +3486,7 @@ Zadaj pytanie! 🤔`,
       messages={chatMessages}
       setMessages={setChatMessages}
       onActiveChange={setIsSearchActive}
+      userRole={userRole}
     />
 
         {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}

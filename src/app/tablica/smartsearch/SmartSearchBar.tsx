@@ -20,6 +20,7 @@ interface SmartSearchBarProps {
   onCalculationSelect?: (result: CalculationResult) => void; // 🆕 Opcjonalny callback dla obliczeń
   onBrowseAll?: () => void;
   onActiveChange?: (isActive: boolean) => void; // Callback gdy search się otwiera/zamyka
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -30,7 +31,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
 };
 
-export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSelect, onBrowseAll, onActiveChange }: SmartSearchBarProps) {
+export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSelect, onBrowseAll, onActiveChange, userRole }: SmartSearchBarProps) {
+  // 🔒 Viewer nie ma dostępu do wyszukiwarki
+  if (userRole === 'viewer') {
+    return null;
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [query, setQuery] = useState('');

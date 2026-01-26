@@ -198,6 +198,20 @@ export function BoardRealtimeProvider({
   // Kolory dla kursorów (cyklicznie przydzielane)
   const cursorColors = useRef(['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'])
   
+  // 🛡️ THROTTLE - Ref do przechowywania ostatnich czasów broadcast
+  const lastBroadcastTimeRef = useRef({
+    elementUpdate: 0,
+    cursorMove: 0,
+    viewportChange: 0
+  })
+  
+  // 🛡️ THROTTLE - Limity częstotliwości (w ms)
+  const THROTTLE_MS = {
+    ELEMENT_UPDATE: 100,    // Max 10 updates/s podczas operacji
+    CURSOR_MOVE: 50,        // Max 20 pozycji kursora/s
+    VIEWPORT_CHANGE: 200    // Max 5 viewport updates/s
+  }
+  
   // Funkcja do notyfikacji subscriberów o zmianie kursorów
   const notifyCursorSubscribers = useCallback(() => {
     cursorSubscribersRef.current.forEach(callback => {
@@ -507,6 +521,15 @@ export function BoardRealtimeProvider({
   const broadcastElementUpdated = useCallback(async (element: DrawingElement) => {
     if (!channelRef.current || !user) return
     
+    // 🛡️ THROTTLE: sprawdź czy minęło wystarczająco czasu od ostatniego broadcast
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.elementUpdate < THROTTLE_MS.ELEMENT_UPDATE) {
+      // console.log('⏱️ Throttle: Pomijam element-updated (zbyt szybko)');
+      return // Zbyt szybko - pomiń ten update
+    }
+    
+    lastBroadcastTimeRef.current.elementUpdate = now
+    
     await channelRef.current.send({
       type: 'broadcast',
       event: 'element-updated',
@@ -548,6 +571,14 @@ export function BoardRealtimeProvider({
   
   const broadcastCursorMove = useCallback(async (x: number, y: number) => {
     if (!channelRef.current || !user) return
+    
+    // 🛡️ THROTTLE: ograniczenie częstotliwości kursorów
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.cursorMove < THROTTLE_MS.CURSOR_MOVE) {
+      return // Zbyt szybko - pomiń
+    }
+    
+    lastBroadcastTimeRef.current.cursorMove = now
     
     await channelRef.current.send({
       type: 'broadcast',
@@ -661,6 +692,14 @@ export function BoardRealtimeProvider({
   
   const broadcastViewportChange = useCallback(async (x: number, y: number, scale: number) => {
     if (!channelRef.current || !user) return
+    
+    // 🛡️ THROTTLE: ograniczenie częstotliwości viewport updates
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.viewportChange < THROTTLE_MS.VIEWPORT_CHANGE) {
+      return // Zbyt szybko - pomiń
+    }
+    
+    lastBroadcastTimeRef.current.viewportChange = now
     
     await channelRef.current.send({
       type: 'broadcast',

@@ -27,7 +27,9 @@ import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
+import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
+import { getMyRoleInWorkspace } from '@/workspace_api/api';
 import { BoardHeader } from './components/BoardHeader';
 import { HomeButton } from './components/HomeButton';
 
@@ -44,6 +46,8 @@ export function TablicaContent() {
   const [boardName, setBoardName] = useState<string>('Moja tablica');
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
@@ -64,10 +68,20 @@ export function TablicaContent() {
         const board = await fetchBoardById(id);
         if (board) {
           setBoardName(board.name);
+          setWorkspaceId(board.workspace_id);
           console.log('✅ Załadowano dane tablicy:', board.name);
+          console.log('📦 Workspace ID:', board.workspace_id);
+        } else {
+          console.warn('⚠️ fetchBoardById zwróciło null - spróbuj pobrać workspace_id z joinBoardWorkspace');
         }
       } catch (error) {
-        console.error('❌ Błąd ładowania danych tablicy:', error);
+        // Bardziej szczegółowe logowanie błędów
+        if (error instanceof Error) {
+          console.error('❌ Błąd ładowania danych tablicy:', error.message);
+          // Nie przerywaj działania aplikacji - dane zostaną pobrane przez joinBoardWorkspace
+        } else {
+          console.error('❌ Nieznany błąd ładowania danych tablicy:', error);
+        }
       }
     };
     
@@ -82,6 +96,13 @@ export function TablicaContent() {
             setIsJoining(true);
             const result = await joinBoardWorkspace(numericId);
             console.log('✅ Join workspace result:', result);
+            
+            // Ustaw workspace_id z wyniku join (fallback jeśli fetchBoardById zawiódł)
+            if (result.workspace_id && !workspaceId) {
+              setWorkspaceId(result.workspace_id);
+              console.log('📦 Workspace ID z join:', result.workspace_id);
+            }
+            
             if (!result.already_member) {
               console.log('🆕 Dołączono do nowego workspace!');
             }
@@ -100,6 +121,70 @@ export function TablicaContent() {
     
     joinWorkspace();
   }, [searchParams]);
+  
+  // Pobierz rolę użytkownika po załadowaniu workspace_id
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (workspaceId && workspaceId > 0) {
+        try {
+          const roleData = await getMyRoleInWorkspace(workspaceId);
+          setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
+          console.log('👤 Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
+        } catch (error) {
+          console.error('❌ Błąd pobierania roli:', error);
+          // Domyślnie editor jeśli nie ma tokenu
+          setUserRole('editor');
+          console.log('⚠️ Ustawiono domyślną rolę: editor (brak tokenu)');
+        }
+      }
+    };
+    
+    fetchUserRole();
+  }, [workspaceId]);
+  
+  // Realtime nasłuchiwanie zmian roli
+  useEffect(() => {
+    if (!workspaceId || workspaceId <= 0) return;
+    
+    const { supabase } = require('@/lib/supabase');
+    
+    const channel = supabase
+      .channel(`workspace_members_${workspaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'workspace_members',
+          filter: `workspace_id=eq.${workspaceId}`
+        },
+        async (payload: any) => {
+          console.log('🔄 Zmiana roli workspace member:', payload);
+          console.log('📊 Payload old:', payload.old, '| new:', payload.new);
+          
+          // Odśwież rolę (API zwraca tylko rolę dla aktualnego użytkownika)
+          try {
+            const roleData = await getMyRoleInWorkspace(workspaceId);
+            const oldRole = userRole;
+            setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
+            console.log('✅ Zaktualizowano rolę z', oldRole, '→', roleData.role);
+            
+            // Reload strony jeśli rola się zmieniła na viewer (dla pewności)
+            if (roleData.role === 'viewer' && oldRole !== 'viewer') {
+              console.log('🔄 Rola zmieniona na viewer - przeładowanie strony...');
+              setTimeout(() => window.location.reload(), 500);
+            }
+          } catch (error) {
+            console.error('❌ Błąd odświeżania roli:', error);
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspaceId]);
 
   // Loading state
   if (!boardId) {
@@ -141,7 +226,14 @@ export function TablicaContent() {
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>
-        <WhiteboardCanvas boardId={boardId} arkuszPath={arkuszPath} />
+        {/* 🆕 VOICE CHAT PROVIDER - P2P audio */}
+        <VoiceChatProvider boardId={boardId}>
+          <WhiteboardCanvas 
+            boardId={boardId} 
+            arkuszPath={arkuszPath}
+            userRole={userRole || 'editor'}
+          />
+        </VoiceChatProvider>
       </BoardRealtimeProvider>
 
       {/* Style dla animacji */}

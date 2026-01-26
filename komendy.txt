@@ -4,7 +4,42 @@ python -m venv .venv
 .\\.venv\Scripts\Activate.ps1
 pip install -r backend/requirements.txt
 
-uvicorn main:app --reload z glownego lub z /backend
+## Error Type
+Build Error
+
+## Error Message
+Export createClient doesn't exist in target module
+
+## Build Output
+./src/app/dashboard/Header/popups/NotificationsPopup.tsx:12:1
+Export createClient doesn't exist in target module
+  10 | } from '@/workspace_api/api';
+  11 | import { useWorkspaces } from '@/app/context/WorkspaceContext';
+> 12 | import { createClient } from '@/lib/supabase';
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  13 |
+  14 | interface NotificationsPopupProps {
+  15 |   onClose: () => void;
+
+The export createClient was not found in module [project]/src/lib/supabase.ts [app-client] (ecmascript).
+Did you mean to import supabase?
+All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
+
+Import traces:
+  Client Component Browser:
+    ./src/app/dashboard/Header/popups/NotificationsPopup.tsx [Client Component Browser]
+    ./src/app/dashboard/Header/DashboardHeader.tsx [Client Component Browser]
+    ./src/app/dashboard/page.tsx [Client Component Browser]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+  Client Component SSR:
+    ./src/app/dashboard/Header/popups/NotificationsPopup.tsx [Client Component SSR]
+    ./src/app/dashboard/Header/DashboardHeader.tsx [Client Component SSR]
+    ./src/app/dashboard/page.tsx [Client Component SSR]
+    ./src/app/dashboard/page.tsx [Server Component]
+
+Next.js version: 16.1.1 (Turbopack)
+ z glownego lub z /backend
 
 # Frontend (Next.js)
 # Instalacja zależności, uruchomienie serwera developerskiego

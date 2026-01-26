@@ -58,6 +58,9 @@ interface ToolbarUIProps {
   // Selection state
   hasSelection?: boolean;
   
+  // 🔒 Read-only mode
+  isReadOnly?: boolean;
+  
   // Handlers
   onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
@@ -143,10 +146,16 @@ export function ToolbarUI({
   onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
+  isReadOnly = false,
 }: ToolbarUIProps) {
   // 🆕 Wykrywanie wysokości ekranu
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  // Debug isReadOnly
+  useEffect(() => {
+    console.log('🛠️ ToolbarUI - isReadOnly:', isReadOnly, '| tool:', tool);
+  }, [isReadOnly, tool]);
 
   useEffect(() => {
     const updateHeight = () => setViewportHeight(window.innerHeight);
@@ -193,12 +202,14 @@ export function ToolbarUI({
         <div className="flex flex-col items-center gap-1.5 p-2">
           
           {/* Main Tools */}
-          <ToolButton
-            icon={MousePointer2}
-            active={tool === 'select'}
-            onClick={() => onToolChange('select')}
-            title="Zaznacz (V)"
-          />
+          {!isReadOnly && (
+            <ToolButton
+              icon={MousePointer2}
+              active={tool === 'select'}
+              onClick={() => onToolChange('select')}
+              title="Zaznacz (V)"
+            />
+          )}
           <ToolButton
             icon={Hand}
             active={tool === 'pan'}
@@ -210,30 +221,35 @@ export function ToolbarUI({
             active={tool === 'pen'}
             onClick={() => onToolChange('pen')}
             title="Rysuj (P)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={Type}
             active={tool === 'text'}
             onClick={() => onToolChange('text')}
             title="Tekst (T)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={getShapeIcon()}
             active={tool === 'shape'}
             onClick={() => onToolChange('shape')}
             title="Kształty (S)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={TrendingUp}
             active={tool === 'function'}
             onClick={() => onToolChange('function')}
             title="Funkcja (F)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={ImageIcon}
             active={tool === 'image'}
             onClick={() => onToolChange('image')}
             title="Obraz (I)"
+            disabled={isReadOnly}
           />
           {/* PDF tool tymczasowo wyłączony  */}
           {/* <ToolButton
@@ -247,6 +263,7 @@ export function ToolbarUI({
             active={tool === 'eraser'}
             onClick={() => onToolChange('eraser')}
             title="Gumka (E)"
+            disabled={isReadOnly}
           />
 
           <Divider />
@@ -259,12 +276,14 @@ export function ToolbarUI({
                 active={tool === 'markdown'}
                 onClick={() => onToolChange('markdown')}
                 title="Notatka Markdown (M)"
+                disabled={isReadOnly}
               />
               <ToolButton
                 icon={Table}
                 active={tool === 'table'}
                 onClick={() => onToolChange('table')}
                 title="Tabelka"
+                disabled={isReadOnly}
               />
             </>
           )}
@@ -279,18 +298,18 @@ export function ToolbarUI({
           <Divider />
 
           {/* History */}
-          <ToolButton icon={Undo} active={false} onClick={onUndo} title="Cofnij (Ctrl+Z)" disabled={!canUndo} />
-          <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo} />
+          <ToolButton icon={Undo} active={false} onClick={onUndo} title="Cofnij (Ctrl+Z)" disabled={!canUndo || isReadOnly} />
+          <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo || isReadOnly} />
 
           {/* Export/Import - UKRYTE w medium height */}
           {!isMediumHeight && !isMobile && (
             <>
               <Divider />
               {onExport && (
-                <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" />
+                <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" disabled={isReadOnly} />
               )}
               {onImport && (
-                <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" />
+                <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" disabled={isReadOnly} />
               )}
             </>
           )}
@@ -304,6 +323,7 @@ export function ToolbarUI({
                 active={isMoreMenuOpen} 
                 onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} 
                 title="Więcej narzędzi" 
+                disabled={isReadOnly}
               />
             </>
           )}
@@ -316,12 +336,13 @@ export function ToolbarUI({
               icon={XIcon} 
               active={false} 
               onClick={onDeleteSelected} 
-              title="Usuń zaznaczone (Del)" 
+              title="Usuń zaznaczone (Del)"
+              disabled={isReadOnly}
             />
           )}
 
           {/* Clear */}
-          <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" />
+          <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" disabled={isReadOnly} />
         </div>
       </div>
 
@@ -340,6 +361,7 @@ export function ToolbarUI({
                 setIsMoreMenuOpen(false);
               }}
               title="Notatka Markdown (M)"
+              disabled={isReadOnly}
             />
             <ToolButton
               icon={Table}
@@ -349,6 +371,7 @@ export function ToolbarUI({
                 setIsMoreMenuOpen(false);
               }}
               title="Tabelka"
+              disabled={isReadOnly}
             />
             
             <Divider />
@@ -361,7 +384,8 @@ export function ToolbarUI({
                   onExport();
                   setIsMoreMenuOpen(false);
                 }} 
-                title="Eksportuj tablicę" 
+                title="Eksportuj tablicę"
+                disabled={isReadOnly}
               />
             )}
             {onImport && (
@@ -372,7 +396,8 @@ export function ToolbarUI({
                   onImport();
                   setIsMoreMenuOpen(false);
                 }} 
-                title="Importuj tablicę" 
+                title="Importuj tablicę"
+                disabled={isReadOnly}
               />
             )}
           </div>

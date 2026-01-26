@@ -64,6 +64,7 @@ interface MathChatbotProps {
   messages: ChatMessage[];
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   onActiveChange?: (isActive: boolean) => void;
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
 // ==========================================
@@ -73,9 +74,10 @@ interface MathChatbotProps {
 interface ChatMessageViewProps {
   msg: ChatMessage;
   onAddToBoard?: (content: string) => void;
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
-const ChatMessageView = memo(function ChatMessageView({ msg, onAddToBoard }: ChatMessageViewProps) {
+const ChatMessageView = memo(function ChatMessageView({ msg, onAddToBoard, userRole }: ChatMessageViewProps) {
   if (msg.role === 'user') {
     return (
       <div className="flex justify-end">
@@ -97,7 +99,7 @@ const ChatMessageView = memo(function ChatMessageView({ msg, onAddToBoard }: Cha
             {msg.content}
           </ReactMarkdown>
         </div>
-        {onAddToBoard && msg.id !== 'welcome' && msg.id !== 'welcome-new' && (
+        {onAddToBoard && msg.id !== 'welcome' && msg.id !== 'welcome-new' && userRole !== 'viewer' && (
           <button
             onClick={() => onAddToBoard(msg.content)}
             className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all active:scale-95 shadow-md cursor-pointer"
@@ -138,6 +140,7 @@ function MathChatbotInner({
   messages,
   setMessages,
   onActiveChange,
+  userRole,
 }: MathChatbotProps) {
   const router = useRouter();
   const [input, setInput] = useState('');
@@ -489,7 +492,8 @@ function MathChatbotInner({
               <ChatMessageView 
                 key={msg.id} 
                 msg={msg} 
-                onAddToBoard={onAddToBoard} 
+                onAddToBoard={onAddToBoard}
+                userRole={userRole}
               />
             ))}
 
@@ -586,7 +590,8 @@ export const MathChatbot = memo(MathChatbotInner, (prevProps, nextProps) => {
   return (
     prevProps.messages === nextProps.messages &&
     prevProps.canvasWidth === nextProps.canvasWidth &&
-    prevProps.canvasHeight === nextProps.canvasHeight
+    prevProps.canvasHeight === nextProps.canvasHeight &&
+    prevProps.userRole === nextProps.userRole
   );
 });
 

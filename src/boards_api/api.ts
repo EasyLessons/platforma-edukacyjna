@@ -283,16 +283,27 @@ export const fetchBoardById = async (boardId: string | number): Promise<Board | 
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      // Dodaj timeout i retry policy
+      signal: AbortSignal.timeout(10000) // 10s timeout
     });
     
     if (!response.ok) {
+      console.warn(`❌ Board fetch failed with status ${response.status}`);
       return null;
     }
     
     return handleResponse(response);
   } catch (error) {
-    console.error('Error fetching board:', error);
+    // Loguj dokładniejszy błąd
+    if (error instanceof Error) {
+      console.error('❌ Error fetching board:', error.message);
+      if (error.name === 'AbortError') {
+        console.error('⏱️ Request timed out after 10s');
+      }
+    } else {
+      console.error('❌ Error fetching board:', error);
+    }
     return null;
   }
 };
