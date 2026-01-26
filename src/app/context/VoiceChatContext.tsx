@@ -161,8 +161,7 @@ const getIceServers = async (): Promise<RTCIceServer[]> => {
       if (response.ok) {
         const data = await response.json()
         console.log('🎤 [VOICE] ✅ Xirsys API response:', data)
-        console.log('🎤 [VOICE] 📊 data.v:', data.v)
-        console.log('🎤 [VOICE] 🏷️ typeof data.v:', typeof data.v)
+        console.log('🎤 [VOICE] 📊 data.v struktura:', JSON.stringify(data.v, null, 2))
         
         if (data.s === 'ok' && data.v) {
           // Xirsys API może zwracać różne formaty
@@ -170,19 +169,40 @@ const getIceServers = async (): Promise<RTCIceServer[]> => {
           
           if (data.v.iceServers && Array.isArray(data.v.iceServers)) {
             // Format 1: { v: { iceServers: [...] } }
+            console.log('🎤 [VOICE] 📋 Format: v.iceServers array')
             xirsysServers = data.v.iceServers
           } else if (Array.isArray(data.v)) {
             // Format 2: { v: [...] } - bezpośrednio array
+            console.log('🎤 [VOICE] 📋 Format: v jest array')
             xirsysServers = data.v
-          } else {
-            console.error('🎤 [VOICE] ❌ Nieznany format Xirsys response:', data.v)
+          } else if (typeof data.v === 'object') {
+            // Format 3: może być { v: { stun: [...], turn: [...] } }
+            console.log('🎤 [VOICE] 📋 Format: v jest object, sprawdzam właściwości')
+            const vKeys = Object.keys(data.v)
+            console.log('🎤 [VOICE] 🔑 Klucze w data.v:', vKeys)
+            
+            // Spróbuj różnych kluczy
+            if (data.v.stun && data.v.turn) {
+              xirsysServers = [...data.v.stun, ...data.v.turn]
+            } else if (data.v.urls && Array.isArray(data.v.urls)) {
+              xirsysServers = data.v.urls
+            } else {
+              // Ostatnia próba - może to są bezpośrednio serwery ICE
+              const firstValue = Object.values(data.v)[0]
+              if (Array.isArray(firstValue)) {
+                xirsysServers = firstValue
+              }
+            }
           }
           
-          if (xirsysServers.length > 0) {
+          console.log('🎤 [VOICE] 🎯 Xirsys servers do dodania:', xirsysServers)
+          
+          if (Array.isArray(xirsysServers) && xirsysServers.length > 0) {
             console.log('🎤 [VOICE] ✅ Dodaję serwery Xirsys:', xirsysServers.length)
-            console.log('🎤 [VOICE] 📋 Xirsys servers:', xirsysServers)
             servers.push(...xirsysServers)
             return servers
+          } else {
+            console.error('🎤 [VOICE] ❌ Nie mogę sparsować Xirsys serwerów:', xirsysServers)
           }
         } else {
           console.error('🎤 [VOICE] ❌ Xirsys API error:', data)
@@ -463,10 +483,18 @@ export function VoiceChatProvider({
     
     // Pobierz aktualne ICE servers (w tym Xirsys z API)
     const iceServers = await getIceServers()
+    
+    // 🚨 DEBUGGING: Tymczasowo wymuś TURN do testów
+    const forceRelay = true // Zmień na false potem!
+    
     const rtcConfig: RTCConfiguration = {
       iceServers,
       iceCandidatePoolSize: 10,
-      iceTransportPolicy: 'all'
+      iceTransportPolicy: forceRelay ? 'relay' : 'all' // 'relay' = tylko TURN (wymusza)
+    }
+    
+    if (forceRelay) {
+      console.log(`🎤 [VOICE] 🚨 DEBUGGING: Wymuszam TURN relay (testowanie)`)
     }
     
     console.log(`🎤 [VOICE] ICE Servers:`, iceServers.map(s => s.urls))
