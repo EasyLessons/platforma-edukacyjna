@@ -399,23 +399,38 @@ export function VoiceChatProvider({
         
         console.log(`🎤 [VOICE] ${username} dołączył do voice chat`)
         
-        // Wyczyść istniejące połączenia tego użytkownika
-        cleanupUserConnections(userId)
+        // 🧹 ZAWSZE czyść istniejące połączenia tego użytkownika
+        const existingConn = peerConnectionsRef.current.get(userId)
+        if (existingConn) {
+          console.log(`🎤 [VOICE] 🧹 Czyszczę stare połączenie z ${username} przed nowym`)
+          if (existingConn.audioElement) {
+            existingConn.audioElement.pause()
+            existingConn.audioElement.srcObject = null
+          }
+          existingConn.pc.close()
+          peerConnectionsRef.current.delete(userId)
+        }
         
-        // Dodaj do listy uczestników
+        // Clear pending i retry dla tego użytkownika
+        pendingConnectionsRef.current.delete(userId)
+        connectionRetriesRef.current.delete(userId)
+        const timeout = connectionTimeoutsRef.current.get(userId)
+        if (timeout) {
+          clearTimeout(timeout)
+          connectionTimeoutsRef.current.delete(userId)
+        }
+        lastSyncTimeRef.current.delete(userId)
+        
+        // Dodaj do listy uczestników (fresh)
         setParticipants(prev => {
           const filtered = prev.filter(p => p.odUserId !== userId)
           return [...filtered, { odUserId: userId, username, isSpeaking: false, isMuted: false, volume: 1 }]
         })
         
-        // Jeśli my jesteśmy w voice chat, odpowiedz voice-sync i utwórz połączenie
+        // Jeśli my jesteśmy w voice chat, odpowiedz voice-sync i utwórz NOWE połączenie
         if (isInVoiceChatRef.current && localStreamRef.current) {
-          // Debounce sync response
-          if (syncTimeoutRef.current) {
-            clearTimeout(syncTimeoutRef.current)
-          }
-          
-          syncTimeoutRef.current = setTimeout(() => {
+          // Małe opóźnienie żeby cleanup się zakończył
+          setTimeout(() => {
             console.log(`🎤 [VOICE] Wysyłam voice-sync do ${username}`)
             
             // Odpowiedz że my też jesteśmy w voice chat
@@ -430,9 +445,9 @@ export function VoiceChatProvider({
               }
             })
             
-            // Utwórz połączenie P2P (jako initiator)
+            // Utwórz NOWE połączenie P2P (jako initiator)
             createPeerConnection(userId, username, true)
-          }, 200)
+          }, 300)
         }
       })
       // Obsługa voice-sync - odpowiedź od kogoś kto już jest w voice chat
@@ -440,10 +455,10 @@ export function VoiceChatProvider({
         const { userId, username, isMuted: remoteMuted } = payload as VoiceEvent & { type: 'voice-sync' }
         if (userId === user.id) return
         
-        // Throttle voice-sync messages (max 1 per second per user)
+        // Throttle voice-sync messages (max 1 per 2 seconds per user)
         const now = Date.now()
         const lastSync = lastSyncTimeRef.current.get(userId) || 0
-        if (now - lastSync < 1000) {
+        if (now - lastSync < 2000) {
           console.log(`🎤 [VOICE] ⚠️ Throttling voice-sync od ${username}`)
           return
         }
@@ -457,14 +472,34 @@ export function VoiceChatProvider({
           return [...filtered, { odUserId: userId, username, isSpeaking: false, isMuted: remoteMuted, volume: 1 }]
         })
         
-        // Jeśli jeszcze nie mamy połączenia P2P i jestem w voice chat
-        // ale TYLKO jeśli nie ma już pending connection dla tego użytkownika
-        if (isInVoiceChatRef.current && 
-            !peerConnectionsRef.current.has(userId) && 
-            !pendingConnectionsRef.current.has(userId)) {
+        // Jeśli jesteśmy w voice chat i NIE mamy połączenia - utwórz jako responder
+        // Ale jeśli mamy połączenie w złym stanie - też utwórz na nowo
+        if (isInVoiceChatRef.current && localStreamRef.current) {
+          const existingConn = peerConnectionsRef.current.get(userId)
+          const needsConnection = !existingConn || 
+            existingConn.pc.connectionState === 'failed' || 
+            existingConn.pc.connectionState === 'disconnected' ||
+            existingConn.pc.connectionState === 'closed'
           
-          console.log(`🎤 [VOICE] Tworzę połączenie P2P z ${username} (jako responder)`)
-          createPeerConnection(userId, username, false)
+          if (needsConnection && !pendingConnectionsRef.current.has(userId)) {
+            console.log(`🎤 [VOICE] Tworzę połączenie P2P z ${username} (jako responder, state: ${existingConn?.pc.connectionState || 'brak'})`)
+            
+            // Wyczyść stare jeśli istnieje
+            if (existingConn) {
+              if (existingConn.audioElement) {
+                existingConn.audioElement.pause()
+                existingConn.audioElement.srcObject = null
+              }
+              existingConn.pc.close()
+              peerConnectionsRef.current.delete(userId)
+            }
+            
+            // Reset retry counter
+            connectionRetriesRef.current.delete(userId)
+            
+            // Utwórz nowe połączenie
+            createPeerConnection(userId, username, false)
+          }
         }
       })
       // Obsługa voice-request-sync - ktoś prosi o informację kto jest w voice chat
@@ -472,20 +507,12 @@ export function VoiceChatProvider({
         const { userId: requestingUserId } = payload as VoiceEvent & { type: 'voice-request-sync' }
         if (requestingUserId === user.id) return
         
-        // Throttle response (max 1 per 2 seconds per requesting user)
-        const now = Date.now()
-        const lastResponse = lastSyncTimeRef.current.get(`response-${requestingUserId}`) || 0
-        if (now - lastResponse < 2000) {
-          console.log(`🎤 [VOICE] ⚠️ Throttling response do user ${requestingUserId}`)
-          return
-        }
-        lastSyncTimeRef.current.set(`response-${requestingUserId}`, now)
-        
         // Jeśli my jesteśmy w voice chat, odpowiedz voice-sync
         if (isInVoiceChatRef.current && localStreamRef.current) {
           console.log(`🎤 [VOICE] Odpowiadam na request-sync od user ${requestingUserId}`)
           
-          // Delay response to avoid race conditions
+          // Małe losowe opóźnienie żeby uniknąć collision (100-400ms)
+          const delay = Math.random() * 300 + 100
           setTimeout(() => {
             channel.send({
               type: 'broadcast',
@@ -497,7 +524,7 @@ export function VoiceChatProvider({
                 isMuted: isMutedRef.current
               }
             })
-          }, Math.random() * 500 + 200) // Random delay 200-700ms
+          }, delay)
         }
       })
       .on('broadcast', { event: 'voice-leave' }, ({ payload }) => {
@@ -937,6 +964,33 @@ export function VoiceChatProvider({
     setIsConnecting(true)
     
     try {
+      // 🧹 CLEAN START - wyczyść WSZYSTKO przed dołączeniem
+      console.log('🎤 [VOICE] 🧹 Clean start - czyszczę wszystkie poprzednie połączenia...')
+      
+      // Stop wszystkie istniejące połączenia P2P
+      peerConnectionsRef.current.forEach((peerConn) => {
+        if (peerConn.audioElement) {
+          peerConn.audioElement.pause()
+          peerConn.audioElement.srcObject = null
+        }
+        peerConn.pc.close()
+      })
+      peerConnectionsRef.current.clear()
+      
+      // Clear wszystkie stany
+      pendingConnectionsRef.current.clear()
+      lastSyncTimeRef.current.clear()
+      connectionRetriesRef.current.clear()
+      connectionTimeoutsRef.current.forEach(timeout => clearTimeout(timeout))
+      connectionTimeoutsRef.current.clear()
+      setParticipants([])
+      
+      // Stop poprzedni stream jeśli istnieje
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach(track => track.stop())
+        localStreamRef.current = null
+      }
+      
       // Pobierz stream audio z lepszymi ustawieniami anty-echo
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: {
@@ -948,11 +1002,6 @@ export function VoiceChatProvider({
           channelCount: 1             // Mono dla lepszej wydajności
         }
       })
-      
-      // Wyczyść poprzedni stream jeśli istnieje
-      if (localStreamRef.current) {
-        localStreamRef.current.getTracks().forEach(track => track.stop())
-      }
       
       localStreamRef.current = stream
       
@@ -990,7 +1039,6 @@ export function VoiceChatProvider({
       ])
       
       // Po krótkim opóźnieniu wyślij request-sync żeby upewnić się że dostaniemy info o obecnych
-      // (voice-join może nie dotrzeć jeśli kanał nie był jeszcze w pełni gotowy)
       setTimeout(() => {
         if (isInVoiceChatRef.current) {
           console.log('🎤 [VOICE] Wysyłam voice-request-sync...')
@@ -1003,12 +1051,12 @@ export function VoiceChatProvider({
             }
           })
         }
-      }, 1000) // 1s opóźnienia żeby kanał był gotowy
+      }, 500)
       
-      // Backup request tylko jeśli wciąż nie mamy uczestników
+      // Backup request po 2 sekundach
       setTimeout(() => {
-        if (isInVoiceChatRef.current && participants.length <= 1) { // tylko my
-          console.log('🎤 [VOICE] Wysyłam backup voice-request-sync...')
+        if (isInVoiceChatRef.current) {
+          console.log('🎤 [VOICE] Backup voice-request-sync...')
           channelRef.current?.send({
             type: 'broadcast',
             event: 'voice-request-sync',
@@ -1018,46 +1066,79 @@ export function VoiceChatProvider({
             }
           })
         }
-      }, 3000) // 3s jako backup
+      }, 2000)
       
-      // Dodatkowy mechanizm weryfikacji połączeń co 5 sekund
+      // Trzeci backup po 5 sekundach dla pewności
+      setTimeout(() => {
+        if (isInVoiceChatRef.current) {
+          // Sprawdź czy mamy połączenia - jeśli nie, wyślij jeszcze raz
+          const otherParticipants = Array.from(peerConnectionsRef.current.keys())
+          if (otherParticipants.length === 0) {
+            console.log('🎤 [VOICE] ⚠️ Brak połączeń P2P - wysyłam force request-sync')
+            channelRef.current?.send({
+              type: 'broadcast',
+              event: 'voice-request-sync',
+              payload: {
+                type: 'voice-request-sync',
+                userId: user.id
+              }
+            })
+          }
+        }
+      }, 5000)
+      
+      // Dodatkowy mechanizm weryfikacji połączeń co 10 sekund
       const verifyInterval = setInterval(() => {
         if (!isInVoiceChatRef.current) {
           clearInterval(verifyInterval)
           return
         }
         
+        console.log('🎤 [VOICE] 🔍 Weryfikacja połączeń P2P...')
+        
         // Sprawdź czy wszystkie połączenia P2P działają
-        participants.forEach(participant => {
-          if (participant.odUserId === user.id) return
-          
-          const peerConn = peerConnectionsRef.current.get(participant.odUserId)
-          if (!peerConn) {
-            console.log(`🎤 [VOICE] 🔍 Brak połączenia P2P z ${participant.username} - próbuję nawiązać`)
-            
-            // Reset retry counter dla tego użytkownika
-            connectionRetriesRef.current.delete(participant.odUserId)
-            createPeerConnection(participant.odUserId, participant.username, true)
-          } else if (peerConn.pc.connectionState === 'failed' || peerConn.pc.connectionState === 'disconnected') {
-            console.log(`🎤 [VOICE] 🔍 Połączenie z ${participant.username} w złym stanie (${peerConn.pc.connectionState}) - restartuję`)
-            
-            cleanupUserConnections(participant.odUserId)
-            setTimeout(() => {
-              createPeerConnection(participant.odUserId, participant.username, true)
-            }, 1000)
-          }
-        })
-      }, 5000)
+        const currentParticipants = Array.from(peerConnectionsRef.current.keys())
+        
+        // Jeśli nie mamy żadnych połączeń ale jesteśmy w voice chat - wyślij request sync
+        if (currentParticipants.length === 0) {
+          console.log('🎤 [VOICE] ⚠️ Brak aktywnych połączeń - próbuję sync')
+          channelRef.current?.send({
+            type: 'broadcast',
+            event: 'voice-request-sync',
+            payload: {
+              type: 'voice-request-sync',
+              userId: user.id
+            }
+          })
+        } else {
+          // Sprawdź stan każdego połączenia
+          peerConnectionsRef.current.forEach((peerConn, odUserId) => {
+            if (peerConn.pc.connectionState === 'failed' || 
+                peerConn.pc.connectionState === 'disconnected' ||
+                peerConn.pc.connectionState === 'closed') {
+              console.log(`🎤 [VOICE] 🔍 Połączenie z ${peerConn.username} w złym stanie (${peerConn.pc.connectionState}) - restartuję`)
+              
+              // Cleanup i reconnect
+              if (peerConn.audioElement) {
+                peerConn.audioElement.pause()
+                peerConn.audioElement.srcObject = null
+              }
+              peerConn.pc.close()
+              peerConnectionsRef.current.delete(odUserId)
+              connectionRetriesRef.current.delete(odUserId)
+              
+              setTimeout(() => {
+                createPeerConnection(odUserId, peerConn.username, true)
+              }, 500)
+            } else {
+              console.log(`🎤 [VOICE] ✅ Połączenie z ${peerConn.username} OK (${peerConn.pc.connectionState})`)
+            }
+          })
+        }
+      }, 10000)
       
-      // Cleanup verification interval when leaving voice chat
-      const originalLeave = leaveVoiceChat
-      const cleanupLeave = () => {
-        clearInterval(verifyInterval)
-        originalLeave()
-      }
-      
-      // Store cleanup function
-      joinTimeoutRef.current = verifyInterval as any
+      // Store interval for cleanup
+      joinTimeoutRef.current = verifyInterval as unknown as NodeJS.Timeout
       
       console.log('🎤 [VOICE] Dołączono do voice chat!')
       
@@ -1067,7 +1148,7 @@ export function VoiceChatProvider({
     } finally {
       setIsConnecting(false)
     }
-  }, [user, isInVoiceChat, settings, startVoiceDetection])
+  }, [user, isInVoiceChat, settings, startVoiceDetection, createPeerConnection])
   
   const leaveVoiceChat = useCallback(() => {
     if (!user) return
