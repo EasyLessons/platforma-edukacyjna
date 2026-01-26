@@ -114,15 +114,42 @@ const DEFAULT_SETTINGS: VoiceSettings = {
   echoCancellation: true
 }
 
-// WebRTC configuration (STUN servers for NAT traversal)
+// WebRTC configuration (STUN + TURN servers for NAT traversal)
+// TURN jest wymagany gdy użytkownicy są za symetrycznym NAT (większość sieci domowych)
 const RTC_CONFIG: RTCConfiguration = {
   iceServers: [
+    // STUN servers (darmowe, do odkrywania publicznego IP)
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
-  ]
+    // Darmowe TURN servers od OpenRelay (relay gdy P2P nie działa)
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject'
+    },
+    // Dodatkowe publiczne TURN (backup)
+    {
+      urls: 'turn:relay.metered.ca:80',
+      username: 'e8dd65b92a6c9d5e9c8f8b1a',
+      credential: 'kxHVpGsrVxLgJLGS'
+    },
+    {
+      urls: 'turn:relay.metered.ca:443',
+      username: 'e8dd65b92a6c9d5e9c8f8b1a',
+      credential: 'kxHVpGsrVxLgJLGS'
+    }
+  ],
+  iceCandidatePoolSize: 10
 }
 
 export function VoiceChatProvider({
@@ -327,12 +354,12 @@ export function VoiceChatProvider({
     
     // Obsługa remote stream
     pc.ontrack = (event) => {
-      console.log(`🎤 [VOICE] Otrzymano audio stream od ${remoteUsername}`)
+      console.log(`🎤 [VOICE] ✅ Otrzymano audio stream od ${remoteUsername}`)
       
       const audio = new Audio()
       audio.srcObject = event.streams[0]
       audio.volume = settings.speakerVolume
-      audio.play().catch(console.error)
+      audio.play().catch(err => console.error('🎤 [VOICE] ❌ Błąd odtwarzania audio:', err))
       
       const existing = peerConnectionsRef.current.get(remoteUserId)
       if (existing) {
@@ -342,23 +369,40 @@ export function VoiceChatProvider({
     
     // ICE candidates
     pc.onicecandidate = (event) => {
-      if (event.candidate && channelRef.current) {
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'voice-ice',
-          payload: {
-            type: 'voice-ice',
-            fromUserId: user.id,
-            toUserId: remoteUserId,
-            candidate: event.candidate.toJSON()
-          }
-        })
+      if (event.candidate) {
+        console.log(`🎤 [VOICE] 🧊 ICE candidate: ${event.candidate.type} (${event.candidate.protocol})`)
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'voice-ice',
+            payload: {
+              type: 'voice-ice',
+              fromUserId: user.id,
+              toUserId: remoteUserId,
+              candidate: event.candidate.toJSON()
+            }
+          })
+        }
+      } else {
+        console.log(`🎤 [VOICE] 🧊 ICE gathering complete`)
+      }
+    }
+    
+    // ICE connection state (ważne dla debugowania!)
+    pc.oniceconnectionstatechange = () => {
+      console.log(`🎤 [VOICE] 🧊 ICE state z ${remoteUsername}: ${pc.iceConnectionState}`)
+      
+      if (pc.iceConnectionState === 'connected') {
+        console.log(`🎤 [VOICE] ✅ Połączenie P2P nawiązane z ${remoteUsername}!`)
+      } else if (pc.iceConnectionState === 'failed') {
+        console.log(`🎤 [VOICE] ❌ ICE failed - próbuję restart`)
+        pc.restartIce()
       }
     }
     
     // Stan połączenia
     pc.onconnectionstatechange = () => {
-      console.log(`🎤 [VOICE] Połączenie z ${remoteUsername}: ${pc.connectionState}`)
+      console.log(`🎤 [VOICE] 📡 Connection state z ${remoteUsername}: ${pc.connectionState}`)
       
       if (pc.connectionState === 'failed' || pc.connectionState === 'disconnected') {
         closePeerConnection(remoteUserId)
