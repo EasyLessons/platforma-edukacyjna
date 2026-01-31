@@ -1,0 +1,4410 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[polish]{babel}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage{hyperref}
+\usepackage{changepage}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{tcolorbox}
+\usepackage{fontawesome5}
+
+\geometry{
+    a4paper,
+    left=2.5cm,
+    right=2.5cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+\titleformat{\section}{\normalfont\Large\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\normalfont\large\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\normalfont\normalsize\bfseries}{\thesubsubsection}{1em}{}
+
+\begin{document}
+
+\begin{titlepage}
+\vspace{6cm}
+    \centering
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.3\linewidth]{Diagramy/uwbLogo.jpg}
+        
+    \end{figure}
+    
+    {\LARGE Uniwersytet w Białymstoku\\}
+    
+    \vspace{0.5cm}
+    {\Large Wydział Informatyki\\}
+    \vspace{0.3cm}
+    {\large Kierunek: Informatyka\\}
+    {\large Rok III semestr V\\}
+    \vspace{1.5cm}
+    
+    {\Large Inżynieria oprogramowania 2\\}
+    \vspace{1cm}
+    
+    {\huge\bfseries Platforma edukacyjna EasyLesson na podstawie współdzielonej tablicy\\}
+    
+    \vspace{3cm}
+    
+    \begin{flushleft}
+    {\large Prowadzący:\\}
+    {\large dr inż. Wiesław Półjanowicz\\}
+    \vspace{1cm}
+    
+    {\large Wykonali:\\}
+    
+    {\large Patryk Kulesza\\}
+    {\large Bartłomiej Koźluk\\}
+    {\large Mateusz Malewski\\}
+    \end{flushleft}
+    
+    \vfill
+    
+    {\large Białystok, dn. \ldots\ldots\ldots\ldots\ldots}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Treść zadania projektowego}
+
+\textbf{Platforma Edukacyjna - System Wspomagania Nauczania Online:}
+
+W dobie cyfryzacji edukacji, szkoły i instytucje edukacyjne borykają się z problemem rozproszonych narzędzi do prowadzenia zajęć online. Nauczyciele korzystają z wielu różnych aplikacji do udostępniania materiałów, komunikacji ze studentami, przeprowadzania testów i zarządzania ocenami. Studenci z kolei tracą czas na przełączanie się między platformami i często gubią się w chaosie informacyjnym.
+
+System ma zintegrować wszystkie aspekty procesu edukacyjnego w jednej, intuicyjnej platformie. Ma oszczędzić czas nauczycielom, poprawić organizację pracy studentów oraz zwiększyć jakość nauczania poprzez lepsze śledzenie postępów i szybszy feedback.
+
+\section{Cel budowania systemu, zakres systemu, przewidywalne mierzalne i niemierzalne korzyści materialne}
+
+\subsection{Cele główne}
+
+\begin{itemize}[leftmargin=*]
+    \item Stworzenie kompleksowej platformy do prowadzenia korepetycji online w czasie rzeczywistym
+    \item Umożliwienie współpracy korepetytora i ucznia na wspólnej tablicy bez opóźnień
+    \item Zapewnienie szybkiego dostępu do wzorów matematycznych i fizycznych (SmartSearch)
+    \item Integracja AI asystenta wspierającego proces nauczania
+    \item Uproszczenie organizacji zajęć poprzez system workspace'ów i tablic
+\end{itemize}
+
+\subsection{Cele szczegółowe}
+
+\begin{itemize}[leftmargin=*]
+    \item Eliminacja potrzeby korzystania z wielu różnych narzędzi (tablica, chat, wzory)
+    \item Umożliwienie prowadzenia lekcji z matematyki w profesjonalny sposób
+    \item Automatyczne renderowanie wzorów matematycznych (LaTeX)
+    \item Przechowywanie historii lekcji i możliwość powrotu do poprzednich tablic
+    \item Zapewnienie dostępności z dowolnego urządzenia (desktop, tablet, telefon)
+    \item Stworzenie intuicyjnego interfejsu, który nie wymaga szkolenia
+    \item Umożliwienie pracy z wieloma uczniami (różne workspace'y)
+\end{itemize}
+
+\subsection{Zakres systemu}
+
+\begin{itemize}[leftmargin=*]
+    \item Zarządzanie workspace'ami i tablicami
+    \item Współdzielona tablica z narzędziami rysowania
+    \item SmartSearch - wyszukiwarka wzorów matematycznych
+    \item AI Assistant - chat z możliwością wysyłania zdjęć
+    \item System autentykacji i zarządzania użytkownikami
+    \item Synchronizacja w czasie rzeczywistym
+\end{itemize}
+
+\subsection{Poza zakresem systemu jest}
+
+\begin{itemize}[leftmargin=*]
+    \item Wideokonferencje/rozmowy głosowe (integracja z Zoom/Teams)
+    \item System płatności (bramki zewnętrzne)
+    \item Automatyczne generowanie zadań przez AI
+    \item Kalendarz i rezerwacja terminów
+    \item System CRM i fakturowanie
+    \item Ocenianie i raportowanie postępów uczniów
+    \item Marketplace z materiałami dydaktycznymi
+    \item Automatyczne nagrywanie sesji
+    \item Gamifikacja dla uczniów
+    \item Integracja z dziennikami elektronicznymi
+\end{itemize}
+
+\subsection{Przewidywane mierzalne korzyści z wdrożenia systemu}
+
+\begin{itemize}[leftmargin=*]
+    \item Redukcja czasu przygotowania do lekcji o 40\% dzięki centralizacji narzędzi
+    \item Eliminacja czasu na przełączanie między aplikacjami - oszczędność 5-10 minut/lekcję
+    \item Szybsze wyszukiwanie wzorów matematycznych - 10 sekund vs 2-3 minuty w Google
+    \item Eliminacja kosztów licencji na wiele narzędzi - oszczędność 150-300 zł/miesiąc
+    \item Obsługa do 20 aktywnych workspace'ów na jednego korepetytora
+    \item System wydajny dla 1,000+ użytkowników jednocześnie
+\end{itemize}
+
+\subsection{Przewidywane niemierzalne korzyści z wdrożenia systemu}
+
+\begin{itemize}[leftmargin=*]
+    \item Zwiększenie profesjonalizmu i prestiżu prowadzonych zajęć
+    \item Możliwość wyróżnienia się na tle konkurencji
+    \item Lepsza wizualizacja trudnych zagadnień matematycznych
+    \item Dostęp do AI asystenta 24/7 (możliwość zadawania pytań nawet po lekcji)
+    \item Możliwość powrotu do materiałów w dowolnym momencie
+    \item Budowanie cyfrowego archiwum wiedzy i materiałów dydaktycznych
+    \item Tworzenie społeczności korepetytorów korzystających z platformy
+    \item Przygotowanie do przyszłości edukacji cyfrowej
+\end{itemize}
+
+\section{Perspektywa wariantów użycia systemu}
+
+\subsection{Diagram wariantów użycia systemu}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{Diagramy/DPU.png}
+    \caption{Diagram przypadków użycia systemu}
+\end{figure}
+
+\newpage
+
+\subsection{Opisy tekstowe wszystkich aktorów}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Niezalogowany} - osoba odwiedzająca platformę EasyLesson, która nie posiada jeszcze konta w systemie lub nie jest aktualnie zalogowana. Niezalogowany użytkownik ma ograniczony dostęp do funkcjonalności platformy. Może przeglądać stronę główną z informacjami o platformie, zapoznać się z cennikiem planów oraz przejrzeć prezentację funkcji systemu. Głównym celem niezalogowanego użytkownika jest zazwyczaj założenie konta (rejestracja) lub zalogowanie się do istniejącego konta. W przypadku zapomnienia hasła ma możliwość skorzystania z funkcji odzyskiwania hasła poprzez kod weryfikacyjny wysyłany na email.
+    
+    \item \textbf{Zalogowany} - Osoba posiadająca konto w systemie EasyLesson, która przeszła pozytywnie proces autentykacji (weryfikacja emaila + logowanie). Użytkownik zalogowany ma pełny dostęp do funkcjonalności platformy odpowiadających wykupionemu planowi. Może tworzyć własne workspace'y (obszary robocze), w których organizuje swoje lekcje i materiały edukacyjne. W ramach każdego workspace'a może tworzyć wiele tablic (boards) służących do prowadzenia interaktywnych lekcji w czasie rzeczywistym.
+\end{itemize}
+
+\subsection{Opisy tekstowe wszystkich wariantów użycia}
+
+\subsubsection{Logowanie}
+
+\textbf{Numer:} UC-01
+
+\textbf{Krótki opis:} Umożliwia użytkownikowi zalogowanie się do systemu przy użyciu adresu email i hasła.
+
+\textbf{Aktorzy:} Niezalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik posiada konto w systemie
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik zalogowany, sesja aktywna
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Zaloguj się"
+    \item System wyświetla formularz logowania
+    \item Użytkownik wprowadza email i hasło
+    \item System weryfikuje dane i generuje token JWT
+    \item System przekierowuje do panelu użytkownika.
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[5a] Błędne dane
+    \begin{itemize}
+        \item komunikat "Nieprawidłowe dane logowania"
+        \item Ponowne wprowadzenie danych logowania
+    \end{itemize}
+    \item[5b] Użytkownik może wybrać opcję "Zapomniałeś hasła?" (extends)
+    \begin{itemize}
+        \item System przekierowuje do przypadku użycia UC-02 "Odzyskiwanie hasła
+    \end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}[leftmargin=*]
+    \item System musi używać bezpiecznego hashowania haseł (bcrypt)
+    \item Maksymalnie 5 nieudanych prób logowania w ciągu 15 minut, po czym konto blokowane na 30 minut
+\end{itemize}
+
+\textbf{Notatki i kwestie:} Brak
+
+\subsubsection{Odzyskiwanie hasła}
+
+\textbf{Numer:} UC-02
+
+\textbf{Krótki opis:} Umożliwia użytkownikowi zresetowanie hasła poprzez kod weryfikacyjny wysłany na email.
+
+\textbf{Aktorzy:} Niezalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik posiada konto w systemie
+    \item Użytkownik zapomniał hasła
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Hasło zmienione
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Zapomniałeś hasło?"
+    \item Użytkownik wprowadza email
+    \item System wysyła 6-cyfrowy kod na email
+    \item Użytkownik wprowadza kod weryfikacyjny
+    \item Użytkownik ustawia nowe hasło
+    \item System aktualizuje hasło
+    \item Użytkownik zostaje przekierowany do strony logowania
+\end{enumerate}
+
+\textbf{Alternatywny przepływ zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[2a] Email nie istnieje
+    \begin{itemize}
+        \item Komunikat błędu
+        \item Ponowne wprowadzenie maila
+    \end{itemize}
+    \item[4a] Nieprawidłowy kod weryfikacyjny
+    \begin{itemize}
+        \item Komunikat błędu
+        \item Ponowne wprowadzenie kodu
+    \end{itemize}
+    \item[4b] Użytkownik klika "Wyślij kod ponownie"
+    \begin{itemize}
+        \item Powrót do kroku 3.
+    \end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}[leftmargin=*]
+    \item System powinien ograniczać liczbę prób wprowadzenia kodu
+\end{itemize}
+
+\textbf{Notatki i kwestie:} Email powinien zawierać informacje o tym, że jeśli użytkownik nie żądał zmiany hasła, powinien zignorować wiadomość.
+
+\subsubsection{Rejestracja}
+
+\textbf{Numer:} UC-03
+
+\textbf{Krótki opis:} Nowy użytkownik tworzy konto w systemie EasyLesson, podając podstawowe dane i weryfikując adres email.
+
+\textbf{Aktor:} Niezalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik nie ma konta w systemie
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Konto użytkownika zostało utworzone w bazie danych
+    \item Kod weryfikacyjny został wysłany na adres email użytkownika
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Zarejestruj się"
+    \item Użytkownik wypełnia formularz (email, username, hasło)
+    \item System weryfikuje dane
+    \item System wywołuje UC-04 "Autoryzacja" ($<<$include$>>$)
+    \item System tworzy konto i przekierowuje do logowania
+\end{enumerate}
+
+\textbf{Alternatywny przepływ zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[2a] Nieprawidłowe dane w formularzu
+    \begin{itemize}[leftmargin=*]
+    \item Komunikat błędu
+    \item Poprawa danych w formularzu
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}[leftmargin=*]
+    \item Email i username muszą być unikalne w systemie
+    \item Hasło musi mieć minimum 8 znaków
+\end{itemize}
+
+\textbf{Notatki i kwestie:} Brak
+
+\subsubsection{Autoryzacja}
+
+\textbf{Numer:} UC-04
+
+\textbf{Krótki opis:} Proces automatycznego wysyłania kodu weryfikacyjnego na email użytkownika podczas rejestracji i weryfikacji konta.
+
+\textbf{Aktor:} System
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik wypełnił formularz rejestracji
+    \item Email użytkownika jest poprawny i nie jest zajęty
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Kod weryfikacyjny został wygenerowany i zapisany w bazie danych
+    \item Email z kodem został wysłany na adres użytkownika
+    \item Konto czeka na weryfikację
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item System generuje losowy 6-cyfrowy kod weryfikacyjny
+    \item System wysyła email na adres użytkownika (używając Resend API)
+    \item System wyświetla użytkownikowi formularz do wprowadzenia kodu
+    \item Użytkownik wprowadza kod w formularzu weryfikacji
+    \item System sprawdza czy kod jest poprawny
+    \item System oznacza konto jako zweryfikowane
+\end{enumerate}
+
+\textbf{Alternatywny przepływ zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[4a] Użytkownik wprowadził nieprawidłowy kod
+    \begin{itemize}[leftmargin=*]
+    \item Komunikat błędu
+    \item Ponowne wprowadzenie kodu
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}[leftmargin=*]
+    \item Maksymalnie 3 próby wprowadzenia błędnego kodu
+\end{itemize}
+
+\textbf{Notatki i kwestie:}
+\begin{itemize}
+    \item System używa Resend API do wysyłania emaili
+\end{itemize}
+
+\subsubsection{Przeglądanie cennika}
+
+\textbf{Numer:} UC-05
+
+\textbf{Krótki opis:} Użytkownik przegląda dostępne plany cenowe (Free i Pro) oraz porównuje ich funkcjonalności, aby podjąć decyzję o zakupie.
+
+\textbf{Aktor:} System
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Brak (dostępne dla wszystkich użytkowników)
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik zapoznał się z dostępnymi planami cenowymi
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Cennik" w menu nawigacyjnym
+    \item System wyświetla stronę z planami
+    \item Użytkownik przegląda dostępne funkcjonalności i limity
+    \item Użytkownik kupuje wersję premium UC-05 "Zakup wersji premium" (<<extends>>)
+\end{enumerate}
+
+\textbf{Alternatywny przepływ zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[4a] Użytkownik niezalogowany
+    \begin{itemize}
+    \item Komunikat o potrzebie zalogowania
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+brak
+
+\textbf{Notatki i kwestie:}
+brak
+
+\subsubsection{Zakupienie wersji premium}
+
+\textbf{Numer:} UC-06
+
+\textbf{Krótki opis:} Użytkownik z planem Free dokonuje zakupu planu Pro, wprowadzając dane karty płatniczej i finalizując transakcję.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik zalogowany
+    \item Użytkownik ma plan Free
+    \item Użytkownik przegląda cennik (UC-05)
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Konto użytkownika zostało zaktualizowane na plan Pro
+    \item Płatność została przetworzona pomyślnie
+    \item Użytkownik otrzymał potwierdzenie zakupu na email
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Kup Premium"
+    \item System przekierowuje użytkownika do zewnętrznego systemu przetwarzania płatności
+    \item System płatności zwraca potwierdzenie transakcji
+    \item System aktualizuje konto na Premium
+    \item System wysyła maila z potwierdzeniem
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[3a] Transakcja zakończona niepowodzeniem
+    \begin{itemize}
+    \item Wyświetlenie komunikatu
+    \item Powrót do strony oferty
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+brak
+
+\textbf{Notatki i kwestie:} \begin{itemize}
+    \item Subskrypcja jest automatycznie odnawiana co miesiąc
+    \item Użytkownik może anulować subskrypcję w każdej chwili
+    \item Po anulowaniu plan Pro jest aktywny do końca opłaconego okresu
+\end{itemize}
+
+\subsubsection{Zarządzenie workspace'ami <<CRUD>>}
+
+\textbf{Numer:} UC-07
+
+\textbf{Krótki opis:} Użytkownik zarządza swoimi workspace'ami (obszarami roboczymi) - tworzy nowe, edytuje istniejące, usuwa niepotrzebne oraz zaprasza innych użytkowników do współpracy.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik zalogowany
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Workspace został utworzony/zaktualizowany/usunięty zgodnie z operacją
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\textbf{CREATE (Tworzenie workspace'a)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika przycisk "Stwórz workspace"
+    \item Użytkownik wprowadza nazwę, wybiera ikonę i tło
+    \item Użytkownik klika przycisk "Utwórz"
+    \item System tworzy workspace i ustawia użytkownika jako właściciela
+    \item System przekierowuje użytkownika do nowo utworzonego workspace'a
+\end{enumerate}
+\textbf{READ (Przeglądanie workspace'ów)}
+\begin{enumerate}[leftmargin=*]
+    \item System wyświetla listę workspace'ów, których członkiem jest użytkownik
+    \item Użytkownik klika na workspace aby go otworzyć
+    \item System ładuje workspace i wyświetla jego tablice
+\end{enumerate}
+\textbf{UPDATE (Edycja workspace'a)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika opcję "Edytuj" przy workspace (dostępne tylko dla Owner)
+    \item System wyświetla formularz edycji z aktualnymi wartościami
+    \item Użytkownik zmienia nazwę/ikonę/kolor
+    \item Użytkownik klika "Zapisz"
+    \item System aktualizuje dane
+\end{enumerate}
+\textbf{DELETE (Usuwanie workspace'a)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika opcję "Usuń" przy workspace (dostępne tylko dla Owner)
+    \item Użytkownik potwierdza usunięcie
+    \item System usuwa workspace z bazy danych
+    \item System wyświetla komunikat
+    \item System przekierowuje do Dashboardu
+\end{enumerate}
+\textbf{Opuszczenie workspace'a (tylko Member)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Opuść workspace"
+    \item System usuwa użytkownika
+    \item Workspace znika z listy użytkownika
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item [CRUD] Brak uprawnień do modyfikacji
+    \begin{itemize}
+    \item Wyświetlenie komunikatu
+    \item Powrót do Dashboardu
+    \end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}
+    \item Tylko Owner może edytować, usuwać workspace i zapraszać członków
+    \item Użytkownik musi wybrać workspace przed przejściem do tablic
+    \item CASCADE DELETE - usunięcie workspace usuwa wszystkie tablice i członków
+\end{itemize}
+
+\textbf{Notatki i kwestie:} \begin{itemize}
+    \item Owner ma pełną kontrolę, Member może tylko przeglądać i pracować na tablicach
+\end{itemize}
+
+\subsubsection{Zarządzanie członkami workspace'a <<CRUD>>}
+
+\textbf{Numer:} UC-08
+
+\textbf{Krótki opis:} Właściciel workspace'a zarządza członkami - zaprasza nowych użytkowników, usuwa członków oraz przegląda listę obecnych członków workspace'a.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+    \item Użytkownik jest Owner'em workspace'a
+    \item Użytkownik wybrał workspace
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik został zaproszony/dodany/usunięty z workspace'a
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\textbf{CREATE (Zapraszanie członka)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik (Owner) klika przycisk "Zaproś" w workspace
+    \item Użytkownik wprowadza email lub username osoby do zaproszenia
+    \item Użytkownik klika "Wyślij zaproszenie"
+    \item System sprawdza czy użytkownik o podanym email/username istnieje oraz czy nie jest już członkiem workspace'a
+    \item System generuje unikalny token zaproszenia
+    \item System wysyła powiadomienie do zaproszonego użytkownika
+\end{enumerate}
+\textbf{READ (Przeglądanie członków)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "wyświetl listę członków"
+    \item Użytkownik może przeglądać listę członków
+\end{enumerate}
+\textbf{DELETE (Usuwanie członka)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik (Owner) klika opcję "Usuń" przy członku
+    \item System wyświetla dialog potwierdzenia
+    \item Użytkownik potwierdza
+    \item System usuwa użytkownika z workspace'a
+    \item Usunięty użytkownik traci dostęp do workspace'a i jego tablic
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item [CRUD] Brak uprawnień, użytkownik nie istnieje
+    \begin{itemize}
+    \item Wyświetlenie komunikatu
+    \item Powrót do Dashboardu
+    \end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}
+    \item Tylko Owner może zapraszać i usuwać członków
+    \item Member może tylko opuścić workspace
+\end{itemize}
+
+\textbf{Notatki i kwestie:} \begin{itemize}
+    \item Zaproszenie wysyłane jest jako powiadomienie w aplikacji oraz wiadomość email z linkiem
+\end{itemize}
+
+\subsubsection{Zarządzanie tablicami <<CRUD>>}
+
+\textbf{Numer:} UC-09
+
+\textbf{Krótki opis:} Użytkownik zarządza tablicami w workspace - tworzy nowe tablice, edytuje istniejące, usuwa niepotrzebne oraz oznacza ulubione.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+    \item Użytkownik wybrał workspace
+    \item Użytkownik ma dostęp do workspace'a
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Tablica została utworzona/zaktualizowana/usunięta
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\textbf{CREATE (Tworzenie tablicy)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika przycisk "Stwórz tablicę" w workspace
+    \item Użytkownik wprowadza nazwę tablicy, wybiera ikonę i kolor tła
+    \item Użytkownik klika "Utwórz"
+    \item System tworzy tablicę
+    \item System przekierowuje użytkownika do nowo utworzonej tablicy
+\end{enumerate}
+\textbf{READ (Przeglądanie tablic)}
+\begin{enumerate}[leftmargin=*]
+    \item System wyświetla listę tablic w workspace
+    \item Użytkownik klika na tablicę aby ją otworzyć
+    \item System ładuje tablicę z wszystkimi elementami
+\end{enumerate}
+\textbf{UPDATE (Edycja tablicy)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika opcję "Edytuj" przy tablicy
+    \item System wyświetla formularz edycji z aktualnymi wartościami
+    \item Użytkownik zmienia nazwę/ikonę/kolor
+    \item Użytkownik klika "Zapisz"
+    \item System aktualizuje dane
+\end{enumerate}
+\textbf{DELETE (Usuwanie tablicy)}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika opcję "Usuń" przy tablicy
+    \item System wyświetla dialog potwierdzenia
+    \item Użytkownik potwierdza
+    \item System usuwa tablicę
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+brak
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}
+    \item CASCADE DELETE - usunięcie tablicy usuwa wszystkie jej elementy
+\end{itemize}
+
+\textbf{Notatki i kwestie:} 
+brak
+
+\subsubsection{Korzystanie z tablicy w czasie rzeczywistym}
+
+\textbf{Numer:} UC-10
+
+\textbf{Krótki opis:} Użytkownik pracuje na tablicy w czasie rzeczywistym - rysuje, wstawia obrazy, tworzy wykresy. Wszystkie zmiany są automatycznie synchronizowane z innymi użytkownikami korzystającymi z tej samej tablicy.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+    \item Użytkownik wybrał tablicę
+    \item Użytkownik ma dostęp do tablicy (należy do workspace'a)
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik widzi tablicę ze wszystkimi elementami
+    \item Połączenie Supabase Realtime jest aktywne
+    \item Użytkownik może modyfikować zawartość tablicy
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika na tablicę aby ją otworzyć
+    \item System ładuje i wyświetla wszystkie elementy tablicy
+    \item System łączy użytkownika z kanałem Supabase Realtime dla tej tablicy
+    \item System wyświetla listę użytkowników obecnie online na tablicy
+    \item System wyświetla listę użytkowników obecnie online na tablicy
+    \item Użytkownik pracuje na tablicy
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[3a] Błąd połączenia z Supabase Realtime
+    \begin{itemize}
+    \item System wyświetla komunikat "Problem z połączeniem realtime. Odśwież stronę"
+    \item System próbuje ponownie nawiązać połączenie co 5 sekund
+    \item Użytkownik może pracować offline, ale zmiany nie będą synchronizowane
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+brak
+
+\textbf{Notatki i kwestie:} \begin{itemize}
+    \item W zakresie korzystania z tablicy jest też używanie chatbota AI UC-11 oraz SmartSearch'a UC-12
+\end{itemize}
+
+\subsubsection{Chat z asystentem AI}
+
+\textbf{Numer:} UC-11
+
+\textbf{Krótki opis:} Użytkownik zadaje pytania asystentowi AI, który pomaga w rozwiązywaniu zadań matematycznych. Możliwe jest wysyłanie zarówno tekstu jak i zdjęć zadań.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+    \item Użytkownik ma otworzoną tablicę
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik otrzymał odpowiedź od AI
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "AI Chat"
+    \item System otwiera panel czatu
+    \item Użytkownik wpisuje pytanie w polu tekstowym
+    \item Użytkownik klika "Wyślij" (lub Enter)
+    \item System wysyła zapytanie do AI Chat API
+    \item System wyświetla odpowiedź w oknie czatu
+    \item Użytkownik dodaje wiadomość z chatu do tablicy
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[3a] Błąd API AI czatu
+    \begin{itemize}
+    \item System wyświetla komunikat
+    \item Ponowne wysłanie wiadomości
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+\begin{itemize}
+    \item System musi obsługiwać zarówno tekst jak i zdjęcia
+\end{itemize}
+
+\textbf{Notatki i kwestie:} brak
+
+\subsubsection{Używanie SmartSearch'a}
+
+\textbf{Numer:} UC-12
+
+\textbf{Krótki opis:} Użytkownik wyszukuje wzory w bazie SmartSearch i dodaje je na tablicę.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+    \item Użytkownik ma otworzoną tablicę
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik znalazł wzór i ma go na tablicy
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "SmartSearch" w menu
+    \item Użytkownik wpisuje frazę w pole wyszukiwania
+    \item System wyświetla wzory pasujące do zapytania
+    \item Użytkownik wybiera wzór
+    \item System dodaje wzór do tablicy
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[2a] Brak wyników dla zapytania
+    \begin{itemize}
+    \item System wyświetla komunikat
+    \item Ponowne wpisanie frazy
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+brak
+
+\textbf{Notatki i kwestie:} brak
+
+\subsubsection{Zarządzanie profilem użytkownika}
+
+\textbf{Numer:} UC-13
+
+\textbf{Krótki opis:} Użytkownik zarządza swoim profilem - edytuje dane osobowe, zmienia username, aktualizuje email oraz zmienia hasło.
+
+\textbf{Aktor:} Zalogowany
+
+\textbf{Warunki wstępne:}
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik jest zalogowany
+\end{itemize}
+
+\textbf{Warunki końcowe:}
+\begin{itemize}[leftmargin=*]
+    \item Dane użytkownika zostały zaktualizowane
+\end{itemize}
+
+\textbf{Główny przepływ zdarzeń:}
+\begin{enumerate}[leftmargin=*]
+    \item Użytkownik klika "Profil" w menu
+    \item System wyświetla stronę profilu z aktualnymi danymi
+    \item Użytkownik zmienia dane
+    \item Użytkownik klika "Zapisz zmiany"
+    \item System weryfikuje poprawność danych
+    \item System aktualizuje dane
+\end{enumerate}
+
+\textbf{Alternatywne przepływy zdarzeń:}
+\begin{itemize}[leftmargin=*]
+    \item[3a] Nowy login/email zajęty
+    \begin{itemize}
+    \item System wyświetla komunikat
+    \item Wpisanie innych danych
+\end{itemize}
+\end{itemize}
+
+\textbf{Specjalne wymagania:}
+brak
+
+\textbf{Notatki i kwestie:}
+\begin{itemize}
+    \item Zmiana emaila wymaga weryfikacji nowego adresu
+    \item Zmiana hasła wymaga wpisania poprzedniego hasła
+\end{itemize}
+
+\subsection{Przykładowe diagramy interakcji/sekwencji z opisem tekstowym
+zidentyfikowanych, występujących na nim komunikatów}
+
+\subsubsection{Przykład 1. Rejestracja i weryfikacja konta}
+
+\begin{figure}[H]
+    \centering
+\includegraphics[width=0.7\linewidth]{Diagramy/Diagramsekw_p1.png}
+\end{figure}
+Użytkownik zakłada konto w systemie EasyLesson oraz przechodzi weryfikację za pomocą kodu autoryzacyjnego wysłanego na maila.
+
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik na stronie głównej klika przycisk "Zarejestruj się"
+    \item System przenosi użytkownika do podstrony rejestracji gdzie znajduje się formularz.
+    \item Użytkownik wypełnia pola Login, Email, Hasło, Powtórz hasło, zaznacza opcję akceptacji regulaminu i klika "Zarejestruj się".
+    \item System za pomocą Resend'a, wysyła kod autoryzacyjny.
+    \item System przenosi użytkownika na podstronę autoryzacji.
+    \item Użytkownik odczytuje maila i wpisuje kod na stronie.
+    \item System wyświetla komunikat "Konto aktywowane", a następnie przenosi użytkownika na stronę logowania.
+\end{itemize}
+
+\subsubsection{Przykład 2. Stworzenie workspace'u i zaproszenie użytkownika}
+
+\begin{figure}[H]
+    \centering
+\includegraphics[width=0.7\linewidth]{Diagramy/Diagramsekw_p2.png}
+\end{figure}
+Korepetytor tworzy nowy workspace do pracy z uczniem.
+
+\begin{itemize}[leftmargin=*]
+    \item Korepetytor klika "Stwórz workspace"
+    \item System wyświetla formularz konfiguracji nowego workspace'a
+    \item Korepetytor wpisuje nazwę: Korki, wybiera ikonkę i tło.
+    \item System tworzy nowy workspace, ustawia korepetytora jako właściciela i wysyła komunikat "Workspace utworzony"
+    \item Korepetytor klika "Zaproś" i wpisuje email ucznia.
+    \item System wysyłą zaproszenie do ucznia.
+    \item Uczeń w zakładce powiadomień odczytuje zaproszenie i klika "Akceptuj"
+    \item System dodaje ucznia do workspace'a "Korki" i wyświetla go na liście workspace'ów ucznia.
+\end{itemize}
+
+\subsubsection{Przykład 3. Współpraca na tablicy w czasie rzeczywistym}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Diagramy/Diagramsekw_p3.png}
+\end{figure}
+Korepetytor oraz uczeń pracują na jednej tablicy synchronizującej zmiany w czasie rzeczywistym.
+
+\begin{itemize}[leftmargin=*]
+    \item Korepetytor otwiera tablicę o nazwie "Lekcja 1", rozpoczyna się sesja, korepetytor jest jedynym aktywnym uczestnikiem.
+    \item System pobiera z bazy danych elementy tablicy dodane podczas poprzednich sesji i wyświetla je lokalnie korepetytorowi.
+    \item Uczeń otwiera tablicę "Lekcja 1", jest dodawany do sesji, w tym momencie aktywnych na tablicy jest dwóch użytkowników.
+    \item System wyświetla elementy tablicy na urządzeniu ucznia.
+    \item Korepetytor korzystając z narzędzia pen rysuje linię na tablicy.
+    \item System zapisuje zmianę zawartości w bazie danych, następnie aktualizuje zawartość tablicy na urządzeniu ucznia.
+    \item Uczeń dodaje tekst "2+2=4" na tablicy.
+    \item System dodaje element do bazy danych oraz aktualizuje tablicę na urządzeniu korepetytora.
+\end{itemize}
+
+\subsubsection{Przykład 4. Wykorzystanie AI Assistant}
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{Diagramy/Diagramsekw_p4.png}
+\end{figure}
+Użytkownik korzystając podczas pracy na tablicy, korzysta z pomocy asystenta AI.
+
+\begin{itemize}[leftmargin=*]
+    \item Użytkownik klika przycisk reprezentujący chat AI.
+    \item System wyświetla okienko chatu.
+    \item Użytkownik wpisuje zapytanie: "Ile to jest 2+2?"
+    \item System wysyła request POST zawierające treść zapytania do interfejsu Google Gemini.
+    \item AI przetwarza zapytanie, generuje odpowiedź i wysyła ją z powrotem do systemu poprzez API.
+    \item System odbiera odpowiedź, następnie wyświetla ją w okienku chatu widocznym dla użytkownika.
+\end{itemize}
+
+\section{Perspektywa logiczna}
+
+\subsection{Diagram klas}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{Diagramy/ClassDiagram.jpg}
+    \caption{Diagram klas}
+    \label{fig:dgClass}
+\end{figure}
+
+\subsection{Uporządkowany alfabetycznie wykaz klas}
+
+\textbf{AIChat} - klasa przechowująca historię rozmów użytkownika z asystentem AI.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator wiadomości
+    \item user\_id - identyfikator użytkownika
+    \item board\_id - opcjonalny identyfikator tablicy
+    \item message - treść wiadomości użytkownika
+    \item response - odpowiedź od asystenta AI
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item sendMessage() - wysyła wiadomość tekstową do AI
+    \item getResponse() - pobiera odpowiedź od AI
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Board} - reprezentuje tablicę w workspace'ie. Tablica to współdzielone płótno, na którym użytkownicy mogą rysować, wstawiać obrazy i tworzyć wykresy w czasie rzeczywistym.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator tablicy
+    \item name - nazwa tablicy
+    \item icon - nazwa ikony
+    \item workspace\_id - identyfikator workspace'a
+    \item last\_modified - data ostatniej modyfikacji
+    \item last\_opened - data ostatniego otwarcia
+    \item created\_at - data utworzenia
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item create() - tworzy nową tablicę
+    \item edit() - edytuje tablicę
+    \item delete() - usuwa tablicę
+    \item open() - otwiera tablicę
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{BoardElement} - klasa bazowa reprezentująca element na tablicy. Może to być ścieżka rysunku, kształt geometryczny, obraz lub wykres funkcji. Dane elementu przechowywane są w formacie JSON dla elastyczności.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator elementu
+    \item board\_id - identyfikator tablicy
+    \item type - typ elementu (path, shape, image, function)
+    \item data - pełne dane elementu w formacie JSON
+    \item created\_by - identyfikator użytkownika który stworzył element
+    \item created\_at - data utworzenia elementu
+    \item is\_deleted - czy element został usunięty (soft delete)
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item create() - tworzy nowy element na tablicy
+    \item update() - aktualizuje dane elementu
+    \item delete() - oznacza element jako usunięty
+    \item sync() - synchronizuje element z innymi użytkownikami
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Invitation} - reprezentuje zaproszenie do workspace'a. Owner workspace'a może zapraszać innych użytkowników, którzy po akceptacji stają się członkami (Members).
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator zaproszenia
+    \item workspace\_id - identyfikator workspace'a
+    \item invited\_by - identyfikator użytkownika zapraszającego
+    \item invited\_user - identyfikator zaproszonego użytkownika
+    \item token - unikalny token zaproszenia
+    \item expires\_at - data wygaśnięcia zaproszenia
+    \item created\_at - data utworzenia zaproszenia
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item send() - wysyła zaproszenie do użytkownika
+    \item accept() - akceptuje zaproszenie i dodaje użytkownika do workspace'a
+    \item reject() - odrzuca zaproszenie
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{SearchBar} - klasa przechowująca historię wyszukiwań przez użytkownika. SmartSearch pozwala na szybkie znajdowanie materiałów z bazy.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator wyszukiwania
+    \item user\_id - identyfikator użytkownika
+    \item query - zapytanie wyszukiwania
+    \item result - znaleziony materiał
+    \item searched\_at - data i czas wyszukiwania
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item search() - wyszukuje danych w bazie.
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Subscription} - reprezentuje subskrypcję użytkownika (plan Free lub Pro). Przechowuje informacje o aktywnym planie, dacie rozpoczęcia i wygaśnięcia.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator subskrypcji
+    \item user\_id - identyfikator użytkownika
+    \item plan\_type - typ planu (FREE, PRO)
+    \item start\_date - data rozpoczęcia subskrypcji
+    \item end\_date - data wygaśnięcia subskrypcji
+    \item is\_active - czy subskrypcja jest aktywna
+    \item price - cena subskrypcji
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item upgrade() - zmienia plan z Free na Pro
+    \item cancel() - anuluje subskrypcję
+    \item renew() - odnawia subskrypcję na kolejny miesiąc
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{User} - reprezentuje użytkownika platformy EasyLesson.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator użytkownika
+    \item username - nazwa użytkownika (unikalna)
+    \item email - adres email (unikalny)
+    \item password - zahashowane hasło
+    \item created\_at - kiedy użytkownik założył konto
+    \item plan\_type - typ planu (FREE, PRO)
+    \item active\_workspace\_id - aktualnie wybrany workspace
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item register() - rejestruje nowego użytkownika w systemie
+    \item login() - loguje użytkownika (generuje token JWT)
+    \item resetPassword() - resetuje hasło
+\end{itemize}
+
+\vspace{1em}
+
+\textbf{Workspace} - reprezentuje workspace (obszar roboczy). Każdy workspace może zawierać wiele tablic (boards) i członków (members). Owner workspace'a ma pełną kontrolę nad nim.
+
+\textbf{\textit{Atrybuty}:}
+\begin{itemize}[leftmargin=*]
+    \item id - unikalny identyfikator workspace'a
+    \item name - nazwa workspace'a
+    \item icon - nazwa ikony
+    \item owner\_id - identyfikator właściciela workspace'a
+    \item created\_at - data utworzenia workspace'a
+\end{itemize}
+
+\textbf{\textit{Metody}:}
+\begin{itemize}[leftmargin=*]
+    \item create() - tworzy nowy workspace
+    \item edit() - edytuje nazwę, ikonę lub kolor workspace'a
+    \item delete() - usuwa workspace
+    \item invite() - zaprasza użytkownika do workspace'a
+\end{itemize}
+
+\subsection{Diagramy stanów dla dwóch wybranych klas, z opisem tekstowym
+występujących na nim elementów}
+
+\subsubsection{Diagram 1.Rejestracja użytkownika }
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Diagramy/rejestracja.jpg}
+\end{figure}
+
+\textbf{1. Stan początkowy}
+
+Użytkownik wypełnia formularz rejestracji podając swoje dane: imię i nazwisko, email, hasło i potwierdzenie hasła.
+
+\textbf{2. Stan „zwalidowane"}
+
+System sprawdza czy dane spełniają wymagania: poprawny format emaila, hasło minimum 8 znaków z wielką literą i cyfrą, zgodność haseł.
+
+\textbf{3. Stan „sprawdzone"}
+
+System weryfikuje w bazie danych czy podany email i nazwa użytkownika nie są już zajęte przez inne konto.
+
+\textbf{4. Stan „zatwierdzone"}
+
+Dane zostały zaakceptowane. System tworzy nowe konto użytkownika z statusem nieaktywnym i generuje 6-cyfrowy kod weryfikacyjny.
+
+\textbf{5. Stan „utworzone"}
+
+System automatycznie tworzy dla użytkownika pierwszą przestrzeń roboczą o nazwie "Moja Przestrzeń" i przypisuje mu plan darmowy.
+
+\textbf{6. Stan „wysłane"}
+
+Kod weryfikacyjny zostaje wysłany na podany adres email. Kod jest ważny przez 15 minut.
+
+\textbf{7. Stan „wprowadzone"}
+
+Użytkownik otrzymuje email, odczytuje kod i wprowadza go w formularzu weryfikacji na stronie.
+
+\textbf{8. Stan końcowy}
+
+Po wpisaniu poprawnego kodu konto zostaje aktywowane. Użytkownik może się zalogować i zacząć korzystać z platformy EasyLesson.
+
+
+
+\subsubsection{Diagram 2.Tworzenie tablicy}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\linewidth]{Diagramy/TablicaGenerate.jpg}
+\end{figure}
+
+\textbf{1. Stan początkowy}
+
+Użytkownik klika przycisk "Nowa" w sekcji tablic na dashboardzie.
+
+\textbf{2. Stan „modal otwarty"}
+
+System otwiera modal z formularzem. Użytkownik wypełnia nazwę tablicy (1-50 znaków, wymagane).
+
+\textbf{3. Stan „ikona wybrana"}
+
+Użytkownik wybiera ikonę z dostępnej siatki 9x4 (36 ikon z Lucide React).
+
+\textbf{4. Stan „kolor wybrany"}
+
+Użytkownik wybiera kolor z palety (10 kolorów z gradientami Tailwind CSS).
+
+\textbf{5. Stan „dane zwalidowane"}
+
+System sprawdza czy nazwa nie jest pusta i czy ma maksymalnie 50 znaków.
+
+\textbf{6. Stan „żądanie wysłane"}
+
+Frontend wywołuje endpoint POST /api/boards z danymi: name, workspaceid, icon, bgcolor.
+
+\textbf{7. Stan „tablica utworzona"}
+
+Backend tworzy Board w bazie danych oraz BoardUsers (relacja user-tablica) z isfavourite=false.
+
+\textbf{8. Stan końcowy}
+
+Użytkownik zostaje automatycznie przekierowany do nowo utworzonej tablicy i może rozpocząć pracę.
+
+
+
+\section{Wymagania niefunkcjonalne dla systemu}
+
+\subsection{Oszacowanie wielkości bazy danych}
+
+\textbf{Założenia:}
+
+W pierwszym roku działania platformy EasyLesson przewidujemy około 1000 użytkowników. Na podstawie analizy przypadków użycia oraz limitów dla planów Free i Premium, oszacowano następujące wielkości danych:
+
+\textbf{Podział użytkowników:}
+\begin{itemize}[leftmargin=*]
+    \item Free: 95\% (950 użytkowników)
+    \item Premium: 5\% (50 użytkowników)
+\end{itemize}
+
+\textbf{Przewidywana liczba rekordów:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Użytkownicy (User):} 1000 użytkowników
+    
+    \item \textbf{Workspace'y:} 1550 workspace'ów
+    \begin{itemize}
+        \item Uczniowie (Free): 700 użytkowników × 1 workspace = 700 workspace'ów
+        \item Korepetytorzy (Free): 250 użytkowników × 2 workspace'y = 500 workspace'ów
+        \item Premium (korepetytorzy): 50 użytkowników × 7 workspace'ów = 350 workspace'ów
+        \item Łącznie: 1550 workspace'ów
+    \end{itemize}
+    
+    \item \textbf{Tablice (Board):} 10 750 tablic
+    \begin{itemize}
+        \item Free (uczniowie): 700 workspace'ów × 5 tablic = 3500 tablic
+        \item Free (korepetytorzy): 500 workspace'ów × 5 tablic = 2500 tablic
+        \item Premium: 350 workspace'ów × 10 tablic = 3500 tablic
+        \item Dodatkowe (użytkownicy aktywni): +1250 tablic
+        \item Łącznie: 10 750 tablic
+    \end{itemize}
+    
+    \item \textbf{Elementy tablicy (BoardElement):} 10 750 000 elementów
+    \begin{itemize}
+        \item Średnio 1000 elementów na tablicę (rysunki, kształty, obrazy, wzory LaTeX)
+        \item 10 750 tablic × 1000 elementów = 10 750 000 elementów
+    \end{itemize}
+    
+    \item \textbf{Wiadomości AI Chat (AIChat):} 130 000 wiadomości miesięcznie
+    \begin{itemize}
+        \item Free: 950 użytkowników × 5 wiadomości/miesiąc = 4750 wiadomości (odnowienie co 24h)
+        \item Premium: 50 użytkowników × 100 wiadomości/miesiąc = 5000 wiadomości
+        \item Łącznie miesięcznie: 9750 wiadomości
+        \item Rocznie (z historią): ~117 000 wiadomości
+    \end{itemize}
+    
+    \item \textbf{Pliki (File):} 12 000 plików
+    \begin{itemize}
+        \item Free: 950 użytkowników × 10 plików = 9500 plików (limit zdjęć)
+        \item Premium: 50 użytkowników × 50 plików = 2500 plików (szacunek konserwatywny)
+        \item Łącznie: ~12 000 plików
+    \end{itemize}
+    
+    \item \textbf{Zaproszenia (Invitation):} 7750 zaproszeń
+    \begin{itemize}
+        \item Średnio 5 zaproszeń na workspace
+        \item 1550 workspace'ów × 5 = 7750 zaproszeń
+    \end{itemize}
+\end{itemize}
+
+\textbf{Przewidywana wielkość rekordu:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{User:} ~500 B (email, username, hasło zahashowane, metadane)
+    \item \textbf{Workspace:} ~300 B (nazwa, ikona, owner\_id, metadane)
+    \item \textbf{Board:} ~400 B (nazwa, ikona, workspace\_id, daty)
+    \item \textbf{BoardElement:} ~3 KB (dane JSON z ścieżkami rysunków, wzory LaTeX ~5 KB)
+    \item \textbf{AIChat:} ~1.5 KB (wiadomość + odpowiedź tekstowa)
+    \item \textbf{File (metadane):} ~500 B (nazwa, ścieżka, rozmiar, daty)
+    \item \textbf{File (zawartość):} średnio 3 MB (zdjęcia SVG, dokumenty)
+    \item \textbf{Invitation:} ~300 B (token, daty, user\_id)
+\end{itemize}
+
+\textbf{Całkowite oszacowanie wielkości bazy danych:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Dane strukturalne (tabele):}
+    \begin{itemize}
+        \item User: 1000 × 500 B = 0.5 MB
+        \item Workspace: 1550 × 300 B = 0.47 MB
+        \item Board: 10 750 × 400 B = 4.3 MB
+        \item BoardElement: 10 750 000 × 3 KB = 32.25 GB
+        \item AIChat: 117 000 × 1.5 KB = 175.5 MB
+        \item File (metadane): 12 000 × 500 B = 6 MB
+        \item Invitation: 7750 × 300 B = 2.3 MB
+    \end{itemize}
+    \textbf{Razem dane strukturalne: ~32.5 GB}
+    
+    \item \textbf{Pliki (storage):}
+    \begin{itemize}
+        \item 12 000 plików × 3 MB (średnia) = 36 GB
+    \end{itemize}
+    \textbf{Razem storage: ~36 GB}
+    
+    \item \textbf{Backup i indeksy:} +30\% = ~20.5 GB
+\end{itemize}
+
+\textbf{Całkowita przewidywana wielkość systemu w pierwszym roku: ~89 GB}
+
+\vspace{1em}
+\textit{Uwaga: Największy udział w bazie danych mają elementy tablic (BoardElement) ze względu na przechowywanie danych rysunków w formacie JSON oraz wzorów LaTeX. Zaleca się monitorowanie wzrostu bazy i planowanie skalowania po przekroczeniu 1000 użytkowników.}
+
+\subsection{Propozycja wymaganych czasów odpowiedzi dla systemu}
+
+System EasyLesson powinien zapewniać odpowiednie czasy odpowiedzi dla poszczególnych operacji, aby zagwarantować płynne i komfortowe korzystanie z platformy przez użytkowników. Poniższa tabela przedstawia maksymalne dopuszczalne czasy odpowiedzi dla kluczowych operacji w systemie:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|}
+\hline
+\textbf{Operacja} & \textbf{Maksymalny czas odpowiedzi} \\ \hline
+Logowanie użytkownika & 3 sekundy \\ \hline
+Rejestracja użytkownika (po wpisaniu kodu autoryzacyjnego) & 3 sekundy \\ \hline
+Ładowanie tablicy z elementami & 5 sekund \\ \hline
+Tworzenie nowej tablicy & 5 sekund \\ \hline
+Rysowanie/dodawanie elementu na tablicy & 50 ms \\ \hline
+Synchronizacja w czasie rzeczywistym (Realtime) & 200 ms \\ \hline
+Odpowiedź od AI Chat & 10 sekund \\ \hline
+Wyszukiwanie wzoru w SmartSearch & 1 sekunda \\ \hline
+Upload pliku (5 MB) & 5 sekund \\ \hline
+Tworzenie nowego workspace'a & 5 sekund \\ \hline
+Wysłanie zaproszenia do workspace'a & 3 sekundy \\ \hline
+\end{tabular}
+\caption{Wymagane czasy odpowiedzi dla operacji w systemie EasyLesson}
+\label{tab:czasy_odpowiedzi}
+\end{table}
+
+\vspace{1em}
+\textit{Uwaga: Najkrótsze czasy odpowiedzi wymagane są dla operacji interaktywnych takich jak rysowanie na tablicy (50 ms) oraz synchronizacja w czasie rzeczywistym (200 ms), co jest kluczowe dla komfortu współpracy wielu użytkowników na jednej tablicy. Operacje wymagające komunikacji z zewnętrznymi API (AI Chat) mogą wymagać dłuższego czasu odpowiedzi.}
+
+\subsection{Oszacowanie ilości i typów potrzebnych stanowisk pracy użytkowników systemu}
+
+System EasyLesson jest aplikacją webową dostępną przez przeglądarkę internetową, co eliminuje potrzebę instalacji dedykowanego oprogramowania. Poniżej przedstawiono oszacowanie ilości stanowisk oraz wymagania sprzętowe dla różnych typów użytkowników.
+
+\textbf{Typy użytkowników i stanowisk:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Uczniowie:} 700 stanowisk (70\% wszystkich użytkowników)
+    \begin{itemize}
+        \item Urządzenia: komputery, tablety, telefony
+        \item Głównie Plan Free (ograniczone funkcje)
+    \end{itemize}
+    
+    \item \textbf{Nauczyciele/Korepetytorzy:} 300 stanowisk (30\% wszystkich użytkowników)
+    \begin{itemize}
+        \item Urządzenia: komputery, tablety z rysikiem
+        \item Część na Planie Premium (rozszerzone funkcje)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Wspierane platformy:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Komputery:}
+    \begin{itemize}
+        \item Windows 10/11
+        \item macOS 10.15 lub nowszy
+        \item Linux (Ubuntu 20.04 lub nowszy, Fedora, Debian)
+    \end{itemize}
+    
+    \item \textbf{Tablety:}
+    \begin{itemize}
+        \item iPad (iPadOS 14 lub nowszy)
+        \item Android (wersja 10 lub nowsza)
+    \end{itemize}
+    
+    \item \textbf{Telefony:}
+    \begin{itemize}
+        \item iPhone (iOS 14 lub nowszy)
+        \item Android (wersja 10 lub nowsza)
+    \end{itemize}
+\end{itemize}
+
+\textbf{Minimalne wymagania sprzętowe dla komputera:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Procesor:} Intel Core i3 (8. generacji) / AMD Ryzen 3 lub równoważny
+    \item \textbf{RAM:} 4 GB (zalecane 8 GB dla płynnej pracy z wieloma tablicami)
+    \item \textbf{Połączenie internetowe:} minimum 5 Mbps (zalecane 10 Mbps dla synchronizacji w czasie rzeczywistym)
+    \item \textbf{Przeglądarka internetowa:}
+    \begin{itemize}
+        \item Google Chrome 100 lub nowszy
+        \item Mozilla Firefox 100 lub nowszy
+        \item Safari 15 lub nowszy
+        \item Microsoft Edge 100 lub nowszy
+    \end{itemize}
+    \item \textbf{Rozdzielczość ekranu:} minimum 1366x768 (zalecane 1920x1080)
+    
+\end{itemize}
+
+\textbf{Minimalne wymagania sprzętowe dla tabletu:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Procesor:} Apple A12 / Snapdragon 665 lub równoważny
+    \item \textbf{RAM:} 3 GB (zalecane 4 GB)
+    \item \textbf{Połączenie internetowe:} minimum 5 Mbps
+    \item \textbf{Rozdzielczość ekranu:} minimum 1280x800
+\end{itemize}
+
+\textbf{Minimalne wymagania sprzętowe dla telefonu:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Procesor:} Apple A12 / Snapdragon 665 lub równoważny
+    \item \textbf{RAM:} 3 GB
+    \item \textbf{Połączenie internetowe:} minimum 5 Mbps
+    \item \textbf{Rozdzielczość ekranu:} minimum 720x1280
+\end{itemize}
+
+\textbf{Zalecane akcesoria:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Tablet graficzny:} Zalecany dla nauczycieli i korepetytorów do precyzyjnego rysowania wzorów matematycznych i wykresów (np. Wacom, XP-Pen)
+    \item \textbf{Rysik:} Zalecany dla urządzeń mobilnych (np. Apple Pencil, Samsung S Pen) w celu łatwiejszego rysowania na tablicy
+    \item \textbf{Mysz:} Zalecana dla komputerów zamiast touchpada dla lepszej precyzji rysowania
+\end{itemize}
+
+\subsection{Wymagania bezpieczeństwa}
+
+System EasyLesson musi zapewniać odpowiedni poziom bezpieczeństwa danych użytkowników oraz ochronę przed nieautoryzowanym dostępem. Poniżej przedstawiono kluczowe wymagania bezpieczeństwa dla platformy:
+
+\subsubsection{Szyfrowanie połączenia}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Protokół:} HTTPS/TLS dla wszystkich połączeń między klientem a serwerem
+    \item \textbf{Certyfikat SSL:} Automatycznie zarządzany przez dostawców hostingu (Vercel dla frontendu, Render dla backendu)
+    \item \textbf{Minimalna wersja TLS:} TLS 1.2 lub nowszy
+    \item \textbf{Szyfrowanie bazy danych:} Dane w bazie PostgreSQL (Neon) szyfrowane w spoczynku (encryption at rest)
+\end{itemize}
+
+\subsubsection{Zarządzanie hasłami}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Algorytm hashowania:} bcrypt z automatycznym solowaniem
+    \item \textbf{Cost factor:} minimum 12 rund (parametr bcrypt)
+    \item \textbf{Polityka haseł:}
+    \begin{itemize}
+        \item Minimalna długość: 8 znaków
+        \item Wymagane: co najmniej jedna wielka litera
+        \item Wymagane: co najmniej jedna cyfra
+            
+        \item Brak wymuszania okresowej zmiany hasła
+    \end{itemize}
+    \item \textbf{Reset hasła:} Token jednorazowy z wygaśnięciem po 1 godzinie, wysyłany na zweryfikowany adres email
+\end{itemize}
+
+\subsubsection{Uwierzytelnianie}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Metoda:} JWT (JSON Web Tokens) z czasem wygaśnięcia
+    \item \textbf{Czas życia tokena:} 24 godziny dla tokena dostępu
+    \item \textbf{Refresh token:} 7 dni dla tokena odświeżającego
+    \item \textbf{Uwierzytelnianie dwuskładnikowe (2FA):} Planowane w przyszłości (weryfikacja przez email)
+    \item \textbf{Weryfikacja email:} Obowiązkowa dla wszystkich nowych użytkowników
+\end{itemize}
+
+\subsubsection{Backup i archiwizacja danych}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Częstotliwość backup:} Codziennie (automatycznie przez Neon PostgreSQL)
+    \item \textbf{Przechowywanie backup:} 7 dni
+    \item \textbf{Lokalizacja:} Infrastruktura dostawcy bazy danych (Neon)
+    \item \textbf{Szyfrowanie backup:} Backup szyfrowane przy użyciu AES-256
+    \item \textbf{Planowane rozszerzenie:} Własne dodatkowe backupy w przyszłości przy wzroście liczby użytkowników
+\end{itemize}
+
+\subsubsection{Komunikacja email}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Dostawca:} Resend (platforma do wysyłania emaili)
+    \item \textbf{Typy emaili:}
+    \begin{itemize}
+        \item Weryfikacja adresu email przy rejestracji
+        \item Reset hasła
+        \item Zaproszenia do workspace'ów
+        \item Powiadomienia o aktywności w workspace'ach (opcjonalne)
+    \end{itemize}
+    \item \textbf{Zabezpieczenia:} SPF, DKIM, DMARC dla autentykacji wiadomości
+\end{itemize}
+
+\subsubsection{Ochrona przed atakami}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Rate Limiting:} Ograniczenie liczby żądań API do 100 requestów/minutę na użytkownika
+    \item \textbf{CORS:} Kontrola dostępu między domenami (tylko dozwolone domeny)
+    \item \textbf{SQL Injection:} Ochrona poprzez parametryzowane zapytania SQL i ORM
+    \item \textbf{XSS Protection:} Sanityzacja danych wejściowych i wyjściowych
+    \item \textbf{CSRF Protection:} Tokeny CSRF dla operacji zmieniających stan
+\end{itemize}
+
+\subsection{Wymagania niezawodności}
+
+System EasyLesson musi zapewniać stabilne działanie oraz odpowiednią dostępność dla użytkowników. Poniżej przedstawiono wymagania dotyczące niezawodności platformy:
+
+\subsubsection{Dostępność systemu (uptime)}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Minimalna dostępność:} 99\% uptime (maksymalnie 87.6 godziny przestoju rocznie)
+    \item \textbf{Planowane okna serwisowe:} Prace konserwacyjne wykonywane w godzinach nocnych (2:00-4:00 czasu polskiego)
+    \item \textbf{Powiadomienia o przestojach:} Użytkownicy informowani z 48-godzinnym wyprzedzeniem o planowanych przerwach
+    \item \textbf{Monitoring:} Ciągłe monitorowanie dostępności serwisów (backend, baza danych, storage)
+\end{itemize}
+
+\subsubsection{Czas reakcji na awarie}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Krytyczne błędy:} 
+    \begin{itemize}
+        \item Definicja: Całkowita niedostępność systemu, utrata danych, naruszenie bezpieczeństwa
+        \item Czas reakcji: maksymalnie 1 godzina od wykrycia problemu
+        \item Czas naprawy: maksymalnie 24 godziny
+    \end{itemize}
+    \item \textbf{Błędy wysokiego priorytetu:}
+    \begin{itemize}
+        \item Definicja: Znaczące problemy z funkcjonalnościami (AI Chat, Realtime, upload plików)
+        \item Czas reakcji: maksymalnie 4 godziny
+        \item Czas naprawy: maksymalnie 72 godziny
+    \end{itemize}
+    \item \textbf{Błędy niskiego priorytetu:}
+    \begin{itemize}
+        \item Definicja: Drobne usterki UI, problemy kosmetyczne
+        \item Czas reakcji: maksymalnie 48 godzin
+        \item Czas naprawy: maksymalnie 7 dni
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Obsługa utraty połączenia internetowego}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Wykrywanie utraty połączenia:} System automatycznie wykrywa utratę połączenia z serwerem
+    \item \textbf{Komunikat dla użytkownika:} Wyświetlenie wyraźnego powiadomienia: "Utracono połączenie z serwerem. Sprawdź połączenie internetowe i odśwież stronę."
+    \item \textbf{Zapisywanie danych:} Dane NIE są zapisywane lokalnie - niezapisane zmiany na tablicy mogą zostać utracone
+    \item \textbf{Synchronizacja po powrocie:} Brak automatycznej synchronizacji - użytkownik musi ręcznie odświeżyć stronę
+    \item \textbf{Planowane ulepszenie:} W przyszłości planowane jest dodanie lokalnego cache'owania i automatycznej synchronizacji po powrocie połączenia
+\end{itemize}
+
+\subsubsection{Obsługa współpracy wielu użytkowników}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Maksymalna liczba użytkowników na tablicy (jednocześnie):}
+    \begin{itemize}
+        \item Plan Free: maksymalnie 5 użytkowników
+        \item Plan Premium: maksymalnie 15 użytkowników
+    \end{itemize}
+    \item \textbf{Limit wydajnościowy:} System ogranicza do 10 zdarzeń/sekundę na użytkownika (ograniczenie Supabase Realtime)
+    \item \textbf{Rozwiązywanie konfliktów edycji:}
+    \begin{itemize}
+        \item Blokada elementu podczas edycji przez jednego użytkownika
+        \item Wizualna sygnalizacja: kursor i nazwa użytkownika edytującego element
+        \item Automatyczne odblokowanie po 30 sekundach bezczynności
+    \end{itemize}
+    \item \textbf{Synchronizacja:} Zmiany na tablicy synchronizowane w czasie rzeczywistym (maksymalnie 200 ms opóźnienia)
+\end{itemize}
+
+\subsubsection{Limity systemu i obsługa przekroczenia}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Zasób} & \textbf{Plan Free} & \textbf{Plan Premium} \\ \hline
+Workspace'y & Bez limitu & Bez limitu \\ \hline
+Tablice na workspace & Bez limitu & Bez limitu \\ \hline
+Pliki (liczba) & 100 plików & 500 plików \\ \hline
+Rozmiar pojedynczego pliku & 5 MB & 25 MB \\ \hline
+AI Chat & 5 wiadomości/24h & 500 wiadomości/miesiąc \\ \hline
+Użytkownicy na tablicy (jednocześnie) & 5 osób & 15 osób \\ \hline
+\end{tabular}
+\caption{Limity zasobów w planach Free i Premium}
+\label{tab:limity_zasobow}
+\end{table}
+
+\textbf{Obsługa przekroczenia limitów:}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Komunikat o przekroczeniu:} Wyświetlenie modal z informacją: "Osiągnięto limit [zasób]. Wykup plan Premium aby korzystać z rozszerzonych limitów."
+    \item \textbf{Propozycja upgrade:} Przycisk "Wykup Premium" przekierowujący do strony z planami cenowymi
+    \item \textbf{Zablokowanie akcji:} Uniemożliwienie dodania kolejnych zasobów po osiągnięciu limitu
+    
+\end{itemize}
+
+\subsection{Wymagania użyteczności}
+
+System EasyLesson powinien być intuicyjny, łatwy w obsłudze oraz dostępny dla szerokiego grona użytkowników. Poniżej przedstawiono wymagania dotyczące użyteczności platformy:
+
+\subsubsection{Dostępność (Accessibility)}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Standard WCAG:} Zgodność z WCAG 2.1 poziom A (podstawowy poziom dostępności)
+    \item \textbf{Nawigacja klawiaturą:} 
+    \begin{itemize}
+        \item Obsługa klawisza Tab do poruszania się między elementami
+        \item Obsługa klawisza Enter do aktywacji przycisków
+        \item Obsługa klawiszy strzałek w menu i listach
+    \end{itemize}
+   
+    \item \textbf{Kontrast kolorów:} standardowe kolory interfejsu
+    \item \textbf{Rozmiar tekstu:} Możliwość powiększenia tekstu przez przeglądarkę (zoom) bez utraty funkcjonalności
+\end{itemize}
+
+\subsubsection{Wielojęzyczność}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Język podstawowy:} Polski (100\% interfejsu)
+    \item \textbf{Język dodatkowy:} Angielski
+    \item \textbf{Planowane rozszerzenie:} Pełne wsparcie języka angielskiego w przyszłych wersjach
+    \item \textbf{Przełączanie języka:} Menu w ustawieniach profilu użytkownika
+\end{itemize}
+
+\subsubsection{Responsywność i wieloplatformowość}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Pełna funkcjonalność na wszystkich urządzeniach:}
+    \begin{itemize}
+        \item Komputery (Windows, macOS, Linux) - pełna funkcjonalność
+        \item Tablety (iPad, Android) - pełna funkcjonalność + wsparcie dla rysików
+        \item Telefony (iPhone, Android) - pełna funkcjonalność z adaptacją UI
+    \end{itemize}
+    \item \textbf{Adaptacja interfejsu:}
+    \begin{itemize}
+        \item Desktop: wielokolumnowy layout, rozszerzone menu
+        \item Tablet: dwukolumnowy layout, menu rozwijane
+        \item Mobile: jednokolumnowy layout, menu hamburger
+    \end{itemize}
+    \item \textbf{Gesty dotykowe:}
+    \begin{itemize}
+        \item Pinch to zoom - przybliżanie i oddalanie tablicy
+        \item Swipe - przewijanie tablicy
+        \item Long press - menu kontekstowe elementu
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Pomoc i wsparcie użytkowników}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Tutorial dla nowych użytkowników:}
+    \begin{itemize}
+        \item Filmik instruktażowy dostępny w sekcji "Pomoc"
+        \item Czas trwania: 3-5 minut
+        \item Tematyka: podstawy korzystania z tablicy, współpraca, AI Chat
+    \end{itemize}
+    \item \textbf{Sekcja FAQ/Pomoc:}
+    \begin{itemize}
+        \item Odpowiedzi na najczęstsze pytania
+        \item Instrukcje krok po kroku dla głównych funkcji
+        \item Artykuły pomocy z zrzutami ekranu
+    \end{itemize}
+    \item \textbf{Obsługa klienta:}
+    \begin{itemize}
+        \item Formularz kontaktowy w aplikacji
+        \item Email: support@easylesson.app
+        \item Czas odpowiedzi: maksymalnie 48 godzin (dni robocze)
+    \end{itemize}
+    \item \textbf{Komunikaty błędów:}
+    \begin{itemize}
+        \item Zrozumiałe komunikaty w języku użytkownika
+        \item Sugestie rozwiązania problemu
+        \item Link do sekcji pomocy dla bardziej szczegółowych informacji
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Powiadomienia}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Powiadomienia email:}
+    \begin{itemize}
+        \item Weryfikacja adresu email
+        \item Zaproszenie do workspace'a
+        \item Akceptacja zaproszenia przez innego użytkownika
+        \item Reset hasła
+    \end{itemize}
+    \item \textbf{Powiadomienia w aplikacji (dashboard):}
+    \begin{itemize}
+        \item Nowe zaproszenie do workspace'a
+        \item Użytkownik dołączył do workspace'a (po akceptacji zaproszenia)
+        \item Badge z liczbą nieprzeczytanych powiadomień
+    \end{itemize}
+    \item \textbf{Brak powiadomień push:} System nie wysyła powiadomień push na urządzenia mobilne
+    \item \textbf{Zarządzanie powiadomieniami:} Użytkownik może wyłączyć powiadomienia email w ustawieniach profilu
+\end{itemize}
+
+\subsection{Wymagania łatwości utrzymania}
+
+System EasyLesson musi być łatwy w utrzymaniu, modyfikacji oraz rozbudowie. Poniżej przedstawiono wymagania dotyczące łatwości utrzymania platformy:
+
+\subsubsection{Testy automatyczne}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Framework testowy:} pytest dla backendu Python (FastAPI)
+    \item \textbf{Zakres testów:}
+    \begin{itemize}
+        \item Testy jednostkowe (unit tests) dla logiki biznesowej
+        \item Testy integracyjne dla API endpoints
+        \item Testy autoryzacji i uwierzytelniania
+    \end{itemize}
+    \item \textbf{Pokrycie testami:} 
+    \begin{itemize}
+        \item Cel: 70-80\% pokrycia kodu
+        
+    \end{itemize}
+    \item \textbf{Kluczowe moduły testowane:}
+    \begin{itemize}
+        \item \texttt{test\_auth\_service.py} - autentykacja (rejestracja, logowanie, weryfikacja)
+        \item \texttt{test\_workspace\_service.py} - zarządzanie workspace'ami
+        \item \texttt{test\_board\_service.py} - zarządzanie tablicami
+        \item \texttt{test\_user\_search.py} - wyszukiwanie użytkowników
+        \item \texttt{test\_workspace\_invites.py} - system zaproszeń
+        \item \texttt{test\_logger.py} - funkcjonalność logowania
+    \end{itemize}
+    \item \textbf{CI/CD:} Automatyczne uruchamianie testów przy każdym push do repozytorium (GitHub Actions)
+\end{itemize}
+
+\subsubsection{Dokumentacja kodu}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Dokumentacja API:}
+    \begin{itemize}
+        \item FastAPI Swagger - automatyczna dokumentacja na endpoint \texttt{/docs}
+        \item Szczegółowe opisy parametrów i odpowiedzi dla każdego endpointu
+        \item Przykłady requestów i responses
+    \end{itemize}
+    \item \textbf{Dokumentacja w kodzie:}
+    \begin{itemize}
+        \item Python: Docstringi w formacie Google Style dla wszystkich funkcji i klas
+        \item TypeScript: JSDoc comments dla złożonych funkcji
+        \item Komentarze inline dla nieoczywistej logiki biznesowej
+    \end{itemize}
+    \item \textbf{Standardy dokumentacji:}
+    \begin{itemize}
+        \item Schemas (Pydantic models): Szczegółowe opisy pól z walidacją
+        \item Services: Każda metoda ma opis funkcjonalności, parametrów i wartości zwracanych
+        \item Frontend components: TypeScript interfaces + komentarze dla złożonych komponentów
+    \end{itemize}
+    \item \textbf{README:} Plik README.md w głównym katalogu projektu z instrukcją uruchomienia i architektury systemu
+\end{itemize}
+
+\subsubsection{Logi systemowe}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Framework logowania:} Python logging module z konfiguracją dla FastAPI
+    \item \textbf{Poziomy logowania:}
+    \begin{itemize}
+        \item \textbf{INFO:} Operacje użytkowników (utworzenie tablicy, workspace, zaproszenie)
+        \item \textbf{WARNING:} Potencjalne problemy (workspace nie znaleziony, brak uprawnień)
+        \item \textbf{ERROR:} Błędy aplikacji wymagające interwencji
+        \item \textbf{DEBUG:} Szczegóły deweloperskie (tylko w trybie development)
+    \end{itemize}
+    \item \textbf{Lokalizacja logów:}
+    \begin{itemize}
+        \item \texttt{logs/app.log} - wszystkie logi aplikacji (rotacja przy 10 MB)
+        \item \texttt{logs/error.log} - tylko błędy ERROR (rotacja przy 10 MB)
+        \item Konsola - kolorowe logi dla trybu development
+    \end{itemize}
+    \item \textbf{Format logów:}
+    \begin{itemize}
+        \item Timestamp (ISO 8601)
+        \item Poziom logowania
+        \item Moduł/funkcja
+        \item Wiadomość
+        \item Dodatkowy kontekst (user\_id, workspace\_id, board\_id)
+    \end{itemize}
+    \item \textbf{Rotacja logów:} RotatingFileHandler - automatyczna rotacja po osiągnięciu 10 MB, zachowanie 5 ostatnich kopii
+    \item \textbf{Przykłady logowanych akcji:}
+    \begin{itemize}
+        \item Utworzenie/usunięcie/modyfikacja zasobów (workspace, tablica, element)
+        \item Zaproszenia użytkowników i akceptacja zaproszeń
+        \item Błędy autoryzacji i walidacji danych
+    \end{itemize}
+\end{itemize}
+
+\subsection{Wymagania przenośności}
+
+System EasyLesson powinien być łatwy do przeniesienia na inne infrastruktury oraz niezależny od konkretnych dostawców usług w jak największym stopniu. Poniżej przedstawiono wymagania dotyczące przenośności platformy:
+
+\subsubsection{Niezależność od bazy danych}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Aktualny dostawca:} Neon PostgreSQL (serverless PostgreSQL)
+    \item \textbf{Standard:} System wykorzystuje standardowy PostgreSQL 15+ bez specyficznych rozszerzeń Neon
+    \item \textbf{Możliwość migracji:}
+    \begin{itemize}
+        \item Łatwa migracja na innego dostawcę PostgreSQL (AWS RDS, Google Cloud SQL, własny serwer)
+        \item Dump bazy danych: \texttt{pg\_dump} / \texttt{pg\_restore}
+        \item Czas migracji: maksymalnie 2-4 godziny dla bazy ~100 GB
+    \end{itemize}
+    
+\end{itemize}
+
+\subsubsection{Niezależność hostingu frontendu}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Aktualny hosting:} Vercel
+    \item \textbf{Framework:} Next.js 15
+    \item \textbf{Możliwość migracji:}
+    \begin{itemize}
+        \item Netlify
+        \item AWS Amplify 
+        \item Własny serwer (Node.js)
+    \end{itemize}
+    \item \textbf{Czas migracji:} 1-2 godziny (zmiana konfiguracji deployment)
+\end{itemize}
+
+\subsubsection{Storage plików użytkowników}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Aktualny dostawca:}
+    \begin{itemize}
+        \item PostgreSQL (Neon.tech) - jedyny storage dla wszystkich danych aplikacji
+
+    \end{itemize}
+    
+    \item \textbf{Format przechowywania:} 
+    \begin{itemize}
+        \item Base64 w kolumnach JSONB w tabeli \texttt{board\_elements}
+        \item Obrazy kompresowane do max 1000px i konwertowane do JPEG (85\% jakość)
+        \item Wszystkie pliki jako embedded data URLs w strukturze elementów tablicy
+    \end{itemize}
+    
+    \item \textbf{Struktura danych:}
+    \begin{lstlisting}[language=SQL]
+CREATE TABLE board_elements (
+    id SERIAL PRIMARY KEY,
+    board_id INTEGER NOT NULL REFERENCES boards(id) ON DELETE CASCADE,
+    element_id VARCHAR(36) NOT NULL,
+    type VARCHAR(20) NOT NULL,        
+    data JSONB NOT NULL,              
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    is_deleted BOOLEAN DEFAULT FALSE
+);
+    
+ 
+    \end{lstlisting}
+
+
+    
+    \item \textbf{Możliwość migracji:}
+    \begin{itemize}
+
+        \item Vercel Blob Storage
+
+        \item Google Cloud Storage
+    \end{itemize}
+    
+    \item \textbf{Czas migracji:} 2-4 dni (przepisanie logiki storage + migracja danych z JSONB na URLs)
+\end{itemize}
+
+\subsubsection{Zewnętrzne API i usługi}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{AI Chat:} 
+    \begin{itemize}
+        \item Aktualnie: Google Gemini API
+        \item Alternatywy: OpenAI GPT, Anthropic Claude
+        
+    \end{itemize}
+    \item \textbf{Email:}
+    \begin{itemize}
+        \item Aktualnie: Resend
+        \item Alternatywy: SendGrid, Mailgun, AWS SES
+        \item Czas przepięcia: 1-2 godziny (zmiana konfiguracji)
+    \end{itemize}
+    \item \textbf{Realtime (WebSocket):}
+    \begin{itemize}
+        \item Aktualnie: Supabase Realtime
+        \item Alternatywy: Socket.io, Pusher, Ably
+        \item Czas przepięcia: 8-16 godzin
+    \end{itemize}
+\end{itemize}
+
+
+
+
+
+
+\section{Propozycja technologii informatycznych, które mogą zostać zastosowane do realizacji systemu (sprzęt i oprogramowanie)}
+
+\subsection{Technologie oprogramowania}
+
+\textbf{Frontend:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Next.js 15} - framework React do budowy aplikacji webowych z renderowaniem po stronie serwera (SSR)
+    \item \textbf{React 19} - biblioteka JavaScript do budowy interfejsów użytkownika
+    \item \textbf{TypeScript} - typowany JavaScript zwiększający bezpieczeństwo kodu
+    \item \textbf{Tailwind CSS} - framework CSS utility-first do stylizacji interfejsu
+    
+    
+\end{itemize}
+
+\textbf{Backend:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{FastAPI} - nowoczesny framework Python do tworzenia REST API
+    \item \textbf{Python 3.12+} - język programowania backend
+    
+    \item \textbf{JWT (JSON Web Tokens)} - autoryzacja użytkowników
+\end{itemize}
+
+\textbf{Baza danych i storage:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Neon PostgreSQL} - serverless PostgreSQL jako główna baza danych
+    \item \textbf{Supabase Realtime} - synchronizacja w czasie rzeczywistym między użytkownikami na tablicy
+    
+\end{itemize}
+
+\textbf{AI i wyszukiwanie:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Google Gemini API} - model AI do asystenta czatu
+    \item \textbf{PostgreSQL Full-Text Search} - wyszukiwanie wzorów w SmartSearch
+\end{itemize}
+
+\textbf{Komunikacja i email:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Resend} - platforma do wysyłania emaili (weryfikacja, resetowanie hasła, zaproszenia)
+    \item \textbf{WebSocket (Supabase Realtime)} - komunikacja w czasie rzeczywistym między użytkownikami
+\end{itemize}
+
+\textbf{Hosting i deployment:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Vercel} - hosting dla aplikacji Next.js (frontend)
+    \item \textbf{Render} - hosting dla backendu FastAPI
+    \item \textbf{Neon} - hosting bazy danych PostgreSQL
+\end{itemize}
+
+\textbf{Narzędzia deweloperskie:}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Git} - system kontroli wersji
+    \item \textbf{GitHub} - repozytorium kodu i CI/CD
+    \item \textbf{npm/pnpm} - menedżer pakietów JavaScript
+    \item \textbf{pip} - menedżer pakietów Python
+    \item \textbf{ESLint} - linter dla kodu JavaScript/TypeScript
+    \item \textbf{Prettier} - formatowanie kodu
+\end{itemize}
+
+\subsection{Wymagania sprzętowe serwera}
+
+\textbf{Serwer aplikacji (Backend - FastAPI):}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{CPU:} 2-4 vCPU (minimum 2 GHz)
+    \item \textbf{RAM:} 4-8 GB
+    \item \textbf{Dysk:} 50 GB SSD
+    \item \textbf{Bandwidth:} 100 GB/miesiąc
+    \item \textbf{System operacyjny:} Ubuntu Server 22.04 LTS lub nowszy
+\end{itemize}
+
+\textbf{Serwer bazy danych (Neon PostgreSQL):}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{CPU:} 2 vCPU
+    \item \textbf{RAM:} 4 GB
+    \item \textbf{Dysk:} 100 GB SSD (z uwzględnieniem wzrostu do ~89 GB w pierwszym roku)
+    \item \textbf{Backup:} automatyczne codzienne backup'y
+\end{itemize}
+
+\textbf{Serwer plików (Vercel Blob Storage):}
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Przestrzeń dyskowa:} 50 GB (dla ~12 000 plików po ~3 MB)
+    \item \textbf{Bandwidth:} 500 GB/miesiąc
+    \item \textbf{CDN:} automatyczne cachowanie i dystrybucja plików
+\end{itemize}
+
+\subsection{Bezpieczeństwo}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{HTTPS/TLS} - szyfrowane połączenie SSL
+    \item \textbf{JWT Authentication} - bezpieczna autoryzacja użytkowników
+    \item \textbf{bcrypt} - hashowanie haseł użytkowników
+    \item \textbf{CORS} - kontrola dostępu między domenami
+    \item \textbf{Rate Limiting} - ochrona przed nadmiernym obciążeniem API
+    \item \textbf{SQL Injection Protection} - parametryzowane zapytania SQL
+\end{itemize}
+
+\subsection{Licencje}
+
+Wszystkie wykorzystane technologie posiadają licencje komercyjne (MIT, Apache 2.0), które pozwalają na swobodne użycie w produktach komercyjnych:
+
+\begin{itemize}[leftmargin=*]
+    \item Next.js, React - MIT License
+    \item Tailwind CSS - MIT License
+    \item FastAPI - MIT License
+    \item PostgreSQL - PostgreSQL License (podobna do MIT)
+    \item KaTeX - MIT License
+\end{itemize}
+
+
+\section{Propozycja planu projektu}
+
+Projekt EasyLesson zostanie zrealizowany w kilku fazach, z uwzględnieniem etapu MVP (Minimum Viable Product) oraz późniejszego rozszerzenia funkcjonalności. Poniżej przedstawiono szczegółowy harmonogram prac.
+
+\subsection{Określenie wymagań}
+
+W fazie tej zostaną określone wymagania opisujące cele, zakres i konspekt systemu. Zbierane będą informacje od przyszłych użytkowników systemu (nauczycieli, korepetytorów, uczniów), czego oczekują od platformy, w czym ma im pomóc, jakie funkcjonalności są dla nich kluczowe. Przeprowadzone zostaną wywiady z potencjalnymi użytkownikami oraz analiza konkurencji na rynku platform edukacyjnych. Stworzony zostanie dokument specyfikacji wymagań funkcjonalnych i niefunkcjonalnych.
+
+\textbf{Czas trwania:} 2 tygodnie.
+
+\textbf{Liczba osób realizujących ten etap:} 3 (cały zespół).
+
+\subsection{Projektowanie}
+
+Na tym etapie powstanie szczegółowy projekt systemu spełniający ustalone wcześniej wymagania. Zostanie zaprojektowana architektura systemu, model bazy danych, interfejs użytkownika oraz API. Stworzone zostaną diagramy UML (przypadki użycia, diagramy klas, diagramy sekwencji), makiety interfejsu (wireframes, mockupy) oraz dokumentacja techniczna. Wykorzystany on będzie do bezpośredniej implementacji systemu. Wskazane jest wydzielenie z projektu pewnych modułów (tablica interaktywna, AI Chat, SmartSearch, system autoryzacji) tak, aby programiści mogli zacząć równoległą pracę. Ponadto moduły te będą mogły być wykorzystane w przyszłych rozszerzeniach projektu.
+
+\textbf{Czas trwania:} 1 miesiąc.
+
+\textbf{Liczba osób realizujących ten etap:} 3 (cały zespół).
+
+\subsection{Implementacja - Etap MVP}
+
+W tej fazie tworzenia system zostanie zaimplementowany w konkretnym środowisku programistycznym (Next.js, FastAPI, Neon PostgreSQL). Implementacja będzie prowadzona równolegle przez wszystkich członków zespołu, z podziałem na moduły:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Moduł autoryzacji} - rejestracja, logowanie, resetowanie hasła
+    \item \textbf{Moduł workspace'ów i tablic} - tworzenie, edycja, usuwanie workspace'ów i tablic
+    \item \textbf{Moduł tablicy interaktywnej} - rysowanie, kształty, synchronizacja w czasie rzeczywistym
+    \item \textbf{Moduł AI Chat} - integracja z Gemini API, historia rozmów
+    \item \textbf{Moduł SmartSearch} - wyszukiwanie wzorów matematycznych
+    \item \textbf{System subskrypcji} - plany Free i Premium, integracja z bramką płatności
+\end{itemize}
+
+W ramach MVP zostaną zaimplementowane podstawowe funkcjonalności umożliwiające prowadzenie lekcji online na tablicy interaktywnej z wykorzystaniem AI i SmartSearch.
+
+\textbf{Czas trwania:} 2 miesiące.
+
+\textbf{Liczba osób realizujących ten etap:} 3 (cały zespół, z możliwością rozszerzenia o dodatkowych programistów w razie potrzeby).
+
+\subsection{Testowanie}
+
+Na tym etapie nastąpi integracja poszczególnych modułów. Testowanie przeprowadzane będzie zarówno na pojedynczych modułach (testy jednostkowe), jak i na całym systemie (testy integracyjne, testy end-to-end). Przeprowadzone zostaną testy wydajnościowe (load testing) oraz testy bezpieczeństwa. W tej części wykorzystane zostaną również osoby, które nie brały udziału w tworzeniu systemu - potencjalni użytkownicy (nauczyciele, uczniowie) w ramach testów użyteczności (usability testing). Zostanie przeprowadzone szkolenie dla pierwszych użytkowników, zapoznanie ich z obsługą i możliwościami oferowanymi przez platformę.
+
+\textbf{Czas trwania:} 2 miesiące.
+
+\textbf{Liczba osób realizujących ten etap:} 3 (cały zespół) + grupa testerów zewnętrznych (5-10 użytkowników).
+
+\subsection{Wdrożenie i beta testy}
+
+System zostanie wdrożony na środowisko produkcyjne (Vercel, Neon) i udostępniony ograniczonej grupie użytkowników w ramach programu beta testów. Użytkownicy beta będą testować platformę w rzeczywistych warunkach, zgłaszać błędy i sugerować ulepszenia. Na podstawie feedbacku zostaną wprowadzone niezbędne poprawki i optymalizacje. Będzie to również faza zbierania danych analitycznych o użytkowaniu systemu (Google Analytics, Hotjar).
+
+\textbf{Czas trwania:} 1 miesiąc.
+
+\textbf{Liczba osób realizujących ten etap:} 3 (cały zespół) + grupa użytkowników beta.
+
+\subsection{Konserwacja i rozszerzanie funkcjonalności}
+
+System jest wykorzystywany już przez użytkowników końcowych. Dokonywana będzie konserwacja oprogramowania oraz pewne modyfikacje polegające na usuwaniu błędów wykrytych przez użytkowników, optymalizacji wydajności, zmianach i rozszerzaniu funkcji systemu na podstawie zebranego feedbacku. Planowane rozszerzenia obejmują:
+
+\begin{itemize}[leftmargin=*]
+    \item Dodatkowe narzędzia do rysowania (np. wykresy 3D)
+    
+    \item Rozszerzenie bazy wzorów w SmartSearch
+    
+\end{itemize}
+
+\textbf{Liczba osób realizujących ten etap:} Cały zespół. W szczególnych wypadkach więcej (np. gdy wykryto krytyczny błąd, którego usunięcie zajęłoby zbyt dużo czasu jednej osobie, lub podczas wdrażania nowych funkcjonalności).
+
+\subsection{Harmonogram całkowity}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|c|c|}
+\hline
+\textbf{Etap} & \textbf{Czas trwania} & \textbf{Liczba osób} \\ \hline
+Określenie wymagań & 2 tygodnie & 3 \\ \hline
+Projektowanie & 1 miesiąc & 3 \\ \hline
+Implementacja (MVP) & 2 miesiące & 3 \\ \hline
+Testowanie & 2 miesiące & 3 \\ \hline
+Wdrożenie i beta testy & 1 miesiąc & 3 + użytkownicy beta \\ \hline
+Konserwacja & Ciągła & 3+ \\ \hline
+\end{tabular}
+\caption{Harmonogram realizacji projektu EasyLesson}
+\label{tab:harmonogram}
+\end{table}
+
+\textbf{Całkowity czas realizacji projektu do wersji MVP:} około 4-5 miesięcy.
+
+\subsection{Diagram Gantt'a}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.9\textwidth]{Diagramy/DiagramGantta.png}
+    \caption{Diagram Gantta - harmonogram projektu EasyLesson}
+    \label{fig:gantt}
+\end{figure}
+
+\newpage
+
+\section{Podręcznik użytkownika}
+
+\subsection{Wprowadzenie}
+
+\subsubsection{Czym jest EasyLesson?}
+
+EasyLesson to platforma edukacyjna umożliwiająca prowadzenie interaktywnych lekcji online w czasie rzeczywistym. System został stworzony specjalnie z myślą o korepetytorach i nauczycielach matematyki, fizyki oraz przedmiotów ścisłych.
+
+
+Kluczowe możliwości:
+\begin{itemize}
+    \item Współdzielona tablica do rysowania i pisania
+    \item SmartSearch - szybkie wyszukiwanie wzorów matematycznych
+    \item AI Assistant - pomoc w rozwiązywaniu zadań
+    \item Praca zespołowa w czasie rzeczywistym
+    \item Organizacja tablic i użytkowników w workspace'ach
+\end{itemize}
+
+\subsubsection{Dla kogo jest EasyLesson?}
+
+\begin{itemize}
+    \item \textbf{Nauczyciele i korepetytorzy} - prowadzenie profesjonalnych zajęć online z wieloma uczniami.
+    \item \textbf{Uczniowie} - dostęp do materiałów, współpraca z nauczycielem, pomoc AI.
+    \item \textbf{Zespoły edukacyjne} - organizacja materiałów, współdzielenie zasobów.
+\end{itemize}
+
+\subsubsection{Wymagania systemowe}
+
+\textbf{Przeglądarki internetowe }(zalecane):
+\begin{itemize}
+    \item Google Chrome
+    \item Microsoft Edge
+\end{itemize}
+\noindent
+\textbf{Urządzenia}:
+\begin{itemize}
+    \item Komputer (Windows, macOS, Linux)
+    \item Tablet (iPad, Android)
+    \item Telefon (iOS, Android)
+\end{itemize}
+\noindent
+\textbf{Połączenie internetowe}:
+\begin{itemize}
+    \item Minimum 5 Mbps
+    \item Zalecane 10 Mbps (dla synchronizacji w czasie rzeczywistym)
+\end{itemize}
+\noindent
+\textbf{Opcjonalnie} (dla lepszego komfortu):
+\begin{itemize}
+    \item Tablet graficzny lub rysik
+    \item Mysz (zamiast touchpada)
+\end{itemize}
+
+\subsection{Rejestracja konta}
+
+Aby korzystać z platformy EasyLesson, należy najpierw utworzyć konto użytkownika.
+
+\paragraph{Krok 1: Przejście do formularza rejestracji}
+
+\begin{enumerate}
+    \item Otwórz stronę główną EasyLesson w przeglądarce
+    \item Kliknij przycisk \textbf{,,Zarejestruj się''} w prawym górnym rogu
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/homepage_rejestracja.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Wypełnienie formularza i akceptacja regulaminu}
+
+W formularzu rejestracji wypełnij następujące pola:
+
+\begin{itemize}
+    \item \textbf{Login (username)} -- unikalna nazwa, która będzie widoczna dla innych użytkowników
+    \item \textbf{Email} -- służy do logowania i odzyskiwania hasła
+    \item \textbf{Hasło} -- minimum 8 znaków, musi zawierać wielką literę i cyfrę
+    \item \textbf{Powtórz hasło} -- wpisz hasło ponownie w celu weryfikacji
+\end{itemize}
+
+Po wypełnieniu formularza, zaakceptuj regulamin po wcześniejszym zapoznaniu się z jego treścią.
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/formularz_rejestracji.png}
+    }
+\end{figure}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!60!black,title=\faInfoCircle\ Wskazówka]
+Wybierz silne hasło zawierające co najmniej 8 znaków, wielką literę, małą literę oraz cyfrę. Nie używaj tego samego hasła co na innych stronach.
+\end{tcolorbox}
+
+Po wysłaniu formularza rejestracji, system automatycznie wysyła 6-cyfrowy kod weryfikacyjny na podany adres email.
+
+\paragraph{Krok 3: Sprawdzenie skrzynki email}
+
+\begin{enumerate}
+    \item Otwórz swoją skrzynkę pocztową
+    \item Znajdź wiadomość od EasyLesson (sprawdź folder SPAM, jeśli nie widzisz wiadomości)
+    \item Odczytaj 6-cyfrowy kod weryfikacyjny
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+Kod weryfikacyjny jest ważny przez 15 minut. Jeśli nie zdążysz go wprowadzić w tym czasie, kliknij przycisk ,,Wyślij kod ponownie''.
+\end{tcolorbox}
+
+\paragraph{Krok 4: Wprowadzenie kodu}
+
+\begin{enumerate}
+    \item System automatycznie przekieruje Cię na stronę weryfikacji
+    \item Wpisz otrzymany 6-cyfrowy kod w formularzu
+    \item Kliknij przycisk \textbf{,,Zweryfikuj''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/weryfikacja_email.png}
+    }
+\end{figure}
+
+\paragraph{Krok 5: Potwierdzenie aktywacji}
+
+Po prawidłowym wprowadzeniu kodu:
+\begin{itemize}
+    \item System wyświetli komunikat: \textit{,,Konto aktywowane pomyślnie''}
+    \item Zostaniesz automatycznie przekierowany na stronę logowania
+\end{itemize}
+
+\subsection{Logowanie do systemu}
+
+\begin{enumerate}
+    \item Na stronie głównej kliknij przycisk \textbf{,,Zaloguj się''}
+    \item Wprowadź swój \textbf{email} lub \textbf{username}
+    \item Wprowadź \textbf{hasło}
+    \item Kliknij przycisk \textbf{,,Zaloguj''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/homepage_login.png}
+    }
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/formularz_logowania.png}
+    }
+\end{figure}
+
+Po pomyślnym zalogowaniu zostaniesz przekierowany do \textbf{Dashboardu} -- głównego panelu użytkownika.
+
+\subsubsection{Problemy z logowaniem}
+
+Jeśli nie możesz się zalogować, sprawdź:
+
+\begin{itemize}
+    \item Czy Caps Lock jest wyłączony
+    \item Czy wpisujesz prawidłowy email lub username
+    \item Czy wpisujesz prawidłowe hasło (zwróć uwagę na wielkie i małe litery)
+    \item Czy Twoje konto zostało zweryfikowane (sprawdź email)
+\end{itemize}
+
+\subsection{Odzyskiwanie hasła}
+
+Jeśli zapomniałeś hasła, możesz je zresetować za pomocą kodu weryfikacyjnego wysłanego na email.
+
+\subsubsection{Krok 1: Rozpoczęcie procedury}
+
+\begin{enumerate}
+    \item Na stronie logowania kliknij link \textbf{,,Zapomniałeś hasła?''}
+    \item Wprowadź swój \textbf{adres email} przypisany do konta
+    \item Kliknij przycisk \textbf{,,Wyślij kod''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/01_rejestracja_logowanie/odzyskiwanie_hasla.png}
+    }
+\end{figure}
+
+\subsubsection{Krok 2: Wprowadzenie kodu weryfikacyjnego}
+
+\begin{enumerate}
+    \item Sprawdź swoją skrzynkę email
+    \item Skopiuj 6-cyfrowy kod weryfikacyjny
+    \item Wprowadź kod w formularzu na stronie
+    \item Kliknij \textbf{,,Zweryfikuj kod''}
+\end{enumerate}
+
+\subsubsection{Krok 3: Ustawienie nowego hasła}
+
+\begin{enumerate}
+    \item Wprowadź \textbf{nowe hasło} (minimum 8 znaków, wielka litera, cyfra)
+    \item Wprowadź ponownie \textbf{nowe hasło} w celu potwierdzenia
+    \item Kliknij przycisk \textbf{,,Zmień hasło''}
+\end{enumerate}
+
+Po pomyślnej zmianie hasła zostaniesz przekierowany na stronę logowania, gdzie możesz zalogować się używając nowego hasła.
+
+\subsection{Dashboard -- centrum kontroli}
+
+Po pierwszym zalogowaniu zobaczysz \textbf{Dashboard} -- główny panel użytkownika, który zawiera:
+
+\begin{itemize}
+    \item \textbf{Lista workspace'ów} -- Twoje obszary robocze
+    \item \textbf{Panel powiadomień} -- zaproszenia, aktywności
+    \item \textbf{Menu nawigacyjne} -- szybki dostęp do funkcji
+    \item \textbf{Informacje o koncie} -- aktualny plan (Free/Premium)
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/dashboard.png}
+    }
+\end{figure}
+
+\subsubsection{Domyślny workspace}
+
+System automatycznie tworzy dla każdego nowego użytkownika pierwszy workspace o nazwie \textit{,,Moja Przestrzeń''}. Możesz go:
+\begin{itemize}
+    \item Zmienić nazwę
+    \item Zmienić ikonę i kolor
+    \item Usunąć i utworzyć nowy
+\end{itemize}
+
+Szczegóły zarządzania workspace'ami opisano w rozdziale 3.
+
+\subsubsection{Menu nawigacyjne}
+
+W górnej części ekranu znajduje się menu nawigacyjne z następującymi opcjami:
+
+\begin{itemize}
+    \item \textbf{Dashboard} -- powrót do strony głównej
+    \item \textbf{SmartSearchBar} -- pasek wyszukiwania, w którym możesz wyszukiwać treści
+    \item \textbf{Cennik} -- porównanie planów Free i Premium
+    \item \textbf{Profil} -- zarządzanie kontem użytkownika
+    \item \textbf{Powiadomienia} -- zaproszenia i aktywności
+    \item \textbf{Pomoc} -- FAQ i kontakt z supportem
+\end{itemize}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Możesz w każdej chwili wrócić do Dashboardu klikając logo EasyLesson w lewym górnym rogu ekranu.
+\end{tcolorbox}
+
+\subsection{Wylogowanie}
+
+Aby wylogować się z systemu:
+
+\begin{enumerate}
+    \item Kliknij ikonę profilu w prawym górnym rogu
+    \item Wybierz opcję \textbf{,,Wyloguj''}
+    \item System zakończy sesję i przekieruje Cię na stronę główną
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga dotycząca bezpieczeństwa]
+Zawsze wylogowuj się z systemu, gdy korzystasz z komputera współdzielonego lub publicznego.
+\end{tcolorbox}
+
+\subsection{Workspace'y}
+
+Workspace (obszar roboczy) to miejsce, w którym organizujesz swoje tablice i współpracujesz z innymi użytkownikami. Każdy workspace może zawierać wiele tablic oraz członków zespołu.
+
+\subsubsection{Tworzenie nowego workspace'a}
+
+\paragraph{Krok 1: Otwórz formularz tworzenia}
+
+\begin{enumerate}
+    \item Z poziomu Dashboardu kliknij przycisk \textbf{,,Stwórz workspace''}
+    \item System wyświetli formularz konfiguracji
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/create_workspace_button.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Konfiguracja workspace'a}
+
+W formularzu wypełnij następujące pola:
+
+\begin{itemize}
+    \item \textbf{Nazwa workspace'a} -- opisowa nazwa, np. ,,Korepetycje z matematyki'', ,,Fizyka - klasa 3''
+    \item \textbf{Ikona} -- wybierz ikonę z dostępnej galerii (36 ikon do wyboru)
+    \item \textbf{Kolor tła} -- wybierz kolor z palety (10 kolorów z gradientami)
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/create_workspace_form.png}
+    }
+\end{figure}
+
+\paragraph{Krok 3: Utworzenie}
+
+\begin{enumerate}
+    \item Kliknij przycisk \textbf{,,Utwórz''}
+    \item System utworzy workspace i ustawi Cię jako właściciela (Owner)
+    \item Zostaniesz automatycznie przekierowany do nowo utworzonego workspace'a
+\end{enumerate}
+
+\subsubsection{Przeglądanie workspace'ów}
+
+Wszystkie workspace'y, do których należysz, wyświetlane są na Dashboardzie w formie kafelków.
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/workspace_list.png}
+    }
+\end{figure}
+
+Każdy kafelek workspace'a zawiera:
+\begin{itemize}
+    \item \textbf{Ikonę i nazwę} workspace'a
+    \item \textbf{Ikonkę dodania do ulubionych}
+    \item \textbf{Ikonę menu} z opcjami zarządzania
+\end{itemize}
+
+Aby otworzyć workspace, kliknij na jego kafelek.
+
+\subsubsection{Edycja workspace'a}
+
+\textbf{Uwaga:} Edycja workspace'a jest dostępna tylko dla \textbf{Owner'a} (właściciela).
+
+\paragraph{Krok 1: Otwórz menu opcji}
+
+\begin{enumerate}
+    \item Na kafelku workspace'a kliknij ikonę \textbf{zębatki}
+\end{enumerate}
+
+\paragraph{Krok 2: Wprowadź zmiany}
+
+\begin{enumerate}
+    \item System wyświetli formularz edycji z aktualnymi wartościami
+    \item Zmień \textbf{nazwę}, \textbf{ikonę} lub \textbf{kolor} według potrzeb
+    \item Kliknij przycisk \textbf{,,Zapisz zmiany''}
+\end{enumerate}
+
+Zmiany zostaną natychmiast zapisane i widoczne dla wszystkich członków workspace'a.
+
+\subsubsection{Zapraszanie użytkowników do workspace'a}
+
+Wszyscy uczestnicy workspace'a mogą zapraszać innych użytkowników do współpracy.
+
+\paragraph{Krok 1: Otwórz workspace}
+
+\begin{enumerate}
+    \item Kliknij na kafelek workspace'a, aby go otworzyć
+    \item W górnej części ekranu znajdziesz przycisk \textbf{,,Zaproś''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/workspace_invite_button.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Wprowadź dane użytkownika}
+
+\begin{enumerate}
+    \item W formularzu zaproszenia wpisz \textbf{email} lub \textbf{username} osoby, którą chcesz zaprosić
+    \item Kliknij przycisk \textbf{,,Wyślij zaproszenie''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.7\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/invite_form.png}
+    }
+\end{figure}
+
+\paragraph{Krok 3: Oczekiwanie na akceptację}
+
+System wyśle powiadomienie do zaproszonego użytkownika:
+\begin{itemize}
+    \item Powiadomienie w aplikacji (widoczne w panelu powiadomień)
+    \item Wiadomość email z linkiem do akceptacji zaproszenia
+\end{itemize}
+
+\subsubsection{Akceptacja zaproszenia (dla zaproszonego użytkownika)}
+
+Jeśli otrzymałeś zaproszenie do workspace'a:
+
+\paragraph{Krok 1: Sprawdź powiadomienia}
+
+\begin{enumerate}
+    \item Kliknij ikonę \textbf{dzwonka} w prawym górnym rogu
+    \item Znajdź powiadomienie o zaproszeniu do workspace'a
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/notification_invite.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Akceptuj lub odrzuć}
+
+\begin{itemize}
+    \item Kliknij \textbf{,,Akceptuj''} -- zostaniesz dodany do workspace'a jako Member
+    \item Kliknij \textbf{,,Odrzuć''} -- zaproszenie zostanie usunięte
+\end{itemize}
+
+Po zaakceptowaniu zaproszenia, workspace pojawi się na Twoim Dashboardzie.
+
+\subsubsection{Przeglądanie członków workspace'a}
+
+\paragraph{Krok 1: Otwórz listę członków}
+
+\begin{enumerate}
+    \item Kliknij przycisk \textbf{,,zębatki''} w kafelku workspace'a
+    \item Wybierz zakładkę \textbf{,,Uczestnicy''} -- znajdują się tam informacje o wszystkich użytkownikach danej przestrzeni
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/02_dashboard_workspace/members_list.png}
+    }
+\end{figure}
+
+\subsubsection{Usuwanie członków (tylko Owner)}
+
+Jako właściciel workspace'a możesz usuwać członków.
+
+\paragraph{Krok 1: Znajdź użytkownika}
+
+\begin{enumerate}
+    \item Otwórz listę członków workspace'a
+    \item Znajdź użytkownika, którego chcesz usunąć
+\end{enumerate}
+
+\paragraph{Krok 2: Usuń użytkownika}
+
+\begin{enumerate}
+    \item Kliknij ikonę \textbf{,,Usuń''} obok nazwy użytkownika
+    \item Potwierdź usunięcie w wyświetlonym oknie dialogowym
+\end{enumerate}
+
+Po potwierdzeniu:
+\begin{itemize}
+    \item Użytkownik zostanie usunięty z workspace'a
+    \item Straci dostęp do wszystkich tablic w tym workspace'ie
+    \item Workspace zniknie z jego Dashboardu
+\end{itemize}
+
+\subsubsection{Opuszczanie workspace'a (dla Member)}
+
+Jeśli jesteś członkiem (Member) workspace'a, możesz go w każdej chwili opuścić.
+
+\paragraph{Krok 1: Otwórz menu workspace'a}
+
+\begin{enumerate}
+    \item Na Dashboardzie kliknij ikonę \textbf{X} na kafelku workspace'a
+    \item Jeżeli jestes właścicielem przestrzeni, zostanie ona usunięta. W pozostałych przypadkach po prostu opuścisz przestrzeń.
+\end{enumerate}
+
+Po opuszczeniu workspace'a:
+\begin{itemize}
+    \item Workspace zniknie z Twojego Dashboardu
+    \item Stracisz dostęp do wszystkich tablic w tym workspace'ie
+\end{itemize}
+
+\subsubsection{Role i uprawnienia w workspace'ie}
+
+W systemie EasyLesson istnieją dwie role użytkowników w workspace'ie:
+
+\paragraph{Owner (Właściciel)}
+\begin{itemize}
+    \item Pełna kontrola nad workspace'm
+    \item Może edytować nazwę, ikonę i kolor workspace'a
+    \item Może usuwać członków
+    \item Może usunąć workspace
+    \item Może tworzyć, edytować i usuwać tablice
+    \item Może pracować na tablicach
+\end{itemize}
+
+\paragraph{Member (Członek)}
+\begin{itemize}
+    \item Może przeglądać workspace i jego tablice
+    \item Może tworzyć nowe tablice
+    \item Może zapraszać nowych członków
+    \item Może edytować i usuwać \textbf{swoje} tablice
+    \item Może pracować na tablicach w czasie rzeczywistym
+    \item Może opuścić workspace w każdej chwili
+    \item \textbf{Nie może} edytować ustawień workspace'a
+    \item \textbf{Nie może} usuwać członków
+    \item \textbf{Nie może} usunąć workspace'a
+\end{itemize}
+
+\subsection{Praca z tablicami}
+
+Tablica to interaktywne płótno, na którym możesz rysować, pisać, wstawiać kształty i współpracować z innymi użytkownikami w czasie rzeczywistym.
+
+\subsubsection{Tworzenie nowej tablicy}
+
+\paragraph{Krok 1: Otwórz workspace}
+
+\begin{enumerate}
+    \item Z poziomu Dashboardu kliknij na kafelek workspace'a, w którym chcesz utworzyć tablicę
+    \item System wyświetli listę tablic w tym workspace'ie
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/03_tablice/workspace_boards_list.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Utwórz tablicę}
+
+\begin{enumerate}
+    \item Kliknij przycisk \textbf{,,Stwórz tablicę''}
+    \item System wyświetli formularz konfiguracji
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/03_tablice/create_board_button.png}
+    }
+\end{figure}
+
+\paragraph{Krok 3: Konfiguracja tablicy}
+
+W formularzu wypełnij następujące pola:
+
+\begin{itemize}
+    \item \textbf{Nazwa tablicy} -- opisowa nazwa, np. ,,Lekcja 1 - Funkcje liniowe'', ,,Zadania domowe''
+    \item \textbf{Ikona} -- wybierz ikonę z dostępnej galerii (36 ikon)
+    \item \textbf{Kolor tła} -- wybierz kolor z palety (10 kolorów)
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/03_tablice/create_board_form.png}
+    }
+\end{figure}
+
+\paragraph{Krok 4: Utworzenie}
+
+\begin{enumerate}
+    \item Kliknij przycisk \textbf{,,Utwórz''}
+    \item System utworzy tablicę i automatycznie ją otworzy
+    \item Możesz rozpocząć pracę
+\end{enumerate}
+
+\subsubsection{Otwieranie tablicy}
+
+\paragraph{Z poziomu workspace'a:}
+
+\begin{enumerate}
+    \item Otwórz workspace
+    \item Kliknij na kafelek tablicy, którą chcesz otworzyć
+    \item System załaduje tablicę ze wszystkimi elementami
+\end{enumerate}
+
+Każdy kafelek tablicy zawiera:
+\begin{itemize}
+    \item \textbf{Ikonę i nazwę} tablicy
+    \item \textbf{Datę ostatniej modyfikacji}
+    \item \textbf{Ikonę menu} (trzy kropki) z opcjami zarządzania
+\end{itemize}
+
+\subsubsection{Interfejs tablicy}
+
+Po otwarciu tablicy zobaczysz następujące elementy interfejsu:
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/03_tablice/board_interface_overview.png}
+    }
+\end{figure}
+
+\paragraph{Główne obszary:}
+
+\begin{itemize}
+    \item \textbf{Lewy pasek narzędzi} -- pionowy toolbar z narzędziami do rysowania i edycji
+    \item \textbf{Płótno tablicy} -- obszar roboczy
+    \item \textbf{Panel boczny} -- AI Chat, SmartSearch
+    \item \textbf{Lista użytkowników online} -- widoczni aktywni użytkownicy
+    \item \textbf{Przyciski nawigacji} -- powrót do workspace'a, ustawienia
+    \item \textbf{Kontrolki zoom} -- przyciski do przybliżania i oddalania widoku
+\end{itemize}
+
+\subsubsection{Dostępne narzędzia tablicy}
+
+Panel narzędzi znajduje się po lewej stronie ekranu i zawiera następujące narzędzia:
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/03_tablice/toolbar_vertical.png}
+    }
+\end{figure}
+
+\paragraph{Podstawowe narzędzia:}
+
+\begin{enumerate}
+    \item \textbf{Zaznacz (Select)} -- zaznaczanie, przesuwanie i edycja elementów | Skrót: \textbf{V}
+    \item \textbf{Przesuwaj (Pan)} -- przesuwanie widoku tablicy bez rysowania | Skrót: \textbf{H}
+    \item \textbf{Rysuj (Pen)} -- rysowanie odręczne piórem | Skrót: \textbf{P}
+    \item \textbf{Tekst (Text)} -- dodawanie napisów i etykiet | Skrót: \textbf{T}
+    \item \textbf{Kształty (Shape)} -- rysowanie figur geometrycznych | Skrót: \textbf{S}
+    \item \textbf{Funkcja (Function)} -- tworzenie wykresów funkcji matematycznych | Skrót: \textbf{F}
+    \item \textbf{Obraz (Image)} -- wstawianie obrazów z plików | Skrót: \textbf{I}
+    \item \textbf{Gumka (Eraser)} -- usuwanie elementów z tablicy | Skrót: \textbf{E}
+\end{enumerate}
+
+\paragraph{Dodatkowe narzędzia:}
+
+\begin{enumerate}
+    \item \textbf{Notatka (Markdown)} -- tworzenie notatek w formacie Markdown | Skrót: \textbf{M}
+    \item \textbf{Tabelka (Table)} -- wstawianie i edycja tabel
+    \item \textbf{Kalkulator (Calculator)} -- wbudowany kalkulator matematyczny
+\end{enumerate}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Wszystkie narzędzia mają przypisane skróty klawiszowe (pojedyncze litery) dla szybszego dostępu. Pełna lista skrótów znajduje się w rozdziale 9.
+\end{tcolorbox}
+
+\subsubsection{Podstawowe opcje narzędzi}
+
+Po wybraniu narzędzia, pojawia się panel właściwości, w którym możesz dostosować parametry:
+
+\paragraph{Pióro (Pen):}
+\begin{itemize}
+    \item Kolor linii (paleta kolorów)
+    \item Grubość linii (suwak 1-20 px)
+\end{itemize}
+
+\paragraph{Kształty (Shape):}
+\begin{itemize}
+    \item Typ kształtu: Prostokąt, Koło, Trójkąt, Linia, Strzałka, Wielokąt
+    \item Kolor obramowania
+    \item Kolor wypełnienia (lub przezroczysty)
+    \item Grubość obramowania
+    \item Liczba boków (dla wielokąta)
+\end{itemize}
+
+\paragraph{Tekst (Text):}
+\begin{itemize}
+    \item Czcionka (krój pisma)
+    \item Rozmiar czcionki
+    \item Kolor tekstu
+    \item Styl (pogrubienie, kursywa, podkreślenie)
+\end{itemize}
+
+\paragraph{Funkcja (Function):}
+\begin{itemize}
+    \item Wzór funkcji matematycznej (np. ,,x\textasciicircum 2'', ,,sin(x)'')
+    \item Zakres osi X
+    \item Kolor wykresu
+    \item Grubość linii wykresu
+\end{itemize}
+
+\paragraph{Gumka (Eraser):}
+\begin{itemize}
+    \item Rozmiar gumki (mały, średni, duży)
+    \item Tryb: usuwanie całych elementów lub mazanie linii
+\end{itemize}
+
+\subsubsection{Cofanie i ponawianie akcji}
+
+System automatycznie zapisuje historię wszystkich zmian na tablicy.
+
+\paragraph{Cofnij (Undo):}
+\begin{itemize}
+    \item Kliknij ikonę \textbf{strzałki w lewo} na pasku narzędzi
+    \item Lub użyj skrótu: \textbf{Ctrl+Z} (Windows/Linux) lub \textbf{Cmd+Z} (macOS)
+\end{itemize}
+
+\paragraph{Ponów (Redo):}
+\begin{itemize}
+    \item Kliknij ikonę \textbf{strzałki w prawo} na pasku narzędzi
+    \item Lub użyj skrótu: \textbf{Ctrl+Y} (Windows/Linux) lub \textbf{Cmd+Shift+Z} (macOS)
+\end{itemize}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+System przechowuje historię ostatnich 50 akcji. Cofnięcie więcej niż 50 kroków wstecz nie jest możliwe.
+\end{tcolorbox}
+
+\subsubsection{Przybliżanie i oddalanie widoku}
+
+\paragraph{Zoom (przybliżanie/oddalanie):}
+
+\textbf{Metoda 1 -- Kółko myszy:}
+\begin{itemize}
+    \item Przytrzymaj \textbf{Ctrl} (Windows/Linux) lub \textbf{Cmd} (macOS)
+    \item Obracaj \textbf{kółkiem myszy} w górę (przybliż) lub w dół (oddal)
+\end{itemize}
+
+\textbf{Metoda 2 -- Gesty dotykowe (tablet/telefon):}
+\begin{itemize}
+    \item Użyj gestu \textbf{pinch-to-zoom} (szczypanie dwoma palcami)
+\end{itemize}
+
+\textbf{Metoda 3 -- Przyciski:}
+\begin{itemize}
+    \item Kliknij ikonę \textbf{lupy +} aby przybliżyć
+    \item Kliknij ikonę \textbf{lupy -} aby oddalić
+    \item Kliknij \textbf{,,Reset''} aby wrócić do domyślnego widoku
+\end{itemize}
+
+\paragraph{Przesuwanie widoku (Pan):}
+
+\textbf{Metoda 1 -- Narzędzie Pan:}
+\begin{itemize}
+    \item Wybierz narzędzie \textbf{Przesuwaj (H)}
+    \item Kliknij i przeciągnij myszą po płótnie
+\end{itemize}
+
+\textbf{Metoda 2 -- Skrót klawiaturowy:}
+\begin{itemize}
+    \item Przytrzymaj \textbf{spację} i przeciągnij myszą
+    \item Lub użyj \textbf{środkowego przycisku myszy} i przeciągnij
+\end{itemize}
+
+\textbf{Metoda 3 -- Gesty dotykowe:}
+\begin{itemize}
+    \item Przeciągnij \textbf{dwoma palcami} po ekranie (tablet/telefon)
+\end{itemize}
+
+\subsubsection{Współpraca w czasie rzeczywistym}
+
+Jedną z kluczowych funkcji EasyLesson jest możliwość jednoczesnej pracy wielu użytkowników na tej samej tablicy.
+
+\paragraph{Użytkownicy online}
+
+W prawym górnym rogu tablicy zobaczysz listę użytkowników aktualnie online:
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/03_tablice/users_online.png}
+    }
+\end{figure}
+
+\textbf{Informacje wyświetlane:}
+\begin{itemize}
+    \item \textbf{Avatar} użytkownika (inicjały lub zdjęcie)
+    \item \textbf{Username}
+    \item \textbf{Kolor kursora} (każdy użytkownik ma unikalny kolor)
+\end{itemize}
+
+\paragraph{Śledzenie kursorów}
+
+Gdy inni użytkownicy pracują na tablicy, ich kursory są widoczne jako kolorowe wskaźniki z nazwą użytkownika.
+
+\textbf{Zachowanie:}
+\begin{itemize}
+    \item Widzisz w czasie rzeczywistym, gdzie znajdują się kursory innych użytkowników
+    \item Gdy ktoś rysuje lub dodaje elementy, widzisz to natychmiast (opóźnienie <200 ms)
+    \item Każdy użytkownik ma przypisany unikalny kolor kursora
+\end{itemize}
+
+\paragraph{Synchronizacja zmian}
+
+Wszystkie zmiany na tablicy są automatycznie synchronizowane:
+
+\begin{itemize}
+    \item \textbf{Dodanie elementu} -- wszyscy widzą nowy element
+    \item \textbf{Przesunięcie elementu} -- pozycja aktualizowana dla wszystkich
+    \item \textbf{Usunięcie elementu} -- element znika dla wszystkich
+    \item \textbf{Edycja tekstu} -- zmiany widoczne w czasie rzeczywistym
+\end{itemize}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+Gdy inny użytkownik edytuje element (np. tekst), element jest tymczasowo zablokowany dla innych. Zobaczysz ikonę \textbf{kłódki} oraz nazwę użytkownika edytującego. Blokada jest automatycznie zdejmowana po zakończeniu edycji.
+\end{tcolorbox}
+
+\subsubsection{Edycja tablicy}
+
+\paragraph{Zmiana nazwy, ikony lub koloru:}
+
+\begin{enumerate}
+    \item Wróć do widoku listy tablic w workspace'ie
+    \item Kliknij ikonę \textbf{trzech kropek} na kafelku tablicy
+    \item Wybierz opcję \textbf{,,Edytuj''}
+    \item Wprowadź zmiany w formularzu
+    \item Kliknij \textbf{,,Zapisz zmiany''}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.7\textwidth]{Podrecznik_screenshots/03_tablice/edit_board_form.png}
+    }
+\end{figure}
+
+\subsubsection{Usuwanie tablicy}
+
+\begin{tcolorbox}[colback=red!10!white,colframe=red!75!black,title=\faExclamationTriangle\ OSTRZEŻENIE]
+Usunięcie tablicy jest \textbf{nieodwracalne}! Cała zawartość tablicy (rysunki, teksty, kształty) zostanie \textbf{trwale usunięta}.
+\end{tcolorbox}
+
+\paragraph{Krok 1: Otwórz menu tablicy}
+
+\begin{enumerate}
+    \item Wróć do widoku listy tablic w workspace'ie
+    \item Kliknij ikonę \textbf{trzech kropek} na kafelku tablicy
+    \item Wybierz opcję \textbf{,,Usuń''}
+\end{enumerate}
+
+\paragraph{Krok 2: Potwierdź usunięcie}
+
+\begin{enumerate}
+    \item System wyświetli okno z ostrzeżeniem
+    \item Wpisz nazwę tablicy w celu potwierdzenia
+    \item Kliknij \textbf{,,Usuń na zawsze''}
+\end{enumerate}
+
+Po potwierdzeniu tablica zostanie trwale usunięta z bazy danych.
+
+\subsubsection{Automatyczne zapisywanie}
+
+System EasyLesson automatycznie zapisuje wszystkie zmiany na tablicy:
+
+\begin{itemize}
+    \item \textbf{Częstotliwość:} Zmiany są zapisywane natychmiast po każdej akcji
+    \item \textbf{Brak przycisku ,,Zapisz'':} Nie musisz martwić się o zapisywanie -- wszystko dzieje się automatycznie
+    \item \textbf{Synchronizacja:} Zmiany są synchronizowane z serwerem i innymi użytkownikami w czasie rzeczywistym
+\end{itemize}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Nawet jeśli zamkniesz przeglądarkę lub stracisz połączenie z internetem, wszystkie zmiany zapisane do momentu utraty połączenia będą bezpieczne na serwerze.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+Zmiany wprowadzone podczas braku połączenia z internetem \textbf{nie zostaną zapisane}. Upewnij się, że masz stabilne połączenie podczas pracy na tablicy.
+\end{tcolorbox}
+
+\subsection{SmartSearch - wyszukiwarka wzorów}
+
+SmartSearch to inteligentna wyszukiwarka wzorów matematycznych. Pozwala na szybkie znalezienie i wstawienie gotowych wzorów bezpośrednio na tablicę.
+
+\subsubsection{Czym jest SmartSearch?}
+
+SmartSearch to narzędzie wyszukiwania zasobów edukacyjnych zawierające:
+
+\begin{itemize}
+    \item \textbf{Wzory (Formulas)} -- pojedyncze równania matematyczne, fizyczne i chemiczne
+    \item \textbf{Karty (Cards)} -- zestawy powiązanych wzorów na dany temat (np. ,,Wzory trygonometryczne'')
+    \item \textbf{Tagi} -- słowa kluczowe ułatwiające wyszukiwanie
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/04_smartsearch/smartsearch_overview.png}
+    }
+\end{figure}
+
+\subsubsection{Otwieranie SmartSearch}
+
+SmartSearch znajduje się w górnej części tablicy jako pasek wyszukiwania.
+
+\paragraph{Otwieranie paska wyszukiwania:}
+
+\begin{enumerate}
+    \item Otwórz tablicę, na której chcesz pracować
+    \item W górnej części ekranu znajdziesz przycisk \textbf{SmartSearch} z ikoną lupy
+    \item Kliknij przycisk, aby otworzyć pasek wyszukiwania
+\end{enumerate}
+
+Po kliknięciu pasek rozwija się i pokazuje pole tekstowe do wpisywania zapytań.
+
+\subsubsection{Wyszukiwanie wzorów}
+
+\paragraph{Krok 1: Wpisz zapytanie}
+
+W rozwiniętym pasku wyszukiwania wpisz nazwę wzoru lub pojęcia, np.:
+
+\begin{itemize}
+    \item ,,pole koła''
+    \item ,,twierdzenie Pitagorasa''
+    \item ,,wzór na deltę''
+    \item ,,sinus''
+\end{itemize}
+
+\paragraph{Krok 2: Przeglądaj wyniki}
+
+System wyświetli listę pasujących wyników **pod paskiem wyszukiwania** w formie rozwijanej listy:
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/04_smartsearch/results_dropdown.png}
+    }
+\end{figure}
+
+Każdy wynik zawiera:
+
+\begin{itemize}
+    \item \textbf{Typ zasobu} -- ikona wskazująca czy to Formula (pojedynczy wzór) czy Card (karta wzorów)
+    \item \textbf{Nazwa} -- pełna nazwa wzoru lub karty
+    \item \textbf{Podgląd} -- krótki opis lub wzór w formacie LaTeX
+\end{itemize}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Wyszukiwarka działa w czasie rzeczywistym -- wyniki pojawiają się natychmiast podczas wpisywania. Możesz także wyszukiwać po symbolach matematycznych, np. ,,$\pi$'', ,,$\sum$'', ,,$\int$''.
+\end{tcolorbox}
+
+\subsubsection{Dodawanie wzorów na tablicę}
+
+\paragraph{Opcja 1: Pojedynczy wzór (Formula)}
+
+\begin{enumerate}
+    \item Z listy wyników kliknij na wybrany wzór
+    \item Wzór zostanie automatycznie wstawiony na tablicę jako obraz (renderowany LaTeX)
+    \item Wzór pojawia się w centrum widocznego obszaru tablicy
+    \item Możesz teraz przesunąć wzór w dowolne miejsce używając narzędzia \textbf{Zaznacz (V)}
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/04_smartsearch/formula_added.png}
+    }
+\end{figure}
+
+\paragraph{Opcja 2: Karta wzorów (Card)}
+
+Kliknięcie na kartę wzorów otwiera specjalny modal podglądu:
+
+\begin{enumerate}
+    \item Z listy wyników kliknij na wybraną kartę
+    \item System otworzy okno \textbf{Card Viewer} (podgląd karty)
+    \item W oknie zobaczysz:
+    \begin{itemize}
+        \item Tytuł i opis karty
+        \item Listę wszystkich wzorów zawartych w karcie
+        \item Checkboxy do zaznaczania wzorów
+    \end{itemize}
+    \item Zaznacz wzory, które chcesz dodać na tablicę
+    \item Kliknij przycisk \textbf{,,Dodaj wybrane wzory na tablicę''}
+    \item Wybrane wzory zostaną wstawione na tablicę
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/04_smartsearch/card_viewer_modal.png}
+    }
+\end{figure}
+
+\subsubsection{Przykłady wyszukiwań}
+
+\paragraph{Matematyka:}
+
+\begin{itemize}
+    \item ,,pole trójkąta'' → $P = \frac{1}{2} \cdot a \cdot h$
+    \item ,,wzór skróconego mnożenia'' → karta ze wzorami $(a \pm b)^2$
+    \item ,,pochodna'' → tabela podstawowych pochodnych
+    \item ,,twierdzenie Talesa'' → proporcje w trójkącie
+    \item ,,delta'' → $\Delta = b^2 - 4ac$
+\end{itemize}
+
+\subsubsection{Nawigacja klawiaturowa}
+
+SmartSearch obsługuje nawigację za pomocą klawiatury:
+
+\begin{itemize}
+    \item \textbf{↑ / ↓} (strzałki góra/dół) -- przełączanie między wynikami
+    \item \textbf{Enter} -- dodanie zaznaczonego wyniku na tablicę
+    \item \textbf{Escape} -- zamknięcie paska wyszukiwania
+\end{itemize}
+
+Zaznaczony wynik jest podświetlony niebieskim kolorem.
+
+\subsubsection{Zamykanie SmartSearch}
+
+Aby zamknąć pasek wyszukiwania:
+
+\begin{itemize}
+    \item Kliknij przycisk \textbf{X} po prawej stronie paska
+    \item Lub naciśnij klawisz \textbf{Escape}
+    \item Lub kliknij w dowolnym miejscu poza paskiem wyszukiwania
+\end{itemize}
+
+Pasek zwinie się z powrotem do przycisku z ikoną lupy.
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Możesz używać SmartSearch jednocześnie z AI Chat! Na przykład: wyszukaj podstawowy wzór w SmartSearch, a następnie zapytaj AI o wyjaśnienie lub przykład zastosowania.
+\end{tcolorbox}
+
+\subsection{AI Chat}
+
+AI Chat to inteligentny chatbot oparty na sztucznej inteligencji (Google Gemini), który pomaga w rozwiązywaniu zadań. Może wyjaśniać pojęcia, rozwiązywać równania i odpowiadać na pytania w czasie rzeczywistym.
+
+\subsubsection{Czym jest AI Chat?}
+
+AI Chat to narzędzie, które:
+
+\begin{itemize}
+    \item \textbf{Wyjaśnia pojęcia} -- definicje, twierdzenia, koncepcje matematyczne
+    \item \textbf{Rozwiązuje zadania} -- równania, problemy tekstowe, obliczenia
+    \item \textbf{Krok po kroku} -- pokazuje szczegółowe rozwiązania z wyjaśnieniami
+    \item \textbf{Odpowiada na pytania} -- pomaga zrozumieć trudne zagadnienia
+    \item \textbf{Pamięta kontekst} -- możesz prowadzić naturalną rozmowę
+\end{itemize}
+
+\subsubsection{Otwieranie AI Chat}
+
+AI Chat znajduje się w prawym panelu bocznym tablicy.
+
+\paragraph{Otwieranie panelu:}
+
+\begin{enumerate}
+    \item Otwórz tablicę, na której chcesz pracować
+    \item Po prawej stronie ekranu znajdziesz przycisk \textbf{,,AI Chat''}
+    \item Kliknij przycisk, aby otworzyć panel AI Chat
+\end{enumerate}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/05_ai_chat/chat_button.png}
+    }
+\end{figure}
+
+Po kliknięciu panel rozwija się i zajmuje prawą część ekranu.
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/05_ai_chat/chat_panel_opened.png}
+    }
+\end{figure}
+
+\subsubsection{Regulowanie szerokości panelu}
+
+Panel AI Chat ma regulowaną szerokość dla wygodniejszej pracy.
+
+\paragraph{Zmiana szerokości:}
+
+\begin{enumerate}
+    \item Po lewej krawędzi panelu znajdziesz \textbf{uchwyt zmiany rozmiaru} (pionowa linia)
+    \item Najedź myszką na uchwyt -- kursor zmieni się na strzałki $\leftrightarrow$
+    \item Kliknij i przeciągnij w lewo (zmniejszenie) lub w prawo (zwiększenie)
+    \item Minimalna szerokość: 300 pikseli
+    \item Maksymalna szerokość: 800 pikseli
+\end{enumerate}
+
+System zapamięta wybraną szerokość i zastosuje ją przy następnym otwarciu panelu.
+
+\subsubsection{Zadawanie pytań}
+
+\paragraph{Krok 1: Wpisz pytanie}
+
+W polu tekstowym na dole panelu AI Chat wpisz swoje pytanie, np.:
+
+\begin{itemize}
+    \item ,,Jak obliczyć pole koła?''
+    \item ,,Rozwiąż równanie: 2x + 5 = 13''
+    \item ,,Co to jest pochodna funkcji?''
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/05_ai_chat/typing_message.png}
+    }
+\end{figure}
+
+\paragraph{Krok 2: Wyślij zapytanie}
+
+\begin{itemize}
+    \item Kliknij przycisk \textbf{,,Wyślij''} (ikona strzałki ↑)
+    \item Lub naciśnij \textbf{Enter}
+\end{itemize}
+
+\paragraph{Krok 3: Otrzymaj odpowiedź}
+
+System przetworzy zapytanie i wyświetli odpowiedź AI w oknie chatu:
+
+\begin{itemize}
+    \item \textbf{Wyjaśnienie} -- szczegółowy opis problemu
+    \item \textbf{Rozwiązanie krok po kroku} -- jeśli dotyczy obliczeń
+    \item \textbf{Wzory matematyczne} -- sformatowane równania
+    \item \textbf{Przykłady} -- ilustracje zastosowania
+\end{itemize}
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/05_ai_chat/ai_response.png}
+    }
+\end{figure}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Im bardziej precyzyjne pytanie, tym lepsza odpowiedź. Zamiast ,,pomóż z matematyką'' napisz ,,rozwiąż równanie kwadratowe: $x^2 - 5x + 6 = 0$''.
+\end{tcolorbox}
+
+\subsubsection{Historia konwersacji}
+
+AI Chat zachowuje historię rozmowy w ramach bieżącej sesji (do zamknięcia tablicy).
+
+\paragraph{Kontynuacja rozmowy:}
+
+AI pamięta poprzednie wiadomości w ramach sesji, co pozwala na naturalną konwersację:
+
+\begin{itemize}
+    \item Ty: ,,Rozwiąż równanie: $2x + 5 = 13$''
+    \item AI: ,,Rozwiązanie: $x = 4$'' [pokazuje kroki]
+    \item Ty: ,,A jak sprawdzić to rozwiązanie?''
+    \item AI: [wyjaśnia sprawdzenie przez podstawienie]
+\end{itemize}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+Historia konwersacji jest przechowywana tylko w interfejsie użytkownika (frontend). Po zamknięciu tablicy lub wylogowaniu historia zostanie utracona. Każde nowe zapytanie do AI jest niezależne -- backend nie pamięta kontekstu między requestami.
+\end{tcolorbox}
+
+\paragraph{Przewijanie historii:}
+
+\begin{itemize}
+    \item Użyj paska przewijania po prawej stronie okna chatu
+    \item System automatycznie przewija do najnowszej wiadomości
+    \item Możesz wracać do wcześniejszych odpowiedzi
+\end{itemize}
+
+\subsubsection{Wskazówki dotyczące korzystania z AI}
+
+\paragraph{Jak zadawać dobre pytania:}
+
+\textbf{Pytania konkretne:}
+\begin{itemize}
+    \item ,,Rozwiąż równanie kwadratowe $x^2 - 5x + 6 = 0$''
+    \item ,,Oblicz pole trójkąta o podstawie 5 cm i wysokości 8 cm''
+    \item ,,Wyjaśnij różnicę między pochodną a różniczką''
+\end{itemize}
+
+\textbf{Pytania ogólne:}
+\begin{itemize}
+    \item ,,Pomóż mi z matematyką''
+    \item ,,Nie rozumiem''
+    \item ,,Co to jest?''
+\end{itemize}
+
+\paragraph{Struktura dobrego pytania:}
+
+\begin{enumerate}
+    \item \textbf{Jasny kontekst} -- o jakiej dziedzinie mowa
+    \item \textbf{Konkretne dane} -- wszystkie liczby, wzory, parametry
+    \item \textbf{Precyzyjne pytanie} -- co dokładnie chcesz wiedzieć
+\end{enumerate}
+
+\subsubsection{Zamykanie AI Chat}
+
+Aby zamknąć panel AI Chat:
+
+\begin{itemize}
+    \item Kliknij przycisk \textbf{X} w prawym górnym rogu panelu
+    \item Lub kliknij ponownie przycisk \textbf{,,AI Chat''} w toolbarze
+\end{itemize}
+
+Panel zostanie ukryty, a pełna szerokość tablicy będzie dostępna do pracy.
+
+\subsection{Zarządzanie kontem}
+
+W tym rozdziale dowiesz się, jak zarządzać swoim kontem użytkownika, edytować dane osobowe, zmieniać hasło i zarządzać subskrypcją.
+
+\subsubsection{Ustawienia profilu}
+
+Aby uzyskać dostęp do ustawień konta, kliknij ikonę \textbf{profilu} w prawym górnym rogu aplikacji, a następnie wybierz \textbf{,,Profil''}.
+
+\begin{figure}[H]
+    \centering
+    \fbox{%
+        \includegraphics[width=0.9\textwidth]{Podrecznik_screenshots/06_profil/profile_menu.png}
+    }
+\end{figure}
+
+\paragraph{Edycja danych osobowych}
+
+W sekcji ,,Informacje podstawowe'' możesz edytować:
+
+\begin{itemize}
+    \item \textbf{Username (login)} -- Twoja unikalna nazwa użytkownika widoczna dla innych
+    \item \textbf{Email} -- adres email używany do logowania i komunikacji
+\end{itemize}
+
+% \begin{figure}[H]
+%     \centering
+%     \fbox{%
+%         \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/06_profil/edit_profile_form.png}
+%     }
+%     \label{fig:edit_profile}
+% \end{figure}
+
+\textbf{Zmiana username:}
+\begin{enumerate}
+    \item Kliknij w pole \textbf{Username}
+    \item Wpisz nową nazwę użytkownika
+    \item Kliknij \textbf{,,Zapisz zmiany''}
+    \item System sprawdzi, czy nazwa jest dostępna
+\end{enumerate}
+
+\textbf{Zmiana adresu email:}
+\begin{enumerate}
+    \item Kliknij w pole \textbf{Email}
+    \item Wpisz nowy adres email
+    \item Kliknij \textbf{,,Zapisz zmiany''}
+    \item System wyśle kod weryfikacyjny na nowy adres email
+    \item Wprowadź 6-cyfrowy kod w formularzu weryfikacji
+    \item Po weryfikacji nowy email zostanie zapisany
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Ważne]
+Do momentu weryfikacji nowego adresu email, logowanie będzie nadal możliwe przy użyciu starego adresu. Po weryfikacji stary adres zostanie zastąpiony nowym.
+\end{tcolorbox}
+
+\subsubsection{Zmiana hasła}
+
+Aby zmienić hasło do konta:
+
+\paragraph{Krok 1: Przejdź do sekcji bezpieczeństwa}
+
+\begin{enumerate}
+    \item W ustawieniach profilu znajdź sekcję \textbf{,,Bezpieczeństwo''}
+    \item Kliknij przycisk \textbf{,,Zmień hasło''}
+\end{enumerate}
+
+\paragraph{Krok 2: Wypełnij formularz}
+
+\begin{enumerate}
+    \item \textbf{Obecne hasło} -- wpisz aktualne hasło
+    \item \textbf{Nowe hasło} -- wpisz nowe hasło (minimum 8 znaków, wielka litera, cyfra)
+    \item \textbf{Powtórz nowe hasło} -- wpisz nowe hasło ponownie
+    \item Kliknij \textbf{,,Zmień hasło''}
+\end{enumerate}
+
+% \begin{figure}[H]
+%     \centering
+%     \fbox{%
+%         \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/06_profil/change_password_form.png}
+%     }
+%     \label{fig:change_password}
+% \end{figure}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip - Silne hasło]
+Dobre hasło powinno:
+\begin{itemize}
+    \item Mieć minimum 8 znaków (zalecane 12+)
+    \item Zawierać wielkie i małe litery
+    \item Zawierać cyfry
+    \item Zawierać znaki specjalne (!@\#\$\%\textasciicircum\&*)
+    \item Nie być słownikowymi słowami
+    \item Nie być używane na innych stronach
+\end{itemize}
+\end{tcolorbox}
+
+Po pomyślnej zmianie hasła zostaniesz automatycznie wylogowany ze wszystkich urządzeń (oprócz obecnego) ze względów bezpieczeństwa.
+
+\subsubsection{Usuwanie konta}
+
+Jeśli chcesz trwale usunąć swoje konto z systemu EasyLesson:
+
+\begin{tcolorbox}[colback=red!10!white,colframe=red!75!black,title=\faExclamationTriangle\ OSTRZEŻENIE]
+Usunięcie konta jest \textbf{nieodwracalne}! Wszystkie Twoje dane zostaną \textbf{trwale usunięte}:
+\begin{itemize}
+    \item Wszystkie workspace'y, których jesteś właścicielem
+    \item Wszystkie tablice i ich zawartość
+    \item Historia AI Chat
+    \item Pliki i materiały
+    \item Dane subskrypcji
+\end{itemize}
+Operacja nie może zostać cofnięta!
+\end{tcolorbox}
+
+\paragraph{Procedura usunięcia konta:}
+
+\begin{enumerate}
+    \item Przejdź do ustawień profilu → sekcja \textbf{,,Bezpieczeństwo''}
+    \item Na dole strony znajdziesz sekcję \textbf{,,Strefa niebezpieczna''}
+    \item Kliknij przycisk \textbf{,,Usuń konto''}
+    \item System wyświetli ostrzeżenie o konsekwencjach
+    \item Wpisz swoje hasło w celu potwierdzenia
+    \item Wpisz frazę ,,USUŃ MOJE KONTO'' (wielkimi literami)
+    \item Kliknij \textbf{,,Usuń konto na zawsze''}
+\end{enumerate}
+
+% \begin{figure}[H]
+%     \centering
+%     \fbox{%
+%         \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/06_profil/delete_account_confirm.png}
+%     }
+%     \label{fig:delete_account}
+% \end{figure}
+
+Po potwierdzeniu:
+\begin{itemize}
+    \item Konto zostanie natychmiast dezaktywowane
+    \item Zostaniesz wylogowany ze wszystkich urządzeń
+    \item Wszystkie dane zostaną usunięte w ciągu 24 godzin
+    \item Otrzymasz potwierdzenie usunięcia na email
+    \item Jeśli miałeś aktywną subskrypcję Premium, zostanie ona automatycznie anulowana i nie będą pobierane kolejne płatności
+\end{itemize}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faInfoCircle\ Workspace'y współdzielone]
+Jeśli jesteś \textbf{członkiem} (Member) cudzych workspace'ów:
+\begin{itemize}
+    \item Nie zostaną one usunięte (należą do innych użytkowników)
+    \item Zostaniesz automatycznie usunięty z listy członków
+    \item Właściciele tych workspace'ów zobaczą, że opuściłeś workspace
+\end{itemize}
+
+Jeśli jesteś \textbf{właścicielem} (Owner) workspace'ów:
+\begin{itemize}
+    \item Wszystkie Twoje workspace'y zostaną trwale usunięte
+    \item Członkowie tych workspace'ów stracą dostęp
+    \item Zalecamy wcześniejsze przeniesienie własności lub poinformowanie członków
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Najczęstsze problemy i rozwiązania}
+
+W tym rozdziale znajdziesz odpowiedzi na najczęściej zadawane pytania oraz rozwiązania typowych problemów technicznych.
+
+\subsubsection{Problemy z logowaniem}
+
+\paragraph{Problem: Nie mogę się zalogować}
+
+\textbf{Możliwe przyczyny i rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Błędne hasło lub email}
+    \begin{itemize}
+        \item Sprawdź, czy \textbf{Caps Lock} jest wyłączony
+        \item Upewnij się, że wpisujesz prawidłowy email lub username
+        \item Zwróć uwagę na wielkie i małe litery w haśle
+        \item Spróbuj skopiować i wkleić hasło z menedżera haseł
+    \end{itemize}
+    
+    \item \textbf{Konto nie zostało zweryfikowane}
+    \begin{itemize}
+        \item Sprawdź swoją skrzynkę email (w tym folder SPAM)
+        \item Znajdź wiadomość z kodem weryfikacyjnym
+        \item Jeśli nie otrzymałeś wiadomości, kliknij ,,Wyślij kod ponownie''
+    \end{itemize}
+    
+    \item \textbf{Tymczasowa blokada konta}
+    \begin{itemize}
+        \item Po 5 nieudanych próbach logowania konto jest blokowane na 30 minut
+        \item Poczekaj 30 minut i spróbuj ponownie
+        \item Lub użyj funkcji ,,Zapomniałeś hasła?'' aby zresetować hasło
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Rozwiązanie]
+Jeśli nadal nie możesz się zalogować, użyj funkcji \textbf{,,Zapomniałeś hasła?''} opisanej w rozdziale 2.4 (Odzyskiwanie hasła).
+\end{tcolorbox}
+
+\paragraph{Problem: Nie otrzymuję emaila z kodem weryfikacyjnym}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Sprawdź folder SPAM/Wiadomości-śmieci}
+    \begin{itemize}
+        \item Wiadomości od EasyLesson mogą zostać błędnie oznaczone jako spam
+        \item Jeśli znajdziesz wiadomość, oznacz ją jako ,,Nie jest to spam''
+    \end{itemize}
+    
+    \item \textbf{Sprawdź zakładkę ,,Promocje'' lub ,,Powiadomienia'' (Gmail)}
+    \begin{itemize}
+        \item Gmail może automatycznie sortować wiadomości do różnych zakładek
+    \end{itemize}
+    
+    \item \textbf{Poczekaj kilka minut}
+    \begin{itemize}
+        \item Dostarczenie emaila może zająć do 5 minut
+    \end{itemize}
+    
+    \item \textbf{Kliknij ,,Wyślij kod ponownie''}
+    \begin{itemize}
+        \item Na stronie weryfikacji znajdziesz przycisk do ponownego wysłania kodu
+        \item Możesz wysłać kod ponownie po upływie 60 sekund
+    \end{itemize}
+    
+    \item \textbf{Sprawdź poprawność adresu email}
+    \begin{itemize}
+        \item Upewnij się, że podałeś prawidłowy adres email podczas rejestracji
+        \item Jeśli podałeś błędny adres, skontaktuj się z supportem
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga]
+Kod weryfikacyjny jest ważny przez \textbf{15 minut}. Po tym czasie musisz poprosić o nowy kod.
+\end{tcolorbox}
+
+\subsubsection{Problemy z tablicą}
+
+\paragraph{Problem: Tablica nie synchronizuje się z innymi użytkownikami}
+
+\textbf{Możliwe przyczyny i rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Problem z połączeniem internetowym}
+    \begin{itemize}
+        \item Sprawdź, czy masz stabilne połączenie z internetem
+        \item Spróbuj odświeżyć stronę (F5 lub Ctrl+R)
+        \item W prawym górnym rogu tablicy powinieneś widzieć wskaźnik połączenia
+    \end{itemize}
+    
+    \item \textbf{Problem z serwerem Real-Time}
+    \begin{itemize}
+        \item Odśwież stronę tablicy
+        \item Jeśli problem się powtarza, zamknij i otwórz tablicę ponownie
+        \item Sprawdź status systemu na stronie: status.easylesson.app
+    \end{itemize}
+    
+    \item \textbf{Przeglądarka nie obsługuje WebSocket}
+    \begin{itemize}
+        \item Upewnij się, że używasz aktualnej wersji przeglądarki
+        \item Zalecane: Chrome 100+, Firefox 100+, Edge 100+
+        \item Zaktualizuj przeglądarkę do najnowszej wersji
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Szybkie rozwiązanie]
+\textbf{Krok 1:} Odśwież stronę (Ctrl+R / Cmd+R)\\
+\textbf{Krok 2:} Zamknij i otwórz tablicę ponownie\\
+\textbf{Krok 3:} Jeśli problem nadal występuje, wyloguj się i zaloguj ponownie
+\end{tcolorbox}
+
+\paragraph{Problem: Nie widzę kursora innych użytkowników}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item Sprawdź listę użytkowników online w prawym górnym rogu tablicy
+    \item Jeśli inni użytkownicy są online, ale nie widzisz ich kursorów:
+    \begin{itemize}
+        \item Odśwież stronę (F5)
+        \item Sprawdź połączenie z internetem
+    \end{itemize}
+    \item Jeśli nikt nie jest widoczny na liście użytkowników online:
+    \begin{itemize}
+        \item Upewnij się, że inne osoby rzeczywiście otworzyły tę samą tablicę
+        \item Sprawdź, czy są w tym samym workspace'ie
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Problem: Element tablicy zablokowany przez innego użytkownika}
+
+\textbf{Co to znaczy:}
+
+Gdy inny użytkownik edytuje element (np. tekst), element jest tymczasowo zablokowany dla innych użytkowników. Zobaczysz ikonę kłódki oraz nazwę użytkownika, który edytuje element.
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item Poczekaj, aż użytkownik zakończy edycję
+    \item Blokada zostanie automatycznie zdjęta po zakończeniu edycji
+    \item Jeśli blokada nie znika:
+    \begin{itemize}
+        \item Poproś użytkownika o kliknięcie poza elementem (aby zakończyć edycję)
+        \item Odśwież stronę -- system automatycznie zdejmie nieaktywne blokady
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Problem: Nie mogę cofnąć akcji (Undo nie działa)}
+
+\textbf{Możliwe przyczyny:}
+
+\begin{enumerate}
+    \item \textbf{Historia cofania jest pusta}
+    \begin{itemize}
+        \item Undo działa tylko dla akcji wykonanych w bieżącej sesji
+        \item Po odświeżeniu strony historia jest czyszczona
+    \end{itemize}
+    
+    \item \textbf{Limit historii (50 akcji) został przekroczony}
+    \begin{itemize}
+        \item System przechowuje tylko ostatnie 50 akcji
+        \item Starsze akcje nie mogą być cofnięte
+    \end{itemize}
+    
+    \item \textbf{Akcja została wykonana przez innego użytkownika}
+    \begin{itemize}
+        \item Możesz cofać tylko swoje własne akcje
+        \item Nie możesz cofnąć akcji innych użytkowników
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Problemy z plikami}
+
+\paragraph{Problem: Nie mogę przesłać pliku na tablicę}
+
+\textbf{Możliwe przyczyny i rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Plik jest za duży}
+    \begin{itemize}
+        \item Plan Free: maksymalnie 5 MB na plik
+        \item Plan Premium: maksymalnie 50 MB na plik
+        \item Rozwiązanie: Zmniejsz rozmiar pliku lub wykup Premium
+    \end{itemize}
+    
+    \item \textbf{Przekroczono limit liczby plików}
+    \begin{itemize}
+        \item Plan Free: maksymalnie 100 plików
+        \item Plan Premium: nielimitowane
+        \item Rozwiązanie: Usuń nieużywane pliki lub wykup Premium
+    \end{itemize}
+    
+    \item \textbf{Nieobsługiwany format pliku}
+    \begin{itemize}
+        \item Obsługiwane formaty obrazów: PNG, JPG, JPEG, GIF, WEBP
+        \item Obsługiwane formaty dokumentów: PDF
+        \item Rozwiązanie: Przekonwertuj plik do obsługiwanego formatu
+    \end{itemize}
+    
+    \item \textbf{Problem z połączeniem internetowym}
+    \begin{itemize}
+        \item Sprawdź stabilność połączenia
+        \item Spróbuj ponownie po chwili
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Problem: Obraz nie wyświetla się na tablicy}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item Odśwież stronę (F5)
+    \item Sprawdź, czy plik nie został usunięty z serwera
+    \item Spróbuj ponownie przesłać plik
+    \item Upewnij się, że format pliku jest obsługiwany (PNG, JPG, GIF, WEBP)
+\end{enumerate}
+
+\subsubsection{Problemy z AI Chat}
+
+\paragraph{Problem: AI Chat nie odpowiada}
+
+\textbf{Możliwe przyczyny i rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Osiągnięto limit zapytań (Rate Limiting)}
+    \begin{itemize}
+        \item Limit: 20 wiadomości na minutę
+        \item Blokada: 2 minuty
+        \item Rozwiązanie: Poczekaj 2 minuty i spróbuj ponownie
+    \end{itemize}
+    
+    \item \textbf{Problem z serwerem AI}
+    \begin{itemize}
+        \item Serwer Gemini API może być tymczasowo niedostępny
+        \item Rozwiązanie: Poczekaj kilka minut i spróbuj ponownie
+    \end{itemize}
+    
+    \item \textbf{Zbyt długie zapytanie}
+    \begin{itemize}
+        \item Maksymalna długość wiadomości: 1000 znaków
+        \item Rozwiązanie: Skróć pytanie i wyślij ponownie
+    \end{itemize}
+    
+    \item \textbf{Problem z połączeniem internetowym}
+    \begin{itemize}
+        \item Sprawdź stabilność połączenia
+        \item Odśwież stronę
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Rate Limiting]
+Jeśli zobaczysz komunikat: \textit{,,Zbyt wiele zapytań. Spróbuj ponownie za 2 minuty''}, oznacza to, że wysłałeś więcej niż 20 wiadomości w ciągu ostatniej minuty. System automatycznie odblokuje się po 2 minutach.
+\end{tcolorbox}
+
+\paragraph{Problem: AI daje błędne odpowiedzi}
+
+\textbf{Co zrobić:}
+
+\begin{enumerate}
+    \item \textbf{Sformułuj pytanie bardziej precyzyjnie}
+    \begin{itemize}
+        \item Podaj wszystkie niezbędne dane (liczby, jednostki, kontekst)
+        \item Unikaj wieloznacznych sformułowań
+        \item Przykład: Zamiast ,,oblicz to'' napisz ,,oblicz pole koła o promieniu 5 cm''
+    \end{itemize}
+    
+    \item \textbf{Poproś o wyjaśnienie}
+    \begin{itemize}
+        \item Napisz: ,,Czy możesz wyjaśnić to dokładniej?''
+        \item Lub: ,,Sprawdź czy to rozwiązanie jest prawidłowe''
+    \end{itemize}
+    
+    \item \textbf{Sprawdź wynik samodzielnie}
+    \begin{itemize}
+        \item AI może popełniać błędy, szczególnie w złożonych obliczeniach
+        \item Zawsze weryfikuj wyniki, zwłaszcza w ważnych zadaniach
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Ważne]
+AI Chat to narzędzie pomocnicze. Nie zastępuje nauczyciela ani podręcznika. Zawsze weryfikuj otrzymane odpowiedzi i używaj ich jako punktu wyjścia do dalszej nauki.
+\end{tcolorbox}
+
+\subsubsection{Problemy z SmartSearch}
+
+\paragraph{Problem: SmartSearch nie znajduje wzoru}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Spróbuj innych słów kluczowych}
+    \begin{itemize}
+        \item Przykład: zamiast ,,delta'' spróbuj ,,wyróżnik''
+        \item Zamiast ,,pole'' spróbuj ,,powierzchnia''
+    \end{itemize}
+    
+    \item \textbf{Użyj symboli matematycznych}
+    \begin{itemize}
+        \item Spróbuj wyszukać po symbolu: ,,$\pi$'', ,,$\sum$'', ,,$\int$''
+    \end{itemize}
+    
+    \item \textbf{Wyszukaj szerszego pojęcia}
+    \begin{itemize}
+        \item Zamiast konkretnego wzoru, wyszukaj kategorię
+        \item Przykład: ,,trygonometria'', ,,mechanika'', ,,stechiometria''
+    \end{itemize}
+    
+    \item \textbf{Użyj przycisku ,,Przeglądaj wszystko''}
+    \begin{itemize}
+        \item Otwórz pełną bibliotekę wzorów
+        \item Przeglądaj według kategorii
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Problem: Wzór dodany na tablicę jest nieczytelny}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Powiększ wzór}
+    \begin{itemize}
+        \item Użyj narzędzia Zaznacz (V)
+        \item Przeciągnij za narożny uchwyt, aby powiększyć
+        \item Trzymaj Shift podczas przeciągania, aby zachować proporcje
+    \end{itemize}
+    
+    \item \textbf{Przybliż widok tablicy}
+    \begin{itemize}
+        \item Użyj Ctrl+Scroll (zoom)
+        \item Lub kliknij przycisk lupy (+) w kontrolkach zoom
+    \end{itemize}
+\end{enumerate}
+
+\subsubsection{Problemy z wydajnością}
+
+\paragraph{Problem: Tablica działa wolno lub się przycina}
+
+\textbf{Możliwe przyczyny i rozwiązania:}
+
+\begin{enumerate}
+    \item \textbf{Za dużo elementów na tablicy}
+    \begin{itemize}
+        \item Tablica z setkami elementów może działać wolniej
+        \item Rozwiązanie: Usuń nieużywane elementy lub przenieś je na nową tablicę
+    \end{itemize}
+    
+    \item \textbf{Słaby komputer lub stare urządzenie}
+    \begin{itemize}
+        \item Minimalne wymagania: 4 GB RAM
+        \item Rozwiązanie: Zamknij inne karty przeglądarki i programy
+    \end{itemize}
+    
+    \item \textbf{Nieaktualna przeglądarka}
+    \begin{itemize}
+        \item Rozwiązanie: Zaktualizuj przeglądarkę do najnowszej wersji
+    \end{itemize}
+    
+    \item \textbf{Słabe połączenie internetowe}
+    \begin{itemize}
+        \item Rozwiązanie: Sprawdź szybkość połączenia (minimum 5 Mbps)
+    \end{itemize}
+\end{enumerate}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Optymalizacja wydajności]
+Aby poprawić wydajność tablicy:
+\begin{itemize}
+    \item Używaj Chrome lub Edge (najszybsze)
+    \item Zamknij nieużywane karty przeglądarki
+    \item Wyłącz rozszerzenia przeglądarki (ad-blockery mogą spowalniać)
+    \item Regularnie czyszczenie cache przeglądarki
+\end{itemize}
+\end{tcolorbox}
+
+\paragraph{Problem: Przycina się obraz podczas rysowania}
+
+\textbf{Rozwiązania:}
+
+\begin{enumerate}
+    \item Zmniejsz zoom tablicy (oddal widok)
+    \item Zmniejsz grubość pióra (cieńsze linie = lepsza wydajność)
+    \item Zamknij inne karty przeglądarki
+    \item Spróbuj używać innej przeglądarki (Chrome zalecany)
+\end{enumerate}
+
+\subsubsection{Kontakt z supportem}
+
+Jeśli żadne z powyższych rozwiązań nie pomogło, skontaktuj się z naszym zespołem wsparcia:
+
+\paragraph{Email:}
+\begin{itemize}
+    \item \textbf{support@easylesson.app}
+    \item Czas odpowiedzi: 48h (Free), 24h (Premium)
+\end{itemize}
+
+\paragraph{Formularz kontaktowy:}
+\begin{itemize}
+    \item Dostępny w aplikacji: \textbf{Menu → Pomoc → Kontakt}
+    \item Lub na stronie: \textbf{https://easylesson.app/contact}
+\end{itemize}
+
+\paragraph{Co podać w zgłoszeniu:}
+
+Aby przyspieszyć rozwiązanie problemu, dołącz następujące informacje:
+
+\begin{enumerate}
+    \item \textbf{Opis problemu}
+    \begin{itemize}
+        \item Co dokładnie się dzieje?
+        \item Kiedy problem występuje?
+        \item Czy problem się powtarza?
+    \end{itemize}
+    
+    \item \textbf{Kroki do odtworzenia}
+    \begin{itemize}
+        \item Krok 1, Krok 2, Krok 3...
+    \end{itemize}
+    
+    \item \textbf{Informacje techniczne}
+    \begin{itemize}
+        \item System operacyjny (Windows, macOS, Linux, iOS, Android)
+        \item Przeglądarka i wersja (np. Chrome 120)
+        \item Czy problem występuje również w innej przeglądarce?
+    \end{itemize}
+    
+    \item \textbf{Zrzuty ekranu} (jeśli możliwe)
+    \begin{itemize}
+        \item Pomaga szybciej zidentyfikować problem
+    \end{itemize}
+\end{enumerate}
+
+% \begin{figure}[H]
+%     \centering
+%     \fbox{%
+%         \includegraphics[width=0.8\textwidth]{Podrecznik_screenshots/09_problemy/contact_form.png}
+%     }
+%     \label{fig:contact_form}
+% \end{figure}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faInfoCircle\ Status systemu]
+Sprawdź aktualny status systemu EasyLesson:
+\begin{itemize}
+    \item \textbf{https://status.easylesson.app}
+    \item Informacje o przerwach technicznych
+    \item Planowane prace konserwacyjne
+    \item Aktualne problemy systemowe
+\end{itemize}
+\end{tcolorbox}
+
+\subsection{Skróty klawiszowe}
+
+Lista wszystkich dostępnych skrótów klawiszowych w aplikacji EasyLesson.
+
+\subsubsection{Narzędzia tablicy}
+
+Skróty do szybkiego przełączania między narzędziami (nie wymagają Ctrl/Cmd):
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Klawisz} & \textbf{Narzędzie} \\
+\hline
+\texttt{V} & Zaznacz (Select) -- zaznaczanie i przesuwanie elementów \\
+\hline
+\texttt{H} & Przesuwaj (Pan) -- przesuwanie widoku tablicy \\
+\hline
+\texttt{P} & Rysuj (Pen) -- rysowanie odręczne piórem \\
+\hline
+\texttt{T} & Tekst (Text) -- dodawanie napisów \\
+\hline
+\texttt{S} & Kształty (Shape) -- rysowanie figur geometrycznych \\
+\hline
+\texttt{F} & Funkcja (Function) -- tworzenie wykresów funkcji \\
+\hline
+\texttt{I} & Obraz (Image) -- wstawianie obrazów \\
+\hline
+\texttt{E} & Gumka (Eraser) -- usuwanie elementów \\
+\hline
+\texttt{M} & Notatka (Markdown) -- tworzenie notatek \\
+\hline
+\end{tabular}
+\caption{Skróty narzędzi tablicy}
+\label{tab:tool_shortcuts}
+\end{table}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Wskazówka]
+Wszystkie skróty narzędzi to pojedyncze litery (bez Ctrl/Cmd). Możesz szybko przełączać się między narzędziami podczas pracy na tablicy.
+\end{tcolorbox}
+
+\subsubsection{Edycja i zarządzanie elementami}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{Ctrl+Z} (Win/Linux) & Cofnij ostatnią akcję (Undo) \\
+\texttt{Cmd+Z} (macOS) & \\
+\hline
+\texttt{Ctrl+Y} (Win/Linux) & Ponów cofniętą akcję (Redo) \\
+\texttt{Cmd+Shift+Z} (macOS) & \\
+\hline
+\texttt{Ctrl+C} & Kopiuj zaznaczone elementy \\
+\texttt{Cmd+C} (macOS) & \\
+\hline
+\texttt{Ctrl+V} & Wklej skopiowane elementy \\
+\texttt{Cmd+V} (macOS) & \\
+\hline
+\texttt{Delete} & Usuń zaznaczone elementy \\
+\texttt{Backspace} & \\
+\hline
+\texttt{Escape} & Anuluj zaznaczenie / Zamknij modalne okna \\
+\hline
+\end{tabular}
+\caption{Skróty edycji elementów}
+\label{tab:edit_shortcuts}
+\end{table}
+
+\begin{tcolorbox}[colback=yellow!10!white,colframe=orange!75!black,title=\faExclamationTriangle\ Uwaga -- Kopiowanie i wklejanie]
+\textbf{Inteligentne wklejanie:}
+\begin{itemize}
+    \item Jeśli skopiowałeś elementy \textbf{w aplikacji} (Ctrl+C na zaznaczonych elementach) -- wklei elementy z pamięci wewnętrznej
+    \item Jeśli skopiowałeś \textbf{obraz spoza aplikacji} (np. screenshot) -- wklei obraz ze schowka systemowego
+\end{itemize}
+System automatycznie rozpoznaje, co znajduje się w schowku.
+\end{tcolorbox}
+
+\subsubsection{Edycja tekstu}
+
+Podczas edycji elementu tekstowego:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Akcja} & \textbf{Opis} \\
+\hline
+Wpisanie dowolnej litery & Automatyczne rozpoczęcie edycji tekstu \\
+& (gdy zaznaczony jest element tekstowy) \\
+\hline
+\texttt{Escape} & Zakończenie edycji tekstu \\
+\hline
+\end{tabular}
+\caption{Skróty edycji tekstu}
+\label{tab:text_edit_shortcuts}
+\end{table}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
+Jeśli masz zaznaczony element tekstowy narzędziem \textbf{Select (V)}, możesz od razu zacząć pisać -- system automatycznie przełączy się w tryb edycji tekstu.
+\end{tcolorbox}
+
+\subsubsection{Zoom i widok}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{Ctrl+Scroll} (kółko myszy) & Przybliż / Oddal widok (Zoom) \\
+\texttt{Cmd+Scroll} (macOS) & \\
+\hline
+\texttt{Spacja + przeciągnięcie} & Przesuń widok tablicy (Pan) \\
+\hline
+\texttt{Środkowy przycisk myszy} & Przesuń widok tablicy (Pan) \\
++ przeciągnięcie & \\
+\hline
+\end{tabular}
+\caption{Skróty nawigacji i zoom}
+\label{tab:zoom_shortcuts}
+\end{table}
+
+\paragraph{Gesty dotykowe (tablet/telefon):}
+
+\begin{itemize}
+    \item \textbf{Pinch-to-zoom} (szczypanie dwoma palcami) -- przybliżanie/oddalanie
+    \item \textbf{Przeciągnięcie dwoma palcami} -- przesuwanie widoku
+\end{itemize}
+
+\subsubsection{SmartSearch}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{Ctrl+K} & Otwórz / Zamknij SmartSearch \\
+\texttt{Cmd+K} (macOS) & \\
+\hline
+\texttt{↑} (strzałka w górę) & Przejdź do poprzedniego wyniku \\
+\hline
+\texttt{↓} (strzałka w dół) & Przejdź do następnego wyniku \\
+\hline
+\texttt{Enter} & Dodaj zaznaczony wzór na tablicę \\
+\hline
+\texttt{Escape} & Zamknij SmartSearch \\
+\hline
+\end{tabular}
+\caption{Skróty SmartSearch}
+\end{table}
+
+\subsubsection{AI Chat}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{Ctrl+Shift+A} & Otwórz / Zamknij panel AI Chat \\
+\texttt{Cmd+Shift+A} (macOS) & \\
+\hline
+\texttt{Enter} & Wyślij wiadomość do AI \\
+\hline
+\texttt{Escape} & Zamknij panel AI Chat \\
+\hline
+\end{tabular}
+\caption{Skróty AI Chat}
+\end{table}
+
+\subsubsection{Czat głosowy (Voice Chat)}
+
+Jeśli korzystasz z czatu głosowego z trybem Push-to-Talk:
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{Space} (domyślnie) & Przytrzymaj, aby mówić (Push-to-Talk) \\
+\hline
+\end{tabular}
+\caption{Skróty czatu głosowego}
+\end{table}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faInfoCircle\ Konfiguracja Push-to-Talk]
+Klawisz Push-to-Talk można zmienić w ustawieniach czatu głosowego:
+\begin{enumerate}
+    \item Otwórz ustawienia Voice Chat (ikona zębatki w panelu głosowym)
+    \item W sekcji ,,Push-to-Talk'' kliknij \textbf{,,Zmień klawisz''}
+    \item Naciśnij wybrany klawisz (np. \texttt{Ctrl}, \texttt{Alt}, itp.)
+    \item Kliknij \textbf{,,Zapisz''}
+\end{enumerate}
+\end{tcolorbox}
+
+\subsubsection{Odświeżanie i przeglądarka}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{F5} & Odśwież stronę \\
+\texttt{Ctrl+R} (Win/Linux) & \\
+\texttt{Cmd+R} (macOS) & \\
+\hline
+\texttt{Ctrl+Shift+R} & Odśwież z pominięciem cache \\
+\texttt{Cmd+Shift+R} (macOS) & \\
+\hline
+\texttt{F11} & Tryb pełnoekranowy (Full Screen) \\
+\hline
+\texttt{Ctrl + / -} & Zmiana zoom przeglądarki \\
+\texttt{Cmd + / -} (macOS) & \\
+\hline
+\end{tabular}
+\caption{Skróty przeglądarki}
+\end{table}
+
+\subsubsection{Podsumowanie -- najczęściej używane}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Skrót} & \textbf{Akcja} \\
+\hline
+\texttt{V} & Narzędzie Zaznacz \\
+\hline
+\texttt{P} & Narzędzie Pióro \\
+\hline
+\texttt{T} & Narzędzie Tekst \\
+\hline
+\texttt{E} & Gumka \\
+\hline
+\texttt{Ctrl+Z} & Cofnij \\
+\hline
+\texttt{Ctrl+Y} & Ponów \\
+\hline
+\texttt{Ctrl+C / Ctrl+V} & Kopiuj / Wklej \\
+\hline
+\texttt{Delete} & Usuń zaznaczone \\
+\hline
+\texttt{Ctrl+K} & SmartSearch \\
+\hline
+\texttt{Escape} & Anuluj / Zamknij \\
+\hline
+\end{tabular}
+\caption{Najczęściej używane skróty}
+\end{table}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Wskazówka końcowa]
+Nauczenie się podstawowych skrótów klawiszowych (V, P, T, E, Ctrl+Z/Y) znacznie przyspieszy Twoją pracę na tablicy. Nie musisz pamiętać wszystkich -- z czasem najczęściej używane skróty wejdą Ci w nawyk.
+\end{tcolorbox}
+
+\newpage
+
+\section{Instrukcja uruchomienia aplikacji lokalnie}
+
+\subsection{Wymagania Systemowe}
+
+Przed uruchomieniem aplikacji upewnij się, że na twoim urządzeniu są zainstalowane:
+
+\begin{itemize}
+    \item \textbf{Node.js} (wersja 18+) -- do uruchomienia frontendu
+    \item \textbf{npm} lub \textbf{yarn} -- menedżer pakietów JavaScript
+    \item \textbf{Python} (wersja 3.9+) -- do uruchomienia backendu
+    \item \textbf{pip} -- menedżer pakietów Python
+    \item \textbf{PostgreSQL} (wersja 14+) -- baza danych
+    \item \textbf{Git} -- system kontroli wersji
+\end{itemize}
+
+\subsubsection{Sprawdzenie Wymagań}
+
+Aby sprawdzić, czy wszystkie narzędzia są zainstalowane, wykonaj następujące komendy:
+
+\begin{lstlisting}[language=bash]
+# Node.js i npm
+node --version
+npm --version
+
+# Python i pip
+python --version
+pip --version
+
+# PostgreSQL
+psql --version
+
+# Git
+git --version
+\end{lstlisting}
+
+Jeśli któreś narzędzie nie jest zainstalowane, pobierz je ze stron:
+\begin{itemize}
+    \item Node.js: \url{https://nodejs.org/}
+    \item Python: \url{https://www.python.org/downloads/}
+    \item PostgreSQL: \url{https://www.postgresql.org/download/}
+    \item Git: \url{https://git-scm.com/downloads}
+\end{itemize}
+
+\subsection{Krok 1: Klonowanie Repozytorium}
+
+Otwórz terminal/PowerShell i przejdź do katalogu, w którym chcesz przechowywać projekt:
+
+\begin{lstlisting}[language=bash]
+# Przejdz do katalogu
+cd C:\Users\YourUsername\Documents
+
+# Sklonuj repozytorium
+git clone <URL_REPOZYTORIUM>
+cd platforma-edukacyjna
+\end{lstlisting}
+
+\subsection{Krok 2: Konfiguracja Zmiennych Środowiskowych}
+
+\subsubsection{Tworzenie Pliku .env}
+
+W katalogu głównym projektu utwórz plik \texttt{.env} z następującą zawartością:
+
+\begin{lstlisting}[language=bash]
+# Baza danych
+DATABASE_URL=postgresql://username:password@localhost:5432/platforma_db
+
+# JWT
+SECRET_KEY=your-super-secret-key-change-this-in-production
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# Email (Resend)
+RESEND_API_KEY=re_xxxxxxxxxxxx
+FROM_EMAIL=onboarding@resend.dev
+
+# Supabase (Frontend)
+NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+\end{lstlisting}
+
+\textbf{Ważne:} Zastąp wartości placeholder swoimi własnymi wartościami!
+
+\subsubsection{Konfiguracja PostgreSQL}
+
+Otwórz pgAdmin lub terminal PostgreSQL i wykonaj:
+
+\begin{lstlisting}[language=bash]
+# Polacz sie z PostgreSQL
+psql -U postgres
+
+# W powloce PostgreSQL:
+CREATE DATABASE platforma_db;
+CREATE USER platforma_user WITH PASSWORD 'your_password';
+ALTER ROLE platforma_user SET client_encoding TO 'utf8';
+ALTER ROLE platforma_user SET default_transaction_isolation TO 'read committed';
+ALTER ROLE platforma_user SET default_transaction_deferrable TO on;
+ALTER ROLE platforma_user SET default_transaction_read_only TO off;
+GRANT ALL PRIVILEGES ON DATABASE platforma_db TO platforma_user;
+\connect platforma_db
+GRANT ALL PRIVILEGES ON SCHEMA public TO platforma_user;
+\q
+\end{lstlisting}
+
+Następnie zaktualizuj \texttt{DATABASE\_URL} w pliku \texttt{.env}:
+
+\begin{lstlisting}[language=bash]
+DATABASE_URL=postgresql://platforma_user:your_password@localhost:5432/platforma_db
+\end{lstlisting}
+
+\subsection{Krok 3: Instalacja Zależności Backend}
+
+Przejdź do katalogu backendu i zainstaluj wymagane pakiety:
+
+\begin{lstlisting}[language=bash]
+cd backend
+pip install -r requirements.txt
+\end{lstlisting}
+
+\subsection{Krok 4: Inicjalizacja Bazy Danych}
+
+Wykonaj migracje Alembic, aby utworzyć strukturę tabel:
+
+\begin{lstlisting}[language=bash]
+# Z katalogu backend/
+alembic upgrade head
+\end{lstlisting}
+
+Alternatywnie, możesz użyć skryptu inicjalizacyjnego:
+
+\begin{lstlisting}[language=bash]
+python init_db.py
+\end{lstlisting}
+
+\subsection{Krok 5: Uruchomienie Backendu}
+
+Z katalogu \texttt{backend/} uruchom aplikację FastAPI:
+
+\begin{lstlisting}[language=bash]
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+\end{lstlisting}
+
+Backend będzie dostępny pod adresem: \url{http://localhost:8000}
+
+Sprawdź dokumentację API pod: \url{http://localhost:8000/docs}
+
+\subsection{Krok 6: Instalacja Zależności Frontend}
+
+Otwórz nowy terminal, przejdź do katalogu głównego projektu i zainstaluj pakiety Node.js:
+
+\begin{lstlisting}[language=bash]
+# Z glownego katalogu projektu (platforma-edukacyjna/)
+npm install
+\end{lstlisting}
+
+\subsection{Krok 7: Uruchomienie Frontendu}
+
+Uruchom serwer deweloperski Next.js:
+
+\begin{lstlisting}[language=bash]
+npm run dev
+\end{lstlisting}
+
+Frontend będzie dostępny pod adresem: \url{http://localhost:3000}
+
+\subsection{Krok 8: Weryfikacja Instalacji}
+
+Po uruchomieniu obu serwisów:
+
+\begin{enumerate}
+    \item Otwórz przeglądarkę i przejdź do \url{http://localhost:3000}
+    \item Powinieneś zobaczyć stronę główną aplikacji
+    \item Sprawdź dokumentację API backendu: \url{http://localhost:8000/docs}
+    \item Spróbuj się zalogować lub zarejestrować
+    \item Sprawdź konsolę przeglądarki (F12) czy nie ma błędów
+\end{enumerate}
+
+\subsection{Rozwiązywanie Problemów}
+
+\subsubsection{Błąd: \texttt{psql: command not found}}
+
+PostgreSQL nie jest w zmiennych systemowych. Dodaj go:
+\begin{lstlisting}[language=bash]
+# Windows - dodaj do PATH:
+C:\Program Files\PostgreSQL\16\bin
+\end{lstlisting}
+
+\subsubsection{Błąd: \texttt{Port 3000/8000 jest już w użyciu}}
+
+Zmień port w komendzie uruchomieniowej:
+\begin{lstlisting}[language=bash]
+# Backend na innym porcie
+uvicorn main:app --reload --host 0.0.0.0 --port 8001
+
+# Frontend na innym porcie
+npm run dev -- -p 3001
+\end{lstlisting}
+
+\subsubsection{Błąd: \texttt{ModuleNotFoundError}}
+
+Upewnij się, że zainstalowałeś wszystkie pakiety:
+\begin{lstlisting}[language=bash]
+cd backend
+pip install -r requirements.txt --upgrade
+\end{lstlisting}
+
+\subsubsection{Błąd: \texttt{DATABASE CONNECTION FAILED}}
+
+Sprawdź:
+\begin{enumerate}
+    \item Czy PostgreSQL jest uruchomiony
+    \item Czy \texttt{DATABASE\_URL} w \texttt{.env} jest poprawny
+    \item Czy baza danych \texttt{platforma\_db} istnieje
+    \item Czy użytkownik \texttt{platforma\_user} ma uprawnienia
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+# Testuj polaczenie
+psql -U platforma_user -d platforma_db -h localhost
+\end{lstlisting}
+
+\subsubsection{Błąd: \texttt{npm ERR! code ERESOLVE}}
+
+Zainstaluj zależności z flagą legacy:
+\begin{lstlisting}[language=bash]
+npm install --legacy-peer-deps
+\end{lstlisting}
+
+\subsection{Struktura Projektu}
+
+\begin{lstlisting}[language=bash]
+platforma-edukacyjna/
+  backend/                    # API - FastAPI + SQLAlchemy
+    main.py                   # Main app file
+    init_db.py                # Database initialization
+    requirements.txt          # Python dependencies
+    core/                     # Config, models, database
+    auth/                     # Login and authorization
+    dashboard/                # API for boards and workspaces
+  src/                        # Frontend - Next.js + React
+    app/                      # Application (Next.js 13+ routing)
+    components/               # React components
+    context/                  # React context (auth, board)
+    lib/                      # Tools (Supabase, API)
+  public/                     # Static resources
+  .env                        # Environment variables (do not commit!)
+  .env.example                # .env template
+  package.json                # Node.js dependencies
+  tsconfig.json               # TypeScript configuration
+  next.config.ts              # Next.js configuration
+\end{lstlisting}
+
+\subsection{Przydatne Komendy}
+
+\begin{lstlisting}[language=bash]
+# Backend
+cd backend
+pip install -r requirements.txt      # Install dependencies
+python init_db.py                    # Initialize database
+alembic upgrade head                 # Run migrations
+uvicorn main:app --reload            # Start development
+
+# Frontend
+npm install                           # Install dependencies
+npm run dev                           # Start development
+npm run build                         # Build for production
+npm start                             # Start production
+
+# Database
+psql -U postgres                      # Connect to PostgreSQL
+\q                                    # Exit psql
+\end{lstlisting}
+
+\subsection{Produkcja}
+
+Aby uruchomić aplikację w trybie produkcyjnym:
+
+\subsubsection{Backend}
+
+\begin{lstlisting}[language=bash]
+cd backend
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+\end{lstlisting}
+
+\subsubsection{Frontend}
+
+\begin{lstlisting}[language=bash]
+npm run build
+npm start
+\end{lstlisting}
+
+\end{document}
