@@ -8,7 +8,7 @@ from typing import List, Dict, Any
 from datetime import datetime, timezone
 
 from core.database import get_db
-from core.models import BoardElement, Board, WorkspaceMember
+from core.models import BoardElement, Board, WorkspaceMember, User, BoardUsers
 from dashboard.boards.schemas import (
     CreateBoard, BoardResponse,
     BoardListResponse, UpdateBoard,
@@ -43,6 +43,62 @@ async def list_boards(
     """Pobieranie listy tablic w workspace"""
     service = BoardService(db)
     return await service.list_boards(workspace_id, user_id, limit, offset)
+
+@router.get("/{board_id}", response_model=BoardResponse)
+async def get_board(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Pobieranie pojedynczej tablicy po ID
+    
+    ZWRACA:
+    Pełne dane tablicy włącznie z workspace_id
+    
+    UŻYWANE DO:
+    - Pobranie workspace_id dla sprawdzenia roli użytkownika
+    - Pobranie nazwy i ustawień tablicy
+    """
+    service = BoardService(db)
+    # Pobierz tablicę z bazy
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board nie znaleziony")
+    
+    # Sprawdź czy użytkownik ma dostęp (jest członkiem workspace'a)
+    member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    
+    if not member and board.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Brak dostępu do tego board'a")
+    
+    # Pobierz informacje o właścicielu
+    owner = db.query(User).filter(User.id == board.created_by).first()
+    
+    # Pobierz dane użytkownika dla tego boardu (is_favourite, last_opened)
+    board_user = db.query(BoardUsers).filter(
+        BoardUsers.board_id == board_id,
+        BoardUsers.user_id == user_id
+    ).first()
+    
+    return BoardResponse(
+        id=board.id,
+        name=board.name,
+        icon=board.icon,
+        bg_color=board.bg_color,
+        workspace_id=board.workspace_id,
+        owner_id=board.created_by,
+        owner_username=owner.username if owner else "Unknown",
+        is_favourite=board_user.is_favourite if board_user else False,
+        last_modified=board.last_modified,
+        last_modified_by=board.last_modified_by,
+        last_opened=board_user.last_opened if board_user else None,
+        created_at=board.created_at,
+        created_by=owner.username if owner else "Unknown"
+    )
 
 @router.put("/{board_id}", response_model=BoardResponse)
 async def update_board(
@@ -289,8 +345,10 @@ async def get_board_elements(
             detail="Brak dostępu do tej tablicy"
         )
     
-    # Pobierz tylko nie usunięte elementy
-    elements = db.query(BoardElement).filter(
+    # Pobierz tylko nie usunięte elementy z informacją o autorze
+    elements = db.query(BoardElement, User).outerjoin(
+        User, BoardElement.created_by == User.id
+    ).filter(
         BoardElement.board_id == board_id,
         BoardElement.is_deleted == False
     ).order_by(BoardElement.created_at.asc()).all()
@@ -298,9 +356,12 @@ async def get_board_elements(
     return {
         "elements": [
             {
-                "element_id": e.element_id,
-                "type": e.type,
-                "data": e.data
+                "element_id": e.BoardElement.element_id,
+                "type": e.BoardElement.type,
+                "data": e.BoardElement.data,
+                "created_by_id": e.BoardElement.created_by,
+                "created_by_username": e.User.username if e.User else None,
+                "created_at": e.BoardElement.created_at.isoformat() if e.BoardElement.created_at else None
             }
             for e in elements
         ]

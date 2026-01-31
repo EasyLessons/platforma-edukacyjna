@@ -82,6 +82,20 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
       return () => overlay.removeEventListener('wheel', handleNativeWheel);
     }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
+    // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+    // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+    useEffect(() => {
+      const overlay = overlayRef.current;
+      if (!overlay) return;
+
+      const handleTouchMove = (e: TouchEvent) => {
+        e.preventDefault();
+      };
+
+      overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+      return () => overlay.removeEventListener('touchmove', handleTouchMove);
+    }, []);
+
     // Expose ref methods (for toolbar buttons)
     useImperativeHandle(ref, () => ({
       handlePasteFromClipboard: () => {
@@ -93,50 +107,142 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
       }
     }));
 
-    // File upload przez input (jedyna lokalna funkcja ImageTool)
+    // 🆕 Konwersja PDF → obrazki (wszystkie strony)
+    const convertPDFToImages = async (file: File): Promise<string[]> => {
+      const pdfjs = await import('pdfjs-dist');
+      pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const images: string[] = [];
+
+      // Konwertuj wszystkie strony
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const viewport = page.getViewport({ scale: 2.0 }); // 2x dla lepszej jakości
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        if (!context) throw new Error('Cannot get canvas context');
+
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        await page.render({
+          canvasContext: context,
+          viewport: viewport,
+          canvas: canvas,
+        }).promise;
+
+        images.push(canvas.toDataURL('image/jpeg', 0.9));
+      }
+
+      console.log(`✅ Skonwertowano ${images.length} stron PDF`);
+      return images;
+    };
+
+    // File upload przez input - obsługuje obrazy i PDF
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
       const file = e.target.files?.[0];
-      if (!file || !file.type.startsWith('image/')) return;
+      if (!file) return;
+
+      const isImage = file.type.startsWith('image/');
+      const isPDF = file.type === 'application/pdf';
+
+      if (!isImage && !isPDF) {
+        console.error('Only images and PDFs are supported');
+        return;
+      }
 
       try {
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-          const img = new Image();
-          img.onload = () => {
-            const dataUrl = evt.target?.result as string;
+        // 🆕 Obsługa PDF → konwersja wszystkich stron
+        if (isPDF) {
+          console.log('📄 Converting PDF to images...');
+          const images = await convertPDFToImages(file);
+          
+          const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+          
+          const worldWidth = 3;
+          const padding = 0.5; // Odstęp między stronami
+          let currentY = centerWorld.y;
+          
+          // Dodaj każdą stronę jako osobny obrazek
+          for (let i = 0; i < images.length; i++) {
+            const dataUrl = images[i];
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = reject;
+              img.src = dataUrl;
+            });
             
-            // Wstaw w centrum widoku
-            const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
-            const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
-            
-            // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
             const aspectRatio = img.height / img.width;
-            const worldWidth = 3;
             const worldHeight = worldWidth * aspectRatio;
             
             const newImage: ImageElement = {
-              id: Date.now().toString(),
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-page-${i + 1}`,
               type: 'image',
               x: centerWorld.x - worldWidth / 2,
-              y: centerWorld.y - worldHeight / 2,
+              y: currentY,
               width: worldWidth,
               height: worldHeight,
               src: dataUrl,
-              alt: file.name,
+              alt: `${file.name} - Strona ${i + 1}/${images.length}`,
             };
 
-            // ✅ Od razu tworzy element - BEZ PREVIEW!
+            console.log(`✅ Creating page ${i + 1}/${images.length}, ID: ${newImage.id}`);
             onImageCreate(newImage);
+            currentY += worldHeight + padding; // Następna strona niżej
+            
+            // Małe opóźnienie żeby ID były unikalne i state się zaktualizował
+            await new Promise(resolve => setTimeout(resolve, 50));
+          }
+          
+          console.log(`✅ Dodano ${images.length} stron z PDF`);
+        } else {
+          // Obsługa zwykłego obrazka
+          const reader = new FileReader();
+          const result = await new Promise<string>((resolve, reject) => {
+            reader.onload = (evt) => resolve(evt.target?.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+          const dataUrl = result;
+
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          const width = img.width;
+          const height = img.height;
+          
+          // Wstaw w centrum widoku
+          const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
+          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
+          
+          // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
+          const aspectRatio = height / width;
+          const worldWidth = 3;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: Date.now().toString(),
+            type: 'image',
+            x: centerWorld.x - worldWidth / 2,
+            y: centerWorld.y - worldHeight / 2,
+            width: worldWidth,
+            height: worldHeight,
+            src: dataUrl,
+            alt: file.name,
           };
-          img.onerror = () => {
-            console.error('Failed to load image');
-          };
-          img.src = evt.target?.result as string;
-        };
-        reader.onerror = () => {
-          console.error('Failed to read file');
-        };
-        reader.readAsDataURL(file);
+
+          // ✅ Od razu tworzy element - BEZ PREVIEW!
+          onImageCreate(newImage);
+        }
+        
+        console.log('✅ Image created from', isPDF ? 'PDF' : 'image');
       } catch (err) {
         console.error('File upload error:', err);
       }
@@ -154,11 +260,11 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           style={{ touchAction: 'none' }}
         />
 
-        {/* Hidden file input */}
+        {/* Hidden file input - akceptuje obrazy i PDF */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,application/pdf"
           onChange={handleFileUpload}
           className="hidden"
         />

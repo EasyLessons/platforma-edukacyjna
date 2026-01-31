@@ -61,4 +61,16 @@ export interface ResourceManifest {
 
 export type SearchResult = 
   | (FormulaResource & { resultType: 'formula' })
-  | (CardResource & { resultType: 'card' });
+  | (CardResource & { resultType: 'card' })
+  | CalculationResult;
+
+/**
+ * 🆕 Quick Math - wynik obliczeń matematycznych
+ */
+export interface CalculationResult {
+  resultType: 'calculation';
+  id: string;
+  expression: string;
+  result: string;
+  numericResult: number;
+}

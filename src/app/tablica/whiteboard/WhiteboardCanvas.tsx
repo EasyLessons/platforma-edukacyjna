@@ -24,6 +24,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
+import NextImage from 'next/image';
 import Toolbar, { Tool, ShapeType } from '../toolbar/Toolbar';
 import { ZoomControls } from '../toolbar/ZoomControls';
 import { TextTool } from '../toolbar/TextTool';
@@ -39,16 +40,25 @@ import { TableTool, TableView } from '../toolbar/TableTool';
 import { CalculatorTool } from '../toolbar/CalculatorTool';
 import { MathChatbot } from '../toolbar/MathChatbot';
 import { OnlineUsers } from './OnlineUsers';
-import { RemoteCursors } from './RemoteCursors';
+import { RemoteCursorsContainer } from './RemoteCursors';
 
 // 🆕 Import SmartSearch
 import { SmartSearchBar, CardViewer, FormulaResource, CardResource } from '../smartsearch';
 
-// 🆕 Import hooka Realtime
-import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
+// 🆕 Import hooka Realtime + typ TypingUser + RemoteViewport
+import { useBoardRealtime, TypingUser, RemoteViewport } from '@/app/context/BoardRealtimeContext';
+
+// 🆕 Import hooka Auth (dla Activity History)
+import { useAuth } from '@/app/context/AuthContext';
+
+// 🆕 Import snap utilities
+import { GuideLine, collectGuidelinesFromImages } from '../utils/snapUtils';
 
 // 🆕 Import API dla elementów tablicy
-import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement } from '@/boards_api/api';
+import { saveBoardElementsBatch, loadBoardElements, deleteBoardElement, BoardElementWithAuthor } from '@/boards_api/api';
+
+// 🆕 Import ActivityHistory
+import { ActivityHistory } from '../toolbar/ActivityHistory';
 
 import {
   Point,
@@ -61,6 +71,7 @@ import {
   ImageElement,
   MarkdownNote,
   TableElement,
+  PDFElement,
   MomentumState 
 } from './types';
 
@@ -73,21 +84,70 @@ import {
   transformPoint,
   updateMomentum,   
   startMomentum,     
-  stopMomentum     
+  stopMomentum,
+  isElementInViewport
 } from './viewport';
 
 import { drawGrid } from './Grid';
 import { drawElement } from './rendering';
 
+// 🆕 Helper do obliczania bounding box elementu (dla viewport culling)
+function getElementBounds(element: DrawingElement): { x: number; y: number; width: number; height: number } {
+  switch (element.type) {
+    case 'path': {
+      if (element.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const point of element.points) {
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      }
+      // Dodaj margines dla width (grubość linii)
+      const margin = (element.width || 2) / 100;
+      return { x: minX - margin, y: minY - margin, width: maxX - minX + margin * 2, height: maxY - minY + margin * 2 };
+    }
+    case 'shape': {
+      const minX = Math.min(element.startX, element.endX);
+      const minY = Math.min(element.startY, element.endY);
+      const width = Math.abs(element.endX - element.startX);
+      const height = Math.abs(element.endY - element.startY);
+      return { x: minX, y: minY, width, height };
+    }
+    case 'text':
+      return { x: element.x, y: element.y, width: element.width || 2, height: element.height || 0.5 };
+    case 'function':
+      // Funkcje są renderowane w całym zakresie - zawsze widoczne
+      return { x: -element.xRange, y: -element.yRange, width: element.xRange * 2, height: element.yRange * 2 };
+    case 'image':
+    case 'pdf':
+    case 'markdown':
+    case 'table':
+      return { x: element.x, y: element.y, width: element.width, height: element.height };
+    default:
+      return { x: 0, y: 0, width: 10, height: 10 };
+  }
+}
+
+// 🆕 Typ akcji użytkownika dla stosu undo/redo (poza komponentem dla wydajności)
+type UserAction = { type: 'create', element: DrawingElement } | { type: 'delete', element: DrawingElement };
+
 interface WhiteboardCanvasProps {
   className?: string;
   boardId: string; // 🆕 boardId z URL params (page.tsx)
+  arkuszPath?: string | null; // 🆕 ścieżka do folderu z arkuszem PDF
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
-export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasProps) {
+export default function WhiteboardCanvas({ className = '', boardId, arkuszPath, userRole = 'editor' }: WhiteboardCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imageToolRef = useRef<ImageToolRef>(null);
+  
+  // Debug userRole
+  useEffect(() => {
+    console.log('🔐 WhiteboardCanvas otrzymał userRole:', userRole);
+  }, [userRole]);
   
   // 🆕 boardId pochodzi z props (przekazany z page.tsx)
   // Automatycznie aktualizuje się gdy URL się zmienia
@@ -106,12 +166,19 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
     broadcastElementDeleted,
     broadcastElementsBatch,
     broadcastCursorMove,
-    remoteCursors,
+    broadcastTypingStarted,
+    broadcastTypingStopped,
+    broadcastViewportChange,
+    subscribeTyping,
+    subscribeViewports,
     onRemoteElementCreated,
     onRemoteElementUpdated,
     onRemoteElementDeleted,
     isConnected
   } = useBoardRealtime();
+  
+  // 🆕 AUTH HOOK (dla Activity History - currentUserId)
+  const { user } = useAuth();
   
   // Viewport state
   const [viewport, setViewport] = useState<ViewportTransform>({ 
@@ -136,8 +203,15 @@ export function WhiteboardCanvas({ className = '', boardId }: WhiteboardCanvasPr
   const [fontSize, setFontSize] = useState(24);
   const [fillShape, setFillShape] = useState(false);
   
+  // 🆕 LOADING STATE - wyświetlanie overlay podczas ładowania
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+  
   // 🆕 KALKULATOR - osobny state (zawsze aktywny po włączeniu)
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
+
+  // 🆕 SNAP GUIDES - aktywne linie prowadzące
+  const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
 
   const [chatMessages, setChatMessages] = useState<Array<{
     id: string;
@@ -163,10 +237,20 @@ Zadaj pytanie! 🤔`,
   
   // Elements state
   const [elements, setElements] = useState<DrawingElement[]>([]);
+  const [elementsWithAuthor, setElementsWithAuthor] = useState<BoardElementWithAuthor[]>([]); // 🆕 Elementy z info o autorze (dla Activity History)
   const [selectedElementIds, setSelectedElementIds] = useState<Set<string>>(new Set());
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
   const [editingMarkdownId, setEditingMarkdownId] = useState<string | null>(null); // 🆕 Edycja markdown
+  const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]); // 🆕 Kto edytuje jakie elementy (realtime)
+  const [followingUserId, setFollowingUserId] = useState<number | null>(null); // 🆕 FOLLOW MODE - kogo śledzimy
   const [debugMode, setDebugMode] = useState(false);
+  
+  // 🆕 COPY/PASTE - schowek dla elementów
+  const [copiedElements, setCopiedElements] = useState<DrawingElement[]>([]);
+  const [lastCopyWasInternal, setLastCopyWasInternal] = useState(false); // 🆕 Czy ostatnie Ctrl+C było w aplikacji
+  
+  // 🆕 Szerokość okna dla responsywności
+  const [windowWidth, setWindowWidth] = useState(0);
   const [loadedImages, setLoadedImages] = useState<Map<string, HTMLImageElement>>(new Map());
   
   // 🆕 ZAPISYWANIE - state i refs
@@ -181,23 +265,40 @@ Zadaj pytanie! 🤔`,
   const [isSearchActive, setIsSearchActive] = useState(false); // Blokuje zoom gdy search otwarty
   const [isCardViewerActive, setIsCardViewerActive] = useState(false); // Blokuje canvas gdy CardViewer otwarty
   
-  // History state
+  // History state (legacy - pełna historia stanów)
   const [history, setHistory] = useState<DrawingElement[][]>([[]]);
   const [historyIndex, setHistoryIndex] = useState(0);
   
+  // 🆕 USER ACTION STACK - stos akcji tylko dla bieżącego użytkownika (Ctrl+Z/Y)
+  const [userUndoStack, setUserUndoStack] = useState<UserAction[]>([]);
+  const [userRedoStack, setUserRedoStack] = useState<UserAction[]>([]);
+  const userUndoStackRef = useRef<UserAction[]>([]);
+  const userRedoStackRef = useRef<UserAction[]>([]);
+  
   const [imageProcessing, setImageProcessing] = useState(false);
   
+  // Wymuszenie pan dla viewera
+  useEffect(() => {
+    if (userRole === 'viewer' && tool !== 'pan') {
+      setTool('pan');
+      console.log('🔒 Viewer - wymuszono narzędzie pan');
+    }
+  }, [userRole, tool]);
+  
   const redrawCanvasRef = useRef<() => void>(() => {});
-  const handleGlobalPasteImageRef = useRef<() => void>(() => {});
+  const handleGlobalPasteImageRef = useRef<() => Promise<boolean>>(async () => false);
   
   // Refs for stable callbacks
   const elementsRef = useRef(elements);
   const saveToHistoryRef = useRef<(els: DrawingElement[]) => void>(() => {});
+  const undoRef = useRef<() => void>(() => {});
+  const redoRef = useRef<() => void>(() => {});
   const historyRef = useRef(history);
   const historyIndexRef = useRef(historyIndex);
   const selectedElementIdsRef = useRef(selectedElementIds);
   const viewportRef = useRef(viewport);
   const boardIdStateRef = useRef(boardIdState);
+  const loadedImagesRef = useRef(loadedImages);
   
   useEffect(() => {
     viewportRef.current = viewport;
@@ -208,12 +309,25 @@ Zadaj pytanie! 🤔`,
   }, [elements]);
 
   useEffect(() => {
+    loadedImagesRef.current = loadedImages;
+  }, [loadedImages]);
+
+  useEffect(() => {
     historyRef.current = history;
   }, [history]);
 
   useEffect(() => {
     historyIndexRef.current = historyIndex;
   }, [historyIndex]);
+
+  // 🆕 Synchronizacja user action stack refs
+  useEffect(() => {
+    userUndoStackRef.current = userUndoStack;
+  }, [userUndoStack]);
+
+  useEffect(() => {
+    userRedoStackRef.current = userRedoStack;
+  }, [userRedoStack]);
 
   useEffect(() => {
     selectedElementIdsRef.current = selectedElementIds;
@@ -227,6 +341,27 @@ Zadaj pytanie! 🤔`,
   useEffect(() => {
     unsavedElementsRef.current = unsavedElements;
   }, [unsavedElements]);
+
+  // 🆕 Śledzenie szerokości okna dla responsywności
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    handleResize(); // Inicjalne ustawienie
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🆕 Resetowanie flagi lastCopyWasInternal gdy użytkownik wychodzi z okna
+  // (może skopiować screenshot lub coś z zewnątrz)
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      // Gdy użytkownik wychodzi z okna, resetuj flagę
+      // (mógł zrobić screenshot lub skopiować coś z innej aplikacji)
+      setLastCopyWasInternal(false);
+    };
+
+    window.addEventListener('blur', handleWindowBlur);
+    return () => window.removeEventListener('blur', handleWindowBlur);
+  }, []);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 REALTIME - ODBIERANIE ZMIAN OD INNYCH UŻYTKOWNIKÓW
@@ -245,15 +380,32 @@ Zadaj pytanie! 🤔`,
         return [...prev, element];
       });
       
+      // 🆕 Aktualizuj elementsWithAuthor dla Activity History
+      setElementsWithAuthor(prev => {
+        if (prev.some(el => el.element_id === element.id)) {
+          return prev;
+        }
+        return [...prev, {
+          element_id: element.id,
+          type: element.type,
+          data: element,
+          created_by_id: userId,
+          created_by_username: username,
+          created_at: new Date().toISOString()
+        }];
+      });
+      
       // 🆕 Jeśli to obraz, załaduj go do loadedImages
       if (element.type === 'image' && (element as ImageElement).src) {
+        console.log(`🖼️ Ładowanie zdalnego obrazu ${element.id}...`);
         const img = new Image();
         img.src = (element as ImageElement).src;
         img.onload = () => {
+          console.log(`✅ Załadowano zdalny obraz ${element.id}`);
           setLoadedImages(prev => new Map(prev).set(element.id, img));
         };
         img.onerror = () => {
-          console.error('Failed to load remote image:', element.id);
+          console.error(`❌ Błąd ładowania zdalnego obrazu ${element.id}`);
         };
       }
     });
@@ -265,6 +417,11 @@ Zadaj pytanie! 🤔`,
       setElements(prev =>
         prev.map(el => (el.id === element.id ? element : el))
       );
+      
+      // 🆕 Aktualizuj elementsWithAuthor
+      setElementsWithAuthor(prev =>
+        prev.map(el => (el.element_id === element.id ? { ...el, data: element } : el))
+      );
     });
     
     // Handler: Usunięcie elementu przez innego użytkownika
@@ -272,30 +429,95 @@ Zadaj pytanie! 🤔`,
       console.log(`📥 [${username}] usunął element:`, elementId);
       
       setElements(prev => prev.filter(el => el.id !== elementId));
+      
+      // 🆕 Usuń z elementsWithAuthor
+      setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
     });
   }, [onRemoteElementCreated, onRemoteElementUpdated, onRemoteElementDeleted]);
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 🖱️ BROADCAST CURSOR POSITION - Wysyłanie pozycji kursora do innych
+  // 🆕 TYPING INDICATOR SUBSCRIPTION - kto edytuje jakie elementy
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  useEffect(() => {
+    const unsubscribe = subscribeTyping((users) => {
+      setTypingUsers(users);
+    });
+    return unsubscribe;
+  }, [subscribeTyping]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🆕 VIEWPORT TRACKING FOR FOLLOW MODE - śledź viewporty innych użytkowników
+  // ═══════════════════════════════════════════════════════════════════════════
+  
+  const remoteViewportsRef = useRef<RemoteViewport[]>([]);
+  
+  useEffect(() => {
+    const unsubscribe = subscribeViewports((viewports) => {
+      remoteViewportsRef.current = viewports;
+      
+      // Jeśli śledzimy użytkownika, zaktualizuj nasz viewport
+      if (followingUserId) {
+        const followedViewport = viewports.find(v => v.userId === followingUserId);
+        if (followedViewport) {
+          setViewport({
+            x: followedViewport.x,
+            y: followedViewport.y,
+            scale: followedViewport.scale
+          });
+        }
+      }
+    });
+    return unsubscribe;
+  }, [subscribeViewports, followingUserId]);
+
+  // 🆕 BROADCAST VIEWPORT CHANGE - gdy mój viewport się zmienia, wyślij do innych
+  const lastViewportBroadcastRef = useRef<number>(0);
+  const VIEWPORT_BROADCAST_INTERVAL = 50; // 50ms = 20 FPS
+  
+  useEffect(() => {
+    // Throttle broadcast żeby nie zalewać sieci
+    const now = Date.now();
+    if (now - lastViewportBroadcastRef.current < VIEWPORT_BROADCAST_INTERVAL) return;
+    lastViewportBroadcastRef.current = now;
+    
+    // Nie broadcastuj gdy jesteśmy w follow mode (bo wtedy viewport jest kopiowany)
+    if (followingUserId) return;
+    
+    broadcastViewportChange(viewport.x, viewport.y, viewport.scale);
+  }, [viewport, broadcastViewportChange, followingUserId]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // 🖱️ BROADCAST CURSOR POSITION - ZOPTYMALIZOWANE (cache rect, ResizeObserver)
   // ═══════════════════════════════════════════════════════════════════════════
   
   const lastCursorBroadcastRef = useRef<number>(0);
-  const CURSOR_BROADCAST_INTERVAL = 50; // ms - throttle do ~20 FPS
+  const cachedRectRef = useRef<DOMRect | null>(null);
+  const CURSOR_BROADCAST_INTERVAL = 100; // Zwiększ do 100ms (10 FPS wystarczy dla kursorów)
   
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
+    // Cache rect - aktualizuj tylko przy resize
+    const updateRect = () => {
+      cachedRectRef.current = container.getBoundingClientRect();
+    };
+    updateRect();
+    
+    const resizeObserver = new ResizeObserver(updateRect);
+    resizeObserver.observe(container);
+    
     const handlePointerMove = (e: PointerEvent) => {
-      const now = Date.now();
-      
-      // Throttle - nie wysyłaj częściej niż co CURSOR_BROADCAST_INTERVAL ms
+      // ✅ Throttle PRZED jakimikolwiek obliczeniami
+      const now = performance.now();
       if (now - lastCursorBroadcastRef.current < CURSOR_BROADCAST_INTERVAL) return;
-      
       lastCursorBroadcastRef.current = now;
       
-      // Oblicz pozycję w world coordinates
-      const rect = container.getBoundingClientRect();
+      // ✅ Użyj cached rect zamiast getBoundingClientRect()
+      const rect = cachedRectRef.current;
+      if (!rect) return;
+      
       const screenX = e.clientX - rect.left;
       const screenY = e.clientY - rect.top;
       
@@ -310,10 +532,15 @@ Zadaj pytanie! 🤔`,
       broadcastCursorMove(worldPos.x, worldPos.y);
     };
     
-    container.addEventListener('pointermove', handlePointerMove, { passive: true });
+    // ✅ PASSIVE + CAPTURE false - pozwól innym handlerom działać
+    container.addEventListener('pointermove', handlePointerMove, { 
+      passive: true,
+      capture: false
+    });
     
     return () => {
       container.removeEventListener('pointermove', handlePointerMove);
+      resizeObserver.disconnect();
     };
   }, [broadcastCursorMove]);
 
@@ -398,48 +625,261 @@ Zadaj pytanie! 🤔`,
   
   useEffect(() => {
     const loadElements = async () => {
-      if (!boardIdState) return;
+      if (!boardIdState) {
+        setIsLoading(false);
+        setDbElementsLoaded(true);
+        setDbWasEmpty(true);
+        return;
+      }
       
       // Walidacja boardId
       const boardIdNum = parseInt(boardIdState);
       if (isNaN(boardIdNum)) {
         console.warn('⚠️ Nieprawidłowy boardId, pomijam ładowanie');
+        setIsLoading(false);
+        setDbElementsLoaded(true);
+        setDbWasEmpty(true);
         return;
       }
       
       try {
+        setIsLoading(true);
+        setLoadingProgress(10);
         console.log(`📥 Ładowanie elementów dla board ${boardIdNum}...`);
         
         const data = await loadBoardElements(boardIdNum);
+        setLoadingProgress(50);
         
         // Ustaw elementy (mapuj data → element)
         const loadedElements = data.elements.map(e => e.data);
         setElements(loadedElements);
+        setElementsWithAuthor(data.elements); // 🆕 Zapisz pełne dane z autorem dla Activity History
+        setLoadingProgress(70);
         
         // 🆕 Ustaw początkową historię na załadowane elementy
         setHistory([loadedElements]);
         setHistoryIndex(0);
         
+        // 🆕 Ustaw flagi dla ładowania arkusza
+        setDbElementsLoaded(true);
+        setDbWasEmpty(loadedElements.length === 0);
+        
         console.log(`✅ Załadowano ${loadedElements.length} elementów`);
+        setLoadingProgress(90);
         
         // Załaduj obrazy
-        loadedElements.forEach((el: DrawingElement) => {
-          if (el.type === 'image' && (el as ImageElement).src) {
-            const img = new Image();
-            img.src = (el as ImageElement).src;
-            img.onload = () => {
-              setLoadedImages(prev => new Map(prev).set(el.id, img));
-            };
-          }
-        });
+        let loadedImagesCount = 0;
+        const imageElements = loadedElements.filter(el => el.type === 'image');
+        
+        if (imageElements.length === 0) {
+          setLoadingProgress(100);
+          setTimeout(() => setIsLoading(false), 300);
+        } else {
+          const imagePromises = imageElements.map((el: DrawingElement) => {
+            return new Promise<void>((resolve) => {
+              if (el.type === 'image' && (el as ImageElement).src) {
+                const img = new Image();
+                img.src = (el as ImageElement).src;
+                img.onload = () => {
+                  setLoadedImages(prev => new Map(prev).set(el.id, img));
+                  loadedImagesCount++;
+                  setLoadingProgress(90 + (loadedImagesCount / imageElements.length) * 10);
+                  resolve();
+                };
+                img.onerror = () => {
+                  console.error('Failed to load image:', el.id);
+                  loadedImagesCount++;
+                  setLoadingProgress(90 + (loadedImagesCount / imageElements.length) * 10);
+                  resolve();
+                };
+              } else {
+                resolve();
+              }
+            });
+          });
+          
+          await Promise.all(imagePromises);
+          setLoadingProgress(100);
+          setTimeout(() => setIsLoading(false), 300);
+        }
         
       } catch (err) {
         console.error('❌ Błąd ładowania elementów:', err);
+        setIsLoading(false);
       }
     };
     
     loadElements();
   }, [boardIdState]);
+
+  // ========================================
+  // COPY/PASTE HANDLERS
+  // ========================================
+  // 🆕 COPY - kopiowanie zaznaczonych elementów (Ctrl+C)
+  const handleCopy = useCallback(() => {
+    const selectedIds = selectedElementIdsRef.current;
+    if (selectedIds.size === 0) return;
+    
+    const elementsToCopy = elementsRef.current.filter(el => selectedIds.has(el.id));
+    setCopiedElements(elementsToCopy);
+    setLastCopyWasInternal(true); // 🆕 Oznacz że kopiowanie było w aplikacji
+    
+    console.log('📋 Skopiowano elementów:', elementsToCopy.length);
+  }, []);
+
+  // 🆕 PASTE - wklejanie skopiowanych elementów (Ctrl+V)
+  const handlePaste = useCallback(() => {
+    if (copiedElements.length === 0) return;
+    
+    const currentViewport = viewportRef.current;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    // Wylicz punkt wklejenia (środek ekranu)
+    const centerScreen = { x: canvas.width / 2, y: canvas.height / 2 };
+    const centerWorld = inverseTransformPoint(
+      centerScreen, 
+      currentViewport, 
+      canvas.width, 
+      canvas.height
+    );
+    
+    // Oblicz środek zaznaczenia oryginalnego
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    copiedElements.forEach(el => {
+      if (el.type === 'path') {
+        el.points.forEach(p => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
+      } else if (el.type === 'shape') {
+        minX = Math.min(minX, el.startX, el.endX);
+        minY = Math.min(minY, el.startY, el.endY);
+        maxX = Math.max(maxX, el.startX, el.endX);
+        maxY = Math.max(maxY, el.startY, el.endY);
+      } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table' || el.type === 'pdf') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + (el.width || 0));
+        maxY = Math.max(maxY, el.y + (el.height || 0));
+      } else if (el.type === 'function') {
+        // Funkcje nie mają dokładnej pozycji, pomijamy
+      }
+    });
+    
+    const originalCenterX = (minX + maxX) / 2;
+    const originalCenterY = (minY + maxY) / 2;
+    
+    // Oblicz offset (różnica między nową a starą pozycją)
+    const offsetX = centerWorld.x - originalCenterX;
+    const offsetY = centerWorld.y - originalCenterY;
+    
+    // Twórz nowe elementy z przesuniętymi pozycjami i nowymi ID
+    const newElements: DrawingElement[] = [];
+    const newIds: string[] = [];
+    
+    copiedElements.forEach(el => {
+      const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+      newIds.push(newId);
+      
+      if (el.type === 'path') {
+        const newPath: DrawingPath = {
+          ...el,
+          id: newId,
+          points: el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }))
+        };
+        newElements.push(newPath);
+      } else if (el.type === 'shape') {
+        const newShape: Shape = {
+          ...el,
+          id: newId,
+          startX: el.startX + offsetX,
+          startY: el.startY + offsetY,
+          endX: el.endX + offsetX,
+          endY: el.endY + offsetY
+        };
+        newElements.push(newShape);
+      } else if (el.type === 'text') {
+        const newText: TextElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newText);
+      } else if (el.type === 'image') {
+        const newImage: ImageElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newImage);
+        
+        // Załaduj obraz do pamięci
+        if (el.src) {
+          const img = new Image();
+          img.src = el.src;
+          img.onload = () => {
+            setLoadedImages(prev => new Map(prev).set(newId, img));
+          };
+        }
+      } else if (el.type === 'markdown') {
+        const newMarkdown: MarkdownNote = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newMarkdown);
+      } else if (el.type === 'table') {
+        const newTable: TableElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+          cells: el.cells.map(row => [...row]) // Deep copy komórek
+        };
+        newElements.push(newTable);
+      } else if (el.type === 'function') {
+        const newFunction: FunctionPlot = {
+          ...el,
+          id: newId
+        };
+        newElements.push(newFunction);
+      } else if (el.type === 'pdf') {
+        const newPDF: PDFElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY
+        };
+        newElements.push(newPDF);
+      }
+    });
+    
+    // Dodaj nowe elementy do tablicy
+    const allElements = [...elementsRef.current, ...newElements];
+    setElements(allElements);
+    saveToHistoryRef.current(allElements);
+    
+    // Zaznacz nowo wklejone elementy
+    setSelectedElementIds(new Set(newIds));
+    
+    // Broadcast i zapisz każdy nowy element
+    newElements.forEach(el => {
+      broadcastElementCreated(el);
+      setUnsavedElements(prev => new Set(prev).add(el.id));
+    });
+    
+    if (boardIdStateRef.current) {
+      debouncedSave(boardIdStateRef.current);
+    }
+    
+    console.log('📌 Wklejono elementów:', newElements.length);
+  }, [copiedElements, broadcastElementCreated, debouncedSave]);
 
   // ========================================
   // KEYBOARD SHORTCUTS (bez zmian)
@@ -451,9 +891,38 @@ Zadaj pytanie! 🤔`,
         return;
       }
       
+      // 🆕 Ctrl+C - kopiowanie zaznaczonych elementów
+      if (e.ctrlKey && e.key === 'c') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          handleCopy();
+          return;
+        }
+      }
+      
+      // 🆕 Ctrl+V - wklejanie
       if (e.ctrlKey && e.key === 'v') {
         e.preventDefault();
-        handleGlobalPasteImageRef.current();
+        
+        // 🎯 INTELIGENTNE WKLEJANIE:
+        // Jeśli ostatnie Ctrl+C było W APLIKACJI → użyj pamięci wewnętrznej
+        // Jeśli ostatnie Ctrl+C było POZA APLIKACJĄ → sprawdź schowek systemowy
+        
+        if (lastCopyWasInternal && copiedElements.length > 0) {
+          // Użytkownik skopiował element w aplikacji - wklej go
+          handlePaste();
+        } else {
+          // Użytkownik prawdopodobnie skopiował coś z zewnątrz (screenshot itp.)
+          // Sprawdź schowek systemowy
+          handleGlobalPasteImageRef.current().then((imageWasPasted: boolean) => {
+            // Jeśli NIE było obrazka w schowku I mamy skopiowane elementy, wklej je
+            if (!imageWasPasted && copiedElements.length > 0) {
+              handlePaste();
+            }
+          });
+        }
+        
         return;
       }
       
@@ -464,16 +933,80 @@ Zadaj pytanie! 🤔`,
         setEditingTextId(null);
       }
       
-      if (e.key === 'e' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        e.preventDefault();
-        setTool('eraser');
+      // 🆕 Skróty klawiszowe do narzędzi (bez Ctrl/Alt/Meta)
+      if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+        // V = Select (Zaznacz)
+        if (e.key === 'v') {
+          e.preventDefault();
+          setTool('select');
+          return;
+        }
+        
+        // H = Pan (Przesuwaj)
+        if (e.key === 'h') {
+          e.preventDefault();
+          setTool('pan');
+          return;
+        }
+        
+        // P = Pen (Rysuj)
+        if (e.key === 'p') {
+          e.preventDefault();
+          setTool('pen');
+          return;
+        }
+        
+        // T = Text (Tekst)
+        if (e.key === 't') {
+          e.preventDefault();
+          setTool('text');
+          return;
+        }
+        
+        // S = Shape (Kształty)
+        if (e.key === 's') {
+          e.preventDefault();
+          setTool('shape');
+          return;
+        }
+        
+        // F = Function (Funkcja)
+        if (e.key === 'f') {
+          e.preventDefault();
+          setTool('function');
+          return;
+        }
+        
+        // I = Image (Obraz)
+        if (e.key === 'i') {
+          e.preventDefault();
+          setTool('image');
+          return;
+        }
+        
+        // E = Eraser (Gumka)
+        if (e.key === 'e') {
+          e.preventDefault();
+          setTool('eraser');
+          return;
+        }
+        
+        // M = Markdown (Notatka)
+        if (e.key === 'm') {
+          e.preventDefault();
+          setTool('markdown');
+          return;
+        }
       }
       
+      // Specjalna logika dla edycji tekstu (tylko dla pojedynczego zaznaczenia)
       if (
         tool === 'select' &&
         selectedElementIds.size === 1 &&
         e.key.length === 1 &&
-        !e.ctrlKey && !e.metaKey && !e.altKey
+        !e.ctrlKey && !e.metaKey && !e.altKey &&
+        // Sprawdź czy to nie jest klawisz narzędzia
+        !['v', 'h', 'p', 't', 's', 'f', 'i', 'e', 'm'].includes(e.key.toLowerCase())
       ) {
         const selectedId = Array.from(selectedElementIds)[0];
         const selectedElement = elementsRef.current.find(el => el.id === selectedId);
@@ -492,28 +1025,14 @@ Zadaj pytanie! 🤔`,
       
       if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex > 0) {
-          const newIndex = currentIndex - 1;
-          setHistoryIndex(newIndex);
-          setElements(currentHistory[newIndex]);
-          setSelectedElementIds(new Set());
-        }
+        // Użyj nowej zsynchronizowanej funkcji undo
+        undoRef.current?.();
       }
       
       if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
         e.preventDefault();
-        const currentIndex = historyIndexRef.current;
-        const currentHistory = historyRef.current;
-        
-        if (currentIndex < currentHistory.length - 1) {
-          const newIndex = currentIndex + 1;
-          setHistoryIndex(newIndex);
-          setElements(currentHistory[newIndex]);
-          setSelectedElementIds(new Set());
-        }
+        // Użyj nowej zsynchronizowanej funkcji redo
+        redoRef.current?.();
       }
       
       if (e.key === 'Delete') {
@@ -526,6 +1045,25 @@ Zadaj pytanie! 🤔`,
           setElements(newElements);
           saveToHistoryRef.current(newElements);
           setSelectedElementIds(new Set());
+          
+          // Najpierw zapisz niezapisane elementy
+          const unsavedToDelete = currentElements.filter(el => 
+            currentSelectedIds.has(el.id) && unsavedElementsRef.current.has(el.id)
+          );
+          
+          if (unsavedToDelete.length > 0 && boardIdStateRef.current) {
+            const numericBoardId = parseInt(boardIdStateRef.current);
+            if (!isNaN(numericBoardId)) {
+              const elementsToSave = unsavedToDelete.map(el => ({
+                element_id: el.id,
+                type: el.type,
+                data: el
+              }));
+              saveBoardElementsBatch(numericBoardId, elementsToSave)
+                .then(() => console.log('✅ Zapisano przed usunięciem:', unsavedToDelete.length))
+                .catch(err => console.error('❌ Błąd zapisywania przed usunięciem:', err));
+            }
+          }
           
           // 🆕 BROADCAST DELETE + API DELETE
           currentSelectedIds.forEach(id => {
@@ -542,6 +1080,128 @@ Zadaj pytanie! 🤔`,
         }
       }
       
+      // 🆕 Ctrl+D - duplikacja zaznaczonych elementów
+      if (e.ctrlKey && e.key === 'd') {
+        const currentSelectedIds = selectedElementIdsRef.current;
+        if (currentSelectedIds.size > 0) {
+          e.preventDefault();
+          
+          // Pobierz zaznaczone elementy
+          const elementsToDuplicate = elementsRef.current.filter(el => currentSelectedIds.has(el.id));
+          
+          if (elementsToDuplicate.length === 0) return;
+          
+          // Offset dla duplikacji (lekkie przesunięcie w prawo i dół)
+          const offsetX = 0.3;
+          const offsetY = 0.3;
+          
+          // Twórz zduplikowane elementy z nowymi ID
+          const newElements: DrawingElement[] = [];
+          const newIds: string[] = [];
+          
+          elementsToDuplicate.forEach(el => {
+            const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+            newIds.push(newId);
+            
+            if (el.type === 'path') {
+              const newPath: DrawingPath = {
+                ...el,
+                id: newId,
+                points: el.points.map(p => ({ x: p.x + offsetX, y: p.y + offsetY }))
+              };
+              newElements.push(newPath);
+            } else if (el.type === 'shape') {
+              const newShape: Shape = {
+                ...el,
+                id: newId,
+                startX: el.startX + offsetX,
+                startY: el.startY + offsetY,
+                endX: el.endX + offsetX,
+                endY: el.endY + offsetY
+              };
+              newElements.push(newShape);
+            } else if (el.type === 'text') {
+              const newText: TextElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newText);
+            } else if (el.type === 'image') {
+              const newImage: ImageElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newImage);
+              
+              // Załaduj obraz do pamięci
+              if (el.src) {
+                const img = new Image();
+                img.src = el.src;
+                img.onload = () => {
+                  setLoadedImages(prev => new Map(prev).set(newId, img));
+                };
+              }
+            } else if (el.type === 'markdown') {
+              const newMarkdown: MarkdownNote = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newMarkdown);
+            } else if (el.type === 'table') {
+              const newTable: TableElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY,
+                cells: el.cells.map(row => [...row]) // Deep copy komórek
+              };
+              newElements.push(newTable);
+            } else if (el.type === 'function') {
+              const newFunction: FunctionPlot = {
+                ...el,
+                id: newId
+              };
+              newElements.push(newFunction);
+            } else if (el.type === 'pdf') {
+              const newPDF: PDFElement = {
+                ...el,
+                id: newId,
+                x: el.x + offsetX,
+                y: el.y + offsetY
+              };
+              newElements.push(newPDF);
+            }
+          });
+          
+          // Dodaj nowe elementy
+          const allElements = [...elementsRef.current, ...newElements];
+          setElements(allElements);
+          saveToHistoryRef.current(allElements);
+          
+          // Zaznacz zduplikowane elementy
+          setSelectedElementIds(new Set(newIds));
+          
+          // Broadcast i zapisz każdy nowy element
+          newElements.forEach(el => {
+            broadcastElementCreated(el);
+            setUnsavedElements(prev => new Set(prev).add(el.id));
+          });
+          
+          if (boardIdStateRef.current) {
+            debouncedSave(boardIdStateRef.current);
+          }
+          
+          console.log('📋 Zduplikowano elementów:', newElements.length);
+          return;
+        }
+      }
+      
       if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         setDebugMode(prev => {
@@ -553,7 +1213,7 @@ Zadaj pytanie! 🤔`,
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tool, selectedElementIds, broadcastElementDeleted]);
+  }, [tool, selectedElementIds, broadcastElementDeleted, handleCopy, handlePaste, copiedElements, lastCopyWasInternal, broadcastElementCreated, debouncedSave]);
 
   // Canvas setup - z obsługą zoom przeglądarki
   useEffect(() => {
@@ -635,27 +1295,21 @@ Zadaj pytanie! 🤔`,
     };
   }, []);
   
-  // Wheel/Touchpad handling - ZOOM na scroll, PAN na Shift+scroll
+  // Wheel/Touchpad handling - NAPRAWIONE: używamy ref zamiast viewport w dependencies
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
     
     const handleWheel = (e: WheelEvent) => {
-      console.log('🖱️ Wheel:', { 
-        deltaY: e.deltaY, 
-        ctrlKey: e.ctrlKey, 
-        shiftKey: e.shiftKey,
-        isSearchActive,
-        isCardViewerActive
-      });
-      
-      // BLOKADA: nie zoomuj gdy SmartSearch lub CardViewer jest aktywny
+      // 🚫 Blokada gdy SmartSearch lub CardViewer są otwarte
       if (isSearchActive || isCardViewerActive) {
-        console.log('🚫 Zoom zablokowany - modal aktywny');
-        return;
+        return; // Pozwól przeglądarce obsłużyć scroll w tych komponentach
       }
       
       e.preventDefault();
+      
+      // 🆕 Wyłącz follow mode gdy user sam nawiguje
+      setFollowingUserId(null);
       
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -665,28 +1319,24 @@ Zadaj pytanie! 🤔`,
       
       const currentViewport = viewportRef.current;
       
-      // STARA SPRAWDZONA LOGIKA:
-      // Ctrl+scroll (pinch) = ZOOM
-      // Normalny scroll/przesuwanie = PAN
-      // Shift+scroll = PAN
-      
       if (e.ctrlKey) {
-        // Ctrl+scroll lub pinch - ZOOM
-        console.log('🔍 Executing ZOOM (Ctrl/Pinch)');
-        const scaledDeltaY = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 50);
-        const newViewport = zoomViewport(currentViewport, scaledDeltaY, mouseX, mouseY, width, height);
-        setViewport(constrainViewport(newViewport));
+        // Ctrl+scroll = zoom
+        const newViewport = zoomViewport(currentViewport, e.deltaY, mouseX, mouseY, width, height);
+        const constrained = constrainViewport(newViewport);
+        viewportRef.current = constrained;
+        setViewport(constrained);
       } else {
-        // Normalny scroll lub Shift+scroll - PAN
-        console.log('📐 Executing PAN');
+        // Normalny scroll = przesuwanie (pan)
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        setViewport(constrainViewport(newViewport));
+        const constrained = constrainViewport(newViewport);
+        viewportRef.current = constrained;
+        setViewport(constrained);
       }
     };
     
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
-  }, [isSearchActive, isCardViewerActive]);
+  }, [isSearchActive, isCardViewerActive]); // 🚫 Re-attach gdy się zmienia status blokady
 
   // Auto-expand (bez zmian)
   const handleAutoExpand = useCallback((elementId: string, newHeight: number) => {
@@ -728,6 +1378,7 @@ Zadaj pytanie! 🤔`,
       // Używamy REFÓW żeby nie tworzyć nowego callbacka przy każdym renderze!
       const currentElements = elementsRef.current;
       const currentViewport = viewportRef.current;
+      const currentLoadedImages = loadedImagesRef.current;
       
       // Reset transform i ustaw nową skalę DPR
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -735,14 +1386,29 @@ Zadaj pytanie! 🤔`,
       
       drawGrid(ctx, currentViewport, width, height);
       
+      // 🆕 VIEWPORT CULLING - renderuj tylko widoczne elementy
+      let culledCount = 0;
       currentElements.forEach(element => {
         if (element.id === editingTextId) return;
-        drawElement(ctx, element, currentViewport, width, height, loadedImages, debugMode, handleAutoExpand);
+        
+        // Sprawdź czy element jest w viewport
+        const bounds = getElementBounds(element);
+        if (!isElementInViewport(bounds.x, bounds.y, bounds.width, bounds.height, currentViewport, width, height)) {
+          culledCount++;
+          return; // Pomiń renderowanie - element poza ekranem
+        }
+        
+        drawElement(ctx, element, currentViewport, width, height, currentLoadedImages, debugMode, handleAutoExpand);
       });
+      
+      // Debug: pokaż ile elementów pominięto
+      if (debugMode && culledCount > 0) {
+        console.log(`🎯 Viewport Culling: pominięto ${culledCount}/${currentElements.length} elementów`);
+      }
       
       rafIdRef.current = null;
     });
-  }, [editingTextId, debugMode, handleAutoExpand, loadedImages]);  // USUNIĘTO elements i viewport!
+  }, [editingTextId, debugMode, handleAutoExpand]);  // USUNIĘTO loadedImages!
   
   // Cleanup RAF on unmount
   useEffect(() => {
@@ -757,10 +1423,10 @@ Zadaj pytanie! 🤔`,
     redrawCanvasRef.current = redrawCanvas;
   }, [redrawCanvas]);
 
-  // Przerysuj canvas gdy zmieni się elements, viewport, lub inne zależności redrawCanvas
+  // Przerysuj canvas gdy zmieni się elements, viewport, lub loadedImages
   useEffect(() => {
     redrawCanvas();
-  }, [elements, viewport, redrawCanvas]);
+  }, [elements, viewport, loadedImages, redrawCanvas]);
 
   // History - uproszczona i stabilna wersja
   const MAX_HISTORY_SIZE = 50;
@@ -791,36 +1457,232 @@ Zadaj pytanie! 🤔`,
     saveToHistoryRef.current = saveToHistory;
   }, [saveToHistory]);
 
+  // 🆕 BROADCAST VIEWPORT - throttled update viewport presence
+  useEffect(() => {
+    if (typeof window !== 'undefined' && (window as any).__updateViewportPresence) {
+      const throttleDelay = 500; // 500ms throttle
+      const timeoutId = setTimeout(() => {
+        (window as any).__updateViewportPresence(viewport.x, viewport.y, viewport.scale);
+        // Usunięto console.log dla wydajności
+      }, throttleDelay);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [viewport.x, viewport.y, viewport.scale]);
+
+  // 🆕 NOWY SYSTEM UNDO - cofa tylko akcje bieżącego użytkownika
   const undo = useCallback(() => {
-    const currentIndex = historyIndexRef.current;
-    const currentHistory = historyRef.current;
+    const undoStack = userUndoStackRef.current;
     
-    if (currentIndex > 0) {
-      const newIndex = currentIndex - 1;
-      historyIndexRef.current = newIndex;
-      setHistoryIndex(newIndex);
-      setElements([...currentHistory[newIndex]]);
-      setSelectedElementIds(new Set());
+    if (undoStack.length === 0) {
+      return;
     }
-  }, []);
+    
+    // Zdejmij ostatnią akcję ze stosu undo
+    const lastAction = undoStack[undoStack.length - 1];
+    const newUndoStack = undoStack.slice(0, -1);
+    userUndoStackRef.current = newUndoStack;
+    setUserUndoStack(newUndoStack);
+    
+    // Przenieś akcję na stos redo
+    const newRedoStack = [...userRedoStackRef.current, lastAction];
+    userRedoStackRef.current = newRedoStack;
+    setUserRedoStack(newRedoStack);
+    
+    if (lastAction.type === 'create') {
+      // Akcja 'create' = użytkownik stworzył element → cofnij = USUŃ element
+      const elementToRemove = lastAction.element;
+      
+      // Usuń z lokalnego stanu
+      setElements(prev => prev.filter(el => el.id !== elementToRemove.id));
+      
+      // Usuń z bazy danych (jeśli był zapisany)
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId) && !unsavedElementsRef.current.has(elementToRemove.id)) {
+          deleteBoardElement(numericBoardId, elementToRemove.id).catch(err => {
+            console.error('❌ Błąd usuwania elementu podczas undo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementDeleted(elementToRemove.id);
+      
+    } else if (lastAction.type === 'delete') {
+      // Akcja 'delete' = użytkownik usunął element → cofnij = PRZYWRÓĆ element
+      const elementToRestore = lastAction.element;
+      
+      // Dodaj z powrotem do lokalnego stanu
+      setElements(prev => [...prev, elementToRestore]);
+      
+      // Zapisz z powrotem do bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId)) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: elementToRestore.id,
+            type: elementToRestore.type,
+            data: elementToRestore
+          }]).catch(err => {
+            console.error('❌ Błąd przywracania elementu podczas undo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementCreated(elementToRestore);
+    }
+    
+    setSelectedElementIds(new Set());
+  }, [broadcastElementDeleted, broadcastElementCreated]);
 
+  // 🆕 NOWY SYSTEM REDO - ponawia tylko akcje bieżącego użytkownika
   const redo = useCallback(() => {
-    const currentIndex = historyIndexRef.current;
-    const currentHistory = historyRef.current;
+    const redoStack = userRedoStackRef.current;
     
-    if (currentIndex < currentHistory.length - 1) {
-      const newIndex = currentIndex + 1;
-      historyIndexRef.current = newIndex;
-      setHistoryIndex(newIndex);
-      setElements([...currentHistory[newIndex]]);
-      setSelectedElementIds(new Set());
+    if (redoStack.length === 0) {
+      return;
     }
+    
+    // Zdejmij ostatnią akcję ze stosu redo
+    const lastAction = redoStack[redoStack.length - 1];
+    const newRedoStack = redoStack.slice(0, -1);
+    userRedoStackRef.current = newRedoStack;
+    setUserRedoStack(newRedoStack);
+    
+    // Przenieś akcję na stos undo
+    const newUndoStack = [...userUndoStackRef.current, lastAction];
+    userUndoStackRef.current = newUndoStack;
+    setUserUndoStack(newUndoStack);
+    
+    if (lastAction.type === 'create') {
+      // Akcja 'create' = użytkownik stworzył element → redo = PRZYWRÓĆ element
+      const elementToRestore = lastAction.element;
+      
+      // Dodaj z powrotem do lokalnego stanu
+      setElements(prev => [...prev, elementToRestore]);
+      
+      // Zapisz do bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId)) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: elementToRestore.id,
+            type: elementToRestore.type,
+            data: elementToRestore
+          }]).catch(err => {
+            console.error('❌ Błąd przywracania elementu podczas redo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementCreated(elementToRestore);
+      
+    } else if (lastAction.type === 'delete') {
+      // Akcja 'delete' = użytkownik usunął element → redo = USUŃ element ponownie
+      const elementToRemove = lastAction.element;
+      
+      // Usuń z lokalnego stanu
+      setElements(prev => prev.filter(el => el.id !== elementToRemove.id));
+      
+      // Usuń z bazy danych
+      if (boardIdStateRef.current) {
+        const numericBoardId = parseInt(boardIdStateRef.current);
+        if (!isNaN(numericBoardId) && !unsavedElementsRef.current.has(elementToRemove.id)) {
+          deleteBoardElement(numericBoardId, elementToRemove.id).catch(err => {
+            console.error('❌ Błąd usuwania elementu podczas redo:', err);
+          });
+        }
+      }
+      
+      // Broadcast do innych użytkowników
+      broadcastElementDeleted(elementToRemove.id);
+    }
+    
+    setSelectedElementIds(new Set());
+  }, [broadcastElementDeleted, broadcastElementCreated]);
+
+  // Aktualizuj refs dla undo/redo
+  useEffect(() => {
+    undoRef.current = undo;
+    redoRef.current = redo;
+  }, [undo, redo]);
+
+  // 🆕 FOLLOW USER - przeniesienie viewport do lokalizacji innego użytkownika + włącz follow mode
+  const handleFollowUser = useCallback((userId: number, userViewportX: number, userViewportY: number, userViewportScale: number) => {
+    console.log('👁️ Follow user:', userId, 'viewport:', userViewportX, userViewportY, userViewportScale);
+    // Ustaw początkowy viewport
+    setViewport({
+      x: userViewportX,
+      y: userViewportY,
+      scale: userViewportScale
+    });
+    // Włącz follow mode - viewport będzie podążał za kursorem użytkownika
+    setFollowingUserId(userId);
   }, []);
 
-  const clearCanvas = useCallback(() => {
+  // 🆕 STOP FOLLOWING - wyłącz follow mode
+  const handleStopFollowing = useCallback(() => {
+    console.log('🛑 Stop following');
+    setFollowingUserId(null);
+  }, []);
+
+  // 🆕 CENTER VIEW ON ELEMENT - dla Activity History
+  const handleCenterViewAndSelectElements = useCallback((targetX: number, targetY: number, scale?: number, bounds?: {minX: number, minY: number, maxX: number, maxY: number}, elementIds?: string[]) => {
+    console.log('🎯 handleCenterViewAndSelectElements wywołane:', {
+      targetX,
+      targetY,
+      scale,
+      bounds,
+      elementIds,
+      currentViewport: viewport
+    });
+    
+    setViewport(prev => ({
+      x: targetX,
+      y: targetY,
+      scale: scale ?? prev.scale
+    }));
+    
+    // Zaznacz elementy jeśli IDs są przekazane
+    if (elementIds && elementIds.length > 0) {
+      console.log('✅ Zaznaczam elementy:', elementIds);
+      setSelectedElementIds(new Set(elementIds));
+      // Zmień tool na select żeby pokazać zaznaczenie
+      setTool('select');
+    }
+  }, [viewport]);
+  
+  // Handler dla ActivityHistory - tylko zaznaczanie elementów
+  const handleSelectElementsFromHistory = useCallback((elementIds: string[]) => {
+    console.log('📝 Zaznaczam elementy z historii:', elementIds);
+    setSelectedElementIds(new Set(elementIds));
+    setTool('select');
+  }, []);
+
+  const clearCanvas = useCallback(async () => {
     // Usuń wszystkie elementy z bazy danych
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Najpierw zapisz wszystkie niezapisane
+      const unsavedToDelete = elements.filter(el => unsavedElements.has(el.id));
+      if (unsavedToDelete.length > 0) {
+        try {
+          const elementsToSave = unsavedToDelete.map(el => ({
+            element_id: el.id,
+            type: el.type,
+            data: el
+          }));
+          await saveBoardElementsBatch(numericBoardId, elementsToSave);
+          console.log('✅ Zapisano niezapisane elementy przed wyczyszczeniem:', unsavedToDelete.length);
+        } catch (err) {
+          console.error('❌ Błąd zapisywania przed wyczyszczeniem:', err);
+        }
+      }
+      
+      // Teraz usuń
       elements.forEach(el => {
         deleteBoardElement(numericBoardId, el.id).catch(err => {
           console.error('❌ Błąd usuwania elementu:', el.id, err);
@@ -832,7 +1694,7 @@ Zadaj pytanie! 🤔`,
     saveToHistory([]);
     setSelectedElementIds(new Set());
     setLoadedImages(new Map()); // Wyczyść też załadowane obrazy
-  }, [saveToHistory, boardIdState, elements]);
+  }, [saveToHistory, boardIdState, elements, unsavedElements]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 📦 EKSPORT/IMPORT TABLICY
@@ -893,10 +1755,12 @@ Zadaj pytanie! 🤔`,
           id: `${el.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
         }));
         
-        // Dodaj do istniejących elementów
-        const newElements = [...elements, ...importedElements];
-        setElements(newElements);
-        saveToHistory(newElements);
+        // Dodaj do istniejących elementów - używamy functional update
+        setElements(prev => {
+          const newElements = [...prev, ...importedElements];
+          saveToHistory(newElements);
+          return newElements;
+        });
         
         // Zapisz do bazy
         if (boardIdState) {
@@ -919,73 +1783,146 @@ Zadaj pytanie! 🤔`,
     };
     
     input.click();
-  }, [elements, saveToHistory, boardIdState, debouncedSave, broadcastElementsBatch]);
+  }, [saveToHistory, boardIdState, debouncedSave, broadcastElementsBatch]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // 🆕 CALLBACKI DLA NARZĘDZI - Z BROADCAST
   // ═══════════════════════════════════════════════════════════════════════════
   
+  // 🆕 Helper: Dodaje element do Activity History (elementsWithAuthor) przy lokalnym tworzeniu
+  const addToActivityHistory = useCallback((element: DrawingElement) => {
+    setElementsWithAuthor(prev => {
+      if (prev.some(el => el.element_id === element.id)) {
+        return prev;
+      }
+      return [...prev, {
+        element_id: element.id,
+        type: element.type,
+        data: element,
+        created_by_id: user?.id || null,
+        created_by_username: user?.username || null,
+        created_at: new Date().toISOString()
+      }];
+    });
+  }, [user?.id, user?.username]);
+  
+  // 🆕 Helper: Usuwa element z Activity History
+  const removeFromActivityHistory = useCallback((elementId: string) => {
+    setElementsWithAuthor(prev => prev.filter(el => el.element_id !== elementId));
+  }, []);
+  
+  // 🆕 Helper: Dodaje akcję 'create' na stos użytkownika (dla undo)
+  const pushCreateAction = useCallback((element: DrawingElement) => {
+    const action = { type: 'create' as const, element };
+    setUserUndoStack(prev => [...prev, action]);
+    userUndoStackRef.current = [...userUndoStackRef.current, action];
+    // Wyczyść stos redo przy nowej akcji
+    setUserRedoStack([]);
+    userRedoStackRef.current = [];
+  }, []);
+  
+  // 🆕 Helper: Dodaje akcję 'delete' na stos użytkownika (dla undo)
+  const pushDeleteAction = useCallback((element: DrawingElement) => {
+    const action = { type: 'delete' as const, element };
+    setUserUndoStack(prev => [...prev, action]);
+    userUndoStackRef.current = [...userUndoStackRef.current, action];
+    // Wyczyść stos redo przy nowej akcji
+    setUserRedoStack([]);
+    userRedoStackRef.current = [];
+  }, []);
+  
   const handlePathCreate = useCallback((path: DrawingPath) => {
-    const newElements = [...elements, path];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    // 🆕 BROADCAST
+    setElements(prev => {
+      const newElements = [...prev, path];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(path);
+    addToActivityHistory(path);
+    pushCreateAction(path);
     
     // 🆕 ZAPISYWANIE - oznacz jako unsaved i zaplanuj zapis
     setUnsavedElements(prev => new Set(prev).add(path.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleShapeCreate = useCallback((shape: Shape) => {
-    const newElements = [...elements, shape];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    // 🆕 BROADCAST
+    setElements(prev => {
+      const newElements = [...prev, shape];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(shape);
+    addToActivityHistory(shape);
+    pushCreateAction(shape);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(shape.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleFunctionCreate = useCallback((func: FunctionPlot) => {
-    const newElements = [...elements, func];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    // 🆕 BROADCAST
+    setElements(prev => {
+      const newElements = [...prev, func];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(func);
+    addToActivityHistory(func);
+    pushCreateAction(func);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(func.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleTextCreate = useCallback((text: TextElement) => {
-    const newElements = [...elements, text];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    // 🆕 BROADCAST
+    setElements(prev => {
+      const newElements = [...prev, text];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(text);
+    addToActivityHistory(text);
+    pushCreateAction(text);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(text.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
-    const newElements = elements.map(el => 
-      el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-    saveToHistory(newElements);
+    let updatedElement: DrawingElement | undefined;
     
-    // 🆕 BROADCAST UPDATE
-    const updatedElement = newElements.find(el => el.id === id);
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === id) {
+          updatedElement = { ...el, ...updates } as DrawingElement;
+          return updatedElement;
+        }
+        return el;
+      });
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST UPDATE (używamy updatedElement ustawionego w setElements)
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
@@ -993,22 +1930,47 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
-  const handleTextDelete = useCallback((id: string) => {
-    const newElements = elements.filter(el => el.id !== id);
+  const handleTextDelete = useCallback(async (id: string) => {
+    // 🆕 Zapisz element przed usunięciem (dla undo) - używamy ref
+    const currentElements = elementsRef.current;
+    const elementToDelete = currentElements.find(el => el.id === id);
+    
+    const newElements = currentElements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
     
+    // 🆕 User Action Stack - zapisz akcję usunięcia
+    if (elementToDelete) {
+      pushDeleteAction(elementToDelete);
+    }
+    
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
+    removeFromActivityHistory(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Zapisz jeśli unsaved
+      if (unsavedElementsRef.current.has(id)) {
+        if (elementToDelete) {
+          try {
+            await saveBoardElementsBatch(numericBoardId, [{
+              element_id: elementToDelete.id,
+              type: elementToDelete.type,
+              data: elementToDelete
+            }]);
+          } catch (err) {
+            console.error('❌ Błąd zapisywania przed usunięciem:', err);
+          }
+        }
+      }
+      
       deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [saveToHistory, broadcastElementDeleted, removeFromActivityHistory, pushDeleteAction, boardIdState]);
 
   const handleTextEdit = useCallback((id: string) => {
     setEditingTextId(id);
@@ -1021,12 +1983,19 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleImageCreate = useCallback((image: ImageElement) => {
-    const newElements = [...elements, image];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    // 🆕 BROADCAST
+    // Używamy functional update żeby uniknąć stale closure
+    setElements(prev => {
+      const newElements = [...prev, image];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 BROADCAST + Activity History + User Action Stack
     broadcastElementCreated(image);
+    addToActivityHistory(image);
+    pushCreateAction(image);
     
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(image.id));
@@ -1042,14 +2011,21 @@ Zadaj pytanie! 🤔`,
         console.error('Failed to load image:', image.id);
       };
     }
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
+
+
 
   // 🆕 MARKDOWN NOTE - tworzenie notatki
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     // TYLKO setElements - bez saveToHistory (powoduje lagi)
     setElements(prev => [...prev, note]);
     
+    // 🆕 User Action Stack
     broadcastElementCreated(note);
+    addToActivityHistory(note);
+    pushCreateAction(note);
     setUnsavedElements(prev => new Set(prev).add(note.id));
     if (boardIdState) debouncedSave(boardIdState);
     
@@ -1057,7 +2033,7 @@ Zadaj pytanie! 🤔`,
     setTool('select');
     setSelectedElementIds(new Set([note.id]));
     setEditingMarkdownId(note.id);
-  }, [broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 CHATBOT - dodawanie odpowiedzi AI jako notatki na tablicy
   const handleChatbotAddToBoard = useCallback((content: string) => {
@@ -1090,29 +2066,40 @@ Zadaj pytanie! 🤔`,
     // Historia zostanie zapisana przy następnej operacji lub przy zapisie do DB
     setElements(prev => [...prev, newNote]);
     
-    // Broadcast i zapis do DB
+    // 🆕 Broadcast, Activity History i User Action Stack + zapis do DB
     broadcastElementCreated(newNote);
+    addToActivityHistory(newNote);
+    pushCreateAction(newNote);
     setUnsavedElements(prev => new Set(prev).add(newNote.id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - tworzenie tabeli
   const handleTableCreate = useCallback((table: TableElement) => {
-    const newElements = [...elements, table];
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
+    setElements(prev => {
+      const newElements = [...prev, table];
+      saveToHistory(newElements);
+      return newElements;
+    });
+    
+    // 🆕 Activity History + User Action Stack
     broadcastElementCreated(table);
+    addToActivityHistory(table);
+    pushCreateAction(table);
     setUnsavedElements(prev => new Set(prev).add(table.id));
     if (boardIdState) debouncedSave(boardIdState);
     
     // Po utworzeniu przełącz na select żeby można było edytować
     setTool('select');
     setSelectedElementIds(new Set([table.id]));
-  }, [elements, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementCreated, addToActivityHistory, pushCreateAction, boardIdState, debouncedSave]);
 
   // 🆕 TABLE - zmiana komórki tabeli
   const handleTableCellChange = useCallback((tableId: string, row: number, col: number, value: string) => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
     setElements(prev => {
       const newElements = prev.map(el => {
         if (el.id === tableId && el.type === 'table') {
@@ -1141,7 +2128,10 @@ Zadaj pytanie! 🤔`,
     setElements(prev => {
       const newElements = prev.map(el => {
         if (el.id === noteId && el.type === 'markdown') {
-          return { ...el, content };
+          const updatedElement = { ...el, content };
+          // 🆕 Broadcast zmianę do innych użytkowników!
+          broadcastElementUpdated(updatedElement);
+          return updatedElement;
         }
         return el;
       });
@@ -1152,16 +2142,22 @@ Zadaj pytanie! 🤔`,
       
       return newElements;
     });
-  }, [saveToHistory, boardIdState, debouncedSave]);
+  }, [saveToHistory, boardIdState, debouncedSave, broadcastElementUpdated]);
 
   // 🆕 STABILNE CALLBACKI dla MarkdownNoteView (żeby nie łamać memo!)
   const handleMarkdownEditStart = useCallback((noteId: string) => {
     setEditingMarkdownId(noteId);
-  }, []);
+    // 🆕 Broadcast: zacząłem edytować element
+    broadcastTypingStarted(noteId);
+  }, [broadcastTypingStarted]);
 
   const handleMarkdownEditEnd = useCallback(() => {
+    // 🆕 Broadcast: skończyłem edytować element
+    if (editingMarkdownId) {
+      broadcastTypingStopped(editingMarkdownId);
+    }
     setEditingMarkdownId(null);
-  }, []);
+  }, [editingMarkdownId, broadcastTypingStopped]);
 
   // handleMarkdownHeightChange usunięty - notatki mają stały rozmiar, user zmienia resize handlerem
 
@@ -1169,20 +2165,46 @@ Zadaj pytanie! 🤔`,
     setViewport(newViewport);
   }, []);
 
-  const handleElementDelete = useCallback((id: string) => {
-    const newElements = elements.filter(el => el.id !== id);
+  const handleElementDelete = useCallback(async (id: string) => {
+    // 🆕 Zapisz element przed usunięciem (dla undo) - używamy ref
+    const currentElements = elementsRef.current;
+    const elementToDelete = currentElements.find(el => el.id === id);
+    
+    const newElements = currentElements.filter(el => el.id !== id);
     setElements(newElements);
     saveToHistory(newElements);
+    
+    // 🆕 User Action Stack - zapisz akcję usunięcia
+    if (elementToDelete) {
+      pushDeleteAction(elementToDelete);
+    }
     
     // 🆕 BROADCAST DELETE + API DELETE
     broadcastElementDeleted(id);
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Jeśli element jest niezapisany, najpierw go zapisz
+      if (unsavedElementsRef.current.has(id)) {
+        if (elementToDelete) {
+          try {
+            await saveBoardElementsBatch(numericBoardId, [{
+              element_id: elementToDelete.id,
+              type: elementToDelete.type,
+              data: elementToDelete
+            }]);
+            console.log('✅ Zapisano element przed usunięciem:', id);
+          } catch (err) {
+            console.error('❌ Błąd zapisywania przed usunięciem:', id, err);
+          }
+        }
+      }
+      
+      // Teraz usuń z bazy
       deleteBoardElement(numericBoardId, id).catch(err => {
         console.error('❌ Błąd usuwania elementu:', id, err);
       });
     }
-  }, [elements, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [saveToHistory, broadcastElementDeleted, pushDeleteAction, boardIdState]);
 
   // 🆕 PARTIAL ERASE - usuwa fragment ścieżki i tworzy nowe
   const handlePathPartialErase = useCallback((pathId: string, newPaths: DrawingPath[]) => {
@@ -1200,6 +2222,19 @@ Zadaj pytanie! 🤔`,
     // API: Usuń oryginalną ścieżkę
     const numericBoardId = parseInt(boardIdState);
     if (!isNaN(numericBoardId)) {
+      // Zapisz jeśli unsaved
+      if (unsavedElements.has(pathId)) {
+        const pathToSave = elements.find(el => el.id === pathId);
+        if (pathToSave) {
+          saveBoardElementsBatch(numericBoardId, [{
+            element_id: pathToSave.id,
+            type: pathToSave.type,
+            data: pathToSave
+          }])
+            .catch(err => console.error('❌ Błąd zapisywania przed usunięciem:', err));
+        }
+      }
+      
       deleteBoardElement(numericBoardId, pathId).catch(err => {
         console.error('❌ Błąd usuwania ścieżki:', pathId, err);
       });
@@ -1225,21 +2260,31 @@ Zadaj pytanie! 🤔`,
   }, []);
 
   const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
-    const newElements = elements.map(el => 
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
+    setElements(prev => prev.map(el => 
       el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-  }, [elements]);
+    ));
+  }, [userRole]);
 
   const handleElementUpdateWithHistory = useCallback((id: string, updates: Partial<DrawingElement>) => {
-    const newElements = elements.map(el => 
-      el.id === id ? { ...el, ...updates } as DrawingElement : el
-    );
-    setElements(newElements);
-    saveToHistory(newElements);
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
+    let updatedElement: DrawingElement | undefined;
+    
+    setElements(prev => {
+      const newElements = prev.map(el => {
+        if (el.id === id) {
+          updatedElement = { ...el, ...updates } as DrawingElement;
+          return updatedElement;
+        }
+        return el;
+      });
+      saveToHistory(newElements);
+      return newElements;
+    });
     
     // 🆕 BROADCAST UPDATE
-    const updatedElement = newElements.find(el => el.id === id);
     if (updatedElement) {
       broadcastElementUpdated(updatedElement);
     }
@@ -1247,22 +2292,27 @@ Zadaj pytanie! 🤔`,
     // 🆕 ZAPISYWANIE
     setUnsavedElements(prev => new Set(prev).add(id));
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [userRole, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
   const handleElementsUpdate = useCallback((updates: Map<string, Partial<DrawingElement>>) => {
-    const newElements = elements.map(el => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
+    
+    setElements(prev => prev.map(el => {
       const update = updates.get(el.id);
       return update ? { ...el, ...update } as DrawingElement : el;
-    });
-    setElements(newElements);
-  }, [elements]);
+    }));
+  }, [userRole]);
 
   const handleSelectionFinish = useCallback(() => {
-    saveToHistory(elements);
+    // Używamy ref żeby mieć aktualny stan
+    const currentElements = elementsRef.current;
+    const currentSelectedIds = selectedElementIdsRef.current;
+    
+    saveToHistory(currentElements);
     
     // 🆕 BROADCAST wszystkie zmienione elementy + zapisz do bazy
-    elements.forEach(element => {
-      if (selectedElementIds.has(element.id)) {
+    currentElements.forEach(element => {
+      if (currentSelectedIds.has(element.id)) {
         broadcastElementUpdated(element);
         setUnsavedElements(prev => new Set(prev).add(element.id));
       }
@@ -1270,18 +2320,52 @@ Zadaj pytanie! 🤔`,
     
     // Zapisz do bazy
     if (boardIdState) debouncedSave(boardIdState);
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
+  }, [saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]);
 
-  const deleteSelectedElements = useCallback(() => {
-    if (selectedElementIds.size === 0) return;
+  const deleteSelectedElements = useCallback(async () => {
+    if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
     
-    const newElements = elements.filter(el => !selectedElementIds.has(el.id));
+    // Używamy refs żeby mieć aktualny stan
+    const currentSelectedIds = selectedElementIdsRef.current;
+    const currentElements = elementsRef.current;
+    const currentUnsaved = unsavedElementsRef.current;
+    
+    if (currentSelectedIds.size === 0) return;
+    
+    // 🆕 Zapisz usuwane elementy do stosu akcji użytkownika (dla undo)
+    const elementsToDelete = currentElements.filter(el => currentSelectedIds.has(el.id));
+    elementsToDelete.forEach(el => {
+      pushDeleteAction(el);
+    });
+    
+    const newElements = currentElements.filter(el => !currentSelectedIds.has(el.id));
     setElements(newElements);
     saveToHistory(newElements);
     
     // 🆕 BROADCAST DELETE + API DELETE dla każdego
     const numericBoardId = parseInt(boardIdState);
-    selectedElementIds.forEach(id => {
+    
+    // Najpierw zapisz wszystkie niezapisane elementy
+    const unsavedToDelete = currentElements.filter(el => 
+      currentSelectedIds.has(el.id) && currentUnsaved.has(el.id)
+    );
+    
+    if (unsavedToDelete.length > 0 && !isNaN(numericBoardId)) {
+      try {
+        const elementsToSave = unsavedToDelete.map(el => ({
+          element_id: el.id,
+          type: el.type,
+          data: el
+        }));
+        await saveBoardElementsBatch(numericBoardId, elementsToSave);
+        console.log('✅ Zapisano niezapisane elementy przed usunięciem:', unsavedToDelete.length);
+      } catch (err) {
+        console.error('❌ Błąd zapisywania przed usunięciem:', err);
+      }
+    }
+    
+    // Teraz usuń z bazy i broadcast
+    currentSelectedIds.forEach(id => {
       broadcastElementDeleted(id);
       if (!isNaN(numericBoardId)) {
         deleteBoardElement(numericBoardId, id).catch(err => {
@@ -1291,7 +2375,7 @@ Zadaj pytanie! 🤔`,
     });
     
     setSelectedElementIds(new Set());
-  }, [elements, selectedElementIds, saveToHistory, broadcastElementDeleted, boardIdState]);
+  }, [saveToHistory, broadcastElementDeleted, pushDeleteAction, boardIdState]);
 
   // Zoom functions (bez zmian)
   const zoomInRef = useRef(() => {
@@ -1356,8 +2440,9 @@ Zadaj pytanie! 🤔`,
     handleFillShapeChangeRef.current(fill);
   }, []);
   
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
+  // 🆕 canUndo/canRedo bazują na stosie akcji użytkownika (nie starej historii)
+  const canUndo = userUndoStack.length > 0;
+  const canRedo = userRedoStack.length > 0;
 
   const getCanvasDimensions = () => {
     const canvas = canvasRef.current;
@@ -1411,6 +2496,7 @@ Zadaj pytanie! 🤔`,
       
       // Broadcast i zapis
       broadcastElementCreated(newImage);
+      addToActivityHistory(newImage);
       setUnsavedElements(prev => new Set(prev).add(newImage.id));
       if (boardIdState) debouncedSave(boardIdState);
     };
@@ -1418,7 +2504,7 @@ Zadaj pytanie! 🤔`,
     img.onerror = () => {
       console.error('❌ Nie można załadować wzoru:', formula.path);
     };
-  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
 
   const handleCardSelect = useCallback((card: CardResource) => {
     setActiveCard(card);
@@ -1487,6 +2573,7 @@ Zadaj pytanie! 🤔`,
         newImages.forEach(({ imageElement, loadedImg }) => {
           setLoadedImages(prev => new Map(prev).set(imageElement.id, loadedImg));
           broadcastElementCreated(imageElement);
+          addToActivityHistory(imageElement);
           setUnsavedElements(prev => new Set(prev).add(imageElement.id));
         });
         
@@ -1498,7 +2585,7 @@ Zadaj pytanie! 🤔`,
         console.error('❌ Błąd ładowania wzorów:', err);
         setActiveCard(null);
       });
-  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, boardIdState, debouncedSave]);
+  }, [viewport, canvasWidth, canvasHeight, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
   
   // Globalne obrazy (bez zmian)
   const fileToBase64 = useCallback((file: Blob): Promise<{ data: string; width: number; height: number }> => {
@@ -1549,7 +2636,7 @@ Zadaj pytanie! 🤔`,
     });
   }, []);
 
-  const handleGlobalPasteImage = useCallback(async () => {
+  const handleGlobalPasteImage = useCallback(async (): Promise<boolean> => {
     setImageProcessing(true);
 
     try {
@@ -1582,57 +2669,344 @@ Zadaj pytanie! 🤔`,
 
           handleImageCreate(newImage);
           setImageProcessing(false);
-          return;
+          return true; // ✅ Udało się wkleić obrazek
         }
       }
       
       console.log('No image in clipboard');
+      setImageProcessing(false);
+      return false; // ❌ Brak obrazka w schowku
     } catch (err) {
       console.error('Clipboard paste error:', err);
-    } finally {
       setImageProcessing(false);
+      return false; // ❌ Błąd
     }
   }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+
+  // 🆕 Konwersja PDF → obrazki (wszystkie strony) dla drag&drop
+  const convertPDFToImages = async (file: File): Promise<string[]> => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const images: string[] = [];
+
+    // Konwertuj wszystkie strony
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const pdfViewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Cannot get canvas context');
+
+      canvas.width = pdfViewport.width;
+      canvas.height = pdfViewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport: pdfViewport,
+        canvas: canvas,
+      }).promise;
+
+      images.push(canvas.toDataURL('image/jpeg', 0.9));
+    }
+
+    console.log(`✅ Skonwertowano ${images.length} stron PDF`);
+    return images;
+  };
+
+  // 🆕 Konwersja PDF z URL → obrazki (dla arkuszy egzaminacyjnych)
+  const convertPDFFromUrlToImages = async (pdfUrl: string): Promise<string[]> => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+    const pdf = await pdfjs.getDocument(pdfUrl).promise;
+    const images: string[] = [];
+
+    // Konwertuj wszystkie strony
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const pdfViewport = page.getViewport({ scale: 2.0 });
+      const canvas = document.createElement('canvas');
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Cannot get canvas context');
+
+      canvas.width = pdfViewport.width;
+      canvas.height = pdfViewport.height;
+
+      await page.render({
+        canvasContext: context,
+        viewport: pdfViewport,
+        canvas: canvas,
+      }).promise;
+
+      images.push(canvas.toDataURL('image/jpeg', 0.9));
+    }
+
+    console.log(`✅ Skonwertowano ${images.length} stron PDF z URL`);
+    return images;
+  };
+
+  // 🆕 Ładowanie arkusza PDF z folderu (gdy arkuszPath jest podany)
+  const [arkuszLoaded, setArkuszLoaded] = useState(false);
+  const [dbElementsLoaded, setDbElementsLoaded] = useState(false);
+  const [dbWasEmpty, setDbWasEmpty] = useState(false);
+  
+  useEffect(() => {
+    // Czekaj aż elementy z bazy zostaną załadowane
+    if (!arkuszPath || arkuszLoaded || !dbElementsLoaded) return;
+    
+    // Ładuj arkusz tylko jeśli baza była pusta
+    if (!dbWasEmpty) {
+      console.log('📄 Tablica ma już elementy, pomijam ładowanie arkusza');
+      setArkuszLoaded(true);
+      return;
+    }
+    
+    const loadArkusz = async () => {
+      console.log('📄 Ładowanie arkusza z:', arkuszPath);
+      setImageProcessing(true);
+      
+      try {
+        // Pobierz listę plików z folderu (manifest.json)
+        const manifestUrl = `${arkuszPath}/manifest.json`;
+        let pdfFiles: string[] = [];
+        
+        try {
+          const manifestResponse = await fetch(manifestUrl);
+          if (manifestResponse.ok) {
+            const manifest = await manifestResponse.json();
+            pdfFiles = manifest.files || [];
+            console.log('📋 Znaleziono pliki z manifest:', pdfFiles);
+          }
+        } catch {
+          // Brak manifestu - spróbuj domyślnej nazwy
+          console.log('📋 Brak manifest.json, próbuję domyślnej nazwy arkusz.pdf');
+          pdfFiles = ['arkusz.pdf'];
+        }
+        
+        if (pdfFiles.length === 0) {
+          console.log('❌ Brak plików PDF w arkuszu');
+          setImageProcessing(false);
+          setArkuszLoaded(true);
+          return;
+        }
+        
+        // Załaduj pierwszy PDF
+        const pdfUrl = `${arkuszPath}/${pdfFiles[0]}`;
+        console.log('📄 Ładowanie PDF:', pdfUrl);
+        
+        const images = await convertPDFFromUrlToImages(pdfUrl);
+        
+        if (images.length === 0) {
+          console.log('❌ Nie udało się skonwertować PDF');
+          setImageProcessing(false);
+          setArkuszLoaded(true);
+          return;
+        }
+        
+        // Dodaj strony jako ImageElement na tablicę
+        const worldWidth = 4; // szerokość w jednostkach świata
+        const padding = 0.2; // odstęp między stronami
+        let currentY = 0;
+        
+        const newImages: ImageElement[] = [];
+        
+        for (let i = 0; i < images.length; i++) {
+          const dataUrl = images[i];
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load image'));
+            img.src = dataUrl;
+          });
+          
+          const aspectRatio = img.height / img.width;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: `arkusz-${Date.now()}-${i}`,
+            type: 'image',
+            x: -worldWidth / 2, // wyśrodkowane
+            y: currentY,
+            width: worldWidth,
+            height: worldHeight,
+            src: dataUrl,
+            alt: `Arkusz - strona ${i + 1}/${images.length}`,
+          };
+          
+          newImages.push(newImage);
+          currentY += worldHeight + padding;
+          
+          // Zapisz załadowany obraz
+          setLoadedImages(prev => new Map(prev).set(newImage.id, img));
+        }
+        
+        // Dodaj wszystkie strony naraz
+        setElements(newImages);
+        saveToHistory(newImages);
+        
+        // Broadcast i zapisywanie
+        newImages.forEach(image => {
+          broadcastElementCreated(image);
+          addToActivityHistory(image);
+          setUnsavedElements(prev => new Set(prev).add(image.id));
+        });
+        
+        if (boardIdState) debouncedSave(boardIdState);
+        
+        console.log(`✅ Załadowano arkusz: ${newImages.length} stron`);
+        
+        // Ustaw viewport na początek arkusza
+        setViewport({ x: 0, y: 1, scale: 0.8 });
+        
+      } catch (err) {
+        console.error('❌ Błąd ładowania arkusza:', err);
+      } finally {
+        setImageProcessing(false);
+        setArkuszLoaded(true);
+      }
+    };
+    
+    // Opóźnij ładowanie żeby dać czas na inicjalizację
+    const timer = setTimeout(loadArkusz, 500);
+    return () => clearTimeout(timer);
+  }, [arkuszPath, arkuszLoaded, dbElementsLoaded, dbWasEmpty, boardIdState, broadcastElementCreated, addToActivityHistory, debouncedSave, saveToHistory]);
 
   const handleGlobalDropImage = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
+    console.log('🎯 handleGlobalDropImage called');
     const file = e.dataTransfer.files?.[0];
-    if (!file || !file.type.startsWith('image/')) {
+    if (!file) {
+      console.log('❌ No file dropped');
       return;
     }
 
+    console.log('📁 Dropped file:', file.name, 'type:', file.type);
+    const isImage = file.type.startsWith('image/');
+    const isPDF = file.type === 'application/pdf';
+
+    if (!isImage && !isPDF) {
+      console.log('❌ Not an image or PDF');
+      return;
+    }
+
+    console.log('✅ File accepted, starting processing...');
     setImageProcessing(true);
 
     try {
-      const { data, width, height } = await fileToBase64(file);
-      
+      let data: string;
+      let width: number;
+      let height: number;
+
       const dropScreen = { x: e.clientX, y: e.clientY };
       const dropWorld = inverseTransformPoint(dropScreen, viewport, canvasWidth, canvasHeight);
       
-      const aspectRatio = height / width;
-      const worldWidth = 3;
-      const worldHeight = worldWidth * aspectRatio;
-      
-      const newImage: ImageElement = {
-        id: Date.now().toString(),
-        type: 'image',
-        x: dropWorld.x - worldWidth / 2,
-        y: dropWorld.y - worldHeight / 2,
-        width: worldWidth,
-        height: worldHeight,
-        src: data,
-        alt: 'Dropped image',
-      };
+      // 🆕 Obsługa PDF → konwersja wszystkich stron do obrazków
+      if (isPDF) {
+        console.log('📄 Converting dropped PDF to images...');
+        const images = await convertPDFToImages(file);
+        
+        const worldWidth = 3;
+        const padding = 0.1; // Odstęp między stronami
+        let currentY = dropWorld.y;
+        
+        const newImages: ImageElement[] = [];
+        
+        // Stwórz wszystkie strony jako ImageElement[]
+        for (let i = 0; i < images.length; i++) {
+          const dataUrl = images[i];
+          const img = new Image();
+          await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = reject;
+            img.src = dataUrl;
+          });
+          
+          const aspectRatio = img.height / img.width;
+          const worldHeight = worldWidth * aspectRatio;
+          
+          const newImage: ImageElement = {
+            id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-page-${i + 1}`,
+            type: 'image',
+            x: dropWorld.x - worldWidth / 2,
+            y: currentY,
+            width: worldWidth,
+            height: worldHeight,
+            src: dataUrl,
+            alt: `${file.name} - Strona ${i + 1}/${images.length}`,
+          };
 
-      handleImageCreate(newImage);
+          console.log(`✅ Creating page ${i + 1}/${images.length}, ID: ${newImage.id}`);
+          newImages.push(newImage);
+          currentY += worldHeight + padding; // Następna strona niżej
+          
+          // Małe opóźnienie żeby ID były unikalne
+          await new Promise(resolve => setTimeout(resolve, 10));
+        }
+        
+        // Dodaj wszystkie strony naraz - używamy functional update
+        setElements(prev => {
+          const newElements = [...prev, ...newImages];
+          saveToHistory(newElements);
+          return newElements;
+        });
+        
+        // Broadcast i zapisywanie dla wszystkich stron
+        newImages.forEach(image => {
+          broadcastElementCreated(image);
+          addToActivityHistory(image);
+          setUnsavedElements(prev => new Set(prev).add(image.id));
+          
+          // Załaduj obrazek do pamięci
+          if (image.src) {
+            const img = new Image();
+            img.src = image.src;
+            img.onload = () => {
+              setLoadedImages(prev => new Map(prev).set(image.id, img));
+            };
+          }
+        });
+        
+        if (boardIdState) debouncedSave(boardIdState);
+        
+        console.log(`✅ Dodano ${newImages.length} stron z PDF`);
+        setImageProcessing(false);
+        return;
+      } else {
+        // Zwykły obrazek
+        const result = await fileToBase64(file);
+        data = result.data;
+        width = result.width;
+        height = result.height;
+        
+        const aspectRatio = height / width;
+        const worldWidth = 3;
+        const worldHeight = worldWidth * aspectRatio;
+        
+        const newImage: ImageElement = {
+          id: Date.now().toString(),
+          type: 'image',
+          x: dropWorld.x - worldWidth / 2,
+          y: dropWorld.y - worldHeight / 2,
+          width: worldWidth,
+          height: worldHeight,
+          src: data,
+          alt: 'Dropped image',
+        };
+
+        handleImageCreate(newImage);
+        console.log('✅ Image created from dropped image');
+      }
     } catch (err) {
       console.error('Drop error:', err);
     } finally {
       setImageProcessing(false);
     }
-  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate]);
+  }, [viewport, canvasWidth, canvasHeight, fileToBase64, handleImageCreate, saveToHistory, broadcastElementCreated, addToActivityHistory, boardIdState, debouncedSave]);
   
   useEffect(() => {
     handleGlobalPasteImageRef.current = handleGlobalPasteImage;
@@ -1701,10 +3075,15 @@ Zadaj pytanie! 🤔`,
         lastY = e.clientY;
         lastMoveTime = currentTime;
         
+        // 🆕 Wyłącz follow mode gdy user sam nawiguje
+        setFollowingUserId(null);
+        
         const currentViewport = viewportRef.current;
         const newViewport = panViewportWithMouse(currentViewport, dx, dy);
+        const constrained = constrainViewport(newViewport);
         
-        setViewport(constrainViewport(newViewport));
+        viewportRef.current = constrained;
+        setViewport(constrained);
       }
     };
 
@@ -1785,11 +3164,15 @@ Zadaj pytanie! 🤔`,
       const { momentum: newMomentum, viewport: viewportChange } = updateMomentum(momentum, currentTime);
       
       if (viewportChange) {
-        setViewport(prev => constrainViewport({
-          x: prev.x + viewportChange.x,
-          y: prev.y + viewportChange.y,
-          scale: prev.scale
-        }));
+        setViewport(prev => {
+          const newViewport = constrainViewport({
+            x: prev.x + viewportChange.x,
+            y: prev.y + viewportChange.y,
+            scale: prev.scale
+          });
+          viewportRef.current = newViewport;
+          return newViewport;
+        });
       }
       
       setMomentum(newMomentum);
@@ -1817,9 +3200,71 @@ Zadaj pytanie! 🤔`,
         e.stopPropagation();
       }}
     >
-      <div ref={containerRef} className="absolute inset-0 overflow-hidden">
+      {/* 🆕 LOADING OVERLAY */}
+      {isLoading && (
+        <div className="absolute inset-0 z-[9999] bg-white/20 backdrop-blur-md flex flex-col items-center justify-center">
+          {/* Logo */}
+          <div className="mb-8">
+            <NextImage 
+              src="/resources/LogoEasyLesson.webp" 
+              alt="EasyLesson" 
+              width={200} 
+              height={80}
+              priority
+            />
+          </div>
+          
+          {/* Progress Bar */}
+          <div className="w-64 h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300 ease-out"
+              style={{ width: `${loadingProgress}%` }}
+            />
+          </div>
+          
+          {/* Progress Text */}
+          <p className="mt-4 text-sm text-gray-600">
+            Ładowanie tablicy... {Math.round(loadingProgress)}%
+          </p>
+        </div>
+      )}
+      
+      <div 
+        ref={containerRef} 
+        className="absolute inset-0 overflow-hidden touch-none overscroll-none"
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitTouchCallout: 'none',
+          touchAction: 'none'
+        }}
+      >
         {/* 🆕 KOMPONENT ONLINE USERS */}
-        <OnlineUsers />
+        <OnlineUsers onFollowUser={handleFollowUser} userRole={userRole} />
+        
+        {/* 🆕 FOLLOW MODE INDICATOR - pasek gdy śledzimy użytkownika */}
+        {followingUserId && (
+          <div className="absolute top-20 right-4 z-50 bg-blue-500 text-white rounded-lg shadow-lg px-4 py-2 flex items-center gap-3 animate-pulse">
+            <span className="text-sm font-medium">👁️ Śledzisz użytkownika</span>
+            <button
+              onClick={handleStopFollowing}
+              className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm font-medium transition-colors"
+            >
+              Przestań śledzić
+            </button>
+          </div>
+        )}
+        
+        {/* 🔒 BANNER TRYBU TYLKO DO ODCZYTU */}
+        {userRole === 'viewer' && (
+          <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-[150] bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg shadow-md flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="font-medium">Tryb tylko do odczytu</span>
+          </div>
+        )}
         
         <Toolbar
           tool={tool}
@@ -1850,14 +3295,22 @@ Zadaj pytanie! 🤔`,
           onImageUpload={handleImageToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
+          isReadOnly={userRole === 'viewer'}
         />
         
-        {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany */}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 pointer-events-auto">
+        {/* 🆕 SMARTSEARCH BAR - na górze, wycentrowany, responsywny */}
+        <div className="absolute top-4 z-50 pointer-events-auto" style={{
+          left: windowWidth <= 760 ? '90px' : windowWidth <= 1550 ? '90px' : '50%',
+          transform: windowWidth <= 760 ? 'none' : windowWidth <= 1550 ? 'none' : 'translateX(-50%)',
+          right: windowWidth <= 760 ? '16px' : windowWidth <= 1550 ? '330px' : 'auto',
+          width: windowWidth <= 760 ? 'auto' : windowWidth <= 1550 ? 'auto' : 'auto',
+          maxWidth: windowWidth <= 760 ? 'calc(100vw - 90px - 16px)' : windowWidth <= 1550 ? 'calc(100vw - 90px - 330px)' : '900px'
+        }}>
           <SmartSearchBar
             onFormulaSelect={handleFormulaSelect}
             onCardSelect={handleCardSelect}
             onActiveChange={setIsSearchActive}
+            userRole={userRole}
           />
         </div>
         
@@ -1876,6 +3329,15 @@ Zadaj pytanie! 🤔`,
           onZoomIn={zoomIn}
           onZoomOut={zoomOut}
           onResetView={resetView}
+        />
+        
+        {/* 🆕 ACTIVITY HISTORY - historia elementów */}
+        <ActivityHistory
+          elements={elementsWithAuthor}
+          currentUserId={user?.id}
+          onCenterView={handleCenterViewAndSelectElements}
+          onSelectElements={handleSelectElementsFromHistory}
+          viewport={viewport}
         />
         
         {/* NARZĘDZIA - BLOKOWANE gdy modal aktywny */}
@@ -1909,6 +3371,7 @@ Zadaj pytanie! 🤔`,
             onTextEdit={handleTextEdit}
             onMarkdownEdit={(id) => setEditingMarkdownId(id)}
             onViewportChange={handleViewportChange}
+            onActiveGuidesChange={setActiveGuides}
           />
         )}
 
@@ -2023,6 +3486,7 @@ Zadaj pytanie! 🤔`,
       messages={chatMessages}
       setMessages={setChatMessages}
       onActiveChange={setIsSearchActive}
+      userRole={userRole}
     />
 
         {/* 🆕 INTERACTIVE MARKDOWN OVERLAYS - Nakładki dla edycji notatek Markdown */}
@@ -2083,6 +3547,7 @@ Zadaj pytanie! 🤔`,
                   onContentChange={handleMarkdownContentChange}
                   onEditStart={handleMarkdownEditStart}
                   onEditEnd={handleMarkdownEditEnd}
+                  remoteTypingUser={typingUsers.find(t => t.elementId === note.id)?.username}
                 />
               </div>
             </div>
@@ -2148,9 +3613,8 @@ Zadaj pytanie! 🤔`,
           }}
         />
         
-        {/* 🆕 REMOTE CURSORS - Kursory innych użytkowników */}
-        <RemoteCursors
-          cursors={remoteCursors}
+        {/* 🆕 REMOTE CURSORS - Kursory innych użytkowników (sam subskrybuje - nie powoduje re-renderów!) */}
+        <RemoteCursorsContainer
           viewport={viewport}
           canvasWidth={canvasWidth}
           canvasHeight={canvasHeight}
@@ -2189,9 +3653,96 @@ Zadaj pytanie! 🤔`,
             </div>
           </div>
         )}
+
+        {/* 🆕 SNAP GUIDES - Niebieskie przerywane linie */}
+        {activeGuides.length > 0 && (
+          <svg className="absolute inset-0 pointer-events-none" 
+          style={{ 
+            zIndex: 1000, 
+            pointerEvents: 'none',
+            width: '100%',
+            height: '100%',
+            strokeWidth: "10",
+            opacity: "1"
+          }}>
+            {activeGuides.map((guide, idx) => {
+              // ✅ POPRAWKA: Użyj transformPoint żeby przeliczyć world → screen
+              
+              if (guide.orientation === 'vertical') {
+                // Pionowa linia - stała X w world space
+                const worldX = guide.value;
+                
+                // Przelicz 2 punkty na ekran (góra i dół canvas)
+                const topPoint = transformPoint(
+                  { x: worldX, y: viewport.y - 100 }, // punkt bardzo wysoko
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                const bottomPoint = transformPoint(
+                  { x: worldX, y: viewport.y + 100 }, // punkt bardzo nisko
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                // Linia przez cały ekran pionowo
+                const screenX = topPoint.x;
+                
+                return (
+                  <line
+                    key={`${guide.sourceId}-v-${idx}`}
+                    x1={screenX}
+                    y1={0}
+                    x2={screenX}
+                    y2={canvasHeight}
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    strokeDasharray="8 4"
+                    opacity="1"
+                  />
+                );
+              } else {
+                // Pozioma linia - stała Y w world space
+                const worldY = guide.value;
+                
+                // Przelicz 2 punkty na ekran (lewy i prawy brzeg)
+                const leftPoint = transformPoint(
+                  { x: viewport.x - 100, y: worldY }, // punkt bardzo z lewej
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                const rightPoint = transformPoint(
+                  { x: viewport.x + 100, y: worldY }, // punkt bardzo z prawej
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                
+                // Linia przez cały ekran poziomo
+                const screenY = leftPoint.y;
+                
+                return (
+                  <line
+                    key={`${guide.sourceId}-h-${idx}`}
+                    x1={0}
+                    y1={screenY}
+                    x2={canvasWidth}
+                    y2={screenY}
+                    stroke="#3b82f6"
+                    strokeWidth="1"
+                    strokeDasharray="8 4"
+                    opacity="0.8"
+                  />
+                );
+              }
+            })}
+          </svg>
+        )}
       </div>
     </div>
   );
 }
-
-export default WhiteboardCanvas;

@@ -44,9 +44,14 @@ export function CalculatorTool({
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-  // Obsługa przeciągania
-  const handleDragStart = (e: React.MouseEvent) => {
+  // Obsługa przeciągania - używa pointer events (działa z myszką i dotykiem)
+  const handleDragStart = (e: React.PointerEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    // Przechwytuj pointer events
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - position.x,
@@ -57,22 +62,24 @@ export function CalculatorTool({
   useEffect(() => {
     if (!isDragging) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
       setPosition({
         x: Math.max(0, Math.min(canvasWidth - 320, e.clientX - dragOffset.x)),
         y: Math.max(0, Math.min(canvasHeight - 400, e.clientY - dragOffset.y)),
       });
     };
 
-    const handleMouseUp = () => {
+    const handlePointerUp = () => {
       setIsDragging(false);
     };
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
     };
   }, [isDragging, dragOffset, canvasWidth, canvasHeight]);
 
@@ -261,7 +268,8 @@ export function CalculatorTool({
       {/* Header - draggable */}
       <div 
         className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 cursor-move select-none"
-        onMouseDown={handleDragStart}
+        onPointerDown={handleDragStart}
+        style={{ touchAction: 'none' }}
       >
         <div className="flex items-center gap-2">
           <GripHorizontal className="w-4 h-4 text-gray-400" />

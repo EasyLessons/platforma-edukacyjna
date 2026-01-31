@@ -30,9 +30,10 @@
 
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform } from '../whiteboard/types';
 import { panViewportWithMouse, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface PanToolProps {
   viewport: ViewportTransform;
@@ -49,6 +50,28 @@ export function PanTool({
 }: PanToolProps) {
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState<Point | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange,
+  });
+
+  // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+  // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
 
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -73,18 +96,23 @@ export function PanTool({
     }
   }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
-  // Mouse down - rozpocznij panning
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Akceptuj LMB lub środkowy przycisk
+  // Pointer down - rozpocznij panning
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerDown(e);
+    // Pan działa zawsze - gesty multitouch mają priorytet ale pojedynczy pan też działa
+    
     if (e.button === 0 || e.button === 1) {
       e.preventDefault();
       setIsPanning(true);
       setLastMousePos({ x: e.clientX, y: e.clientY });
     }
-  }, []);
+  }, [gestures]);
 
-  // Mouse move - kontynuuj panning
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  // Pointer move - kontynuuj panning
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return; // Gesty mają priorytet
+    
     if (!isPanning || !lastMousePos) return;
 
     const dx = e.clientX - lastMousePos.x;
@@ -94,43 +122,15 @@ export function PanTool({
     onViewportChange(constrainViewport(newViewport));
 
     setLastMousePos({ x: e.clientX, y: e.clientY });
-  }, [isPanning, lastMousePos, viewport, onViewportChange]);
+  }, [isPanning, lastMousePos, viewport, onViewportChange, gestures]);
 
-  // Mouse up - zakończ panning
-  const handleMouseUp = useCallback(() => {
+  // Pointer up - zakończ panning
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    gestures.handlePointerUp(e);
+    
     setIsPanning(false);
     setLastMousePos(null);
-  }, []);
-
-  // Touch events - obsługa dotykowa
-  const handleTouchStart = useCallback((e: React.TouchEvent) => {
-    if (e.touches.length === 1) {
-      e.preventDefault();
-      const touch = e.touches[0];
-      setIsPanning(true);
-      setLastMousePos({ x: touch.clientX, y: touch.clientY });
-    }
-  }, []);
-
-  const handleTouchMove = useCallback((e: React.TouchEvent) => {
-    if (!isPanning || !lastMousePos || e.touches.length !== 1) return;
-
-    e.preventDefault();
-    const touch = e.touches[0];
-    const dx = touch.clientX - lastMousePos.x;
-    const dy = touch.clientY - lastMousePos.y;
-
-    const newViewport = panViewportWithMouse(viewport, dx, dy);
-    onViewportChange(constrainViewport(newViewport));
-
-    setLastMousePos({ x: touch.clientX, y: touch.clientY });
-  }, [isPanning, lastMousePos, viewport, onViewportChange]);
-
-  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
-    e.preventDefault();
-    setIsPanning(false);
-    setLastMousePos(null);
-  }, []);
+  }, [gestures]);
 
   return (
     <div
@@ -144,17 +144,15 @@ export function PanTool({
         </div>
       )}
 
-      {/* Overlay dla mouse events */}
+      {/* Overlay dla pointer events */}
       <div
+        ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
       />
     </div>

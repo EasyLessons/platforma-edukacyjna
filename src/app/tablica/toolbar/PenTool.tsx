@@ -35,6 +35,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { clampLineWidth } from '../whiteboard/utils';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface PenToolProps {
   viewport: ViewportTransform;
@@ -55,9 +56,22 @@ export function PenTool({
   onPathCreate,
   onViewportChange,
 }: PenToolProps) {
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
+  const isDrawingRef = useRef(false);
+  const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const pointsRef = useRef<Point[]>([]);
+  const [, forceUpdate] = useState({});
+  
+  // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
+  const isPenModeRef = useRef(false);
+
+  // 🆕 Multi-touch gestures (2+ palce = pan/zoom)
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
 
   // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
   useEffect(() => {
@@ -81,102 +95,146 @@ export function PenTool({
     return () => overlay.removeEventListener('wheel', handleNativeWheel);
   }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
-  // Mouse down - rozpocznij rysowanie
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+  // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
+
+  // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // 🆕 Wykryj czy to pióro i aktywuj pen mode (jak Excalidraw)
+    if (e.pointerType === 'pen') {
+      isPenModeRef.current = true;
+    }
+    
+    // 🆕 W pen mode: BLOKUJ wszystko oprócz pen (blokuje palce gdy pióro aktywne)
+    if (isPenModeRef.current && e.pointerType !== 'pen') {
+      return;
+    }
+    
+    // 🆕 Najpierw przekaż do gesture handler
+    gestures.handlePointerDown(e);
+
+    // 🆕 Jeśli gesty aktywne (2+ palce touch) → blokuj rysowanie
+    if (gestures.isGestureActive()) return;
+
+    // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
+    if (e.button !== 0 && e.button !== -1) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    // Przechwytuj pointer events
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+    pointsRef.current = [worldPoint];
 
     const newPath: DrawingPath = {
       id: Date.now().toString(),
       type: 'path',
-      points: [worldPoint],
+      points: pointsRef.current,
       color,
       width: lineWidth,
     };
 
-    setCurrentPath(newPath);
-    setIsDrawing(true);
+    currentPathRef.current = newPath;
+    isDrawingRef.current = true;
+    // Wymuszaj natychmiastowy render pierwszego punktu
+    forceUpdate({});
   };
 
-  // Mouse move - kontynuuj rysowanie
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDrawing || !currentPath) return;
+  // Pointer move - kontynuuj rysowanie (obsługuje mysz, tablet, touch)
+  const handlePointerMove = (e: React.PointerEvent) => {
+    // 🆕 W pen mode: BLOKUJ wszystko oprócz pen
+    if (isPenModeRef.current && e.pointerType !== 'pen') {
+      return;
+    }
+    
+    // 🆕 Najpierw przekaż do gesture handler
+    gestures.handlePointerMove(e);
+
+    // 🆕 Jeśli gesty aktywne → nie rysuj
+    if (gestures.isGestureActive()) return;
+
+    if (!isDrawingRef.current || !currentPathRef.current) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
 
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
-    setCurrentPath({
-      ...currentPath,
-      points: [...currentPath.points, worldPoint],
-    });
+    // Dodaj punkt bezpośrednio do ref (bez kopiowania całej tablicy)
+    pointsRef.current.push(worldPoint);
+    
+    // Wymuszaj re-render dla płynnego podglądu
+    forceUpdate({});
   };
 
-  // Mouse up - zakończ rysowanie
-  const handleMouseUp = () => {
-    if (isDrawing && currentPath && currentPath.points.length >= 1) {
-      onPathCreate(currentPath);
+  // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
+  const handlePointerUp = (e: React.PointerEvent) => {
+    // 🆕 Przekaż do gesture handler
+    gestures.handlePointerUp(e);
+
+    if (!isDrawingRef.current) return;
+    
+    // Zwolnij pointer capture
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    if (currentPathRef.current && pointsRef.current.length >= 1) {
+      // Utwórz finalną ścieżkę z kopiami punktów
+      const finalPath: DrawingPath = {
+        ...currentPathRef.current,
+        points: [...pointsRef.current],
+      };
+      onPathCreate(finalPath);
     }
 
-    setIsDrawing(false);
-    setCurrentPath(null);
+    isDrawingRef.current = false;
+    currentPathRef.current = null;
+    pointsRef.current = [];
+    
+    // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
+    setTimeout(() => {
+      if (!isDrawingRef.current) {
+        isPenModeRef.current = false;
+      }
+    }, 1000);
   };
 
-  // Touch events - obsługa dotykowa
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseDown(mouseEvent);
-    }
-  };
+  // Pointer cancel - anuluj rysowanie
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    // 🆕 Przekaż do gesture handler
+    gestures.handlePointerCancel(e);
 
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseMove(mouseEvent);
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleMouseUp();
+    if (!isDrawingRef.current) return;
+    
+    // Zwolnij pointer capture
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+    
+    isDrawingRef.current = false;
+    currentPathRef.current = null;
+    pointsRef.current = [];
   };
 
   // Render preview path (rysowanie w trakcie)
   const renderPreviewPath = () => {
-    if (!currentPath || currentPath.points.length === 0) return null;
-
-    // Jeśli jest tylko jeden punkt, narysuj małe kółko
-    if (currentPath.points.length === 1) {
-      const p = currentPath.points[0];
-      const screenPoint = transformPoint(p, viewport, canvasWidth, canvasHeight);
-      
-      return (
-        <svg
-          className="absolute inset-0 pointer-events-none z-40"
-          style={{ width: canvasWidth, height: canvasHeight }}
-        >
-          <circle
-            cx={screenPoint.x}
-            cy={screenPoint.y}
-            r={clampLineWidth(currentPath.width, viewport.scale)}
-            fill={currentPath.color}
-          />
-        </svg>
-      );
-    }
+    if (!currentPathRef.current || pointsRef.current.length === 0) return null;
 
     // Transformuj punkty ze współrzędnych świata na ekran
-    const pathData = currentPath.points
+    const pathData = pointsRef.current
       .map((p, i) => {
         const screenPoint = transformPoint(p, viewport, canvasWidth, canvasHeight);
         return i === 0 ? `M ${screenPoint.x} ${screenPoint.y}` : `L ${screenPoint.x} ${screenPoint.y}`;
@@ -190,8 +248,8 @@ export function PenTool({
       >
         <path
           d={pathData}
-          stroke={currentPath.color}
-          strokeWidth={clampLineWidth(currentPath.width, viewport.scale)}
+          stroke={currentPathRef.current.color}
+          strokeWidth={clampLineWidth(currentPathRef.current.width, viewport.scale)}
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
@@ -207,13 +265,10 @@ export function PenTool({
         ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
       />
 
       {/* Preview path */}

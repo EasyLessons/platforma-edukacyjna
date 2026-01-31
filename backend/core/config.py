@@ -98,9 +98,10 @@ class Settings(BaseSettings):
     # HS512 = HMAC-SHA512 (wolniejszy, mocniejszy)
     # RS256 = RSA (klucze publiczny/prywatny, dla mikroserwisów)
     
-    access_token_expire_minutes: int = 30  # Opcjonalne - czas życia tokenu
+    access_token_expire_minutes: int = 1440  # Opcjonalne - czas życia tokenu (24h)
     # 15 = Więcej bezpieczeństwa, gorsze UX (częste logowania)
     # 30 = Standard (balans)
+    # 360 = 6h (dla długich sesji pracy na tablicy)
     # 1440 = 24h (wygodne, ale jeśli token wycieknie → szkody przez 24h)
     
     # === EMAIL (RESEND) ===

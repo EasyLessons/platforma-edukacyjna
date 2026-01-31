@@ -10,15 +10,17 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library, Sparkles } from 'lucide-react';
+import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library, Sparkles, Copy, Check, Plus } from 'lucide-react';
 import { loadManifest, searchResources, getResourceTypeColor } from './searchService';
-import { ResourceManifest, SearchResult, FormulaResource, CardResource } from './types';
+import { ResourceManifest, SearchResult, FormulaResource, CardResource, CalculationResult } from './types';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
   onCardSelect: (card: CardResource) => void;
+  onCalculationSelect?: (result: CalculationResult) => void; // 🆕 Opcjonalny callback dla obliczeń
   onBrowseAll?: () => void;
   onActiveChange?: (isActive: boolean) => void; // Callback gdy search się otwiera/zamyka
+  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -29,7 +31,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
 };
 
-export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onActiveChange }: SmartSearchBarProps) {
+export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSelect, onBrowseAll, onActiveChange, userRole }: SmartSearchBarProps) {
+  // 🔒 Viewer nie ma dostępu do wyszukiwarki
+  if (userRole === 'viewer') {
+    return null;
+  }
   const [isOpen, setIsOpen] = useState(false);
   const [isClosing, setIsClosing] = useState(false);
   const [query, setQuery] = useState('');
@@ -39,11 +45,21 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isAnimatingSelection, setIsAnimatingSelection] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(0);
+  const [copiedCalculation, setCopiedCalculation] = useState(false); // 🆕 Stan kopiowania
   
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLLIElement>(null);
+
+  // Monitor window width
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Ctrl+K skrót klawiszowy
   useEffect(() => {
@@ -171,10 +187,43 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
       setQuery('');
       setSelectedItemId(null);
       setIsAnimatingSelection(false);
+      setCopiedCalculation(false);
     }, 300);
   };
 
+  // 🆕 Kopiuj wynik obliczeń do schowka
+  const handleCopyCalculation = async (result: CalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(result.result);
+      setCopiedCalculation(true);
+      setTimeout(() => setCopiedCalculation(false), 2000);
+    } catch (err) {
+      console.error('Nie udało się skopiować:', err);
+    }
+  };
+
+  // 🆕 Dodaj wynik jako tekst na tablicę
+  const handleAddCalculation = (result: CalculationResult, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onCalculationSelect) {
+      onCalculationSelect(result);
+    }
+    handleClose();
+  };
+
   const handleSelect = (result: SearchResult) => {
+    // 🆕 Obsługa obliczeń - kopiuj do schowka
+    if (result.resultType === 'calculation') {
+      navigator.clipboard.writeText(result.result);
+      setCopiedCalculation(true);
+      setTimeout(() => {
+        setCopiedCalculation(false);
+        handleClose();
+      }, 500);
+      return;
+    }
+    
     // Rozpocznij fancy animację
     setSelectedItemId(result.id);
     setIsAnimatingSelection(true);
@@ -231,23 +280,51 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
           to { opacity: 1; }
         }
         
-        @keyframes expandWidth {
+        @keyframes expandSearch {
           from {
             width: 500px;
+            opacity: 0.8;
           }
           to {
-            width: 800px;
+            width: 700px;
+            opacity: 1;
           }
         }
         
-        @keyframes shrinkWidth {
+        @keyframes expandSearchMobile {
           from {
-            width: 800px;
+            width: 56px;
+            opacity: 0.8;
+          }
+          to {
+            width: 90vw;
+            opacity: 1;
+          }
+        }
+        
+        @keyframes shrinkSearch {
+          from {
+            width: 700px;
+            opacity: 1;
           }
           to {
             width: 500px;
+            opacity: 0.8;
           }
         }
+        
+        @keyframes shrinkSearchMobile {
+          from {
+            width: 90vw;
+            opacity: 1;
+          }
+          to {
+            width: 56px;
+            opacity: 0.8;
+          }
+        }
+        
+
         
         @keyframes pulse {
           0%, 100% {
@@ -348,48 +425,74 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
                 setIsOpen(true);
                 setTimeout(() => inputRef.current?.focus(), 50);
               }}
-              className="flex items-center gap-3 pl-6 pr-20 py-4 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 transition-all duration-300 shadow-2xl hover:shadow-blue-200/50 hover:scale-[1.02] hover:cursor-pointer"
-              style={{ width: '500px', height: '64px' }}
+              className={`flex items-center gap-3 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 shadow-lg hover:shadow-blue-200/50 hover:scale-[1.02] hover:cursor-pointer relative ${windowWidth > 1550 ? 'mx-auto' : ''}`}
+              style={{ 
+                width: windowWidth <= 760 ? '56px' : '100%', 
+                maxWidth: windowWidth <= 760 ? '56px' : '1000px', 
+                height: '64px',
+                padding: windowWidth <= 760 ? '0' : '16px 24px',
+                justifyContent: windowWidth <= 760 ? 'center' : 'flex-start',
+                transition: 'all 0.3s ease-out'
+              }}
               title="Szukaj wzorów (Ctrl+K)"
             >
               <Search className="w-5 h-5 text-gray-400" />
-              <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
-            </button>
-            
-            {/* Ctrl+K badge - POZA buttonem, z lewej od separatora */}
-            <kbd className="hidden sm:inline-flex absolute right-[104px] top-1/2 -translate-y-1/2 items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm pointer-events-none">
-              Ctrl+K
-            </kbd>
-            
-            {/* Separator + ikonka wzorów - POZA głównym buttonem */}
-            <div className="absolute right-[88px] top-1/2 -translate-y-1/2 w-px h-8 bg-gray-200/50 pointer-events-none" />
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(true);
-                setQuery('karty wzorów');
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }}
-              className="absolute right-4 top-1/2 -translate-y-1/2 p-2 hover:bg-blue-50/80 rounded-xl transition-all duration-200 hover:scale-110 group"
-              title="Przeglądaj karty wzorów"
-            >
-              <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
+  
               
-              {/* Tooltip */}
-              <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                  Przeglądaj karty wzorów
-                  <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
-                </div>
-              </div>
+              
+              
+
+              {/* Tekst i przyciski ukrywane przy 760px */}
+              {windowWidth > 760 && (
+                <>
+                  <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
+                  
+                  {/* Ctrl+K badge - WEWNĄTRZ buttona */}
+                  <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
+                    Ctrl+K
+                  </kbd>
+                  
+                  {/* Separator - WEWNĄTRZ buttona */}
+                  <div className="w-px h-8 bg-gray-200/50 mx-2" />
+                  
+                  {/* Ikonka wzorów - WEWNĄTRZ głównego buttona */}
+                  <div
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsOpen(true);
+                      setQuery('karty wzorów');
+                      setTimeout(() => inputRef.current?.focus(), 50);
+                    }}
+                    className="p-2 bg-blue-100/80 hover:bg-blue-100/99 rounded-xl transition-all duration-200 hover:scale-110 group relative"
+                    title="Przeglądaj karty wzorów"
+                  >
+                    <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
+                  
+                    {/* Tooltip */}
+                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                      <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                        Przeglądaj karty wzorów
+                        <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </button>
           </>
         ) : (
           <div 
-            className="flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-2xl px-6 transition-all duration-300 ease-out"
+            className={`flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-lg px-6 ${windowWidth > 1550 ? 'mx-auto' : ''}`}
             style={{
-              animation: isClosing ? 'shrinkWidth 0.3s ease-out forwards' : 'expandWidth 0.3s ease-out forwards',
-              height: '64px'
+              height: '64px',
+              width: windowWidth <= 760 ? '90vw' : '100%',
+              maxWidth: windowWidth <= 760 ? '500px' : windowWidth <= 1550 ? '100%' : windowWidth<=1580 ? '500px' : windowWidth<= 1620 ? '550px' : windowWidth <= 1800 ? '620px' : '1000px',
+              position: 'relative',
+              animation: windowWidth > 760 && windowWidth <= 1550 
+                ? 'none' 
+                : (isClosing 
+                  ? (windowWidth <= 760 ? 'shrinkSearchMobile 0.3s ease-out forwards' : 'shrinkSearch 0.3s ease-out forwards')
+                  : (windowWidth <= 760 ? 'expandSearchMobile 0.3s ease-out forwards' : 'expandSearch 0.3s ease-out forwards'))
             }}
           >
             <Search className="w-5 h-5 text-blue-500 animate-pulse" />
@@ -417,9 +520,14 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
           <div 
             ref={resultsContainerRef}
             onWheel={handleWheel}
-            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-2xl max-h-[500px] z-[60] results-scroll overflow-y-auto"
+            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-[60] results-scroll overflow-y-auto"
             style={{
-              animation: 'slideIn 0.3s ease-out'
+              animation: 'slideIn 0.3s ease-out',
+              width: windowWidth <= 760 ? '90vw' : 'auto',
+              maxWidth: windowWidth <= 760 ? '500px' : 'none',
+              left: windowWidth <= 760 ? '50%' : '0',
+              right: windowWidth <= 760 ? 'auto' : '0',
+              transform: windowWidth <= 760 ? 'translateX(-50%)' : 'none'
             }}
           >
             {isLoading ? (
@@ -434,12 +542,80 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
               </div>
             ) : results.length === 0 && query.trim() ? (
               <div className="p-6 text-center text-gray-500">
-                <div className="text-4xl mb-2">🔍</div>
+                <div className="text-4xl mb-2"></div>
                 Brak wyników dla "{query}"
               </div>
             ) : (
               <ul className="py-2">
                 {results.map((result, index) => {
+                  // 🆕 QUICK MATH - specjalne renderowanie dla obliczeń
+                  if (result.resultType === 'calculation') {
+                    return (
+                      <li
+                        key={result.id}
+                        ref={index === selectedIndex ? selectedItemRef : null}
+                        onClick={() => handleSelect(result)}
+                        onMouseEnter={() => setSelectedIndex(index)}
+                        className={`
+                          flex items-center gap-4 px-5 py-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 relative overflow-hidden
+                          ${index === selectedIndex 
+                            ? 'bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg border-2 border-emerald-300' 
+                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200'
+                          }
+                        `}
+                        style={{
+                          animation: `slideIn 0.2s ease-out both`
+                        }}
+                      >
+                        {/* Ikona kalkulatora */}
+                        <div className="p-3 rounded-2xl bg-emerald-500 shrink-0">
+                          <Calculator className="w-6 h-6 text-white" />
+                        </div>
+                        
+                        {/* Wyrażenie i wynik */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm text-emerald-700 font-medium">Quick Math</span>
+                            <Sparkles className="w-4 h-4 text-emerald-500" />
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="text-gray-600 font-mono text-lg">{result.expression}</span>
+                            <span className="text-emerald-600 font-bold">=</span>
+                            <span className="text-2xl font-bold text-emerald-700 font-mono">{result.result}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Przyciski akcji */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          {/* Kopiuj */}
+                          <button
+                            onClick={(e) => handleCopyCalculation(result, e)}
+                            className="p-2 rounded-xl bg-white/80 hover:bg-white shadow-sm transition-all hover:scale-110"
+                            title="Kopiuj wynik"
+                          >
+                            {copiedCalculation ? (
+                              <Check className="w-5 h-5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-5 h-5 text-emerald-600" />
+                            )}
+                          </button>
+                          
+                          {/* Dodaj do tablicy */}
+                          {onCalculationSelect && (
+                            <button
+                              onClick={(e) => handleAddCalculation(result, e)}
+                              className="p-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 shadow-sm transition-all hover:scale-110"
+                              title="Dodaj do tablicy"
+                            >
+                              <Plus className="w-5 h-5 text-white" />
+                            </button>
+                          )}
+                        </div>
+                      </li>
+                    );
+                  }
+                  
+                  // Normalne renderowanie dla wzorów i kart
                   const Icon = getIcon(result.type);
                   const color = manifest ? getResourceTypeColor(manifest, result.type) : '#3B82F6';
                   const isCard = result.resultType === 'card';
@@ -533,7 +709,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onBrowseAll, onA
         {/* Animacja zamykania wyników */}
         {isOpen && (query.trim() || isLoading) && isClosing && (
           <div 
-            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-2xl max-h-[500px] z-50"
+            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-50"
             style={{
               animation: 'slideOut 0.2s ease-out forwards'
             }}

@@ -18,6 +18,8 @@ import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
 import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { TextMiniToolbar } from './TextMiniToolbar';
 import { SelectionPropertiesPanel } from './SelectionPropertiesPanel';
+import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '../utils/snapUtils';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -33,6 +35,7 @@ interface SelectToolProps {
   onTextEdit?: (id: string) => void;
   onMarkdownEdit?: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  onActiveGuidesChange?: (guides: GuideLine[]) => void;
 }
 
 type ResizeHandle =
@@ -63,6 +66,7 @@ export function SelectTool({
   onTextEdit,
   onMarkdownEdit,
   onViewportChange,
+  onActiveGuidesChange,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -78,6 +82,14 @@ export function SelectTool({
   const [resizeOriginalElements, setResizeOriginalElements] = useState<Map<string, DrawingElement>>(new Map());
 
   const overlayRef = useRef<HTMLDivElement>(null);
+  
+  // 🆕 Multi-touch gestures
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
   
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
@@ -109,11 +121,31 @@ export function SelectTool({
     return () => overlay.removeEventListener('wheel', handleNativeWheel);
   }, [canvasWidth, canvasHeight, onViewportChange]);
 
+  // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+  // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
+
   // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag
   useEffect(() => {
     if (!isResizing && !isDragging) return;
 
-    const handleGlobalMouseMove = (e: MouseEvent) => {
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch - blokuj drag/resize podczas gestów
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerMove(e as any);
+        if (gestures.isGestureActive()) return;
+      }
+      
       const screenPoint = { x: e.clientX, y: e.clientY };
       const worldPoint = inverseTransformPoint(screenPoint, viewportRef.current, canvasWidth, canvasHeight);
 
@@ -131,27 +163,139 @@ export function SelectTool({
         // Zachowaj oryginalne proporcje (aspect ratio)
         const aspectRatio = resizeOriginalBox.width / resizeOriginalBox.height;
         
+        // 🆕 Zbierz guidelines dla snap podczas resize
+        const guidelines = collectGuidelinesFromImages(elements);
+        const excludeIds = Array.from(resizeOriginalElements.keys());
+        const SNAP_THRESHOLD = 0.1;
+        
+        // Filtruj guidelines (wykluczamy źródłowe obiekty)
+        const validGuidelines = guidelines.filter(g => !excludeIds.includes(g.sourceId));
+        const verticalGuides = validGuidelines.filter(g => g.orientation === 'vertical');
+        const horizontalGuides = validGuidelines.filter(g => g.orientation === 'horizontal');
+        
+        const activeGuides: any[] = [];
+        
         if (resizeHandle === 'se') {
-          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          // Prawy dolny róg - snapujemy right i bottom edge
+          let targetRight = currentWorldX;
+          let targetBottom = currentWorldY;
+          
+          // Snap right edge do vertical guidelines
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetRight - guide.value) < SNAP_THRESHOLD) {
+              targetRight = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, targetRight - resizeOriginalBox.x);
           newBoxHeight = newBoxWidth / aspectRatio;
+          
+          // Snap bottom edge do horizontal guidelines  
+          const calculatedBottom = resizeOriginalBox.y + newBoxHeight;
+          for (const guide of horizontalGuides) {
+            if (Math.abs(calculatedBottom - guide.value) < SNAP_THRESHOLD) {
+              newBoxHeight = guide.value - resizeOriginalBox.y;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'sw') {
+          // Lewy dolny róg - snapujemy left i bottom edge
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
-          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          let targetLeft = currentWorldX;
+          
+          // Snap left edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetLeft - guide.value) < SNAP_THRESHOLD) {
+              targetLeft = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - targetLeft);
           newBoxX = originalRight - newBoxWidth;
           newBoxHeight = newBoxWidth / aspectRatio;
+          
+          // Snap bottom edge
+          const calculatedBottom = resizeOriginalBox.y + newBoxHeight;
+          for (const guide of horizontalGuides) {
+            if (Math.abs(calculatedBottom - guide.value) < SNAP_THRESHOLD) {
+              newBoxHeight = guide.value - resizeOriginalBox.y;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              newBoxX = originalRight - newBoxWidth;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'ne') {
-          newBoxWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
-          newBoxHeight = newBoxWidth / aspectRatio;
+          // Prawy górny róg - snapujemy right i top edge
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
+          let targetRight = currentWorldX;
+          let targetTop = currentWorldY;
+          
+          // Snap right edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetRight - guide.value) < SNAP_THRESHOLD) {
+              targetRight = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, targetRight - resizeOriginalBox.x);
+          newBoxHeight = newBoxWidth / aspectRatio;
           newBoxY = originalBottom - newBoxHeight;
+          
+          // Snap top edge
+          for (const guide of horizontalGuides) {
+            if (Math.abs(newBoxY - guide.value) < SNAP_THRESHOLD) {
+              newBoxY = guide.value;
+              newBoxHeight = originalBottom - newBoxY;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         } else if (resizeHandle === 'nw') {
+          // Lewy górny róg - snapujemy left i top edge
           const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
           const originalBottom = resizeOriginalBox.y + resizeOriginalBox.height;
-          newBoxWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+          let targetLeft = currentWorldX;
+          let targetTop = currentWorldY;
+          
+          // Snap left edge
+          for (const guide of verticalGuides) {
+            if (Math.abs(targetLeft - guide.value) < SNAP_THRESHOLD) {
+              targetLeft = guide.value;
+              activeGuides.push(guide);
+              break;
+            }
+          }
+          
+          newBoxWidth = Math.max(MIN_SIZE, originalRight - targetLeft);
           newBoxX = originalRight - newBoxWidth;
           newBoxHeight = newBoxWidth / aspectRatio;
           newBoxY = originalBottom - newBoxHeight;
+          
+          // Snap top edge
+          for (const guide of horizontalGuides) {
+            if (Math.abs(newBoxY - guide.value) < SNAP_THRESHOLD) {
+              newBoxY = guide.value;
+              newBoxHeight = originalBottom - newBoxY;
+              newBoxWidth = newBoxHeight * aspectRatio;
+              newBoxX = originalRight - newBoxWidth;
+              activeGuides.push(guide);
+              break;
+            }
+          }
         }
+        
+        // Zaktualizuj active guides dla wizualizacji
+        onActiveGuidesChange?.(activeGuides);
         
         const scaleX = newBoxWidth / resizeOriginalBox.width;
         const scaleY = newBoxHeight / resizeOriginalBox.height;
@@ -253,46 +397,102 @@ export function SelectTool({
         const dx = worldPoint.x - dragStart.x;
         const dy = worldPoint.y - dragStart.y;
 
-        const updates = new Map<string, Partial<DrawingElement>>();
+        // Zbierz guide lines z obrazków
+        const guidelines = collectGuidelinesFromImages(elements);
+        
+        // Oblicz bounding box przeciąganych elementów
+        const draggedElements = Array.from(draggedElementsOriginal.values());
+        if (draggedElements.length > 0) {
+          let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+          
+          draggedElements.forEach((el) => {
+            if (el.type === 'path') {
+              el.points.forEach((p: Point) => {
+                const px = p.x + dx;
+                const py = p.y + dy;
+                minX = Math.min(minX, px);
+                minY = Math.min(minY, py);
+                maxX = Math.max(maxX, px);
+                maxY = Math.max(maxY, py);
+              });
+            } else if (el.type === 'shape') {
+              const x1 = el.startX + dx;
+              const y1 = el.startY + dy;
+              const x2 = el.endX + dx;
+              const y2 = el.endY + dy;
+              minX = Math.min(minX, x1, x2);
+              minY = Math.min(minY, y1, y2);
+              maxX = Math.max(maxX, x1, x2);
+              maxY = Math.max(maxY, y1, y2);
+            } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table') {
+              const x = el.x + dx;
+              const y = el.y + dy;
+              minX = Math.min(minX, x);
+              minY = Math.min(minY, y);
+              maxX = Math.max(maxX, x + (el.width || 0));
+              maxY = Math.max(maxY, y + (el.height || 0));
+            }
+          });
 
-        draggedElementsOriginal.forEach((originalEl, id) => {
-          if (originalEl.type === 'path') {
-            const newPoints = originalEl.points.map((p: Point) => ({
-              x: p.x + dx,
-              y: p.y + dy,
-            }));
-            updates.set(id, { points: newPoints });
-          } else if (originalEl.type === 'shape') {
-            updates.set(id, {
-              startX: originalEl.startX + dx,
-              startY: originalEl.startY + dy,
-              endX: originalEl.endX + dx,
-              endY: originalEl.endY + dy,
-            });
-          } else if (originalEl.type === 'text') {
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          } else if (originalEl.type === 'image') {
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
-            // 🆕 Drag dla markdown i table
-            updates.set(id, {
-              x: originalEl.x + dx,
-              y: originalEl.y + dy,
-            });
-          }
-        });
+          const width = maxX - minX;
+          const height = maxY - minY;
+          
+          // Snap do guidelines
+          const excludeIds = Array.from(draggedElementsOriginal.keys());
+          const snapResult = snapToGuidelines(minX, minY, width, height, guidelines, excludeIds);
+          
+          // Oblicz adjustment snapu
+          const snapDx = snapResult.x - minX;
+          const snapDy = snapResult.y - minY;
+          
+          // Zaktualizuj active guides dla wizualizacji
+          onActiveGuidesChange?.(snapResult.activeGuides);
 
-        onElementsUpdate(updates);
+          const updates = new Map<string, Partial<DrawingElement>>();
+
+          draggedElementsOriginal.forEach((originalEl, id) => {
+            if (originalEl.type === 'path') {
+              const newPoints = originalEl.points.map((p: Point) => ({
+                x: p.x + dx + snapDx,
+                y: p.y + dy + snapDy,
+              }));
+              updates.set(id, { points: newPoints });
+            } else if (originalEl.type === 'shape') {
+              updates.set(id, {
+                startX: originalEl.startX + dx + snapDx,
+                startY: originalEl.startY + dy + snapDy,
+                endX: originalEl.endX + dx + snapDx,
+                endY: originalEl.endY + dy + snapDy,
+              });
+            } else if (originalEl.type === 'text') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            } else if (originalEl.type === 'image') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            }
+          });
+
+          onElementsUpdate(updates);
+        }
       }
     };
 
-    const handleGlobalMouseUp = () => {
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerUp(e as any);
+      }
+      
       if (isDragging && draggedElementsOriginal.size > 0) {
         onOperationFinish?.();
       }
@@ -309,16 +509,28 @@ export function SelectTool({
       setResizeHandle(null);
       setResizeOriginalBox(null);
       setResizeOriginalElements(new Map());
+      
+      // Wyczyść active guides po zakończeniu operacji
+      onActiveGuidesChange?.([]);
     };
 
-    window.addEventListener('mousemove', handleGlobalMouseMove);
-    window.addEventListener('mouseup', handleGlobalMouseUp);
+    const handleGlobalPointerCancel = (e: PointerEvent) => {
+      // 🆕 Obsługa gestów multitouch przy cancel
+      if (e.pointerType === 'touch') {
+        gestures.handlePointerCancel(e as any);
+      }
+    };
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerCancel);
 
     return () => {
-      window.removeEventListener('mousemove', handleGlobalMouseMove);
-      window.removeEventListener('mouseup', handleGlobalMouseUp);
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerCancel);
     };
-  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish]);
+  }, [isResizing, isDragging, resizeHandle, resizeOriginalBox, resizeOriginalElements, dragStart, draggedElementsOriginal, canvasWidth, canvasHeight, onElementsUpdate, onOperationFinish, elements, onActiveGuidesChange]);
 
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedIds.size === 0) return null;
@@ -432,6 +644,16 @@ export function SelectTool({
     return false;
   };
 
+  // 🆕 Sprawdza czy punkt jest w bounding box (dla przeciągania zaznaczonych elementów)
+  const isPointInBoundingBox = (worldPoint: Point, bbox: BoundingBox): boolean => {
+    return (
+      worldPoint.x >= bbox.x &&
+      worldPoint.x <= bbox.x + bbox.width &&
+      worldPoint.y >= bbox.y &&
+      worldPoint.y <= bbox.y + bbox.height
+    );
+  };
+
   const getResizeHandleAt = (screenPoint: Point, boundingBox: BoundingBox): ResizeHandle => {
     const box = boundingBox;
     const handleSize = 10;
@@ -490,7 +712,14 @@ export function SelectTool({
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
+    if (e.button === 1 || e.button === 2) return;
+    
+    // 🆕 Obsługa gestów multitouch
+    gestures.handlePointerDown(e);
+    if (gestures.isGestureActive()) return;
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -513,12 +742,11 @@ export function SelectTool({
       }
     }
 
-    if (selectedIds.size > 0) {
-      const clickedSelected = elements.find(
-        (el) => selectedIds.has(el.id) && isPointInElement(worldPoint, el)
-      );
-
-      if (clickedSelected) {
+    // 🆕 Sprawdź czy kliknięto w bounding box zaznaczonych elementów
+    if (selectedIds.size > 0 && bbox) {
+      // Najpierw sprawdź czy kliknięto w bounding box zaznaczenia
+      if (isPointInBoundingBox(worldPoint, bbox)) {
+        // Można przeciągać - kliknięto w obszar zaznaczenia
         setIsDragging(true);
         setDragStart(worldPoint);
 
@@ -554,14 +782,23 @@ export function SelectTool({
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
+    // 🆕 Obsługa gestów multitouch
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return;
+
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
       setSelectionEnd({ x: e.clientX, y: e.clientY });
     }
   };
 
-  const handleMouseUp = () => {
+  const handlePointerUp = (e?: React.PointerEvent) => {
+    // 🆕 Obsługa gestów multitouch
+    if (e) {
+      gestures.handlePointerUp(e);
+    }
+
     // Tylko dla zaznaczania obszaru - resize/drag mouseup obsługiwane przez global listener
     if (isSelecting && selectionStart && selectionEnd) {
       const worldStart = inverseTransformPoint(selectionStart, viewport, canvasWidth, canvasHeight);
@@ -572,6 +809,14 @@ export function SelectTool({
       const minY = Math.min(worldStart.y, worldEnd.y);
       const maxY = Math.max(worldStart.y, worldEnd.y);
 
+      // 🆕 Funkcja sprawdzająca czy prostokąty się przecinają (intersection)
+      const rectanglesIntersect = (
+        ax: number, ay: number, aw: number, ah: number,
+        bx: number, by: number, bw: number, bh: number
+      ): boolean => {
+        return !(ax + aw < bx || bx + bw < ax || ay + ah < by || by + bh < ay);
+      };
+
       const newSelection = new Set<string>();
       elements.forEach((el) => {
         if (el.type === 'shape') {
@@ -580,36 +825,31 @@ export function SelectTool({
           const elMinY = Math.min(el.startY, el.endY);
           const elMaxY = Math.max(el.startY, el.endY);
 
-          if (elMinX >= minX && elMaxX <= maxX && elMinY >= minY && elMaxY <= maxY) {
+          // Sprawdź czy zaznaczenie przecina się z elementem
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, elMinX, elMinY, elMaxX - elMinX, elMaxY - elMinY)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'text') {
-          const elMaxX = el.x + (el.width || 3);
-          const elMaxY = el.y + (el.height || 1);
+          const elWidth = el.width || 3;
+          const elHeight = el.height || 1;
 
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'image') {
-          const elMaxX = el.x + el.width;
-          const elMaxY = el.y + el.height;
-
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, el.width, el.height)) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'path') {
-          const allInside = el.points.every(
+          // Dla ścieżki sprawdzamy czy jakikolwiek punkt jest w zaznaczeniu
+          const anyPointInside = el.points.some(
             (p: Point) => p.x >= minX && p.x <= maxX && p.y >= minY && p.y <= maxY
           );
-          if (allInside) {
+          if (anyPointInside) {
             newSelection.add(el.id);
           }
         } else if (el.type === 'markdown' || el.type === 'table') {
-          // 🆕 Area selection dla markdown i table
-          const elMaxX = el.x + el.width;
-          const elMaxY = el.y + el.height;
-
-          if (el.x >= minX && elMaxX <= maxX && el.y >= minY && elMaxY <= maxY) {
+          if (rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, el.width, el.height)) {
             newSelection.add(el.id);
           }
         }
@@ -621,6 +861,11 @@ export function SelectTool({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent) => {
+    // 🆕 Obsługa gestów multitouch przy cancel
+    gestures.handlePointerCancel(e);
   };
 
   const renderTextToolbar = () => {
@@ -773,9 +1018,10 @@ export function SelectTool({
       <div
         className="absolute inset-0 z-30 pointer-events-auto"
         style={{ cursor: 'default', touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         onDoubleClick={handleDoubleClick}
       />
       

@@ -22,7 +22,8 @@
 import { useState } from 'react'
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext'
 import { useAuth } from '@/app/context/AuthContext'
-import { Plus, Link, Check } from 'lucide-react'
+import { Plus, Check, Eye } from 'lucide-react'
+import VoiceChat from './VoiceChat'
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)
@@ -53,7 +54,12 @@ const getInitials = (username: string) => {
 // 🧩 KOMPONENT
 // ═══════════════════════════════════════════════════════════════════════════
 
-export function OnlineUsers() {
+interface OnlineUsersProps {
+  onFollowUser?: (userId: number, viewportX: number, viewportY: number, viewportScale: number) => void
+  userRole?: 'owner' | 'editor' | 'viewer' // 🆕 Rola użytkownika
+}
+
+export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
   const { onlineUsers, isConnected } = useBoardRealtime()
   const { user: currentUser } = useAuth()
   const [linkCopied, setLinkCopied] = useState(false)
@@ -83,6 +89,12 @@ export function OnlineUsers() {
   return (
     <div className="absolute top-4 right-4 z-50 bg-white rounded-lg shadow-lg border border-gray-200 p-3">
       <div className="flex items-center gap-3">
+        {/* 🆕 VOICE CHAT - obok listy online */}
+        <VoiceChat />
+        
+        {/* Separator */}
+        <div className="w-px h-6 bg-gray-300"></div>
+        
         {/* Status połączenia */}
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-green-500"></div>
@@ -102,25 +114,49 @@ export function OnlineUsers() {
             const isCurrentUser = onlineUser.user_id === currentUser?.id
             const color = getAvatarColor(onlineUser.user_id)
             const initials = getInitials(onlineUser.username)
+            const hasViewport = onlineUser.viewport_x !== undefined && onlineUser.viewport_y !== undefined
             
             // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
             const uniqueKey = `${onlineUser.user_id}-${onlineUser.online_at || index}`
             
+            // Handler kliknięcia - przeniesienie do viewport użytkownika
+            const handleClick = () => {
+              if (!isCurrentUser && hasViewport && onFollowUser) {
+                console.log('👁️ Kliknięto użytkownika:', onlineUser.username, 'viewport:', onlineUser.viewport_x, onlineUser.viewport_y, onlineUser.viewport_scale)
+                onFollowUser(
+                  onlineUser.user_id,
+                  onlineUser.viewport_x!,
+                  onlineUser.viewport_y!,
+                  onlineUser.viewport_scale || 1
+                )
+              }
+            }
+            
             return (
               <div
                 key={uniqueKey}
+                onClick={handleClick}
                 className={`
                   relative group w-10 h-10 rounded-full 
                   ${color} 
                   flex items-center justify-center 
                   text-white text-sm font-bold
-                  ring-2 ring-white
                   transition-transform hover:scale-110 hover:z-10
-                  ${isCurrentUser ? 'ring-4 ring-blue-300' : ''}
+                  ${!isCurrentUser && hasViewport 
+                    ? 'ring-4 ring-green-400 cursor-pointer shadow-lg' 
+                    : 'ring-2 ring-white'
+                  }
                 `}
                 title={onlineUser.username}
               >
                 {initials}
+                
+                {/* 🆕 Ikonka oka - widoczna zawsze gdy można przejść do widoku */}
+                {!isCurrentUser && hasViewport && (
+                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 shadow-md border-2 border-white">
+                    <Eye size={12} className="text-white" />
+                  </div>
+                )}
                 
                 {/* Tooltip */}
                 <div className="
@@ -131,9 +167,11 @@ export function OnlineUsers() {
                   opacity-0 group-hover:opacity-100
                   transition-opacity
                   pointer-events-none
+                  z-50
                 ">
                   {onlineUser.username}
-                  {isCurrentUser && ' (Ty)'}
+                  {isCurrentUser && userRole && ` (${userRole})`}
+                  {!isCurrentUser && hasViewport && ' - Przejdź do widoku'}
                 </div>
               </div>
             )

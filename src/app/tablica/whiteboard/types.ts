@@ -102,6 +102,20 @@ export interface ImageElement {
   alt?: string;
 }
 
+// 🆕 PDF Document - dla dokumentów PDF
+export interface PDFElement {
+  id: string;
+  type: 'pdf';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  src: string; // URL lub base64 PDF
+  fileName?: string;
+  currentPage?: number; // Aktualnie wyświetlana strona
+  totalPages?: number; // Łączna liczba stron
+}
+
 // 🆕 Notatka Markdown - dla chatbota i notatek użytkownika
 export interface MarkdownNote {
   id: string;
@@ -134,7 +148,7 @@ export interface TableElement {
   headerBgColor?: string;
 }
 
-export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement | MarkdownNote | TableElement;
+export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement | PDFElement | MarkdownNote | TableElement;
 
 export interface MomentumState {
   velocityX: number;

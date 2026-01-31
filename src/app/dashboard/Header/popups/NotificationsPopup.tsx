@@ -9,6 +9,7 @@ import {
   PendingInvite 
 } from '@/workspace_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
+import { supabase } from '@/lib/supabase';
 
 interface NotificationsPopupProps {
   onClose: () => void;
@@ -22,6 +23,28 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
 
   useEffect(() => {
     loadInvites();
+    
+    // Realtime nasłuchiwanie nowych zaproszeń
+    const channel = supabase
+      .channel('workspace_invites_realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'workspace_invites'
+        },
+        (payload) => {
+          console.log('🔔 Nowe zaproszenie:', payload);
+          // Odśwież listę zaproszeń
+          loadInvites();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const loadInvites = async () => {

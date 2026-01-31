@@ -311,6 +311,95 @@ class PendingInviteResponse(BaseModel):
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# � WORKSPACE MEMBER - Członek przestrzeni
+# ═══════════════════════════════════════════════════════════════════════════
+
+class WorkspaceMemberResponse(BaseModel):
+    """
+    Informacje o członku workspace'a
+    
+    KIEDY UŻYWANY?
+    GET /api/workspaces/{id}/members → lista członków
+    """
+    id: int  # ID członkostwa (workspace_members.id)
+    user_id: int
+    username: str
+    email: str
+    full_name: Optional[str] = None
+    role: str  # "owner", "editor", lub "viewer"
+    joined_at: datetime
+    is_owner: bool
+    
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "id": 1,
+                "user_id": 5,
+                "username": "jan_kowalski",
+                "email": "jan@example.com",
+                "full_name": "Jan Kowalski",
+                "role": "editor",
+                "joined_at": "2024-01-15T10:30:00",
+                "is_owner": False
+            }
+        }
+
+
+class WorkspaceMembersListResponse(BaseModel):
+    """Lista członków workspace'a"""
+    members: List[WorkspaceMemberResponse]
+    total: int
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "members": [
+                    {
+                        "id": 1,
+                        "user_id": 1,
+                        "username": "owner",
+                        "email": "owner@example.com",
+                        "full_name": "Właściciel",
+                        "role": "owner",
+                        "joined_at": "2024-01-01T00:00:00",
+                        "is_owner": True
+                    }
+                ],
+                "total": 1
+            }
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔐 UPDATE MEMBER ROLE - Zmiana roli członka
+# ═══════════════════════════════════════════════════════════════════════════
+
+class UpdateMemberRoleRequest(BaseModel):
+    """
+    Request do zmiany roli członka workspace'a
+    
+    MOŻLIWE ROLE:
+    - owner: Pełne uprawnienia (twórca workspace)
+    - editor: Może edytować tablice
+    - viewer: Tylko przeglądanie (nie może rysować ani edytować)
+    
+    PRZYKŁAD:
+    {
+      "role": "editor"
+    }
+    """
+    role: str = Field(..., pattern="^(owner|editor|viewer)$", description="Nowa rola: owner, editor, lub viewer")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "role": "editor"
+            }
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # 📚 PODSUMOWANIE
 # ═══════════════════════════════════════════════════════════════════════════
 

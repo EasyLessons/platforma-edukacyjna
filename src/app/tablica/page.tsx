@@ -27,25 +27,65 @@ import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
-import { joinBoardWorkspace } from '@/boards_api/api';
+import { VoiceChatProvider } from '../context/VoiceChatContext';
+import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
+import { getMyRoleInWorkspace } from '@/workspace_api/api';
+import { BoardHeader } from './components/BoardHeader';
+import { HomeButton } from './components/HomeButton';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
 // ═══════════════════════════════════════════════════════════════════════════
 
-function TablicaContent() {
+export function TablicaContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [showTooltip, setShowTooltip] = useState(false);
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [arkuszPath, setArkuszPath] = useState<string | null>(null);
+  const [boardName, setBoardName] = useState<string>('Moja tablica');
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
 
-  // Pobierz boardId z URL query params i dołącz do workspace
+  // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
     const id = searchParams.get('boardId') || 'demo-board';
+    const arkusz = searchParams.get('arkusz');
+    
     setBoardId(id);
+    setArkuszPath(arkusz);
+    
     console.log('📋 Board ID:', id);
+    if (arkusz) {
+      console.log('📄 Arkusz path:', arkusz);
+    }
+    
+    // Pobierz dane tablicy z bazy
+    const loadBoardData = async () => {
+      try {
+        const board = await fetchBoardById(id);
+        if (board) {
+          setBoardName(board.name);
+          setWorkspaceId(board.workspace_id);
+          console.log('✅ Załadowano dane tablicy:', board.name);
+          console.log('📦 Workspace ID:', board.workspace_id);
+        } else {
+          console.warn('⚠️ fetchBoardById zwróciło null - spróbuj pobrać workspace_id z joinBoardWorkspace');
+        }
+      } catch (error) {
+        // Bardziej szczegółowe logowanie błędów
+        if (error instanceof Error) {
+          console.error('❌ Błąd ładowania danych tablicy:', error.message);
+          // Nie przerywaj działania aplikacji - dane zostaną pobrane przez joinBoardWorkspace
+        } else {
+          console.error('❌ Nieznany błąd ładowania danych tablicy:', error);
+        }
+      }
+    };
+    
+    loadBoardData();
     
     // Automatyczne dołączenie do workspace przy wejściu przez link
     const joinWorkspace = async () => {
@@ -56,6 +96,13 @@ function TablicaContent() {
             setIsJoining(true);
             const result = await joinBoardWorkspace(numericId);
             console.log('✅ Join workspace result:', result);
+            
+            // Ustaw workspace_id z wyniku join (fallback jeśli fetchBoardById zawiódł)
+            if (result.workspace_id && !workspaceId) {
+              setWorkspaceId(result.workspace_id);
+              console.log('📦 Workspace ID z join:', result.workspace_id);
+            }
+            
             if (!result.already_member) {
               console.log('🆕 Dołączono do nowego workspace!');
             }
@@ -74,6 +121,70 @@ function TablicaContent() {
     
     joinWorkspace();
   }, [searchParams]);
+  
+  // Pobierz rolę użytkownika po załadowaniu workspace_id
+  useEffect(() => {
+    const fetchUserRole = async () => {
+      if (workspaceId && workspaceId > 0) {
+        try {
+          const roleData = await getMyRoleInWorkspace(workspaceId);
+          setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
+          console.log('👤 Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
+        } catch (error) {
+          console.error('❌ Błąd pobierania roli:', error);
+          // Domyślnie editor jeśli nie ma tokenu
+          setUserRole('editor');
+          console.log('⚠️ Ustawiono domyślną rolę: editor (brak tokenu)');
+        }
+      }
+    };
+    
+    fetchUserRole();
+  }, [workspaceId]);
+  
+  // Realtime nasłuchiwanie zmian roli
+  useEffect(() => {
+    if (!workspaceId || workspaceId <= 0) return;
+    
+    const { supabase } = require('@/lib/supabase');
+    
+    const channel = supabase
+      .channel(`workspace_members_${workspaceId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'workspace_members',
+          filter: `workspace_id=eq.${workspaceId}`
+        },
+        async (payload: any) => {
+          console.log('🔄 Zmiana roli workspace member:', payload);
+          console.log('📊 Payload old:', payload.old, '| new:', payload.new);
+          
+          // Odśwież rolę (API zwraca tylko rolę dla aktualnego użytkownika)
+          try {
+            const roleData = await getMyRoleInWorkspace(workspaceId);
+            const oldRole = userRole;
+            setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
+            console.log('✅ Zaktualizowano rolę z', oldRole, '→', roleData.role);
+            
+            // Reload strony jeśli rola się zmieniła na viewer (dla pewności)
+            if (roleData.role === 'viewer' && oldRole !== 'viewer') {
+              console.log('🔄 Rola zmieniona na viewer - przeładowanie strony...');
+              setTimeout(() => window.location.reload(), 500);
+            }
+          } catch (error) {
+            console.error('❌ Błąd odświeżania roli:', error);
+          }
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [workspaceId]);
 
   // Loading state
   if (!boardId) {
@@ -107,94 +218,22 @@ function TablicaContent() {
         </div>
       )}
       
-      {/* Logo powrotu - lewy górny róg */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '16px',
-          left: '16px',
-          zIndex: 100,
-        }}
-      >
-        <button
-          onClick={() => router.push('/dashboard')}
-          onMouseEnter={() => setShowTooltip(true)}
-          onMouseLeave={() => setShowTooltip(false)}
-          style={{
-            padding: '8px 12px',
-            backgroundColor: 'white',
-            border: '2px solid #e0e0e0',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            transition: 'all 0.2s',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            position: 'relative'
-          }}
-          onMouseOver={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0px)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-          }}
-          onMouseOut={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-          }}
-        >
-          <Image
-            src="/resources/LogoEasyLesson.webp"
-            alt="EasyLesson Logo"
-            width={160}
-            height={50}
-            className="h-11 w-auto"
-            priority
-          />
-        </button>
+      {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
+      <HomeButton />
 
-        {/* Tooltip POD logo */}
-        {showTooltip && (
-          <div
-            style={{
-              position: 'absolute',
-              top: '100%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              marginTop: '8px',
-              backgroundColor: '#1f2937',
-              color: 'white',
-              padding: '8px 14px',
-              borderRadius: '6px',
-              fontSize: '13px',
-              fontWeight: '500',
-              whiteSpace: 'nowrap',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-              pointerEvents: 'none',
-              zIndex: 101,
-              animation: 'fadeIn 0.2s ease-in-out'
-            }}
-          >
-            Wróć do panelu
-            {/* Strzałka tooltipa */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '-6px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: 0,
-                height: 0,
-                borderLeft: '6px solid transparent',
-                borderRight: '6px solid transparent',
-                borderBottom: '6px solid #1f2937'
-              }}
-            />
-          </div>
-        )}
-      </div>
+      {/* Nagłówek z logo, nazwą tablicy i przyciskiem premium */}
+      <BoardHeader boardName={boardName} boardId={boardId} />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>
-        <WhiteboardCanvas boardId={boardId} />
+        {/* 🆕 VOICE CHAT PROVIDER - P2P audio */}
+        <VoiceChatProvider boardId={boardId}>
+          <WhiteboardCanvas 
+            boardId={boardId} 
+            arkuszPath={arkuszPath}
+            userRole={userRole || 'editor'}
+          />
+        </VoiceChatProvider>
       </BoardRealtimeProvider>
 
       {/* Style dla animacji */}

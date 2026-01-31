@@ -32,10 +32,11 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Point, ViewportTransform, Shape } from '../whiteboard/types';
 import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
 import { ShapeType } from '../toolbar/Toolbar';
+import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
@@ -64,6 +65,28 @@ export function ShapeTool({
 }: ShapeToolProps) {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
+  const overlayRef = useRef<HTMLDivElement>(null);
+
+  const gestures = useMultiTouchGestures({
+    viewport,
+    canvasWidth,
+    canvasHeight,
+    onViewportChange: onViewportChange || (() => {}),
+  });
+
+  // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
+  // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+    };
+
+    overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
+    return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
 
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = (e: React.WheelEvent) => {
@@ -83,8 +106,14 @@ export function ShapeTool({
     }
   };
 
-  // Mouse down - rozpocznij rysowanie kształtu
-  const handleMouseDown = (e: React.MouseEvent) => {
+  // Pointer down - rozpocznij rysowanie kształtu
+  const handlePointerDown = (e: React.PointerEvent) => {
+    // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
+    if (e.button === 1 || e.button === 2) return;
+    
+    gestures.handlePointerDown(e);
+    if (gestures.isGestureActive()) return;
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -106,8 +135,11 @@ export function ShapeTool({
     setIsDrawing(true);
   };
 
-  // Mouse move - kontynuuj rysowanie kształtu
-  const handleMouseMove = (e: React.MouseEvent) => {
+  // Pointer move - kontynuuj rysowanie kształtu
+  const handlePointerMove = (e: React.PointerEvent) => {
+    gestures.handlePointerMove(e);
+    if (gestures.isGestureActive()) return;
+
     if (!isDrawing || !currentShape) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
@@ -120,44 +152,16 @@ export function ShapeTool({
     });
   };
 
-  // Mouse up - zakończ rysowanie kształtu
-  const handleMouseUp = () => {
+  // Pointer up - zakończ rysowanie kształtu
+  const handlePointerUp = (e: React.PointerEvent) => {
+    gestures.handlePointerUp(e);
+
     if (isDrawing && currentShape) {
       onShapeCreate(currentShape);
     }
 
     setIsDrawing(false);
     setCurrentShape(null);
-  };
-
-  // Touch events - obsługa dotykowa
-  const handleTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseDown(mouseEvent);
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    e.preventDefault();
-    if (e.touches.length === 1) {
-      const touch = e.touches[0];
-      const mouseEvent = {
-        clientX: touch.clientX,
-        clientY: touch.clientY,
-      } as React.MouseEvent;
-      handleMouseMove(mouseEvent);
-    }
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleMouseUp();
   };
 
   // Render preview shape (rysowanie w trakcie)
@@ -316,17 +320,15 @@ export function ShapeTool({
 
   return (
     <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      {/* Overlay dla mouse events */}
+      {/* Overlay dla pointer events */}
       <div
+        ref={overlayRef}
         className="absolute inset-0 pointer-events-auto z-30"
         style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
       />
 

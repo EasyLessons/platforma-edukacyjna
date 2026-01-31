@@ -60,3 +60,21 @@ class UserSearchResult(BaseModel):
     
     class Config:
         from_attributes = True
+
+# === PASSWORD RESET SCHEMAS ===
+
+class RequestPasswordReset(BaseModel):
+    """Schema dla żądania resetu hasła"""
+    email: EmailStr
+
+class VerifyPasswordResetCode(BaseModel):
+    """Schema dla weryfikacji kodu resetowania hasła"""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+
+class ResetPassword(BaseModel):
+    """Schema dla resetu hasła"""
+    email: EmailStr
+    code: str = Field(..., min_length=6, max_length=6)
+    password: str = Field(..., min_length=8, max_length=72)
+    password_confirm: str = Field(..., min_length=8, max_length=72)

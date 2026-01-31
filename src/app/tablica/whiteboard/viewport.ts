@@ -230,3 +230,58 @@ export function zoomViewport(
 export function constrainViewport(viewport: ViewportTransform): ViewportTransform {
   return viewport;
 }
+
+/**
+ * 🆕 VIEWPORT CULLING - sprawdza czy element jest widoczny w viewport
+ * Zwraca true jeśli element (lub jego część) jest w widocznym obszarze
+ * 
+ * OPTYMALIZACJA: Elementy poza ekranem nie są renderowane
+ * 
+ * @param elementX - pozycja X elementu (world coords)
+ * @param elementY - pozycja Y elementu (world coords)  
+ * @param elementWidth - szerokość elementu (world coords)
+ * @param elementHeight - wysokość elementu (world coords)
+ * @param viewport - aktualny viewport
+ * @param canvasWidth - szerokość canvas w px
+ * @param canvasHeight - wysokość canvas w px
+ * @param margin - margines w px (domyślnie 100) - elementy tuż za ekranem są renderowane
+ */
+export function isElementInViewport(
+  elementX: number,
+  elementY: number,
+  elementWidth: number,
+  elementHeight: number,
+  viewport: ViewportTransform,
+  canvasWidth: number,
+  canvasHeight: number,
+  margin: number = 100
+): boolean {
+  // Transformuj rogi elementu do screen coordinates
+  const topLeft = transformPoint(
+    { x: elementX, y: elementY },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
+  
+  const bottomRight = transformPoint(
+    { x: elementX + elementWidth, y: elementY + elementHeight },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
+  
+  // Sprawdź czy prostokąt elementu przecina się z prostokątem ekranu (+ margines)
+  const screenLeft = -margin;
+  const screenTop = -margin;
+  const screenRight = canvasWidth + margin;
+  const screenBottom = canvasHeight + margin;
+  
+  // Jeśli element jest całkowicie poza ekranem - zwróć false
+  if (bottomRight.x < screenLeft) return false;  // Element całkowicie po lewej
+  if (topLeft.x > screenRight) return false;     // Element całkowicie po prawej
+  if (bottomRight.y < screenTop) return false;   // Element całkowicie powyżej
+  if (topLeft.y > screenBottom) return false;    // Element całkowicie poniżej
+  
+  return true;
+}

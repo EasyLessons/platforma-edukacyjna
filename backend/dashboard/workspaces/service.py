@@ -32,7 +32,7 @@ from core.models import Workspace, WorkspaceMember, Board, User, WorkspaceInvite
 from core.config import get_settings
 
 # Importy schematów Pydantic
-from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, InviteCreate, InviteResponse, PendingInviteResponse
+from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, InviteCreate, InviteResponse, PendingInviteResponse, WorkspaceMemberResponse, WorkspaceMembersListResponse, UpdateMemberRoleRequest
 
 from dashboard.workspaces.utils import send_workspace_invite_email
 
@@ -557,6 +557,305 @@ def leave_workspace(db: Session, workspace_id: int, user_id: int) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════
+# 👥 POBIERANIE CZŁONKÓW WORKSPACE'A
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_workspace_members(db: Session, workspace_id: int, user_id: int) -> WorkspaceMembersListResponse:
+    """
+    Pobiera listę wszystkich członków workspace'a
+    
+    BEZPIECZEŃSTWO:
+    Tylko członek workspace'a może zobaczyć innych członków
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - workspace_id: ID workspace'a
+    - user_id: ID użytkownika który wykonuje zapytanie
+    
+    ZWRACA:
+    WorkspaceMembersListResponse z listą członków
+    
+    BŁĘDY:
+    - 404: Workspace nie istnieje lub użytkownik nie ma dostępu
+    """
+    
+    # Sprawdź czy workspace istnieje
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace nie został znaleziony"
+        )
+    
+    # Sprawdź czy użytkownik jest członkiem
+    user_membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id
+        )
+        .first()
+    )
+    
+    if not user_membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie masz dostępu do tego workspace'a"
+        )
+    
+    # Pobierz wszystkich członków z danymi użytkownika
+    memberships = (
+        db.query(WorkspaceMember)
+        .options(joinedload(WorkspaceMember.user))
+        .filter(WorkspaceMember.workspace_id == workspace_id)
+        .order_by(WorkspaceMember.joined_at.asc())
+        .all()
+    )
+    
+    # Przygotuj odpowiedź
+    members = []
+    for membership in memberships:
+        is_owner = workspace.created_by == membership.user_id
+        members.append(WorkspaceMemberResponse(
+            id=membership.id,
+            user_id=membership.user.id,
+            username=membership.user.username,
+            email=membership.user.email,
+            full_name=membership.user.full_name,
+            role="owner" if is_owner else membership.role,
+            joined_at=membership.joined_at,
+            is_owner=is_owner
+        ))
+    
+    return WorkspaceMembersListResponse(
+        members=members,
+        total=len(members)
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🗑️ USUWANIE CZŁONKA Z WORKSPACE'A
+# ═══════════════════════════════════════════════════════════════════════════
+
+def remove_workspace_member(db: Session, workspace_id: int, member_user_id: int, current_user_id: int) -> dict:
+    """
+    Usuwa członka z workspace'a
+    
+    BEZPIECZEŃSTWO:
+    - Tylko OWNER może usuwać członków
+    - Owner nie może usunąć samego siebie (musi usunąć cały workspace)
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - workspace_id: ID workspace'a
+    - member_user_id: ID użytkownika do usunięcia
+    - current_user_id: ID użytkownika wykonującego akcję (musi być owner)
+    
+    ZWRACA:
+    {"message": "Członek został usunięty z workspace'a"}
+    
+    BŁĘDY:
+    - 404: Workspace lub członek nie istnieje
+    - 403: Brak uprawnień (nie jesteś ownerem)
+    - 400: Nie można usunąć właściciela
+    """
+    
+    # Sprawdź czy workspace istnieje
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace nie został znaleziony"
+        )
+    
+    # Sprawdź czy użytkownik jest właścicielem
+    if workspace.created_by != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tylko właściciel może usuwać członków"
+        )
+    
+    # Nie można usunąć właściciela
+    if member_user_id == workspace.created_by:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie można usunąć właściciela workspace'a"
+        )
+    
+    # Znajdź członkostwo
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == member_user_id
+        )
+        .first()
+    )
+    
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Użytkownik nie jest członkiem tego workspace'a"
+        )
+    
+    # Pobierz nazwę użytkownika przed usunięciem (do wiadomości)
+    user = db.query(User).filter(User.id == member_user_id).first()
+    username = user.username if user else "Użytkownik"
+    
+    # Usuń członkostwo
+    db.delete(membership)
+    db.commit()
+    
+    return {
+        "message": f"Użytkownik {username} został usunięty z workspace'a"
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 🔐 ZMIANA ROLI CZŁONKA WORKSPACE'A
+# ═══════════════════════════════════════════════════════════════════════════
+
+def update_member_role(db: Session, workspace_id: int, member_user_id: int, new_role: str, current_user_id: int) -> dict:
+    """
+    Zmienia rolę członka workspace'a
+    
+    BEZPIECZEŃSTWO:
+    - Tylko OWNER może zmieniać role
+    - Nie można zmienić roli samemu sobie (właściciel zawsze owner)
+    - Możliwe role: "owner", "editor", "viewer"
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - workspace_id: ID workspace'a
+    - member_user_id: ID użytkownika którego rolę zmieniamy
+    - new_role: Nowa rola ("owner", "editor", "viewer")
+    - current_user_id: ID użytkownika wykonującego akcję (musi być owner)
+    
+    ZWRACA:
+    {"message": "Rola została zmieniona", "new_role": "editor"}
+    
+    BŁĘDY:
+    - 404: Workspace lub członek nie istnieje
+    - 403: Brak uprawnień (nie jesteś ownerem)
+    - 400: Nie można zmienić własnej roli / nieprawidłowa rola
+    """
+    
+    # Walidacja roli
+    valid_roles = ["owner", "editor", "viewer"]
+    if new_role not in valid_roles:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Nieprawidłowa rola. Dozwolone: {', '.join(valid_roles)}"
+        )
+    
+    # Sprawdź czy workspace istnieje
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace nie został znaleziony"
+        )
+    
+    # Sprawdź czy użytkownik jest właścicielem
+    if workspace.created_by != current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tylko właściciel może zmieniać role członków"
+        )
+    
+    # Nie można zmienić roli sobie
+    if member_user_id == current_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Nie możesz zmienić własnej roli"
+        )
+    
+    # Znajdź członkostwo
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == member_user_id
+        )
+        .first()
+    )
+    
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Użytkownik nie jest członkiem tego workspace'a"
+        )
+    
+    # Pobierz nazwę użytkownika (do wiadomości)
+    user = db.query(User).filter(User.id == member_user_id).first()
+    username = user.username if user else "Użytkownik"
+    
+    # Zmień rolę
+    old_role = membership.role
+    membership.role = new_role
+    db.commit()
+    
+    return {
+        "message": f"Zmieniono rolę użytkownika {username} z '{old_role}' na '{new_role}'",
+        "new_role": new_role,
+        "user_id": member_user_id
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 📋 POBIERANIE WŁASNEJ ROLI W WORKSPACE
+# ═══════════════════════════════════════════════════════════════════════════
+
+def get_user_role_in_workspace(db: Session, workspace_id: int, user_id: int) -> dict:
+    """
+    Pobiera rolę użytkownika w workspace'ie
+    
+    PARAMETRY:
+    - db: Sesja bazy danych
+    - workspace_id: ID workspace'a
+    - user_id: ID użytkownika
+    
+    ZWRACA:
+    {"role": "editor", "is_owner": false}
+    
+    BŁĘDY:
+    - 404: Nie jesteś członkiem tego workspace'a
+    """
+    
+    # Sprawdź czy workspace istnieje
+    workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Workspace nie został znaleziony"
+        )
+    
+    # Znajdź członkostwo
+    membership = (
+        db.query(WorkspaceMember)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == user_id
+        )
+        .first()
+    )
+    
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Nie jesteś członkiem tego workspace'a"
+        )
+    
+    is_owner = workspace.created_by == user_id
+    
+    return {
+        "role": "owner" if is_owner else membership.role,
+        "is_owner": is_owner,
+        "workspace_id": workspace_id
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════
 # Utowrzenie zaproszenia do workspace'a
 # ═══════════════════════════════════════════════════════════════════════════
 
@@ -789,7 +1088,7 @@ def accept_invite(db: Session, invite_token: str, user_id: int) -> dict:
         new_member = WorkspaceMember(
             workspace_id=invite.workspace_id,
             user_id=user_id,
-            role="member",
+            role="editor",  # Nowi członkowie domyślnie z prawem edycji
             is_favourite=False,
             joined_at=datetime.utcnow()
         )

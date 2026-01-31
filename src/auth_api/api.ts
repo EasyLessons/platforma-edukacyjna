@@ -48,6 +48,23 @@ export interface UserSearchResult {
   full_name?: string;
 }
 
+// Password reset types
+export interface RequestPasswordResetData {
+  email: string;
+}
+
+export interface VerifyResetCodeData {
+  email: string;
+  code: string;
+}
+
+export interface ResetPasswordData {
+  email: string;
+  code: string;
+  password: string;
+  password_confirm: string;
+}
+
 // Helper do obsługi błędów
 const handleResponse = async (response: Response) => {
   const data = await response.json().catch(() => ({}));
@@ -270,4 +287,52 @@ export const checkUserInviteStatus = async (
   }
   
   return response.json();
+};
+
+
+// === PASSWORD RESET API ===
+
+/**
+ * Wysyła żądanie resetu hasła - kod na email
+ */
+export const requestPasswordReset = async (data: RequestPasswordResetData): Promise<{ message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/request-password-reset`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  return handleResponse(response);
+};
+
+/**
+ * Weryfikuje kod resetowania hasła
+ */
+export const verifyResetCode = async (data: VerifyResetCodeData): Promise<{ message: string; valid: boolean }> => {
+  const response = await fetch(`${API_BASE_URL}/api/verify-reset-code`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  return handleResponse(response);
+};
+
+/**
+ * Resetuje hasło użytkownika
+ */
+export const resetPassword = async (data: ResetPasswordData): Promise<{ message: string }> => {
+  const response = await fetch(`${API_BASE_URL}/api/reset-password`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  
+  return handleResponse(response);
 };

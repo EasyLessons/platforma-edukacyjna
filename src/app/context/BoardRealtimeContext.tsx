@@ -54,6 +54,9 @@ interface OnlineUser {
   online_at: string
   cursor_x?: number // Opcjonalnie: pozycja kursora
   cursor_y?: number
+  viewport_x?: number // 🆕 Viewport pozycja
+  viewport_y?: number
+  viewport_scale?: number
 }
 
 /**
@@ -69,6 +72,27 @@ export interface RemoteCursor {
 }
 
 /**
+ * 🆕 Użytkownik który obecnie edytuje element
+ */
+export interface TypingUser {
+  userId: number
+  username: string
+  elementId: string
+}
+
+/**
+ * 🆕 Viewport innego użytkownika (dla Follow Mode)
+ */
+export interface RemoteViewport {
+  userId: number
+  username: string
+  x: number
+  y: number
+  scale: number
+  lastUpdate: number
+}
+
+/**
  * Typy eventów synchronizacji
  */
 type BoardEvent =
@@ -77,6 +101,9 @@ type BoardEvent =
   | { type: 'element-deleted'; elementId: string; userId: number; username: string }
   | { type: 'elements-batch'; elements: DrawingElement[]; userId: number; username: string }
   | { type: 'cursor-moved'; x: number; y: number; userId: number; username: string }
+  | { type: 'typing-started'; elementId: string; userId: number; username: string }
+  | { type: 'typing-stopped'; elementId: string; userId: number; username: string }
+  | { type: 'viewport-changed'; x: number; y: number; scale: number; userId: number; username: string }
 
 /**
  * Context Type
@@ -86,8 +113,8 @@ interface BoardRealtimeContextType {
   onlineUsers: OnlineUser[]
   isConnected: boolean
   
-  // 🆕 Kursory innych użytkowników
-  remoteCursors: RemoteCursor[]
+  // 🆕 Subskrypcja kursorów (nie powoduje re-renderów context!)
+  subscribeCursors: (callback: (cursors: RemoteCursor[]) => void) => () => void
   
   // Synchronizacja elementów
   broadcastElementCreated: (element: DrawingElement) => Promise<void>
@@ -97,6 +124,15 @@ interface BoardRealtimeContextType {
   
   // Kursor
   broadcastCursorMove: (x: number, y: number) => Promise<void>
+  
+  // 🆕 Typing indicator
+  broadcastTypingStarted: (elementId: string) => Promise<void>
+  broadcastTypingStopped: (elementId: string) => Promise<void>
+  subscribeTyping: (callback: (typingUsers: TypingUser[]) => void) => () => void
+  
+  // 🆕 Viewport tracking (dla Follow Mode)
+  broadcastViewportChange: (x: number, y: number, scale: number) => Promise<void>
+  subscribeViewports: (callback: (viewports: RemoteViewport[]) => void) => () => void
   
   // Handlery dla przychodzących eventów
   onRemoteElementCreated: (handler: (element: DrawingElement, userId: number, username: string) => void) => void
@@ -141,13 +177,61 @@ export function BoardRealtimeProvider({
   
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([])
   const [isConnected, setIsConnected] = useState(false)
-  const [remoteCursors, setRemoteCursors] = useState<RemoteCursor[]>([])
+  
+  // 🆕 KURSORY - używamy ref + subscribers zamiast state
+  // To zapobiega re-renderom WhiteboardCanvas przy każdym ruchu kursora
+  const remoteCursorsRef = useRef<RemoteCursor[]>([])
+  const cursorSubscribersRef = useRef<Set<(cursors: RemoteCursor[]) => void>>(new Set())
+  
+  // 🆕 TYPING INDICATOR - ref + subscribers
+  const typingUsersRef = useRef<TypingUser[]>([])
+  const typingSubscribersRef = useRef<Set<(typing: TypingUser[]) => void>>(new Set())
+  
+  // 🆕 VIEWPORT TRACKING - ref + subscribers (dla Follow Mode)
+  const remoteViewportsRef = useRef<RemoteViewport[]>([])
+  const viewportSubscribersRef = useRef<Set<(viewports: RemoteViewport[]) => void>>(new Set())
+  
   const channelRef = useRef<RealtimeChannel | null>(null)
   
   const { user } = useAuth()
   
   // Kolory dla kursorów (cyklicznie przydzielane)
   const cursorColors = useRef(['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F'])
+  
+  // 🛡️ THROTTLE - Ref do przechowywania ostatnich czasów broadcast
+  const lastBroadcastTimeRef = useRef({
+    elementUpdate: 0,
+    cursorMove: 0,
+    viewportChange: 0
+  })
+  
+  // 🛡️ THROTTLE - Limity częstotliwości (w ms)
+  const THROTTLE_MS = {
+    ELEMENT_UPDATE: 100,    // Max 10 updates/s podczas operacji
+    CURSOR_MOVE: 50,        // Max 20 pozycji kursora/s
+    VIEWPORT_CHANGE: 200    // Max 5 viewport updates/s
+  }
+  
+  // Funkcja do notyfikacji subscriberów o zmianie kursorów
+  const notifyCursorSubscribers = useCallback(() => {
+    cursorSubscribersRef.current.forEach(callback => {
+      callback(remoteCursorsRef.current)
+    })
+  }, [])
+  
+  // 🆕 Funkcja do notyfikacji subscriberów o zmianie typing
+  const notifyTypingSubscribers = useCallback(() => {
+    typingSubscribersRef.current.forEach(callback => {
+      callback(typingUsersRef.current)
+    })
+  }, [])
+  
+  // 🆕 Funkcja do notyfikacji subscriberów o zmianie viewportów
+  const notifyViewportSubscribers = useCallback(() => {
+    viewportSubscribersRef.current.forEach(callback => {
+      callback(remoteViewportsRef.current)
+    })
+  }, [])
   
   // Handlery dla eventów (refs żeby uniknąć re-renderów)
   const elementCreatedHandlerRef = useRef<((element: DrawingElement, userId: number, username: string) => void) | null>(null)
@@ -204,7 +288,8 @@ export function BoardRealtimeProvider({
         console.log('🔴 Użytkownik wyszedł:', leftPresences)
         // Usuń kursory użytkowników którzy wyszli
         const leftUserIds = leftPresences.map((p: any) => p.user_id)
-        setRemoteCursors(prev => prev.filter(c => !leftUserIds.includes(c.userId)))
+        remoteCursorsRef.current = remoteCursorsRef.current.filter(c => !leftUserIds.includes(c.userId))
+        notifyCursorSubscribers()
       })
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -218,7 +303,7 @@ export function BoardRealtimeProvider({
         // Ignoruj własne eventy (już mamy lokalnie)
         if (userId === user.id) return
         
-        console.log(`📥 Otrzymano element-created od ${username}:`, element.id)
+        console.log(`📥 Otrzymano element-created od ${username}:`, element.id, `(typ: ${element.type})`)
         
         // Wywołaj handler (jeśli zarejestrowany)
         if (elementCreatedHandlerRef.current) {
@@ -263,25 +348,80 @@ export function BoardRealtimeProvider({
         
         if (userId === user.id) return
         
-        // Automatycznie aktualizuj remote cursors
-        setRemoteCursors(prev => {
-          const existing = prev.find(c => c.userId === userId)
-          const color = existing?.color || cursorColors.current[userId % cursorColors.current.length]
-          
-          if (existing) {
-            return prev.map(c => 
-              c.userId === userId 
-                ? { ...c, x, y, lastUpdate: Date.now() }
-                : c
-            )
-          } else {
-            return [...prev, { userId, username, x, y, color, lastUpdate: Date.now() }]
-          }
-        })
+        // Automatycznie aktualizuj remote cursors (używamy ref zamiast state!)
+        const prev = remoteCursorsRef.current
+        const existing = prev.find(c => c.userId === userId)
+        const color = existing?.color || cursorColors.current[userId % cursorColors.current.length]
+        
+        if (existing) {
+          remoteCursorsRef.current = prev.map(c => 
+            c.userId === userId 
+              ? { ...c, x, y, lastUpdate: Date.now() }
+              : c
+          )
+        } else {
+          remoteCursorsRef.current = [...prev, { userId, username, x, y, color, lastUpdate: Date.now() }]
+        }
+        
+        // Notyfikuj subscriberów (nie powoduje re-rendera context!)
+        notifyCursorSubscribers()
         
         if (cursorMoveHandlerRef.current) {
           cursorMoveHandlerRef.current(x, y, userId, username)
         }
+      })
+      // 🆕 TYPING INDICATOR - ktoś zaczął edytować
+      .on('broadcast', { event: 'typing-started' }, ({ payload }) => {
+        const { elementId, userId, username } = payload as BoardEvent & { type: 'typing-started' }
+        
+        console.log(`✏️ [TYPING] ${username} zaczął edytować element ${elementId}`)
+        
+        if (userId === user.id) return
+        
+        // Dodaj do listy (jeśli jeszcze nie ma)
+        const exists = typingUsersRef.current.some(t => t.userId === userId && t.elementId === elementId)
+        if (!exists) {
+          typingUsersRef.current = [...typingUsersRef.current, { userId, username, elementId }]
+          console.log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current)
+          notifyTypingSubscribers()
+        }
+      })
+      // 🆕 TYPING INDICATOR - ktoś skończył edytować
+      .on('broadcast', { event: 'typing-stopped' }, ({ payload }) => {
+        const { elementId, userId } = payload as BoardEvent & { type: 'typing-stopped' }
+        
+        console.log(`✏️ [TYPING] User ${userId} skończył edytować element ${elementId}`)
+        
+        if (userId === user.id) return
+        
+        // Usuń z listy
+        typingUsersRef.current = typingUsersRef.current.filter(
+          t => !(t.userId === userId && t.elementId === elementId)
+        )
+        console.log(`✏️ [TYPING] Aktualna lista po usunięciu:`, typingUsersRef.current)
+        notifyTypingSubscribers()
+      })
+      // 🆕 VIEWPORT CHANGED - ktoś zmienił swój viewport (dla Follow Mode)
+      .on('broadcast', { event: 'viewport-changed' }, ({ payload }) => {
+        const { x, y, scale, userId, username } = payload as BoardEvent & { type: 'viewport-changed' }
+        
+        if (userId === user.id) return
+        
+        // Aktualizuj lub dodaj viewport użytkownika
+        const prev = remoteViewportsRef.current
+        const existing = prev.find(v => v.userId === userId)
+        
+        if (existing) {
+          remoteViewportsRef.current = prev.map(v => 
+            v.userId === userId 
+              ? { ...v, x, y, scale, lastUpdate: Date.now() }
+              : v
+          )
+        } else {
+          remoteViewportsRef.current = [...prev, { userId, username, x, y, scale, lastUpdate: Date.now() }]
+        }
+        
+        notifyViewportSubscribers()
       })
     
     // ═══════════════════════════════════════════════════════════════════════
@@ -295,19 +435,33 @@ export function BoardRealtimeProvider({
         setIsConnected(true)
         console.log('✅ Połączono z kanałem tablicy')
         
-        // Wyślij swoją obecność (Presence)
-        const trackPresence = async () => {
-          await channel.track({
+        // Wyślij swoją obecność (Presence) z viewport
+        const trackPresence = async (viewport?: { x: number; y: number; scale: number }) => {
+          const presenceData: any = {
             user_id: user.id,
             username: user.username,
             online_at: new Date().toISOString()
-          })
+          }
+          
+          // Dodaj viewport jeśli jest dostępny
+          if (viewport) {
+            presenceData.viewport_x = viewport.x
+            presenceData.viewport_y = viewport.y
+            presenceData.viewport_scale = viewport.scale
+          }
+          
+          await channel.track(presenceData)
         }
         
         await trackPresence()
         
+        // Funkcja do update viewport (może być wywołana z zewnątrz)
+        ;(window as any).__updateViewportPresence = (x: number, y: number, scale: number) => {
+          trackPresence({ x, y, scale })
+        }
+        
         // Heartbeat co 15 sekund żeby utrzymać obecność
-        presenceHeartbeat = setInterval(trackPresence, 15000)
+        presenceHeartbeat = setInterval(() => trackPresence(), 15000)
       } else if (status === 'CHANNEL_ERROR') {
         setIsConnected(false)
         console.error('❌ Błąd połączenia z kanałem')
@@ -341,9 +495,10 @@ export function BoardRealtimeProvider({
       channel.unsubscribe()
       // clearInterval(cursorCleanupInterval)
       setIsConnected(false)
-      setRemoteCursors([])
+      remoteCursorsRef.current = []
+      notifyCursorSubscribers()
     }
-  }, [boardId, user])
+  }, [boardId, user, notifyCursorSubscribers])
   
   // ───────────────────────────────────────────────────────────────────────
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
@@ -365,6 +520,15 @@ export function BoardRealtimeProvider({
   
   const broadcastElementUpdated = useCallback(async (element: DrawingElement) => {
     if (!channelRef.current || !user) return
+    
+    // 🛡️ THROTTLE: sprawdź czy minęło wystarczająco czasu od ostatniego broadcast
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.elementUpdate < THROTTLE_MS.ELEMENT_UPDATE) {
+      // console.log('⏱️ Throttle: Pomijam element-updated (zbyt szybko)');
+      return // Zbyt szybko - pomiń ten update
+    }
+    
+    lastBroadcastTimeRef.current.elementUpdate = now
     
     await channelRef.current.send({
       type: 'broadcast',
@@ -408,6 +572,14 @@ export function BoardRealtimeProvider({
   const broadcastCursorMove = useCallback(async (x: number, y: number) => {
     if (!channelRef.current || !user) return
     
+    // 🛡️ THROTTLE: ograniczenie częstotliwości kursorów
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.cursorMove < THROTTLE_MS.CURSOR_MOVE) {
+      return // Zbyt szybko - pomiń
+    }
+    
+    lastBroadcastTimeRef.current.cursorMove = now
+    
     await channelRef.current.send({
       type: 'broadcast',
       event: 'cursor-moved',
@@ -444,6 +616,118 @@ export function BoardRealtimeProvider({
     cursorMoveHandlerRef.current = handler
   }, [])
   
+  // 🆕 SUBSKRYPCJA KURSORÓW - nie powoduje re-renderów context!
+  const subscribeCursors = useCallback((callback: (cursors: RemoteCursor[]) => void) => {
+    // Dodaj subscriber
+    cursorSubscribersRef.current.add(callback)
+    
+    // Od razu wywołaj z aktualnym stanem
+    callback(remoteCursorsRef.current)
+    
+    // Zwróć funkcję do anulowania subskrypcji
+    return () => {
+      cursorSubscribersRef.current.delete(callback)
+    }
+  }, [])
+  
+  // ───────────────────────────────────────────────────────────────────────
+  // 🆕 TYPING INDICATOR FUNCTIONS
+  // ───────────────────────────────────────────────────────────────────────
+  
+  const broadcastTypingStarted = useCallback(async (elementId: string) => {
+    if (!channelRef.current || !user) {
+      console.log(`⚠️ [TYPING] Nie można wysłać typing-started - brak kanału lub użytkownika`)
+      return
+    }
+    
+    console.log(`📤 [TYPING] Wysyłam typing-started dla elementu ${elementId}`)
+    
+    await channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing-started',
+      payload: {
+        elementId,
+        userId: user.id,
+        username: user.username
+      }
+    })
+  }, [user])
+  
+  const broadcastTypingStopped = useCallback(async (elementId: string) => {
+    if (!channelRef.current || !user) {
+      console.log(`⚠️ [TYPING] Nie można wysłać typing-stopped - brak kanału lub użytkownika`)
+      return
+    }
+    
+    console.log(`📤 [TYPING] Wysyłam typing-stopped dla elementu ${elementId}`)
+    
+    await channelRef.current.send({
+      type: 'broadcast',
+      event: 'typing-stopped',
+      payload: {
+        elementId,
+        userId: user.id,
+        username: user.username
+      }
+    })
+  }, [user])
+  
+  // 🆕 SUBSKRYPCJA TYPING - dla komponentów które chcą wiedzieć kto edytuje
+  const subscribeTyping = useCallback((callback: (typingUsers: TypingUser[]) => void) => {
+    // Dodaj subscriber
+    typingSubscribersRef.current.add(callback)
+    
+    // Od razu wywołaj z aktualnym stanem
+    callback(typingUsersRef.current)
+    
+    // Zwróć funkcję do anulowania subskrypcji
+    return () => {
+      typingSubscribersRef.current.delete(callback)
+    }
+  }, [])
+  
+  // ───────────────────────────────────────────────────────────────────────
+  // 🆕 VIEWPORT TRACKING FUNCTIONS (dla Follow Mode)
+  // ───────────────────────────────────────────────────────────────────────
+  
+  const broadcastViewportChange = useCallback(async (x: number, y: number, scale: number) => {
+    if (!channelRef.current || !user) return
+    
+    // 🛡️ THROTTLE: ograniczenie częstotliwości viewport updates
+    const now = Date.now()
+    if (now - lastBroadcastTimeRef.current.viewportChange < THROTTLE_MS.VIEWPORT_CHANGE) {
+      return // Zbyt szybko - pomiń
+    }
+    
+    lastBroadcastTimeRef.current.viewportChange = now
+    
+    await channelRef.current.send({
+      type: 'broadcast',
+      event: 'viewport-changed',
+      payload: {
+        x,
+        y,
+        scale,
+        userId: user.id,
+        username: user.username
+      }
+    })
+  }, [user])
+  
+  // 🆕 SUBSKRYPCJA VIEWPORTÓW - dla Follow Mode
+  const subscribeViewports = useCallback((callback: (viewports: RemoteViewport[]) => void) => {
+    // Dodaj subscriber
+    viewportSubscribersRef.current.add(callback)
+    
+    // Od razu wywołaj z aktualnym stanem
+    callback(remoteViewportsRef.current)
+    
+    // Zwróć funkcję do anulowania subskrypcji
+    return () => {
+      viewportSubscribersRef.current.delete(callback)
+    }
+  }, [])
+  
   // ───────────────────────────────────────────────────────────────────────
   // PROVIDER
   // ───────────────────────────────────────────────────────────────────────
@@ -453,12 +737,17 @@ export function BoardRealtimeProvider({
       value={{
         onlineUsers,
         isConnected,
-        remoteCursors,
+        subscribeCursors,
+        subscribeTyping,
+        subscribeViewports,
         broadcastElementCreated,
         broadcastElementUpdated,
         broadcastElementDeleted,
         broadcastElementsBatch,
         broadcastCursorMove,
+        broadcastTypingStarted,
+        broadcastTypingStopped,
+        broadcastViewportChange,
         onRemoteElementCreated,
         onRemoteElementUpdated,
         onRemoteElementDeleted,

@@ -229,7 +229,88 @@ export const createBoard = async (data: BoardCreate): Promise<Board> => {
 
 /**
  * ───────────────────────────────────────────────────────────────────────────
- * 🗑️ USUWANIE TABLICY
+ * � POBIERANIE POJEDYNCZEJ TABLICY
+ * ───────────────────────────────────────────────────────────────────────────
+ * 
+ * Pobiera szczegóły pojedynczej tablicy po ID
+ * 
+ * ENDPOINT:
+ * GET /api/boards/{boardId}
+ * 
+ * WYMAGANIA:
+ * - Użytkownik MUSI być zalogowany (opcjonalne dla demo-board)
+ * 
+ * PARAMETRY:
+ * - boardId: ID tablicy (number) lub "demo-board"
+ * 
+ * ZWRACA:
+ * Board (pełne dane tablicy) lub null jeśli nie znaleziono
+ * 
+ * PRZYKŁAD UŻYCIA:
+ * const board = await fetchBoardById(1);
+ * console.log(`Nazwa tablicy: ${board?.name}`);
+ */
+export const fetchBoardById = async (boardId: string | number): Promise<Board | null> => {
+  // Demo board - zwróć mock data
+  if (boardId === 'demo-board') {
+    return {
+      id: 0,
+      name: 'Demo Tablica',
+      icon: 'PenTool',
+      bg_color: 'bg-blue-500',
+      workspace_id: 0,
+      owner_id: 0,
+      owner_username: 'Demo',
+      is_favourite: false,
+      last_modified: new Date().toISOString(),
+      last_modified_by: null,
+      last_opened: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      created_by: 'Demo'
+    };
+  }
+
+  const token = getToken();
+  
+  if (!token) {
+    console.warn('Brak tokenu - nie można pobrać tablicy');
+    return null;
+  }
+  
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/boards/${boardId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      // Dodaj timeout i retry policy
+      signal: AbortSignal.timeout(10000) // 10s timeout
+    });
+    
+    if (!response.ok) {
+      console.warn(`❌ Board fetch failed with status ${response.status}`);
+      return null;
+    }
+    
+    return handleResponse(response);
+  } catch (error) {
+    // Loguj dokładniejszy błąd
+    if (error instanceof Error) {
+      console.error('❌ Error fetching board:', error.message);
+      if (error.name === 'AbortError') {
+        console.error('⏱️ Request timed out after 10s');
+      }
+    } else {
+      console.error('❌ Error fetching board:', error);
+    }
+    return null;
+  }
+};
+
+/**
+ * ───────────────────────────────────────────────────────────────────────────
+ * �🗑️ USUWANIE TABLICY
  * ───────────────────────────────────────────────────────────────────────────
  * 
  * Usuwa tablicę
@@ -421,6 +502,15 @@ export interface BoardElement {
 }
 
 /**
+ * Element tablicy z informacją o autorze (z API GET /elements)
+ */
+export interface BoardElementWithAuthor extends BoardElement {
+  created_by_id: number | null;
+  created_by_username: string | null;
+  created_at: string | null;
+}
+
+/**
  * ───────────────────────────────────────────────────────────────────────────
  * 💾 ZAPIS BATCH - Zapisz wiele elementów naraz
  * ───────────────────────────────────────────────────────────────────────────
@@ -509,7 +599,7 @@ export const saveBoardElementsBatch = async (
  * 
  * ZWRACA:
  * {
- *   elements: BoardElement[]
+ *   elements: BoardElementWithAuthor[]
  * }
  * 
  * FILTROWANIE:
@@ -528,7 +618,7 @@ export const saveBoardElementsBatch = async (
  */
 export const loadBoardElements = async (
   boardId: number
-): Promise<{ elements: BoardElement[] }> => {
+): Promise<{ elements: BoardElementWithAuthor[] }> => {
   const token = getToken();
   if (!token) throw new Error('Brak autoryzacji');
   

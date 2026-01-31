@@ -26,12 +26,12 @@
 
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
   Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
   Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon,
-  StickyNote, Table, Calculator, MessageCircle
+  StickyNote, Table, Calculator, MessageCircle, FileText, MoreVertical
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -58,6 +58,9 @@ interface ToolbarUIProps {
   // Selection state
   hasSelection?: boolean;
   
+  // 🔒 Read-only mode
+  isReadOnly?: boolean;
+  
   // Handlers
   onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
@@ -75,13 +78,11 @@ interface ToolbarUIProps {
   onExport?: () => void;
   onImport?: () => void;
   
-  // Mobile state
-  isMobileMenuOpen: boolean;
-  setIsMobileMenuOpen: (open: boolean) => void;
-  
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
+  // 📄 PDFTool handlers
+  onPDFUpload?: () => void;
 }
 
 const ToolButton = ({
@@ -140,13 +141,36 @@ export function ToolbarUI({
   onDeleteSelected,
   onExport,
   onImport,
-  isMobileMenuOpen,
-  setIsMobileMenuOpen,
   onImagePaste,
   onImageUpload,
+  onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
+  isReadOnly = false,
 }: ToolbarUIProps) {
+  // 🆕 Wykrywanie wysokości ekranu
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  // Debug isReadOnly
+  useEffect(() => {
+    console.log('🛠️ ToolbarUI - isReadOnly:', isReadOnly, '| tool:', tool);
+  }, [isReadOnly, tool]);
+
+  useEffect(() => {
+    const updateHeight = () => setViewportHeight(window.innerHeight);
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, []);
+
+  // Określenie layoutu na podstawie wysokości
+  // Full: >= 815px - wszystko widoczne
+  // Medium: < 815px - ukryj markdown, table, import, export do menu "więcej"
+  // Mobile: < 768px (md breakpoint) - pełny modal
+  const isMediumHeight = viewportHeight < 815 && viewportHeight >= 768;
+  const isMobile = viewportHeight < 768;
+
   const getShapeIcon = () => {
     switch (selectedShape) {
       case 'circle':
@@ -169,32 +193,23 @@ export function ToolbarUI({
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
   // - eraser: brak właściwości do edycji
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image' || tool === 'pdf';
 
   return (
     <>
-      {/* MOBILE: Hamburger Menu Button */}
-      <div className="md:hidden pointer-events-auto">
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="bg-white rounded-lg shadow-lg border border-gray-200 p-3 hover:bg-gray-50 transition-colors"
-          title="Menu narzędzi"
-        >
-          <Menu className="w-7 h-7 text-gray-700" />
-        </button>
-      </div>
-
-      {/* DESKTOP: GŁÓWNY TOOLBAR - PIONOWY */}
-      <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
+      {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
+      <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
         <div className="flex flex-col items-center gap-1.5 p-2">
           
           {/* Main Tools */}
-          <ToolButton
-            icon={MousePointer2}
-            active={tool === 'select'}
-            onClick={() => onToolChange('select')}
-            title="Zaznacz (V)"
-          />
+          {!isReadOnly && (
+            <ToolButton
+              icon={MousePointer2}
+              active={tool === 'select'}
+              onClick={() => onToolChange('select')}
+              title="Zaznacz (V)"
+            />
+          )}
           <ToolButton
             icon={Hand}
             active={tool === 'pan'}
@@ -206,53 +221,73 @@ export function ToolbarUI({
             active={tool === 'pen'}
             onClick={() => onToolChange('pen')}
             title="Rysuj (P)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={Type}
             active={tool === 'text'}
             onClick={() => onToolChange('text')}
             title="Tekst (T)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={getShapeIcon()}
             active={tool === 'shape'}
             onClick={() => onToolChange('shape')}
             title="Kształty (S)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={TrendingUp}
             active={tool === 'function'}
             onClick={() => onToolChange('function')}
             title="Funkcja (F)"
+            disabled={isReadOnly}
           />
           <ToolButton
             icon={ImageIcon}
             active={tool === 'image'}
             onClick={() => onToolChange('image')}
             title="Obraz (I)"
+            disabled={isReadOnly}
           />
+          {/* PDF tool tymczasowo wyłączony  */}
+          {/* <ToolButton
+            icon={FileText}
+            active={tool === 'pdf'}
+            onClick={() => onToolChange('pdf')}
+            title="PDF (Shift+P)"
+          /> */}
           <ToolButton
             icon={Eraser}
             active={tool === 'eraser'}
             onClick={() => onToolChange('eraser')}
             title="Gumka (E)"
+            disabled={isReadOnly}
           />
 
           <Divider />
 
-          {/* Nowe narzędzia */}
-          <ToolButton
-            icon={StickyNote}
-            active={tool === 'markdown'}
-            onClick={() => onToolChange('markdown')}
-            title="Notatka Markdown (M)"
-          />
-          <ToolButton
-            icon={Table}
-            active={tool === 'table'}
-            onClick={() => onToolChange('table')}
-            title="Tabelka"
-          />
+          {/* Nowe narzędzia - UKRYTE w medium height */}
+          {!isMediumHeight && !isMobile && (
+            <>
+              <ToolButton
+                icon={StickyNote}
+                active={tool === 'markdown'}
+                onClick={() => onToolChange('markdown')}
+                title="Notatka Markdown (M)"
+                disabled={isReadOnly}
+              />
+              <ToolButton
+                icon={Table}
+                active={tool === 'table'}
+                onClick={() => onToolChange('table')}
+                title="Tabelka"
+                disabled={isReadOnly}
+              />
+            </>
+          )}
+          
           <ToolButton
             icon={Calculator}
             active={isCalculatorOpen ?? false}
@@ -263,17 +298,34 @@ export function ToolbarUI({
           <Divider />
 
           {/* History */}
-          <ToolButton icon={Undo} active={false} onClick={onUndo} title="Cofnij (Ctrl+Z)" disabled={!canUndo} />
-          <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo} />
+          <ToolButton icon={Undo} active={false} onClick={onUndo} title="Cofnij (Ctrl+Z)" disabled={!canUndo || isReadOnly} />
+          <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo || isReadOnly} />
 
-          <Divider />
-
-          {/* Export/Import */}
-          {onExport && (
-            <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" />
+          {/* Export/Import - UKRYTE w medium height */}
+          {!isMediumHeight && !isMobile && (
+            <>
+              <Divider />
+              {onExport && (
+                <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" disabled={isReadOnly} />
+              )}
+              {onImport && (
+                <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" disabled={isReadOnly} />
+              )}
+            </>
           )}
-          {onImport && (
-            <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" />
+
+          {/* 🆕 Przycisk "Więcej" - WIDOCZNY w medium height i mobile */}
+          {(isMediumHeight || isMobile) && (
+            <>
+              <Divider />
+              <ToolButton 
+                icon={MoreVertical} 
+                active={isMoreMenuOpen} 
+                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} 
+                title="Więcej narzędzi" 
+                disabled={isReadOnly}
+              />
+            </>
           )}
 
           <Divider />
@@ -284,263 +336,70 @@ export function ToolbarUI({
               icon={XIcon} 
               active={false} 
               onClick={onDeleteSelected} 
-              title="Usuń zaznaczone (Del)" 
+              title="Usuń zaznaczone (Del)"
+              disabled={isReadOnly}
             />
           )}
 
           {/* Clear */}
-          <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" />
+          <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" disabled={isReadOnly} />
         </div>
       </div>
 
-      {/* MOBILE: Full Screen Modal */}
-      {isMobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 bg-black/50 z-50 flex items-start justify-center pt-4">
-          <div className="bg-white rounded-lg shadow-xl border border-gray-200 w-[90vw] max-w-md max-h-[80vh] overflow-y-auto">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 border-b border-gray-200 sticky top-0 bg-white rounded-t-lg">
-              <h3 className="text-sm font-semibold text-gray-800">Narzędzia</h3>
-              <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 hover:bg-gray-100 rounded transition-colors">
-                <X className="w-5 h-5 text-gray-700" />
-              </button>
-            </div>
-
-            {/* Tools Grid */}
-            <div className="p-3 space-y-3">
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  onClick={() => {
-                    onToolChange('select');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'select' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <MousePointer2 className="w-5 h-5" />
-                  <span className="text-xs font-medium">Zaznacz</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('pan');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'pan' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Hand className="w-5 h-5" />
-                  <span className="text-xs font-medium">Przesuwaj</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('pen');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'pen' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <PenTool className="w-5 h-5" />
-                  <span className="text-xs font-medium">Rysuj</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('text');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'text' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Type className="w-5 h-5" />
-                  <span className="text-xs font-medium">Tekst</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('shape');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'shape' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Square className="w-5 h-5" />
-                  <span className="text-xs font-medium">Kształty</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('function');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'function' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <TrendingUp className="w-5 h-5" />
-                  <span className="text-xs font-medium">Funkcja</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('image');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'image' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <ImageIcon className="w-5 h-5" />
-                  <span className="text-xs font-medium">Obraz</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onToolChange('eraser');
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className={`p-3 rounded-lg transition-all flex flex-col items-center gap-1 ${
-                    tool === 'eraser' ? 'bg-blue-500 text-white' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <Eraser className="w-5 h-5" />
-                  <span className="text-xs font-medium">Gumka</span>
-                </button>
-              </div>
-
-              {/* Shape Selection */}
-              {tool === 'shape' && (
-                <div className="pt-2 border-t border-gray-200">
-                  <p className="text-xs font-semibold text-gray-600 mb-2">Wybierz kształt:</p>
-                  <div className="grid grid-cols-5 gap-2">
-                    <button
-                      onClick={() => onShapeChange('rectangle')}
-                      className={`p-2 rounded transition-all ${
-                        selectedShape === 'rectangle' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Square className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('circle')}
-                      className={`p-2 rounded transition-all ${
-                        selectedShape === 'circle' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Circle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('triangle')}
-                      className={`p-2 rounded transition-all ${
-                        selectedShape === 'triangle' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Triangle className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('line')}
-                      className={`p-2 rounded transition-all ${
-                        selectedShape === 'line' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <Minus className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('arrow')}
-                      className={`p-2 rounded transition-all ${
-                        selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              <div className="pt-2 border-t border-gray-200 space-y-2">
-                {/* Usuń zaznaczone - widoczne gdy coś jest zaznaczone */}
-                {hasSelection && onDeleteSelected && (
-                  <button
-                    onClick={() => {
-                      onDeleteSelected();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full p-2 rounded-lg bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors flex items-center gap-2 justify-center"
-                  >
-                    <XIcon className="w-4 h-4" />
-                    <span className="text-sm font-medium">Usuń zaznaczone</span>
-                  </button>
-                )}
-                
-                <button
-                  onClick={() => {
-                    onUndo();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  disabled={!canUndo}
-                  className="w-full p-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 justify-center"
-                >
-                  <Undo className="w-4 h-4" />
-                  <span className="text-sm font-medium">Cofnij</span>
-                </button>
-
-                <button
-                  onClick={() => {
-                    onRedo();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  disabled={!canRedo}
-                  className="w-full p-2 rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-2 justify-center"
-                >
-                  <Redo className="w-4 h-4" />
-                  <span className="text-sm font-medium">Ponów</span>
-                </button>
-
-                {/* Export/Import */}
-                {onExport && (
-                  <button
-                    onClick={() => {
-                      onExport();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full p-2 rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-100 transition-colors flex items-center gap-2 justify-center"
-                  >
-                    <Download className="w-4 h-4" />
-                    <span className="text-sm font-medium">Eksportuj tablicę</span>
-                  </button>
-                )}
-
-                {onImport && (
-                  <button
-                    onClick={() => {
-                      onImport();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="w-full p-2 rounded-lg bg-green-50 text-green-600 hover:bg-green-100 transition-colors flex items-center gap-2 justify-center"
-                  >
-                    <FolderOpen className="w-4 h-4" />
-                    <span className="text-sm font-medium">Importuj tablicę</span>
-                  </button>
-                )}
-
-                <button
-                  onClick={() => {
-                    onClear();
-                    setIsMobileMenuOpen(false);
-                  }}
-                  className="w-full p-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 transition-colors flex items-center gap-2 justify-center"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  <span className="text-sm font-medium">Wyczyść wszystko</span>
-                </button>
-              </div>
-            </div>
+      {/* 🆕 MEDIUM HEIGHT + MOBILE: "Więcej" Menu */}
+      {(isMediumHeight || isMobile) && isMoreMenuOpen && (
+        <div className="fixed left-20 top-1/2 -translate-y-1/2 bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto z-50">
+          <div className="flex flex-col items-center gap-1.5 p-2">
+            <div className="text-xs font-semibold text-gray-600 px-2 py-1">Więcej</div>
+            <Divider />
+            
+            <ToolButton
+              icon={StickyNote}
+              active={tool === 'markdown'}
+              onClick={() => {
+                onToolChange('markdown');
+                setIsMoreMenuOpen(false);
+              }}
+              title="Notatka Markdown (M)"
+              disabled={isReadOnly}
+            />
+            <ToolButton
+              icon={Table}
+              active={tool === 'table'}
+              onClick={() => {
+                onToolChange('table');
+                setIsMoreMenuOpen(false);
+              }}
+              title="Tabelka"
+              disabled={isReadOnly}
+            />
+            
+            <Divider />
+            
+            {onExport && (
+              <ToolButton 
+                icon={Download} 
+                active={false} 
+                onClick={() => {
+                  onExport();
+                  setIsMoreMenuOpen(false);
+                }} 
+                title="Eksportuj tablicę"
+                disabled={isReadOnly}
+              />
+            )}
+            {onImport && (
+              <ToolButton 
+                icon={FolderOpen} 
+                active={false} 
+                onClick={() => {
+                  onImport();
+                  setIsMoreMenuOpen(false);
+                }} 
+                title="Importuj tablicę"
+                disabled={isReadOnly}
+              />
+            )}
           </div>
         </div>
       )}
@@ -717,6 +576,23 @@ export function ToolbarUI({
                   <Upload className="w-3.5 h-3.5" />
                   <span className="font-medium">Upload</span>
                 </button>
+              </div>
+            )}
+
+            {/* 📄 PDF */}
+            {tool === 'pdf' && (
+              <div className="flex flex-col gap-1.5">
+                <button
+                  onClick={onPDFUpload}
+                  className="flex items-center gap-1.5 px-2 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs"
+                  title="Wybierz plik PDF z dysku"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span className="font-medium">Wczytaj PDF</span>
+                </button>
+                <div className="text-[10px] text-gray-500 text-center px-2">
+                  Drag & Drop również działa
+                </div>
               </div>
             )}
           </div>
