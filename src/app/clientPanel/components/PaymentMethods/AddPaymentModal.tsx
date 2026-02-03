@@ -17,7 +17,7 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
     expiryMonth: new Date().getMonth() + 1,
     expiryYear: new Date().getFullYear(),
     cvv: '',
-    isDefault: false
+    isDefault: false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,28 +38,28 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (!formData.cardNumber || formData.cardNumber.replace(/\s/g, '').length < 13) {
       newErrors.cardNumber = 'Numer karty jest nieprawidłowy';
     }
-    
+
     if (!formData.cardHolderName.trim()) {
       newErrors.cardHolderName = 'Imię i nazwisko jest wymagane';
     }
-    
+
     if (!formData.cvv || formData.cvv.length < 3) {
       newErrors.cvv = 'Kod CVV jest nieprawidłowy';
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     const cardNumber = formData.cardNumber.replace(/\s/g, '');
     const paymentMethod: Omit<PaymentMethod, 'id'> = {
       type: 'credit_card',
@@ -68,9 +68,9 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
       expiryMonth: formData.expiryMonth,
       expiryYear: formData.expiryYear,
       isDefault: formData.isDefault,
-      brand: detectCardBrand(cardNumber)
+      brand: detectCardBrand(cardNumber),
     };
-    
+
     onSave(paymentMethod);
     handleReset();
   };
@@ -82,7 +82,7 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
       expiryMonth: new Date().getMonth() + 1,
       expiryYear: new Date().getFullYear(),
       cvv: '',
-      isDefault: false
+      isDefault: false,
     });
     setErrors({});
   };
@@ -117,34 +117,36 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
               <span className="font-medium text-sm">Bezpieczne płatności</span>
             </div>
             <p className="text-xs text-blue-600">
-              Twoje dane karty są szyfrowane i bezpiecznie przechowywane zgodnie z standardami PCI DSS.
+              Twoje dane karty są szyfrowane i bezpiecznie przechowywane zgodnie z standardami PCI
+              DSS.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Numer karty *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Numer karty *</label>
             <div className="relative">
               <input
                 type="text"
                 required
                 value={formData.cardNumber}
-                onChange={(e) => setFormData(prev => ({ 
-                  ...prev, 
-                  cardNumber: formatCardNumber(e.target.value) 
-                }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    cardNumber: formatCardNumber(e.target.value),
+                  }))
+                }
                 maxLength={19}
                 className={`w-full pl-12 pr-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
                   errors.cardNumber ? 'border-red-300' : 'border-gray-400'
                 }`}
                 placeholder="1234 5678 9012 3456"
               />
-              <CreditCard size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <CreditCard
+                size={20}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+              />
             </div>
-            {errors.cardNumber && (
-              <p className="text-red-500 text-xs mt-1">{errors.cardNumber}</p>
-            )}
+            {errors.cardNumber && <p className="text-red-500 text-xs mt-1">{errors.cardNumber}</p>}
           </div>
 
           <div>
@@ -155,7 +157,7 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
               type="text"
               required
               value={formData.cardHolderName}
-              onChange={(e) => setFormData(prev => ({ ...prev, cardHolderName: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, cardHolderName: e.target.value }))}
               className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
                 errors.cardHolderName ? 'border-red-300' : 'border-gray-400'
               }`}
@@ -168,16 +170,16 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Miesiąc *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Miesiąc *</label>
               <select
                 required
                 value={formData.expiryMonth}
-                onChange={(e) => setFormData(prev => ({ ...prev, expiryMonth: parseInt(e.target.value) }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, expiryMonth: parseInt(e.target.value) }))
+                }
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
-                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
                   <option key={month} value={month}>
                     {month.toString().padStart(2, '0')}
                   </option>
@@ -185,16 +187,16 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Rok *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Rok *</label>
               <select
                 required
                 value={formData.expiryYear}
-                onChange={(e) => setFormData(prev => ({ ...prev, expiryYear: parseInt(e.target.value) }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, expiryYear: parseInt(e.target.value) }))
+                }
                 className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
               >
-                {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() + i).map((year) => (
                   <option key={year} value={year}>
                     {year}
                   </option>
@@ -202,23 +204,21 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                CVV *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">CVV *</label>
               <input
                 type="text"
                 required
                 value={formData.cvv}
-                onChange={(e) => setFormData(prev => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, cvv: e.target.value.replace(/\D/g, '') }))
+                }
                 maxLength={4}
                 className={`w-full px-3 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 ${
                   errors.cvv ? 'border-red-300' : 'border-gray-400'
                 }`}
                 placeholder="123"
               />
-              {errors.cvv && (
-                <p className="text-red-500 text-xs mt-1">{errors.cvv}</p>
-              )}
+              {errors.cvv && <p className="text-red-500 text-xs mt-1">{errors.cvv}</p>}
             </div>
           </div>
 
@@ -227,7 +227,7 @@ export default function AddPaymentModal({ isOpen, onClose, onSave }: AddPaymentM
               type="checkbox"
               id="isDefault"
               checked={formData.isDefault}
-              onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, isDefault: e.target.checked }))}
               className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
             />
             <label htmlFor="isDefault" className="ml-2 text-sm text-gray-700">

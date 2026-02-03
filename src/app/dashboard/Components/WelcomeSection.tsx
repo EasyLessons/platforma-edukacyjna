@@ -28,7 +28,7 @@ export default function WelcomeSection() {
       'Poranek idealny, żeby pokazać światu, kto rządzi tablicą!',
       'Kiedy inni jeszcze się budzą, Ty już tworzysz rozwiązania — szacun!',
       'Nowy dzień, nowa wiedza — dziś wszystko kliknie!',
-      'Idealna pora, żeby umysł złapał rytm nauki jak metronom.'
+      'Idealna pora, żeby umysł złapał rytm nauki jak metronom.',
     ];
 
     const dayHooks = [
@@ -36,7 +36,7 @@ export default function WelcomeSection() {
       'Czas działa na Twoją korzyść — tablica już czeka!',
       'Energii nie brakuje, więc ruszamy po nowe rekordy nauki!',
       'Mała przerwa od świata, duży krok w kierunku wiedzy!',
-      'Kiedy nauka staje się zabawą — to znaczy, że jesteś na dobrej platformie!'
+      'Kiedy nauka staje się zabawą — to znaczy, że jesteś na dobrej platformie!',
     ];
 
     const eveningHooks = [
@@ -47,7 +47,7 @@ export default function WelcomeSection() {
       'Spokojnie, dziś pójdzie gładko — tablica już gotowa!',
       'Dobre pomysły przychodzą po zmroku — czas na kreatywną sesję!',
       'Cisza, spokój i Ty — najlepszy zestaw do nauki.',
-      'Dziś wieczór bez stresu — tylko czysta przyjemność z nauki!'
+      'Dziś wieczór bez stresu — tylko czysta przyjemność z nauki!',
     ];
 
     let hooks;
@@ -80,11 +80,10 @@ export default function WelcomeSection() {
 
   return (
     <div className="w-full relative overflow-hidden bg-gradient-to-br from-green-50 via-blue-50 to-purple-50 rounded-2xl md:rounded-3xl px-4 md:px-8 py-6 md:py-12 mb-6 md:mb-8 border border-gray-100 shadow-sm">
-      
       {/* Dekoracyjne kółka w tle */}
       <div className="absolute top-0 right-0 w-32 md:w-64 h-32 md:h-64 bg-green-200/20 rounded-full blur-3xl"></div>
       <div className="absolute bottom-0 left-0 w-24 md:w-48 h-24 md:h-48 bg-blue-200/20 rounded-full blur-3xl"></div>
-      
+
       <div className="relative z-10">
         {/* Małe powitanie */}
         <div className="flex items-center gap-1.5 md:gap-2 mb-2 md:mb-3">
@@ -100,7 +99,6 @@ export default function WelcomeSection() {
             {motivationalText}
           </span>
         </h1>
-
 
         {/* Podpis - losowy tekst */}
         {/* <p className="text-gray-600 max-w-2xl italic transition-all duration-300 ease-in-out">

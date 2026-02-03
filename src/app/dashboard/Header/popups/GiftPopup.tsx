@@ -11,7 +11,7 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
   const [copied, setCopied] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
 
-  const referralLink = "https://easylesson.com/ref/mateusz123";
+  const referralLink = 'https://easylesson.com/ref/mateusz123';
 
   const handleCopy = () => {
     navigator.clipboard.writeText(referralLink);
@@ -20,11 +20,11 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
   };
 
   return (
-    <div 
+    <div
       className="fixed inset-0 bg-black/15 backdrop-blur-sm flex items-center justify-center z-[100] px-4"
       onClick={onClose}
     >
-      <div 
+      <div
         className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200"
         onClick={(e) => e.stopPropagation()}
       >
@@ -35,12 +35,8 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
               <Gift size={24} className="text-green-600" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
-                Dostań 10% zniżki
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Na konto Premium
-              </p>
+              <h2 className="text-2xl font-bold text-gray-800">Dostań 10% zniżki</h2>
+              <p className="text-sm text-gray-600 mt-1">Na konto Premium</p>
             </div>
           </div>
           <button
@@ -53,12 +49,11 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
 
         {/* Content */}
         <div className="p-6 space-y-5">
-          
           {/* Opis */}
           <div className="text-center">
             <p className="text-gray-700 leading-relaxed">
-              Zapraszaj nowe osoby na <strong className="text-green-600">EasyLesson</strong> i otrzymaj{' '}
-              <strong className="text-green-600">10% zniżki</strong> na konto Premium!
+              Zapraszaj nowe osoby na <strong className="text-green-600">EasyLesson</strong> i
+              otrzymaj <strong className="text-green-600">10% zniżki</strong> na konto Premium!
             </p>
           </div>
 
@@ -128,7 +123,7 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
                 className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700 font-mono cursor-pointer"
                 onClick={(e) => e.currentTarget.select()}
               />
-              
+
               <button
                 onClick={handleCopy}
                 className="px-4 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md"

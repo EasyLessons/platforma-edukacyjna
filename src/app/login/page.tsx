@@ -1,10 +1,10 @@
-"use client";
-import { loginUser, saveToken, saveUser } from "@/auth_api/api";
-import { useAuth } from "../context/AuthContext";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, Lock, Mail } from "lucide-react";
-import Link from "next/link";
+'use client';
+import { loginUser, saveToken, saveUser } from '@/auth_api/api';
+import { useAuth } from '../context/AuthContext';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
+import Link from 'next/link';
 
 export default function Login() {
   const router = useRouter();
@@ -12,16 +12,16 @@ export default function Login() {
 
   // State management
   const [formData, setFormData] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
   });
   const [errors, setErrors] = useState({
-    email: "",
-    password: "",
+    email: '',
+    password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [generalError, setGeneralError] = useState("");
+  const [generalError, setGeneralError] = useState('');
 
   // Email validation
   const validateEmail = (email: string) => {
@@ -40,29 +40,29 @@ export default function Login() {
     // Clear error when user starts typing
     setErrors((prev) => ({
       ...prev,
-      [name]: "",
+      [name]: '',
     }));
-    setGeneralError("");
+    setGeneralError('');
   };
 
   // Form validation
   const validateForm = () => {
     let isValid = true;
-    const newErrors = { email: "", password: "" };
+    const newErrors = { email: '', password: '' };
 
     if (!formData.email) {
-      newErrors.email = "Email jest wymagany";
+      newErrors.email = 'Email jest wymagany';
       isValid = false;
     } else if (!validateEmail(formData.email)) {
-      newErrors.email = "Nieprawidłowy format email";
+      newErrors.email = 'Nieprawidłowy format email';
       isValid = false;
     }
 
     if (!formData.password) {
-      newErrors.password = "Hasło jest wymagane";
+      newErrors.password = 'Hasło jest wymagane';
       isValid = false;
     } else if (formData.password.length < 6) {
-      newErrors.password = "Hasło musi mieć co najmniej 6 znaków";
+      newErrors.password = 'Hasło musi mieć co najmniej 6 znaków';
       isValid = false;
     }
 
@@ -70,26 +70,26 @@ export default function Login() {
     return isValid;
   };
 
-// Handle login - NAPRAWIONE
-// WAŻNE: api.ts SAMO zapisuje token i user - NIE róbmy tego tutaj!
-const handleLogin = async (e: React.FormEvent) => {
+  // Handle login - NAPRAWIONE
+  // WAŻNE: api.ts SAMO zapisuje token i user - NIE róbmy tego tutaj!
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!validateForm()) return;
 
     setIsLoading(true);
-    setGeneralError("");
+    setGeneralError('');
 
     try {
-      console.log("🔐 Próba logowania...");
-      
+      console.log('🔐 Próba logowania...');
+
       // Krok 1: Wywołaj API logowania
       const response = await loginUser({
         login: formData.email,
         password: formData.password,
       });
 
-      console.log("✅ Odpowiedź z API:", response);
+      console.log('✅ Odpowiedź z API:', response);
 
       // 🔥 Krok 2: Użyj funkcji login() z AuthContext
       // To automatycznie:
@@ -99,20 +99,19 @@ const handleLogin = async (e: React.FormEvent) => {
       // - Layout się zaktualizuje!
       login(response.access_token, response.user);
 
-      console.log("✅ Login z Context wywołany! isLoggedIn powinien być true");
+      console.log('✅ Login z Context wywołany! isLoggedIn powinien być true');
 
       // Krok 3: Przekieruj do dashboard
-      router.push("/dashboard");
-
+      router.push('/dashboard');
     } catch (error: any) {
       setIsLoading(false);
-      
-      console.error("❌ Błąd logowania:", error);
+
+      console.error('❌ Błąd logowania:', error);
 
       // Obsługa błędów z backendu
-      if (error.message.includes("niezweryfikowane")) {
-        console.log("⚠️ Konto niezweryfikowane - wysyłam nowy kod...");
-        
+      if (error.message.includes('niezweryfikowane')) {
+        console.log('⚠️ Konto niezweryfikowane - wysyłam nowy kod...');
+
         try {
           const checkResponse = await fetch(
             `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/check-user`,
@@ -122,22 +121,22 @@ const handleLogin = async (e: React.FormEvent) => {
               body: JSON.stringify({ email: formData.email }),
             }
           );
-          
+
           const checkData = await checkResponse.json();
 
           if (!checkData.verified && checkData.user_id) {
-            console.log("📧 Redirect do weryfikacji");
+            console.log('📧 Redirect do weryfikacji');
             router.push(
               `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
             );
           } else {
-            setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email.");
+            setGeneralError('⚠️ Konto niezweryfikowane. Sprawdź email.');
           }
         } catch (checkError) {
-          setGeneralError("⚠️ Konto niezweryfikowane. Sprawdź email lub zarejestruj się ponownie.");
+          setGeneralError('⚠️ Konto niezweryfikowane. Sprawdź email lub zarejestruj się ponownie.');
         }
       } else {
-        setGeneralError(error.message || "Błędny email lub hasło");
+        setGeneralError(error.message || 'Błędny email lub hasło');
       }
     }
   };
@@ -150,17 +149,10 @@ const handleLogin = async (e: React.FormEvent) => {
       </div>
 
       {/* Login Form */}
-      <form
-        onSubmit={handleLogin}
-        className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md"
-      >
-        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">
-          Zaloguj się
-        </h1>
+      <form onSubmit={handleLogin} className="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-md">
+        <h1 className="text-3xl font-bold text-center text-gray-800 mb-2">Zaloguj się</h1>
 
-        <p className="text-center text-gray-600 mb-6">
-          Zaloguj się, aby kontynuować
-        </p>
+        <p className="text-center text-gray-600 mb-6">Zaloguj się, aby kontynuować</p>
 
         {/* General Error Message */}
         {generalError && (
@@ -171,9 +163,7 @@ const handleLogin = async (e: React.FormEvent) => {
 
         {/* Email Input */}
         <div className="mb-4">
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            Email
-          </label>
+          <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
           <div className="relative">
             <input
               type="email"
@@ -184,29 +174,23 @@ const handleLogin = async (e: React.FormEvent) => {
               className={`w-full pl-10 pr-4 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
                 ${
                   errors.email
-                    ? "border-red-500 bg-red-50 focus:border-red-500"
-                    : "border-gray-200 focus:border-green-500"
+                    ? 'border-red-500 bg-red-50 focus:border-red-500'
+                    : 'border-gray-200 focus:border-green-500'
                 }`}
             />
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
               <Mail className="w-5 h-5" />
             </span>
           </div>
-          {errors.email && (
-            <span className="text-red-500 text-xs mt-1 block">
-              {errors.email}
-            </span>
-          )}
+          {errors.email && <span className="text-red-500 text-xs mt-1 block">{errors.email}</span>}
         </div>
 
         {/* Password Input */}
         <div className="mb-6">
-          <label className="block mb-2 text-sm font-medium text-gray-700">
-            Hasło
-          </label>
+          <label className="block mb-2 text-sm font-medium text-gray-700">Hasło</label>
           <div className="relative">
             <input
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               name="password"
               value={formData.password}
               onChange={handleChange}
@@ -214,8 +198,8 @@ const handleLogin = async (e: React.FormEvent) => {
               className={`w-full pl-10 pr-12 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
                 ${
                   errors.password
-                    ? "border-red-500 bg-red-50 focus:border-red-500"
-                    : "border-gray-200 focus:border-green-500"
+                    ? 'border-red-500 bg-red-50 focus:border-red-500'
+                    : 'border-gray-200 focus:border-green-500'
                 }`}
             />
             <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
@@ -225,21 +209,15 @@ const handleLogin = async (e: React.FormEvent) => {
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
-              title={showPassword ? "Ukryj hasło" : "Pokaż hasło"}
+              title={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
             >
-              {showPassword ? (
-                <Eye className="w-5 h-5" />
-              ) : (
-                <EyeOff className="w-5 h-5" />
-              )}
+              {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
             </button>
           </div>
           {errors.password && (
-            <span className="text-red-500 text-xs mt-1 block">
-              {errors.password}
-            </span>
+            <span className="text-red-500 text-xs mt-1 block">{errors.password}</span>
           )}
-          
+
           {/* Forgot Password Link */}
           <div className="mt-2 text-right">
             <Link
@@ -258,8 +236,8 @@ const handleLogin = async (e: React.FormEvent) => {
           className={`w-full py-3 px-4 text-white font-semibold rounded-lg transition-all duration-200 transform mb-5
             ${
               isLoading
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-green-500 hover:bg-green-600 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0"
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-500 hover:bg-green-600 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0'
             }`}
         >
           {isLoading ? (
@@ -268,13 +246,13 @@ const handleLogin = async (e: React.FormEvent) => {
               <span>Logowanie...</span>
             </div>
           ) : (
-            "Zaloguj"
+            'Zaloguj'
           )}
         </button>
 
         {/* Sign Up Link */}
         <div className="text-center text-gray-600">
-          Nie masz konta?{" "}
+          Nie masz konta?{' '}
           <Link
             href="/rejestracja"
             className="text-green-600 font-semibold hover:text-green-700 hover:underline transition-colors duration-200"
@@ -381,18 +359,18 @@ const handleLogin = async (e: React.FormEvent) => {
 //     saveUser(response.user);
 
 //     console.log("✅ Zalogowano pomyślnie! User:", response.user.username);
-    
+
 //     // Przekierowanie do dashboard
 //     router.push("/dashboard");
 
 //   } catch (error: any) {
 //     setIsLoading(false);
-    
+
 //     // Obsługa różnych błędów z backendu
 //     if (error.message.includes("niezweryfikowane")) {
 //       // Konto istnieje ale niezweryfikowane
 //       console.log("⚠️ Konto niezweryfikowane - wysyłam nowy kod...");
-      
+
 //       try {
 //         // Sprawdź użytkownika i wyślij nowy kod
 //         const checkResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/check-user`, {
@@ -400,7 +378,7 @@ const handleLogin = async (e: React.FormEvent) => {
 //           headers: { 'Content-Type': 'application/json' },
 //           body: JSON.stringify({ email: formData.email }),
 //         });
-        
+
 //         const checkData = await checkResponse.json();
 
 //         if (!checkData.verified && checkData.user_id) {
@@ -416,7 +394,7 @@ const handleLogin = async (e: React.FormEvent) => {
 //     } else {
 //       setGeneralError(error.message || "Błędny email lub hasło");
 //     }
-    
+
 //     console.error("❌ Błąd logowania:", error);
 //   }
 // };

@@ -9,7 +9,7 @@ const Ad = () => {
     days: 0,
     hours: 0,
     minutes: 0,
-    seconds: 0
+    seconds: 0,
   });
   const [isVisible, setIsVisible] = useState(true);
 
@@ -30,7 +30,7 @@ const Ad = () => {
           days: Math.floor(difference / (1000 * 60 * 60 * 24)),
           hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
           minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60)
+          seconds: Math.floor((difference / 1000) % 60),
         });
       } else {
         // Jak minie termin, ukryj baner
@@ -59,32 +59,34 @@ const Ad = () => {
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <div className="flex flex-col md:flex-row items-center justify-between gap-3">
-          
           {/* Lewa strona - Tekst główny */}
           <div className="flex items-center gap-3 flex-1">
             <div className="hidden sm:block">
               <Sparkles className="w-6 h-6 text-yellow-300 animate-pulse" />
             </div>
-            
+
             <div className="text-center md:text-left">
               <div className="flex items-center gap-2 mb-1">
                 <span className="bg-yellow-300 text-green-900 text-xs font-bold px-2 py-1 rounded-full uppercase tracking-wide">
                   NowyRokSale 🎉
                 </span>
-                <span className="hidden sm:inline text-sm font-semibold">
-                  Limitowana oferta!
-                </span>
+                <span className="hidden sm:inline text-sm font-semibold">Limitowana oferta!</span>
               </div>
               <p className="text-sm md:text-base font-medium">
-                Wejdź na <span className="font-bold underline decoration-yellow-300">wyższy poziom</span> prowadzenia korepetycji za jedyne <span className="text-yellow-300 font-bold text-lg">40 zł</span> miesięcznie!
+                Wejdź na{' '}
+                <span className="font-bold underline decoration-yellow-300">wyższy poziom</span>{' '}
+                prowadzenia korepetycji za jedyne{' '}
+                <span className="text-yellow-300 font-bold text-lg">40 zł</span> miesięcznie!
               </p>
             </div>
           </div>
 
           {/* Środek - Countdown Timer */}
           <div className="flex items-center gap-2 md:gap-3">
-            <span className="text-xs md:text-sm font-medium hidden sm:block">Oferta kończy się za:</span>
-            
+            <span className="text-xs md:text-sm font-medium hidden sm:block">
+              Oferta kończy się za:
+            </span>
+
             <div className="flex gap-2">
               <TimeBox value={timeLeft.days} label="dni" />
               <TimeBox value={timeLeft.hours} label="godz" />
@@ -126,9 +128,7 @@ const TimeBox = ({ value, label }: { value: number; label: string }) => {
       <div className="text-lg md:text-2xl font-bold leading-none">
         {value.toString().padStart(2, '0')}
       </div>
-      <div className="text-[10px] md:text-xs opacity-90 uppercase">
-        {label}
-      </div>
+      <div className="text-[10px] md:text-xs opacity-90 uppercase">{label}</div>
     </div>
   );
 };

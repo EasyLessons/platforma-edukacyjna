@@ -2,7 +2,7 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/CalculatorTool.tsx
  * ============================================================================
- * 
+ *
  * Kalkulator matematyczny wbudowany w tablicę.
  * Obsługuje podstawowe operacje + funkcje matematyczne.
  * Teraz jest przeciągalnym obiektem zamiast modala.
@@ -38,7 +38,7 @@ export function CalculatorTool({
   const [history, setHistory] = useState<string[]>([]);
   const [showScientific, setShowScientific] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  
+
   // Pozycja kalkulatora (przeciągalne okno)
   const [position, setPosition] = useState({ x: canvasWidth - 340, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
@@ -48,10 +48,10 @@ export function CalculatorTool({
   const handleDragStart = (e: React.PointerEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    
+
     setIsDragging(true);
     setDragOffset({
       x: e.clientX - position.x,
@@ -143,10 +143,13 @@ export function CalculatorTool({
     try {
       // Używamy mathjs do bezpiecznej ewaluacji
       const result = math.evaluate(expression.replace(/×/g, '*').replace(/÷/g, '/'));
-      const resultStr = typeof result === 'number' 
-        ? Number.isInteger(result) ? result.toString() : result.toFixed(10).replace(/\.?0+$/, '')
-        : result.toString();
-      
+      const resultStr =
+        typeof result === 'number'
+          ? Number.isInteger(result)
+            ? result.toString()
+            : result.toFixed(10).replace(/\.?0+$/, '')
+          : result.toString();
+
       setHistory([...history, `${expression} = ${resultStr}`]);
       setDisplay(resultStr);
       setExpression(resultStr);
@@ -189,7 +192,7 @@ export function CalculatorTool({
     try {
       let result: number;
       const currentValue = math.evaluate(display);
-      
+
       switch (func) {
         case 'sin':
           result = math.sin(currentValue);
@@ -230,8 +233,10 @@ export function CalculatorTool({
         default:
           return;
       }
-      
-      const resultStr = Number.isInteger(result) ? result.toString() : result.toFixed(10).replace(/\.?0+$/, '');
+
+      const resultStr = Number.isInteger(result)
+        ? result.toString()
+        : result.toFixed(10).replace(/\.?0+$/, '');
       setDisplay(resultStr);
       setExpression(resultStr);
       setIsResult(true);
@@ -241,9 +246,14 @@ export function CalculatorTool({
     }
   };
 
-  const Button = ({ children, onClick, className = '', wide = false }: { 
-    children: React.ReactNode; 
-    onClick: () => void; 
+  const Button = ({
+    children,
+    onClick,
+    className = '',
+    wide = false,
+  }: {
+    children: React.ReactNode;
+    onClick: () => void;
     className?: string;
     wide?: boolean;
   }) => (
@@ -256,7 +266,7 @@ export function CalculatorTool({
   );
 
   return (
-    <div 
+    <div
       ref={overlayRef}
       className="absolute bg-white rounded-2xl shadow-2xl border border-gray-200 w-80 overflow-hidden pointer-events-auto z-30"
       style={{
@@ -266,7 +276,7 @@ export function CalculatorTool({
       onClick={(e) => e.stopPropagation()}
     >
       {/* Header - draggable */}
-      <div 
+      <div
         className="flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 cursor-move select-none"
         onPointerDown={handleDragStart}
         style={{ touchAction: 'none' }}
@@ -288,77 +298,242 @@ export function CalculatorTool({
         </div>
       </div>
 
-        {/* Expression display */}
-        <div className="px-4 pt-2 text-right text-sm text-gray-400 h-6 overflow-hidden">
-          {expression || '\u00A0'}
-        </div>
+      {/* Expression display */}
+      <div className="px-4 pt-2 text-right text-sm text-gray-400 h-6 overflow-hidden">
+        {expression || '\u00A0'}
+      </div>
 
-        {/* Main display */}
-        <div className="px-4 pb-2 text-right text-4xl font-light text-gray-800 overflow-x-auto">
-          {display}
-        </div>
+      {/* Main display */}
+      <div className="px-4 pb-2 text-right text-4xl font-light text-gray-800 overflow-x-auto">
+        {display}
+      </div>
 
-        {/* Scientific buttons */}
-        {showScientific && (
-          <div className="grid grid-cols-5 gap-1 px-2 pb-2">
-            <Button onClick={() => handleScientific('sin')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">sin</Button>
-            <Button onClick={() => handleScientific('cos')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">cos</Button>
-            <Button onClick={() => handleScientific('tan')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">tan</Button>
-            <Button onClick={() => handleScientific('log')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">log</Button>
-            <Button onClick={() => handleScientific('ln')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">ln</Button>
-            <Button onClick={() => handleScientific('sqrt')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">√</Button>
-            <Button onClick={() => handleScientific('pow2')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">x²</Button>
-            <Button onClick={() => handleScientific('pow3')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">x³</Button>
-            <Button onClick={() => handleScientific('1/x')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">1/x</Button>
-            <Button onClick={() => handleScientific('factorial')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">n!</Button>
-            <Button onClick={() => handleScientific('pi')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">π</Button>
-            <Button onClick={() => handleScientific('e')} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">e</Button>
-            <Button onClick={() => { setExpression(expression + '('); setDisplay('('); }} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">(</Button>
-            <Button onClick={() => { setExpression(expression + ')'); setDisplay(')'); }} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">)</Button>
-            <Button onClick={() => { setExpression(expression + '^'); setDisplay('^'); }} className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm">^</Button>
-          </div>
-        )}
-
-        {/* Main buttons */}
-        <div className="grid grid-cols-4 gap-1 p-2">
-          <Button onClick={handleClear} className="bg-red-100 text-red-600 hover:bg-red-200">C</Button>
-          <Button onClick={handleBackspace} className="bg-gray-100 text-gray-600 hover:bg-gray-200">
-            <Delete className="w-5 h-5 mx-auto" />
+      {/* Scientific buttons */}
+      {showScientific && (
+        <div className="grid grid-cols-5 gap-1 px-2 pb-2">
+          <Button
+            onClick={() => handleScientific('sin')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            sin
           </Button>
-          <Button onClick={handlePercent} className="bg-gray-100 text-gray-600 hover:bg-gray-200">%</Button>
-          <Button onClick={() => handleOperator('/')} className="bg-blue-100 text-blue-600 hover:bg-blue-200">÷</Button>
-          
-          <Button onClick={() => handleNumber('7')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">7</Button>
-          <Button onClick={() => handleNumber('8')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">8</Button>
-          <Button onClick={() => handleNumber('9')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">9</Button>
-          <Button onClick={() => handleOperator('*')} className="bg-blue-100 text-blue-600 hover:bg-blue-200">×</Button>
-          
-          <Button onClick={() => handleNumber('4')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">4</Button>
-          <Button onClick={() => handleNumber('5')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">5</Button>
-          <Button onClick={() => handleNumber('6')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">6</Button>
-          <Button onClick={() => handleOperator('-')} className="bg-blue-100 text-blue-600 hover:bg-blue-200">−</Button>
-          
-          <Button onClick={() => handleNumber('1')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">1</Button>
-          <Button onClick={() => handleNumber('2')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">2</Button>
-          <Button onClick={() => handleNumber('3')} className="bg-gray-50 text-gray-800 hover:bg-gray-100">3</Button>
-          <Button onClick={() => handleOperator('+')} className="bg-blue-100 text-blue-600 hover:bg-blue-200">+</Button>
-          
-          <Button onClick={() => handleNumber('0')} wide className="bg-gray-50 text-gray-800 hover:bg-gray-100">0</Button>
-          <Button onClick={handleDecimal} className="bg-gray-50 text-gray-800 hover:bg-gray-100">.</Button>
-          <Button onClick={handleEquals} className="bg-blue-500 text-white hover:bg-blue-600">=</Button>
+          <Button
+            onClick={() => handleScientific('cos')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            cos
+          </Button>
+          <Button
+            onClick={() => handleScientific('tan')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            tan
+          </Button>
+          <Button
+            onClick={() => handleScientific('log')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            log
+          </Button>
+          <Button
+            onClick={() => handleScientific('ln')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            ln
+          </Button>
+          <Button
+            onClick={() => handleScientific('sqrt')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            √
+          </Button>
+          <Button
+            onClick={() => handleScientific('pow2')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            x²
+          </Button>
+          <Button
+            onClick={() => handleScientific('pow3')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            x³
+          </Button>
+          <Button
+            onClick={() => handleScientific('1/x')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            1/x
+          </Button>
+          <Button
+            onClick={() => handleScientific('factorial')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            n!
+          </Button>
+          <Button
+            onClick={() => handleScientific('pi')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            π
+          </Button>
+          <Button
+            onClick={() => handleScientific('e')}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            e
+          </Button>
+          <Button
+            onClick={() => {
+              setExpression(expression + '(');
+              setDisplay('(');
+            }}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            (
+          </Button>
+          <Button
+            onClick={() => {
+              setExpression(expression + ')');
+              setDisplay(')');
+            }}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            )
+          </Button>
+          <Button
+            onClick={() => {
+              setExpression(expression + '^');
+              setDisplay('^');
+            }}
+            className="bg-purple-100 text-purple-700 hover:bg-purple-200 text-sm"
+          >
+            ^
+          </Button>
         </div>
+      )}
 
-        {/* History */}
-        {history.length > 0 && (
-          <div className="border-t border-gray-200 max-h-24 overflow-y-auto">
-            <div className="px-4 py-2">
-              <p className="text-xs text-gray-400 mb-1">Historia:</p>
-              {history.slice(-5).map((item, i) => (
-                <p key={i} className="text-xs text-gray-500">{item}</p>
-              ))}
-            </div>
+      {/* Main buttons */}
+      <div className="grid grid-cols-4 gap-1 p-2">
+        <Button onClick={handleClear} className="bg-red-100 text-red-600 hover:bg-red-200">
+          C
+        </Button>
+        <Button onClick={handleBackspace} className="bg-gray-100 text-gray-600 hover:bg-gray-200">
+          <Delete className="w-5 h-5 mx-auto" />
+        </Button>
+        <Button onClick={handlePercent} className="bg-gray-100 text-gray-600 hover:bg-gray-200">
+          %
+        </Button>
+        <Button
+          onClick={() => handleOperator('/')}
+          className="bg-blue-100 text-blue-600 hover:bg-blue-200"
+        >
+          ÷
+        </Button>
+
+        <Button
+          onClick={() => handleNumber('7')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          7
+        </Button>
+        <Button
+          onClick={() => handleNumber('8')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          8
+        </Button>
+        <Button
+          onClick={() => handleNumber('9')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          9
+        </Button>
+        <Button
+          onClick={() => handleOperator('*')}
+          className="bg-blue-100 text-blue-600 hover:bg-blue-200"
+        >
+          ×
+        </Button>
+
+        <Button
+          onClick={() => handleNumber('4')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          4
+        </Button>
+        <Button
+          onClick={() => handleNumber('5')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          5
+        </Button>
+        <Button
+          onClick={() => handleNumber('6')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          6
+        </Button>
+        <Button
+          onClick={() => handleOperator('-')}
+          className="bg-blue-100 text-blue-600 hover:bg-blue-200"
+        >
+          −
+        </Button>
+
+        <Button
+          onClick={() => handleNumber('1')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          1
+        </Button>
+        <Button
+          onClick={() => handleNumber('2')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          2
+        </Button>
+        <Button
+          onClick={() => handleNumber('3')}
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          3
+        </Button>
+        <Button
+          onClick={() => handleOperator('+')}
+          className="bg-blue-100 text-blue-600 hover:bg-blue-200"
+        >
+          +
+        </Button>
+
+        <Button
+          onClick={() => handleNumber('0')}
+          wide
+          className="bg-gray-50 text-gray-800 hover:bg-gray-100"
+        >
+          0
+        </Button>
+        <Button onClick={handleDecimal} className="bg-gray-50 text-gray-800 hover:bg-gray-100">
+          .
+        </Button>
+        <Button onClick={handleEquals} className="bg-blue-500 text-white hover:bg-blue-600">
+          =
+        </Button>
+      </div>
+
+      {/* History */}
+      {history.length > 0 && (
+        <div className="border-t border-gray-200 max-h-24 overflow-y-auto">
+          <div className="px-4 py-2">
+            <p className="text-xs text-gray-400 mb-1">Historia:</p>
+            {history.slice(-5).map((item, i) => (
+              <p key={i} className="text-xs text-gray-500">
+                {item}
+              </p>
+            ))}
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,9 +2,9 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/types.ts
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z: (brak - plik podstawowy)
- * 
+ *
  * EKSPORTUJE:
  * - Point (interface) - współrzędne x, y
  * - ViewportTransform (interface) - stan widoku: x, y, scale
@@ -14,7 +14,7 @@
  * - FunctionPlot (interface) - wykres funkcji matematycznej
  * - ImageElement (interface) - obraz/zdjęcie
  * - DrawingElement (type) - union wszystkich typów elementów
- * 
+ *
  * UŻYWANE PRZEZ:
  * ⚠️ BARDZO WAŻNE - używane przez WSZYSTKIE pliki w /tablica!
  * - WhiteboardCanvas.tsx (główny komponent)
@@ -25,7 +25,7 @@
  * - SelectTool.tsx (zaznaczanie)
  * - TextTool.tsx (tekst)
  * - selection.ts (logika zaznaczania)
- * 
+ *
  * ⚠️ UWAGA: Zmiana tutaj wpływa na CAŁY projekt tablicy!
  * Sprawdzaj wszystkie pliki po modyfikacji!
  * ============================================================================
@@ -148,7 +148,15 @@ export interface TableElement {
   headerBgColor?: string;
 }
 
-export type DrawingElement = DrawingPath | Shape | TextElement | FunctionPlot | ImageElement | PDFElement | MarkdownNote | TableElement;
+export type DrawingElement =
+  | DrawingPath
+  | Shape
+  | TextElement
+  | FunctionPlot
+  | ImageElement
+  | PDFElement
+  | MarkdownNote
+  | TableElement;
 
 export interface MomentumState {
   velocityX: number;

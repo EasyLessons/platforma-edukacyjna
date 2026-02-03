@@ -13,7 +13,7 @@ export default function BasicInfo({ user }: BasicInfoProps) {
   const [formData, setFormData] = useState({
     firstName: user?.username?.split(' ')[0] || '',
     lastName: user?.username?.split(' ').slice(1).join(' ') || '',
-    email: user?.email || ''
+    email: user?.email || '',
   });
 
   const handleSave = () => {
@@ -26,7 +26,7 @@ export default function BasicInfo({ user }: BasicInfoProps) {
     setFormData({
       firstName: user?.username?.split(' ')[0] || '',
       lastName: user?.username?.split(' ').slice(1).join(' ') || '',
-      email: user?.email || ''
+      email: user?.email || '',
     });
     setIsEditing(false);
   };
@@ -56,24 +56,20 @@ export default function BasicInfo({ user }: BasicInfoProps) {
             {/* Edycja - Imię i nazwisko */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Imię
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Imię</label>
                 <input
                   type="text"
                   value={formData.firstName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nazwisko
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Nazwisko</label>
                 <input
                   type="text"
                   value={formData.lastName}
-                  onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 />
               </div>
@@ -81,13 +77,11 @@ export default function BasicInfo({ user }: BasicInfoProps) {
 
             {/* Edycja - Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Główny e-mail
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Główny e-mail</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               />
             </div>
@@ -119,24 +113,18 @@ export default function BasicInfo({ user }: BasicInfoProps) {
                 <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                   <User size={20} className="text-green-600" />
                 </div>
-                <span className="text-gray-900 font-medium">
-                  {user?.username || 'Brak danych'}
-                </span>
+                <span className="text-gray-900 font-medium">{user?.username || 'Brak danych'}</span>
               </div>
             </div>
 
             {/* Wyświetlanie - Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">
-                Główny e-mail
-              </label>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Główny e-mail</label>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <Mail size={20} className="text-blue-600" />
                 </div>
-                <span className="text-gray-900 font-medium">
-                  {user?.email || 'Brak danych'}
-                </span>
+                <span className="text-gray-900 font-medium">{user?.email || 'Brak danych'}</span>
               </div>
             </div>
           </div>

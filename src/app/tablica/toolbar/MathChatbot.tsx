@@ -2,12 +2,12 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/MathChatbot.tsx
  * ============================================================================
- * 
+ *
  * 🤖 MATH TUTOR CHATBOT - RESIZABLE SIDEBAR
- * 
+ *
  * Chatbot matematyczny jako sidebar z prawej strony tablicy.
  * Pomaga uczniom z zadaniami, wyjaśnia koncepcje, daje podpowiedzi.
- * 
+ *
  * ✨ FEATURES:
  * - Resizable - przeciąganie lewej krawędzi
  * - Backdrop blur - mleczny efekt
@@ -21,10 +21,10 @@
 
 import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { useRouter } from 'next/navigation';
-import { 
-  X, 
-  Send, 
-  BookOpen, 
+import {
+  X,
+  Send,
+  BookOpen,
   Lightbulb,
   Calculator,
   Loader2,
@@ -38,7 +38,7 @@ import {
   PlusCircle,
   Crown,
   GripVertical,
-  Minimize2
+  Minimize2,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -77,53 +77,55 @@ interface ChatMessageViewProps {
   userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
 }
 
-const ChatMessageView = memo(function ChatMessageView({ msg, onAddToBoard, userRole }: ChatMessageViewProps) {
-  if (msg.role === 'user') {
+const ChatMessageView = memo(
+  function ChatMessageView({ msg, onAddToBoard, userRole }: ChatMessageViewProps) {
+    if (msg.role === 'user') {
+      return (
+        <div className="flex justify-end">
+          <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-gray-700 text-white rounded-br-md shadow-lg">
+            <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+          </div>
+        </div>
+      );
+    }
+
     return (
-      <div className="flex justify-end">
-        <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-gray-700 text-white rounded-br-md shadow-lg">
-          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+      <div className="flex justify-start">
+        <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-gray-100 text-gray-800 rounded-bl-md shadow-lg">
+          <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
+            <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>
+              {msg.content}
+            </ReactMarkdown>
+          </div>
+          {onAddToBoard &&
+            msg.id !== 'welcome' &&
+            msg.id !== 'welcome-new' &&
+            userRole !== 'viewer' && (
+              <button
+                onClick={() => onAddToBoard(msg.content)}
+                className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all active:scale-95 shadow-md cursor-pointer"
+                title="Dodaj tę odpowiedź jako notatkę na tablicy"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                Dodaj do tablicy
+              </button>
+            )}
         </div>
       </div>
     );
+  },
+  (prevProps, nextProps) => {
+    return prevProps.msg.id === nextProps.msg.id && prevProps.msg.content === nextProps.msg.content;
   }
-
-  return (
-    <div className="flex justify-start">
-      <div className="max-w-[90%] rounded-2xl px-4 py-2.5 bg-gray-100 text-gray-800 rounded-bl-md shadow-lg">
-        <div className="prose prose-sm max-w-none prose-p:my-1 prose-ul:my-1 prose-li:my-0 prose-headings:my-2">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex]}
-          >
-            {msg.content}
-          </ReactMarkdown>
-        </div>
-        {onAddToBoard && msg.id !== 'welcome' && msg.id !== 'welcome-new' && userRole !== 'viewer' && (
-          <button
-            onClick={() => onAddToBoard(msg.content)}
-            className="mt-2 flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-all active:scale-95 shadow-md cursor-pointer"
-            title="Dodaj tę odpowiedź jako notatkę na tablicy"
-          >
-            <PlusCircle className="w-3.5 h-3.5" />
-            Dodaj do tablicy
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}, (prevProps, nextProps) => {
-  return prevProps.msg.id === nextProps.msg.id && 
-         prevProps.msg.content === nextProps.msg.content;
-});
+);
 
 // ==========================================
 // 🎨 QUICK PROMPTS
 // ==========================================
 const QUICK_PROMPTS = [
-  { icon: Lightbulb, text: "Podpowiedź", prompt: "Potrzebuję podpowiedzi do zadania: " },
-  { icon: Calculator, text: "Sprawdź", prompt: "Sprawdź moje rozwiązanie: " },
-  { icon: BookOpen, text: "Wyjaśnij", prompt: "Wyjaśnij mi " },
+  { icon: Lightbulb, text: 'Podpowiedź', prompt: 'Potrzebuję podpowiedzi do zadania: ' },
+  { icon: Calculator, text: 'Sprawdź', prompt: 'Sprawdź moje rozwiązanie: ' },
+  { icon: BookOpen, text: 'Wyjaśnij', prompt: 'Wyjaśnij mi ' },
 ];
 
 // LocalStorage key
@@ -156,7 +158,7 @@ function MathChatbotInner({
     return 420;
   });
   const [isResizing, setIsResizing] = useState(false);
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -180,12 +182,15 @@ function MathChatbotInner({
   }, [messages, scrollToBottom]);
 
   // Resize handling
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    setIsResizing(true);
-    resizeStartX.current = e.clientX;
-    resizeStartWidth.current = width;
-    e.preventDefault();
-  }, [width]);
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      setIsResizing(true);
+      resizeStartX.current = e.clientX;
+      resizeStartWidth.current = width;
+      e.preventDefault();
+    },
+    [width]
+  );
 
   useEffect(() => {
     if (!isResizing) return;
@@ -210,70 +215,80 @@ function MathChatbotInner({
   }, [isResizing]);
 
   // Send message
-  const sendMessage = useCallback(async (customMessage?: string) => {
-    const messageText = customMessage || input.trim();
-    if (!messageText || isLoading) return;
+  const sendMessage = useCallback(
+    async (customMessage?: string) => {
+      const messageText = customMessage || input.trim();
+      if (!messageText || isLoading) return;
 
-    const userMessage: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: messageText,
-      timestamp: new Date(),
-    };
-    
-    setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsLoading(true);
-
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message: messageText,
-          context: boardContext 
-        })
-      });
-
-      const data = await response.json();
-
-      const assistantMessage: ChatMessage = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: response.ok 
-          ? data.response 
-          : (data.response || 'Przepraszam, wystąpił błąd. Spróbuj ponownie! 😅'),
+      const userMessage: ChatMessage = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: messageText,
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, assistantMessage]);
-      
-    } catch (error) {
-      console.error('Chat error:', error);
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: 'Nie mogę się połączyć. Sprawdź internet! 🔌',
-        timestamp: new Date(),
-      }]);
-    }
 
-    setIsLoading(false);
-  }, [input, isLoading, boardContext, setMessages]);
+      setMessages((prev) => [...prev, userMessage]);
+      setInput('');
+      setIsLoading(true);
 
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  }, [sendMessage]);
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: messageText,
+            context: boardContext,
+          }),
+        });
+
+        const data = await response.json();
+
+        const assistantMessage: ChatMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: response.ok
+            ? data.response
+            : data.response || 'Przepraszam, wystąpił błąd. Spróbuj ponownie! 😅',
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } catch (error) {
+        console.error('Chat error:', error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Nie mogę się połączyć. Sprawdź internet! 🔌',
+            timestamp: new Date(),
+          },
+        ]);
+      }
+
+      setIsLoading(false);
+    },
+    [input, isLoading, boardContext, setMessages]
+  );
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    },
+    [sendMessage]
+  );
 
   const clearChat = useCallback(() => {
-    setMessages([{
-      id: 'welcome-new',
-      role: 'assistant',
-      content: 'Nowa rozmowa! Jak mogę Ci pomóc? 🚀',
-      timestamp: new Date(),
-    }]);
+    setMessages([
+      {
+        id: 'welcome-new',
+        role: 'assistant',
+        content: 'Nowa rozmowa! Jak mogę Ci pomóc? 🚀',
+        timestamp: new Date(),
+      },
+    ]);
   }, [setMessages]);
 
   const handleQuickPrompt = useCallback((prompt: string) => {
@@ -282,15 +297,18 @@ function MathChatbotInner({
   }, []);
 
   // Handler do przekierowania na stronę główną + scroll
-  const handlePricingClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    router.push('/#pricing');
-    // Czekamy na załadowanie strony i scrollujemy
-    setTimeout(() => {
-      const element = document.getElementById('pricing');
-      element?.scrollIntoView({ behavior: 'smooth' });
-    }, 100);
-  }, [router]);
+  const handlePricingClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      router.push('/#pricing');
+      // Czekamy na załadowanie strony i scrollujemy
+      setTimeout(() => {
+        const element = document.getElementById('pricing');
+        element?.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    },
+    [router]
+  );
 
   // Funkcja zwijania z animacją
   const handleCollapse = useCallback(() => {
@@ -319,7 +337,7 @@ function MathChatbotInner({
     const handleClickOutside = (e: MouseEvent) => {
       // Środkowy przycisk (button === 1) - ignoruj
       if (e.button === 1) return;
-      
+
       // Lewy (button === 0) lub prawy (button === 2) - zwiń
       if (!isCollapsed && overlayRef.current && !overlayRef.current.contains(e.target as Node)) {
         handleCollapse();
@@ -336,7 +354,7 @@ function MathChatbotInner({
   // Collapsed state - latająca chmurka
   if (isCollapsed && !isExiting) {
     return (
-      <div 
+      <div
         className="fixed z-50 pointer-events-auto"
         style={{
           right: '20px',
@@ -349,9 +367,9 @@ function MathChatbotInner({
           className="bg-gradient-to-r from-blue-500 to-blue-500 text-white p-4 px-6 rounded-full shadow-2xl hover:shadow-blue-500/50 hover:scale-105 transition-all group cursor-pointer flex items-center gap-2"
           title="Powrót do rozmowy"
         >
-           <GraduationCap className="w-6 h-6" />
+          <GraduationCap className="w-6 h-6" />
           <span className="text-sm font-semibold">Tutor AI</span>
-          
+
           {/* <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full animate-pulse" /> */}
         </button>
       </div>
@@ -363,7 +381,7 @@ function MathChatbotInner({
     <>
       {/* Bąbelek podczas collapse - wyjeżdża od dołu równocześnie z zwijaniem */}
       {isExiting && (
-        <div 
+        <div
           className="fixed z-50 pointer-events-none"
           style={{
             right: '20px',
@@ -412,7 +430,7 @@ function MathChatbotInner({
         }
       `}</style>
 
-      <div 
+      <div
         ref={overlayRef}
         className="fixed flex flex-col z-60 pointer-events-auto"
         style={{
@@ -421,11 +439,13 @@ function MathChatbotInner({
           bottom: '10px',
           right: '10px',
           paddingTop: '120px',
-          animation: isExiting 
-            ? 'slideOutToRight 1s cubic-bezier(0.32, 0.72, 0, 1) forwards' 
-            : 'slideInFromRight 0.6s cubic-bezier(0.16, 1, 0.3, 1)'
+          animation: isExiting
+            ? 'slideOutToRight 1s cubic-bezier(0.32, 0.72, 0, 1) forwards'
+            : 'slideInFromRight 0.6s cubic-bezier(0.16, 1, 0.3, 1)',
         }}
-        onClick={(e) => e.stopPropagation()}        onWheel={(e) => e.stopPropagation()}      >
+        onClick={(e) => e.stopPropagation()}
+        onWheel={(e) => e.stopPropagation()}
+      >
         {/* Resize Handle */}
         <div
           onMouseDown={handleResizeStart}
@@ -433,14 +453,11 @@ function MathChatbotInner({
             isResizing ? 'bg-blue-500/30' : ''
           }`}
           style={{
-          
-          bottom: '10px',
-          right: '10px',
+            bottom: '10px',
+            right: '10px',
 
-          paddingTop: '120px',
-          
-        }}
-          
+            paddingTop: '120px',
+          }}
         >
           {/* Visual indicator */}
           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -464,7 +481,7 @@ function MathChatbotInner({
                 <p className="text-gray-500 text-xs">Asystent AI</p>
               </div>
             </div>
-            
+
             <div className="flex items-center gap-1">
               <button
                 onClick={clearChat}
@@ -484,14 +501,14 @@ function MathChatbotInner({
           </div>
 
           {/* 💬 MESSAGES */}
-          <div 
+          <div
             className="flex-1 overflow-y-auto p-5 space-y-10 bg-gray-50/30 backdrop-blur-sm"
             onWheel={handleWheel}
           >
             {messages.map((msg) => (
-              <ChatMessageView 
-                key={msg.id} 
-                msg={msg} 
+              <ChatMessageView
+                key={msg.id}
+                msg={msg}
                 onAddToBoard={onAddToBoard}
                 userRole={userRole}
               />
@@ -507,7 +524,7 @@ function MathChatbotInner({
                 </div>
               </div>
             )}
-            
+
             <div ref={messagesEndRef} />
           </div>
 
@@ -537,8 +554,8 @@ function MathChatbotInner({
                   className="underline hover:text-amber-950 font-medium cursor-pointer bg-transparent border-none p-0"
                 >
                   Wykup Premium
-                </button>
-                {' '}po większe limity AI Tutora
+                </button>{' '}
+                po większe limity AI Tutora
               </p>
             </div>
           </div>

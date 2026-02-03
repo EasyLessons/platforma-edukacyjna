@@ -10,12 +10,42 @@ import * as LucideIcons from 'lucide-react';
 
 // Ikony dostępne dla workspace'ów (dopasowane do iconMap z WorkspaceSidebar)
 const availableIcons = [
-  'BookOpen', 'Briefcase', 'Code', 'Coffee', 'Compass', 'Crown',
-  'Gamepad2', 'Heart', 'Home', 'Lightbulb', 'Music', 'Palette',
-  'Rocket', 'Sparkles', 'Target', 'Zap', 'Users', 'Calendar',
-  'FileText', 'MessageCircle', 'Bell', 'Star', 'Trophy', 'Award',
-  'Globe', 'Calculator', 'Camera', 'Monitor', 'Laptop', 'Cloud',
-  'Database', 'Server', 'Wifi', 'Smartphone', 'PenTool', 'Presentation'
+  'BookOpen',
+  'Briefcase',
+  'Code',
+  'Coffee',
+  'Compass',
+  'Crown',
+  'Gamepad2',
+  'Heart',
+  'Home',
+  'Lightbulb',
+  'Music',
+  'Palette',
+  'Rocket',
+  'Sparkles',
+  'Target',
+  'Zap',
+  'Users',
+  'Calendar',
+  'FileText',
+  'MessageCircle',
+  'Bell',
+  'Star',
+  'Trophy',
+  'Award',
+  'Globe',
+  'Calculator',
+  'Camera',
+  'Monitor',
+  'Laptop',
+  'Cloud',
+  'Database',
+  'Server',
+  'Wifi',
+  'Smartphone',
+  'PenTool',
+  'Presentation',
 ] as const;
 
 // Kolory tła (format bg-{color}-500)
@@ -59,7 +89,7 @@ export default function WorkspaceSettingsModal({
   onClose,
   onSave,
   mode,
-  initialData
+  initialData,
 }: WorkspaceSettingsModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'Home');
@@ -131,7 +161,7 @@ export default function WorkspaceSettingsModal({
       await onSave({
         name: name.trim(),
         icon: selectedIcon,
-        bg_color: selectedColor // Bez prefixu "bg-"
+        bg_color: selectedColor, // Bez prefixu "bg-"
       });
       onClose();
     } catch (err) {
@@ -150,7 +180,7 @@ export default function WorkspaceSettingsModal({
   // Znajdź kolor po nazwie
   const getColorData = (colorName: string) => {
     const normalizedColor = colorName.replace('bg-', '').replace('-500', '');
-    return availableColors.find(c => c.name === normalizedColor) || availableColors[0];
+    return availableColors.find((c) => c.name === normalizedColor) || availableColors[0];
   };
 
   if (!isOpen) return null;
@@ -185,7 +215,9 @@ export default function WorkspaceSettingsModal({
         <div className="p-6 space-y-6">
           {/* Podgląd */}
           <div className="flex items-center justify-center">
-            <div className={`w-20 h-20 rounded-2xl ${selectedColorData.class} flex items-center justify-center shadow-lg`}>
+            <div
+              className={`w-20 h-20 rounded-2xl ${selectedColorData.class} flex items-center justify-center shadow-lg`}
+            >
               <SelectedIconComponent size={40} className="text-white drop-shadow" />
             </div>
           </div>
@@ -204,16 +236,12 @@ export default function WorkspaceSettingsModal({
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-gray-900 placeholder-gray-400"
               maxLength={200}
             />
-            <div className="text-right text-xs text-gray-400 mt-1">
-              {name.length}/200
-            </div>
+            <div className="text-right text-xs text-gray-400 mt-1">{name.length}/200</div>
           </div>
 
           {/* Ikona */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ikona
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ikona</label>
             <div className="grid grid-cols-9 gap-2 max-h-32 overflow-y-auto p-1">
               {availableIcons.map((iconName) => {
                 const IconComponent = getIconComponent(iconName);
@@ -238,18 +266,19 @@ export default function WorkspaceSettingsModal({
 
           {/* Kolor */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Kolor
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Kolor</label>
             <div className="flex flex-wrap gap-2">
               {availableColors.map((color) => {
-                const isSelected = selectedColor === `${color.name}-500` || selectedColor === color.name;
+                const isSelected =
+                  selectedColor === `${color.name}-500` || selectedColor === color.name;
                 return (
                   <button
                     key={color.name}
                     onClick={() => setSelectedColor(`${color.name}-500`)}
                     className={`w-10 h-10 rounded-xl ${color.class} transition-all flex items-center justify-center ${
-                      isSelected ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : 'hover:scale-105'
+                      isSelected
+                        ? 'ring-2 ring-offset-2 ring-gray-900 scale-110'
+                        : 'hover:scale-105'
                     }`}
                     title={color.label}
                   >

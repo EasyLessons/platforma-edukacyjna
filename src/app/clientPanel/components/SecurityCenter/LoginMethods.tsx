@@ -10,15 +10,15 @@ const mockActiveSessions = [
     device: 'Chrome na Windows',
     location: 'Białystok, Polska',
     lastActive: '2 minuty temu',
-    current: true
+    current: true,
   },
   {
     id: 2,
     device: 'Safari na iPhone',
     location: 'Białystok, Polska',
     lastActive: '1 dzień temu',
-    current: false
-  }
+    current: false,
+  },
 ];
 
 // Przykładowe dane metod uwierzytelniania dwuskładnikowego - tylko email
@@ -28,8 +28,8 @@ const mockTwoFactorMethods = [
     type: 'email',
     identifier: 'w***@gmail.com',
     enabled: false,
-    primary: true
-  }
+    primary: true,
+  },
 ];
 
 export default function LoginMethods() {
@@ -39,16 +39,14 @@ export default function LoginMethods() {
 
   const handleEndSession = (sessionId: number) => {
     if (confirm('Czy na pewno chcesz zakończyć tę sesję?')) {
-      setActiveSessions(prev => prev.filter(session => session.id !== sessionId));
+      setActiveSessions((prev) => prev.filter((session) => session.id !== sessionId));
     }
   };
 
   const handleToggleTwoFactor = (methodId: number) => {
-    setTwoFactorMethods(prev => 
-      prev.map(method => 
-        method.id === methodId 
-          ? { ...method, enabled: !method.enabled }
-          : method
+    setTwoFactorMethods((prev) =>
+      prev.map((method) =>
+        method.id === methodId ? { ...method, enabled: !method.enabled } : method
       )
     );
   };
@@ -79,7 +77,10 @@ export default function LoginMethods() {
 
         <div className="space-y-4">
           {activeSessions.map((session) => (
-            <div key={session.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div
+              key={session.id}
+              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                   {getDeviceIcon(session.device)}
@@ -118,7 +119,8 @@ export default function LoginMethods() {
             <span className="font-medium text-sm">Wskazówka bezpieczeństwa</span>
           </div>
           <p className="text-xs text-blue-600">
-            Regularnie sprawdzaj aktywne sesje. Jeśli widzisz nieznane urządzenie lub lokalizację, natychmiast zakończ sesję i zmień hasło.
+            Regularnie sprawdzaj aktywne sesje. Jeśli widzisz nieznane urządzenie lub lokalizację,
+            natychmiast zakończ sesję i zmień hasło.
           </p>
         </div>
       </div>
@@ -126,7 +128,9 @@ export default function LoginMethods() {
       {/* Uwierzytelnianie dwuskładnikowe */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Uwierzytelnianie dwuskładnikowe (2FA)</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Uwierzytelnianie dwuskładnikowe (2FA)
+          </h2>
           <button
             onClick={() => setShowAddTwoFactor(!showAddTwoFactor)}
             className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
@@ -138,7 +142,10 @@ export default function LoginMethods() {
 
         <div className="space-y-4">
           {twoFactorMethods.map((method) => (
-            <div key={method.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+            <div
+              key={method.id}
+              className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+            >
               <div className="flex items-center gap-4">
                 <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
                   {getTwoFactorIcon(method.type)}
@@ -152,9 +159,7 @@ export default function LoginMethods() {
                       </span>
                     )}
                   </h3>
-                  <p className="text-sm text-gray-600">
-                    {method.identifier}
-                  </p>
+                  <p className="text-sm text-gray-600">{method.identifier}</p>
                 </div>
               </div>
 
@@ -198,7 +203,8 @@ export default function LoginMethods() {
             <span className="font-medium text-sm">Zwiększ bezpieczeństwo</span>
           </div>
           <p className="text-xs text-green-600">
-            Uwierzytelnianie dwuskładnikowe dodaje dodatkową warstwę ochrony do Twojego konta. Zalecamy włączenie co najmniej jednej metody 2FA.
+            Uwierzytelnianie dwuskładnikowe dodaje dodatkową warstwę ochrony do Twojego konta.
+            Zalecamy włączenie co najmniej jednej metody 2FA.
           </p>
         </div>
       </div>

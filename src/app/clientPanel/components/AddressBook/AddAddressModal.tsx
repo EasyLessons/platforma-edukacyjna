@@ -21,7 +21,7 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
     country: 'PL',
     email: '',
     phone: '',
-    isDefault: false
+    isDefault: false,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -41,7 +41,7 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
       country: 'PL',
       email: '',
       phone: '',
-      isDefault: false
+      isDefault: false,
     });
   };
 
@@ -69,14 +69,12 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
 
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nazwa adresu *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nazwa adresu *</label>
             <input
               type="text"
               required
               value={formData.label}
-              onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, label: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               placeholder="np. Dom, Praca, Magazyn..."
             />
@@ -90,21 +88,19 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
               type="text"
               required
               value={formData.fullName}
-              onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               placeholder="Jan Kowalski lub Nazwa Firmy Sp. z o.o."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ulica i numer *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ulica i numer *</label>
             <input
               type="text"
               required
               value={formData.street}
-              onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, street: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
               placeholder="ul. Przykładowa 123/45"
             />
@@ -112,40 +108,34 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Miasto *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Miasto *</label>
               <input
                 type="text"
                 required
                 value={formData.city}
-                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 placeholder="Warszawa"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Województwo *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Województwo *</label>
               <input
                 type="text"
                 required
                 value={formData.state}
-                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 placeholder="mazowieckie"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kod pocztowy *
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Kod pocztowy *</label>
               <input
                 type="text"
                 required
                 value={formData.zipCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, zipCode: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 placeholder="00-000"
               />
@@ -153,13 +143,11 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Kraj *
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Kraj *</label>
             <select
               required
               value={formData.country}
-              onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, country: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
             >
               <option value="PL">Polska</option>
@@ -172,25 +160,21 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 placeholder="jan@example.com"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Telefon
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Telefon</label>
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                 placeholder="+48 123 456 789"
               />
@@ -202,7 +186,7 @@ export default function AddAddressModal({ isOpen, onClose, onSave }: AddAddressM
               type="checkbox"
               id="isDefault"
               checked={formData.isDefault}
-              onChange={(e) => setFormData(prev => ({ ...prev, isDefault: e.target.checked }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, isDefault: e.target.checked }))}
               className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
             />
             <label htmlFor="isDefault" className="ml-2 text-sm text-gray-700">

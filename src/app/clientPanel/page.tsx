@@ -53,16 +53,16 @@ export default function ClientPanel() {
             </div>
           </button>
         </div>
-        
+
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="mt-4 border-t border-gray-200 pt-4">
-            <Sidebar 
-              activeSection={activeSection} 
+            <Sidebar
+              activeSection={activeSection}
               setActiveSection={(section) => {
                 setActiveSection(section);
                 setIsMobileMenuOpen(false);
-              }} 
+              }}
               isMobile={true}
             />
           </div>
@@ -81,17 +81,12 @@ export default function ClientPanel() {
               <span className="font-medium">Powrót do panelu</span>
             </button>
           </div>
-          <Sidebar 
-            activeSection={activeSection} 
-            setActiveSection={setActiveSection} 
-          />
+          <Sidebar activeSection={activeSection} setActiveSection={setActiveSection} />
         </div>
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6 md:p-8">
-            {renderContent()}
-          </div>
+          <div className="max-w-4xl mx-auto p-6 md:p-8">{renderContent()}</div>
         </main>
       </div>
     </div>

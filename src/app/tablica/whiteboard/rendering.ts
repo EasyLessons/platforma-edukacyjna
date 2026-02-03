@@ -2,12 +2,12 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/rendering.ts
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - ./types (DrawingElement, DrawingPath, Shape, TextElement, FunctionPlot, ImageElement, ViewportTransform)
  * - ./viewport (transformPoint)
  * - ./utils (clampLineWidth, clampFontSize, evaluateExpression)
- * 
+ *
  * EKSPORTUJE:
  * - drawPath (function) - rysuje ścieżkę piórem
  * - drawShape (function) - rysuje kształty geometryczne
@@ -15,15 +15,15 @@
  * - drawFunction (function) - rysuje wykresy funkcji
  * - drawImage (function) - rysuje obrazy
  * - drawElement (function) - GŁÓWNA funkcja - deleguje do powyższych
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (główna pętla renderowania)
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - zmiana interfejsów wymaga aktualizacji funkcji draw
  * - viewport.ts - używa transformPoint do konwersji współrzędnych
  * - utils.ts - używa clamp i evaluateExpression
- * 
+ *
  * PRZEZNACZENIE:
  * Główny moduł renderowania wszystkich elementów na canvas.
  * Konwertuje współrzędne świata na ekran i rysuje z transformacjami viewport.
@@ -39,7 +39,7 @@ import {
   ImageElement,
   MarkdownNote,
   TableElement,
-  ViewportTransform
+  ViewportTransform,
 } from './types';
 import { transformPoint } from './viewport';
 import { clampLineWidth, clampFontSize, evaluateExpression } from './utils';
@@ -57,9 +57,9 @@ export function drawPath(
   canvasHeight: number
 ): void {
   if (path.points.length === 0) return;
-  
+
   const lineWidth = clampLineWidth(path.width, viewport.scale);
-  
+
   // Pojedynczy punkt - rysuj jako kółko (kropka)
   if (path.points.length === 1) {
     const point = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
@@ -69,21 +69,21 @@ export function drawPath(
     ctx.fill();
     return;
   }
-  
+
   ctx.strokeStyle = path.color;
   ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  
+
   const startPoint = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
   ctx.moveTo(startPoint.x, startPoint.y);
-  
+
   for (let i = 1; i < path.points.length; i++) {
     const point = transformPoint(path.points[i], viewport, canvasWidth, canvasHeight);
     ctx.lineTo(point.x, point.y);
   }
-  
+
   ctx.stroke();
 }
 
@@ -98,13 +98,18 @@ export function drawShape(
   canvasWidth: number,
   canvasHeight: number
 ): void {
-  const start = transformPoint({ x: shape.startX, y: shape.startY }, viewport, canvasWidth, canvasHeight);
+  const start = transformPoint(
+    { x: shape.startX, y: shape.startY },
+    viewport,
+    canvasWidth,
+    canvasHeight
+  );
   const end = transformPoint({ x: shape.endX, y: shape.endY }, viewport, canvasWidth, canvasHeight);
-  
+
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
   ctx.lineWidth = clampLineWidth(shape.strokeWidth, viewport.scale);
-  
+
   switch (shape.shapeType) {
     case 'rectangle':
       if (shape.fill) {
@@ -113,13 +118,13 @@ export function drawShape(
         ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
       }
       break;
-    
+
     case 'circle':
       const radiusX = Math.abs(end.x - start.x) / 2;
       const radiusY = Math.abs(end.y - start.y) / 2;
       const centerX = (start.x + end.x) / 2;
       const centerY = (start.y + end.y) / 2;
-      
+
       ctx.beginPath();
       ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, Math.PI * 2);
       if (shape.fill) {
@@ -128,7 +133,7 @@ export function drawShape(
         ctx.stroke();
       }
       break;
-    
+
     case 'triangle':
       const midX = (start.x + end.x) / 2;
       ctx.beginPath();
@@ -142,23 +147,23 @@ export function drawShape(
         ctx.stroke();
       }
       break;
-    
+
     case 'line':
       ctx.beginPath();
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
       break;
-    
+
     case 'arrow':
       const headlen = 15;
       const angle = Math.atan2(end.y - start.y, end.x - start.x);
-      
+
       ctx.beginPath();
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
-      
+
       ctx.beginPath();
       ctx.moveTo(end.x, end.y);
       ctx.lineTo(
@@ -172,7 +177,7 @@ export function drawShape(
       );
       ctx.stroke();
       break;
-    
+
     case 'polygon':
       // Wielokąt foremny z n bokami
       const sides = shape.sides || 5; // domyślnie pięciokąt
@@ -180,14 +185,14 @@ export function drawShape(
       const polyCenterY = (start.y + end.y) / 2;
       const polyRadiusX = Math.abs(end.x - start.x) / 2;
       const polyRadiusY = Math.abs(end.y - start.y) / 2;
-      
+
       ctx.beginPath();
       for (let i = 0; i < sides; i++) {
         // Zaczynamy od góry (-90 stopni = -PI/2)
-        const polyAngle = (i * 2 * Math.PI / sides) - Math.PI / 2;
+        const polyAngle = (i * 2 * Math.PI) / sides - Math.PI / 2;
         const px = polyCenterX + polyRadiusX * Math.cos(polyAngle);
         const py = polyCenterY + polyRadiusY * Math.sin(polyAngle);
-        
+
         if (i === 0) {
           ctx.moveTo(px, py);
         } else {
@@ -195,7 +200,7 @@ export function drawShape(
         }
       }
       ctx.closePath();
-      
+
       if (shape.fill) {
         ctx.fill();
       } else {
@@ -220,15 +225,15 @@ function calculateRequiredTextLines(
   lines.forEach((line) => {
     const words = line.split(' ');
     let currentLine = '';
-    
+
     words.forEach((word) => {
       const testLine = currentLine + (currentLine ? ' ' : '') + word;
       const metrics = ctx.measureText(testLine);
-      
+
       if (metrics.width > maxWidth && currentLine) {
         totalLines++;
         currentLine = word;
-        
+
         // Check if single word needs character wrapping
         while (ctx.measureText(currentLine).width > maxWidth) {
           let fitLength = 0;
@@ -247,7 +252,7 @@ function calculateRequiredTextLines(
         currentLine = testLine;
       }
     });
-    
+
     // Handle remaining line with character wrapping if needed
     while (currentLine && ctx.measureText(currentLine).width > maxWidth) {
       let fitLength = 0;
@@ -262,7 +267,7 @@ function calculateRequiredTextLines(
       totalLines++;
       currentLine = currentLine.substring(fitLength);
     }
-    
+
     if (currentLine) {
       totalLines++;
     }
@@ -285,51 +290,51 @@ export function drawText(
   debug: boolean = false
 ): { requiredHeight?: number } {
   const pos = transformPoint({ x: textEl.x, y: textEl.y }, viewport, canvasWidth, canvasHeight);
-  
+
   // 🆕 Font styling
   const fontWeight = textEl.fontWeight || 'normal';
   const fontStyle = textEl.fontStyle || 'normal';
   const fontFamily = textEl.fontFamily || 'Arial, sans-serif';
   const fontSize = clampFontSize(textEl.fontSize, viewport.scale);
-  
+
   ctx.fillStyle = textEl.color;
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
   ctx.textBaseline = 'top';
-  
+
   // 🆕 Text alignment
   const textAlign = textEl.textAlign || 'left';
   ctx.textAlign = textAlign;
-  
+
   const lines = textEl.text.split('\n');
   const lineHeight = fontSize * 1.4;
-  
+
   // Padding (matching textarea px-3 py-2 = 12px 8px)
   const paddingX = 12; // 12px horizontal padding (px-3 = 0.75rem = 12px)
-  const paddingY = 8;  // 8px vertical padding (py-2 = 0.5rem = 8px)
-  
+  const paddingY = 8; // 8px vertical padding (py-2 = 0.5rem = 8px)
+
   // 🆕 Calculate X position based on alignment and width
   let textX = pos.x + paddingX;
   if (textEl.width) {
     const boxWidth = textEl.width * viewport.scale * 100;
-    const contentWidth = boxWidth - (paddingX * 2); // Subtract padding from both sides
-    
+    const contentWidth = boxWidth - paddingX * 2; // Subtract padding from both sides
+
     if (textAlign === 'center') {
       textX = pos.x + paddingX + contentWidth / 2;
     } else if (textAlign === 'right') {
       textX = pos.x + paddingX + contentWidth;
     }
   }
-  
+
   // 🆕 Text wrapping jeśli jest width
   if (textEl.width) {
     const boxWidth = textEl.width * viewport.scale * 100;
-    const maxWidth = boxWidth - (paddingX * 2); // Subtract padding from both sides
-    
+    const maxWidth = boxWidth - paddingX * 2; // Subtract padding from both sides
+
     // Calculate required lines
     const requiredLines = calculateRequiredTextLines(ctx, textEl.text, maxWidth);
     const requiredHeight = (requiredLines * lineHeight + paddingY * 2) / (viewport.scale * 100);
     const currentHeight = textEl.height || 0;
-    
+
     // Debug info
     if (debug) {
       console.log('📏 Text sizing:', {
@@ -339,26 +344,26 @@ export function drawText(
         currentHeight: currentHeight.toFixed(2),
         needsExpand: requiredHeight > currentHeight,
         width: textEl.width.toFixed(2),
-        text: textEl.text.substring(0, 30) + '...'
+        text: textEl.text.substring(0, 30) + '...',
       });
     }
-    
+
     let currentY = pos.y + paddingY;
-    
+
     lines.forEach((line) => {
       const words = line.split(' ');
       let currentLine = '';
-      
+
       words.forEach((word, i) => {
         const testLine = currentLine + (currentLine ? ' ' : '') + word;
         const metrics = ctx.measureText(testLine);
-        
+
         if (metrics.width > maxWidth && currentLine) {
           // Current line is full, render it
           ctx.fillText(currentLine, textX, currentY);
           currentLine = word;
           currentY += lineHeight;
-          
+
           // Check if single word is too long (character-based wrapping)
           while (ctx.measureText(currentLine).width > maxWidth) {
             // Find how many characters fit
@@ -370,9 +375,9 @@ export function drawText(
                 break;
               }
             }
-            
+
             if (fitLength === 0) fitLength = 1; // At least one character
-            
+
             // Render the part that fits
             ctx.fillText(currentLine.substring(0, fitLength), textX, currentY);
             currentLine = currentLine.substring(fitLength);
@@ -382,7 +387,7 @@ export function drawText(
           currentLine = testLine;
         }
       });
-      
+
       // Render remaining line (with character wrapping if needed)
       while (currentLine && ctx.measureText(currentLine).width > maxWidth) {
         let fitLength = 0;
@@ -393,14 +398,14 @@ export function drawText(
             break;
           }
         }
-        
+
         if (fitLength === 0) fitLength = 1;
-        
+
         ctx.fillText(currentLine.substring(0, fitLength), textX, currentY);
         currentLine = currentLine.substring(fitLength);
         currentY += lineHeight;
       }
-      
+
       if (currentLine) {
         ctx.fillText(currentLine, textX, currentY);
         currentY += lineHeight;
@@ -412,22 +417,22 @@ export function drawText(
       ctx.fillText(line, textX, pos.y + paddingY + i * lineHeight);
     });
   }
-  
+
   // 🔍 DEBUG MODE: Visual feedback
   if (debug && textEl.width && textEl.height) {
     const boxWidth = textEl.width * viewport.scale * 100;
     const boxHeight = textEl.height * viewport.scale * 100;
-    const maxWidth = boxWidth - (paddingX * 2);
-    
+    const maxWidth = boxWidth - paddingX * 2;
+
     // Calculate required height
     const requiredLines = calculateRequiredTextLines(ctx, textEl.text, maxWidth);
     const requiredHeightPx = requiredLines * lineHeight + paddingY * 2;
-    
+
     // Draw current box (blue)
     ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.strokeRect(pos.x, pos.y, boxWidth, boxHeight);
-    
+
     // Draw required box (red if needs expand, green if ok)
     const needsExpand = requiredHeightPx > boxHeight;
     ctx.strokeStyle = needsExpand ? 'rgba(255, 0, 0, 0.8)' : 'rgba(0, 255, 0, 0.8)';
@@ -435,7 +440,7 @@ export function drawText(
     ctx.setLineDash([5, 5]);
     ctx.strokeRect(pos.x, pos.y, boxWidth, requiredHeightPx);
     ctx.setLineDash([]);
-    
+
     // Draw label
     ctx.fillStyle = needsExpand ? 'rgba(255, 0, 0, 0.9)' : 'rgba(0, 255, 0, 0.9)';
     ctx.font = '12px monospace';
@@ -445,13 +450,13 @@ export function drawText(
       pos.x,
       pos.y - 20
     );
-    
+
     // Return required height for auto-expand
     if (needsExpand) {
       return { requiredHeight: requiredHeightPx / (viewport.scale * 100) };
     }
   }
-  
+
   return {};
 }
 
@@ -471,19 +476,24 @@ export function drawFunction(
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
   ctx.beginPath();
-  
+
   let started = false;
   const step = 0.02 / viewport.scale;
-  
+
   for (let worldX = -func.xRange; worldX <= func.xRange; worldX += step) {
     try {
       const worldY = evaluateExpression(func.expression, worldX);
-      
+
       if (!isFinite(worldY)) continue;
       if (Math.abs(worldY) > func.yRange) continue;
-      
-      const screenPos = transformPoint({ x: worldX, y: -worldY }, viewport, canvasWidth, canvasHeight);
-      
+
+      const screenPos = transformPoint(
+        { x: worldX, y: -worldY },
+        viewport,
+        canvasWidth,
+        canvasHeight
+      );
+
       if (!started) {
         ctx.moveTo(screenPos.x, screenPos.y);
         started = true;
@@ -494,7 +504,7 @@ export function drawFunction(
       started = false;
     }
   }
-  
+
   if (started) {
     ctx.stroke();
   }
@@ -518,10 +528,10 @@ export function drawImage(
     canvasWidth,
     canvasHeight
   );
-  
+
   const screenWidth = bottomRight.x - topLeft.x;
   const screenHeight = bottomRight.y - topLeft.y;
-  
+
   const htmlImg = loadedImages.get(img.id);
   if (htmlImg && htmlImg.complete) {
     ctx.drawImage(htmlImg, topLeft.x, topLeft.y, screenWidth, screenHeight);
@@ -555,7 +565,7 @@ export function drawElement(
     drawShape(ctx, element, viewport, canvasWidth, canvasHeight);
   } else if (element.type === 'text') {
     const result = drawText(ctx, element, viewport, canvasWidth, canvasHeight, debug);
-    
+
     // Auto-expand if needed
     if (result.requiredHeight && onAutoExpand) {
       onAutoExpand(element.id, result.requiredHeight);
@@ -595,19 +605,19 @@ export function drawMarkdownNote(
     canvasWidth,
     canvasHeight
   );
-  
+
   const screenWidth = bottomRight.x - topLeft.x;
   const screenHeight = bottomRight.y - topLeft.y;
-  
+
   // Tło
   ctx.fillStyle = note.backgroundColor || '#ffffff';
   ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-  
+
   // Ramka
   ctx.strokeStyle = note.borderColor || '#e5e7eb';
   ctx.lineWidth = 2;
   ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-  
+
   // Ikona notatki w rogu (opcjonalnie)
   if (note.isFromChatbot) {
     ctx.fillStyle = '#3b82f6';
@@ -634,29 +644,29 @@ export function drawTable(
     canvasWidth,
     canvasHeight
   );
-  
+
   const screenWidth = bottomRight.x - topLeft.x;
   const screenHeight = bottomRight.y - topLeft.y;
   const cellWidth = screenWidth / table.cols;
   const cellHeight = screenHeight / table.rows;
-  
+
   // Tło całej tabeli
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-  
+
   // Tło nagłówka
   if (table.headerRow) {
     ctx.fillStyle = table.headerBgColor || '#f3f4f6';
     ctx.fillRect(topLeft.x, topLeft.y, screenWidth, cellHeight);
   }
-  
+
   // Linie siatki
   ctx.strokeStyle = table.borderColor || '#d1d5db';
   ctx.lineWidth = 1;
-  
+
   // Zewnętrzna ramka
   ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
-  
+
   // Linie poziome
   for (let r = 1; r < table.rows; r++) {
     const y = topLeft.y + r * cellHeight;
@@ -665,7 +675,7 @@ export function drawTable(
     ctx.lineTo(topLeft.x + screenWidth, y);
     ctx.stroke();
   }
-  
+
   // Linie pionowe
   for (let c = 1; c < table.cols; c++) {
     const x = topLeft.x + c * cellWidth;

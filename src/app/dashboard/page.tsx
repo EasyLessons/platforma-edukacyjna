@@ -20,15 +20,13 @@ export default function Dashboard() {
         {/* PRAWA STRONA - Główna treść */}
         <div className="flex-1 overflow-auto">
           <div className="w-full mx-auto p-8">
-            
             {/* SEKCJA POWITALNA */}
             <WelcomeSection />
 
             {/* SEKCJA SZABLONÓW */}
             <TemplatesSection />
 
-            <LastBoards /> 
-
+            <LastBoards />
           </div>
         </div>
       </div>

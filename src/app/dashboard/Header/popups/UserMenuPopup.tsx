@@ -52,22 +52,19 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   };
 
   return (
-    <div ref={popupRef} className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50">
+    <div
+      ref={popupRef}
+      className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50"
+    >
       {/* Info użytkownika */}
       <div className="px-4 py-4 border-b border-gray-100 bg-gray-50">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center shadow-sm">
-            <span className="text-white font-semibold text-base">
-              {user.avatar}
-            </span>
+            <span className="text-white font-semibold text-base">{user.avatar}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <div className="font-semibold text-gray-800 text-sm truncate">
-              {user.name}
-            </div>
-            <div className="text-xs text-gray-500 truncate">
-              {user.email}
-            </div>
+            <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
+            <div className="text-xs text-gray-500 truncate">{user.email}</div>
           </div>
         </div>
 
@@ -98,7 +95,6 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
           <span className="text-gray-700 font-medium text-sm">Profil</span>
         </button>
 
-        
         {!user.isPremium && (
           <>
             <div className="my-2 border-t border-gray-100"></div>
@@ -111,12 +107,8 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
                   <Crown size={16} className="text-yellow-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="text-yellow-700 font-semibold text-sm">
-                    Przejdź na Premium
-                  </div>
-                  <div className="text-xs text-yellow-600">
-                    Więcej funkcji
-                  </div>
+                  <div className="text-yellow-700 font-semibold text-sm">Przejdź na Premium</div>
+                  <div className="text-xs text-yellow-600">Więcej funkcji</div>
                 </div>
               </button>
             </Link>
@@ -124,7 +116,7 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
         )}
 
         <div className="my-2 border-t border-gray-100"></div>
-        
+
         {/* Wyloguj */}
         <button
           onClick={handleLogout}

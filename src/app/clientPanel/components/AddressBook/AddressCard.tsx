@@ -23,7 +23,7 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
     country: address.country,
     email: address.email || '',
     phone: address.phone || '',
-    isDefault: address.isDefault
+    isDefault: address.isDefault,
   });
 
   const handleSave = () => {
@@ -42,7 +42,7 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
       country: address.country,
       email: address.email || '',
       phone: address.phone || '',
-      isDefault: address.isDefault
+      isDefault: address.isDefault,
     });
     setIsEditing(false);
   };
@@ -105,13 +105,11 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
       {isEditing ? (
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nazwa adresu
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Nazwa adresu</label>
             <input
               type="text"
               value={formData.label}
-              onChange={(e) => setFormData(prev => ({ ...prev, label: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, label: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             />
           </div>
@@ -123,54 +121,46 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
             <input
               type="text"
               value={formData.fullName}
-              onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, fullName: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ulica i numer
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ulica i numer</label>
             <input
               type="text"
               value={formData.street}
-              onChange={(e) => setFormData(prev => ({ ...prev, street: e.target.value }))}
+              onChange={(e) => setFormData((prev) => ({ ...prev, street: e.target.value }))}
               className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             />
           </div>
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Miasto
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Miasto</label>
               <input
                 type="text"
                 value={formData.city}
-                onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Województwo
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Województwo</label>
               <input
                 type="text"
                 value={formData.state}
-                onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kod pocztowy
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Kod pocztowy</label>
               <input
                 type="text"
                 value={formData.zipCode}
-                onChange={(e) => setFormData(prev => ({ ...prev, zipCode: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, zipCode: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
@@ -178,24 +168,20 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Telefon
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Telefon</label>
               <input
                 type="tel"
                 value={formData.phone}
-                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
@@ -218,22 +204,22 @@ export default function AddressCard({ address, onEdit, onDelete, onSetDefault }:
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="text-gray-900 font-medium">
-            {address.fullName}
-          </div>
+          <div className="text-gray-900 font-medium">{address.fullName}</div>
           <div className="text-gray-700">
-            {address.street}<br />
-            {address.city}, {address.state}, {address.zipCode}<br />
+            {address.street}
+            <br />
+            {address.city}, {address.state}, {address.zipCode}
+            <br />
             {address.country}
           </div>
-          
+
           {address.email && (
             <div className="flex items-center gap-2 text-gray-600">
               <Mail size={14} />
               <span className="text-sm">{address.email}</span>
             </div>
           )}
-          
+
           {address.phone && (
             <div className="flex items-center gap-2 text-gray-600">
               <Phone size={14} />

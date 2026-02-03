@@ -7,7 +7,7 @@ import { Edit2, User2, Key, ExternalLink } from 'lucide-react';
 const mockSecurityData = {
   username: 'WhiteslopeStudio',
   loginMethod: 'password',
-  externalPlatforms: []
+  externalPlatforms: [],
 };
 
 export default function SecurityInfo() {
@@ -81,9 +81,7 @@ export default function SecurityInfo() {
               <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
                 <User2 size={20} className="text-purple-600" />
               </div>
-              <span className="text-gray-900 font-medium">
-                {mockSecurityData.username}
-              </span>
+              <span className="text-gray-900 font-medium">{mockSecurityData.username}</span>
             </div>
           )}
         </div>
@@ -99,16 +97,12 @@ export default function SecurityInfo() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">
-                Hasło
-              </label>
+              <label className="block text-sm font-medium text-gray-500 mb-1">Hasło</label>
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
                   <Key size={20} className="text-orange-600" />
                 </div>
-                <span className="text-gray-900 font-medium">
-                  Aktualnie używasz hasła
-                </span>
+                <span className="text-gray-900 font-medium">Aktualnie używasz hasła</span>
               </div>
             </div>
           </div>

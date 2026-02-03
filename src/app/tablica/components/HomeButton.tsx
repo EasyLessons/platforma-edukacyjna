@@ -2,7 +2,7 @@
  * ============================================================================
  * PLIK: src/app/tablica/components/HomeButton.tsx
  * ============================================================================
- * 
+ *
  * PRZEZNACZENIE:
  * Przycisk powrotu do dashboardu (Home) - pojawia się gdy BoardHeader znika
  * ============================================================================
@@ -39,7 +39,7 @@ export function HomeButton() {
       }}
     >
       <button
-        onClick={() => window.location.href = '/dashboard'}
+        onClick={() => (window.location.href = '/dashboard')}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         style={{
@@ -98,7 +98,7 @@ export function HomeButton() {
                 height: 0,
                 borderLeft: '6px solid transparent',
                 borderRight: '6px solid transparent',
-                borderBottom: '6px solid #1f2937'
+                borderBottom: '6px solid #1f2937',
               }}
             />
           </div>

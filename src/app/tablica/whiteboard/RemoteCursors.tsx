@@ -2,10 +2,10 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *                    REMOTE CURSORS - Wyświetlanie kursorów innych użytkowników
  * ═══════════════════════════════════════════════════════════════════════════
- * 
+ *
  * Renderuje kursory innych użytkowników na tablicy z płynnymi animacjami CSS.
  * Używa world coordinates i transformuje je do screen coordinates.
- * 
+ *
  * ✅ ZOPTYMALIZOWANE:
  * - Używa CSS transition zamiast requestAnimationFrame + forceUpdate
  * - RemoteCursorsContainer sam subskrybuje kursory - nie powoduje re-renderów rodzica!
@@ -47,15 +47,15 @@ const CURSOR_COLORS = [
 ];
 
 // Pojedynczy kursor - memo żeby nie re-renderować gdy inne kursory się zmieniają
-const SingleCursor = memo(function SingleCursor({ 
-  cursor, 
-  screenX, 
-  screenY, 
-  color 
-}: { 
-  cursor: RemoteCursor; 
-  screenX: number; 
-  screenY: number; 
+const SingleCursor = memo(function SingleCursor({
+  cursor,
+  screenX,
+  screenY,
+  color,
+}: {
+  cursor: RemoteCursor;
+  screenX: number;
+  screenY: number;
   color: string;
 }) {
   return (
@@ -72,12 +72,7 @@ const SingleCursor = memo(function SingleCursor({
           willChange: 'transform',
         }}
       >
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 28 28"
-          fill="none"
-        >
+        <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
           {/* Cień kursora */}
           <path
             d="M5 5L15 23L17.5 15.5L25 13L5 5Z"
@@ -93,14 +88,10 @@ const SingleCursor = memo(function SingleCursor({
             strokeLinejoin="round"
           />
           {/* Wewnętrzny highlight */}
-          <path
-            d="M7 7L13 18L14.5 13.5L19 12L7 7Z"
-            fill="white"
-            fillOpacity="0.3"
-          />
+          <path d="M7 7L13 18L14.5 13.5L19 12L7 7Z" fill="white" fillOpacity="0.3" />
         </svg>
       </div>
-      
+
       {/* Nazwa użytkownika */}
       <div
         className="absolute"
@@ -128,16 +119,16 @@ const SingleCursor = memo(function SingleCursor({
 });
 
 // Prezentacyjny komponent - memo
-const RemoteCursorsInner = memo(function RemoteCursorsInner({ 
-  cursors, 
-  viewport, 
-  canvasWidth, 
-  canvasHeight 
+const RemoteCursorsInner = memo(function RemoteCursorsInner({
+  cursors,
+  viewport,
+  canvasWidth,
+  canvasHeight,
 }: RemoteCursorsProps) {
   if (cursors.length === 0) return null;
 
   return (
-    <div 
+    <div
       className="absolute inset-0 pointer-events-none z-40 overflow-hidden"
       style={{ width: canvasWidth, height: canvasHeight }}
     >
@@ -149,11 +140,13 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
           canvasWidth,
           canvasHeight
         );
-        
+
         // Ukryj kursory poza widocznym obszarem (z marginesem)
         if (
-          screenPos.x < -50 || screenPos.x > canvasWidth + 50 ||
-          screenPos.y < -50 || screenPos.y > canvasHeight + 50
+          screenPos.x < -50 ||
+          screenPos.x > canvasWidth + 50 ||
+          screenPos.y < -50 ||
+          screenPos.y > canvasHeight + 50
         ) {
           return null;
         }
@@ -178,7 +171,7 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
 
 /**
  * 🆕 CONTAINER - sam subskrybuje kursory z context
- * 
+ *
  * To jest kluczowe dla wydajności! Ten komponent sam zarządza
  * subskrypcją kursorów, więc zmiany kursorów powodują re-render
  * TYLKO tego komponentu, nie WhiteboardCanvas.
@@ -186,18 +179,18 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
 export function RemoteCursorsContainer({
   viewport,
   canvasWidth,
-  canvasHeight
+  canvasHeight,
 }: RemoteCursorsContainerProps) {
   const { subscribeCursors } = useBoardRealtime();
   const [cursors, setCursors] = useState<RemoteCursor[]>([]);
-  
+
   useEffect(() => {
     const unsubscribe = subscribeCursors((newCursors) => {
       setCursors(newCursors);
     });
     return unsubscribe;
   }, [subscribeCursors]);
-  
+
   return (
     <RemoteCursorsInner
       cursors={cursors}

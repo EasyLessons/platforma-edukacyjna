@@ -2,28 +2,28 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/PenTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useState, useCallback)
  * - ../whiteboard/types (Point, ViewportTransform, DrawingPath)
  * - ../whiteboard/viewport (inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
- * 
+ *
  * EKSPORTUJE:
  * - PenTool (component) - narzędzie rysowania piórem
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (aktywne gdy tool === 'pen')
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - używa DrawingPath
  * - viewport.ts - używa funkcji transformacji i zoom/pan
  * - WhiteboardCanvas.tsx - dostarcza callback'i: onPathCreate, onViewportChange
- * 
+ *
  * ⚠️ WAŻNE - WHEEL EVENTS:
  * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
  * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
  * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
- * 
+ *
  * PRZEZNACZENIE:
  * Rysowanie ścieżek piórem - płynne linie rysowane myszką/touchem.
  * ============================================================================
@@ -33,7 +33,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '../whiteboard/types';
-import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  inverseTransformPoint,
+  transformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { clampLineWidth } from '../whiteboard/utils';
 import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
@@ -61,7 +67,7 @@ export function PenTool({
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<Point[]>([]);
   const [, forceUpdate] = useState({});
-  
+
   // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
   const isPenModeRef = useRef(false);
 
@@ -83,7 +89,14 @@ export function PenTool({
       e.stopPropagation();
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(
+          viewport,
+          e.deltaY,
+          e.clientX,
+          e.clientY,
+          canvasWidth,
+          canvasHeight
+        );
         onViewportChange(constrainViewport(newViewport));
       } else {
         const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
@@ -115,12 +128,12 @@ export function PenTool({
     if (e.pointerType === 'pen') {
       isPenModeRef.current = true;
     }
-    
+
     // 🆕 W pen mode: BLOKUJ wszystko oprócz pen (blokuje palce gdy pióro aktywne)
     if (isPenModeRef.current && e.pointerType !== 'pen') {
       return;
     }
-    
+
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerDown(e);
 
@@ -129,13 +142,13 @@ export function PenTool({
 
     // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
     if (e.button !== 0 && e.button !== -1) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -161,7 +174,7 @@ export function PenTool({
     if (isPenModeRef.current && e.pointerType !== 'pen') {
       return;
     }
-    
+
     // 🆕 Najpierw przekaż do gesture handler
     gestures.handlePointerMove(e);
 
@@ -169,7 +182,7 @@ export function PenTool({
     if (gestures.isGestureActive()) return;
 
     if (!isDrawingRef.current || !currentPathRef.current) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
 
@@ -178,7 +191,7 @@ export function PenTool({
 
     // Dodaj punkt bezpośrednio do ref (bez kopiowania całej tablicy)
     pointsRef.current.push(worldPoint);
-    
+
     // Wymuszaj re-render dla płynnego podglądu
     forceUpdate({});
   };
@@ -189,10 +202,10 @@ export function PenTool({
     gestures.handlePointerUp(e);
 
     if (!isDrawingRef.current) return;
-    
+
     // Zwolnij pointer capture
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    
+
     if (currentPathRef.current && pointsRef.current.length >= 1) {
       // Utwórz finalną ścieżkę z kopiami punktów
       const finalPath: DrawingPath = {
@@ -205,7 +218,7 @@ export function PenTool({
     isDrawingRef.current = false;
     currentPathRef.current = null;
     pointsRef.current = [];
-    
+
     // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
     setTimeout(() => {
       if (!isDrawingRef.current) {
@@ -220,10 +233,10 @@ export function PenTool({
     gestures.handlePointerCancel(e);
 
     if (!isDrawingRef.current) return;
-    
+
     // Zwolnij pointer capture
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-    
+
     isDrawingRef.current = false;
     currentPathRef.current = null;
     pointsRef.current = [];
@@ -237,7 +250,9 @@ export function PenTool({
     const pathData = pointsRef.current
       .map((p, i) => {
         const screenPoint = transformPoint(p, viewport, canvasWidth, canvasHeight);
-        return i === 0 ? `M ${screenPoint.x} ${screenPoint.y}` : `L ${screenPoint.x} ${screenPoint.y}`;
+        return i === 0
+          ? `M ${screenPoint.x} ${screenPoint.y}`
+          : `L ${screenPoint.x} ${screenPoint.y}`;
       })
       .join(' ');
 

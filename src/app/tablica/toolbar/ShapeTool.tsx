@@ -2,29 +2,29 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/ShapeTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useState)
  * - ../whiteboard/types (Point, ViewportTransform, Shape, ShapeType)
  * - ../whiteboard/viewport (inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
  * - ../toolbar/Toolbar (ShapeType)
- * 
+ *
  * EKSPORTUJE:
  * - ShapeTool (component) - narzędzie rysowania kształtów
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (aktywne gdy tool === 'shape')
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - używa Shape
  * - viewport.ts - używa funkcji transformacji i zoom/pan
  * - WhiteboardCanvas.tsx - dostarcza callback'i: onShapeCreate, onViewportChange
- * 
+ *
  * ⚠️ WAŻNE - WHEEL EVENTS:
  * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
  * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
  * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
- * 
+ *
  * PRZEZNACZENIE:
  * Rysowanie kształtów geometrycznych (prostokąt, koło, trójkąt, linia, strzałka).
  * ============================================================================
@@ -34,7 +34,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Point, ViewportTransform, Shape } from '../whiteboard/types';
-import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  inverseTransformPoint,
+  transformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { ShapeType } from '../toolbar/Toolbar';
 import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
@@ -91,13 +97,20 @@ export function ShapeTool({
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = (e: React.WheelEvent) => {
     if (!onViewportChange) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.ctrlKey) {
       // Zoom
-      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+      const newViewport = zoomViewport(
+        viewport,
+        e.deltaY,
+        e.clientX,
+        e.clientY,
+        canvasWidth,
+        canvasHeight
+      );
       onViewportChange(constrainViewport(newViewport));
     } else {
       // Pan
@@ -110,7 +123,7 @@ export function ShapeTool({
   const handlePointerDown = (e: React.PointerEvent) => {
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
-    
+
     gestures.handlePointerDown(e);
     if (gestures.isGestureActive()) return;
 
@@ -259,7 +272,7 @@ export function ShapeTool({
           x: tip.x - arrowLength * Math.cos(angle + Math.PI / 6),
           y: tip.y - arrowLength * Math.sin(angle + Math.PI / 6),
         };
-        
+
         shapeElement = (
           <>
             <line
@@ -287,7 +300,7 @@ export function ShapeTool({
         const polygonRadiusY = Math.abs(end.y - start.y) / 2;
         const polygonCenterX = (start.x + end.x) / 2;
         const polygonCenterY = (start.y + end.y) / 2;
-        
+
         const polygonPoints: string[] = [];
         for (let i = 0; i < sides; i++) {
           const polygonAngle = (i * 2 * Math.PI) / sides - Math.PI / 2;
@@ -295,7 +308,7 @@ export function ShapeTool({
           const py = polygonCenterY + polygonRadiusY * Math.sin(polygonAngle);
           polygonPoints.push(`${px},${py}`);
         }
-        
+
         shapeElement = (
           <polygon
             points={polygonPoints.join(' ')}

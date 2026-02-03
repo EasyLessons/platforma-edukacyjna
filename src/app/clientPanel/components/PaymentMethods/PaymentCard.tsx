@@ -16,7 +16,7 @@ const getCardIcon = (brand: string) => {
     visa: '💳',
     mastercard: '💳',
     amex: '💳',
-    discover: '💳'
+    discover: '💳',
   };
   return icons[brand] || '💳';
 };
@@ -26,7 +26,7 @@ const getCardBrandName = (brand: string) => {
     visa: 'Visa',
     mastercard: 'Mastercard',
     amex: 'American Express',
-    discover: 'Discover'
+    discover: 'Discover',
   };
   return names[brand] || 'Karta';
 };
@@ -35,7 +35,7 @@ const getExpiryStatus = (month: number, year: number) => {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-  
+
   if (year < currentYear || (year === currentYear && month < currentMonth)) {
     return { status: 'expired', text: 'Wygasła', color: 'text-red-600' };
   } else if (year === currentYear && month <= currentMonth + 3) {
@@ -44,13 +44,18 @@ const getExpiryStatus = (month: number, year: number) => {
   return { status: 'valid', text: 'Ważna', color: 'text-green-600' };
 };
 
-export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefault }: PaymentCardProps) {
+export default function PaymentCard({
+  paymentMethod,
+  onEdit,
+  onDelete,
+  onSetDefault,
+}: PaymentCardProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     cardHolderName: paymentMethod.cardHolderName,
     expiryMonth: paymentMethod.expiryMonth,
     expiryYear: paymentMethod.expiryYear,
-    isDefault: paymentMethod.isDefault
+    isDefault: paymentMethod.isDefault,
   });
 
   const expiryStatus = getExpiryStatus(paymentMethod.expiryMonth, paymentMethod.expiryYear);
@@ -58,7 +63,7 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
   const handleSave = () => {
     onEdit(paymentMethod.id, {
       ...paymentMethod,
-      ...formData
+      ...formData,
     });
     setIsEditing(false);
   };
@@ -68,7 +73,7 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
       cardHolderName: paymentMethod.cardHolderName,
       expiryMonth: paymentMethod.expiryMonth,
       expiryYear: paymentMethod.expiryYear,
-      isDefault: paymentMethod.isDefault
+      isDefault: paymentMethod.isDefault,
     });
     setIsEditing(false);
   };
@@ -91,14 +96,10 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
               <span className="text-lg font-semibold text-gray-900">
                 **** {paymentMethod.lastFourDigits}
               </span>
-              <span className="text-sm text-gray-500">
-                {getCardBrandName(paymentMethod.brand)}
-              </span>
+              <span className="text-sm text-gray-500">{getCardBrandName(paymentMethod.brand)}</span>
             </div>
             <div className="flex items-center gap-4 mt-1">
-              <span className="text-sm text-gray-600">
-                {paymentMethod.cardHolderName}
-              </span>
+              <span className="text-sm text-gray-600">{paymentMethod.cardHolderName}</span>
               {paymentMethod.isDefault && (
                 <div className="flex items-center gap-1">
                   <Star size={14} className="text-yellow-500 fill-yellow-500" />
@@ -150,7 +151,9 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
               <input
                 type="text"
                 value={formData.cardHolderName}
-                onChange={(e) => setFormData(prev => ({ ...prev, cardHolderName: e.target.value }))}
+                onChange={(e) =>
+                  setFormData((prev) => ({ ...prev, cardHolderName: e.target.value }))
+                }
                 className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
               />
             </div>
@@ -162,10 +165,12 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
                 </label>
                 <select
                   value={formData.expiryMonth}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiryMonth: parseInt(e.target.value) }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, expiryMonth: parseInt(e.target.value) }))
+                  }
                   className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
-                  {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                  {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
                     <option key={month} value={month}>
                       {month.toString().padStart(2, '0')}
                     </option>
@@ -178,14 +183,18 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
                 </label>
                 <select
                   value={formData.expiryYear}
-                  onChange={(e) => setFormData(prev => ({ ...prev, expiryYear: parseInt(e.target.value) }))}
+                  onChange={(e) =>
+                    setFormData((prev) => ({ ...prev, expiryYear: parseInt(e.target.value) }))
+                  }
                   className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
                 >
-                  {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
+                  {Array.from({ length: 20 }, (_, i) => new Date().getFullYear() + i).map(
+                    (year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
             </div>
@@ -209,7 +218,8 @@ export default function PaymentCard({ paymentMethod, onEdit, onDelete, onSetDefa
           <div className="flex items-center justify-between">
             <div>
               <span className="text-sm text-gray-600">
-                Wygasa: <span className="font-medium">
+                Wygasa:{' '}
+                <span className="font-medium">
                   {paymentMethod.expiryMonth.toString().padStart(2, '0')}/{paymentMethod.expiryYear}
                 </span>
               </span>

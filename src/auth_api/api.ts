@@ -68,12 +68,12 @@ export interface ResetPasswordData {
 // Helper do obsługi błędów
 const handleResponse = async (response: Response) => {
   const data = await response.json().catch(() => ({}));
-  
+
   if (!response.ok) {
     const errorMessage = data.detail || 'Wystąpił błąd';
     throw new Error(errorMessage);
   }
-  
+
   return data;
 };
 
@@ -90,7 +90,7 @@ export const registerUser = async (userData: RegisterData): Promise<RegisterResp
     },
     body: JSON.stringify(userData),
   });
-  
+
   return handleResponse(response);
 };
 
@@ -105,7 +105,7 @@ export const verifyEmail = async (verifyData: VerifyEmailData): Promise<AuthResp
     },
     body: JSON.stringify(verifyData),
   });
-  
+
   return handleResponse(response);
 };
 
@@ -113,20 +113,20 @@ export const verifyEmail = async (verifyData: VerifyEmailData): Promise<AuthResp
  * Logowanie użytkownika
  */
 export const loginUser = async (loginData: LoginData): Promise<AuthResponse> => {
-     console.log('API_BASE_URL:', API_BASE_URL);
-     console.log('Full URL:', `${API_BASE_URL}/api/login`);
-     console.log('Login data:', loginData);
-     
-     const response = await fetch(`${API_BASE_URL}/api/login`, {
-       method: 'POST',
-       headers: {
-         'Content-Type': 'application/json',
-       },
-       body: JSON.stringify(loginData),
-     });
-     
-     return handleResponse(response);
-   };
+  console.log('API_BASE_URL:', API_BASE_URL);
+  console.log('Full URL:', `${API_BASE_URL}/api/login`);
+  console.log('Login data:', loginData);
+
+  const response = await fetch(`${API_BASE_URL}/api/login`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(loginData),
+  });
+
+  return handleResponse(response);
+};
 
 /**
  * Ponowne wysłanie kodu weryfikacyjnego
@@ -139,7 +139,7 @@ export const resendVerificationCode = async (userId: number): Promise<{ message:
     },
     body: JSON.stringify({ user_id: userId }),
   });
-  
+
   return handleResponse(response);
 };
 
@@ -151,7 +151,7 @@ export const saveToken = (token: string) => {
   if (typeof window !== 'undefined') {
     // Zapisz w localStorage
     localStorage.setItem('access_token', token);
-    
+
     // Zapisz w cookies (ważne przez 7 dni)
     document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict`;
   }
@@ -168,7 +168,7 @@ export const removeToken = () => {
   if (typeof window !== 'undefined') {
     // Usuń z localStorage
     localStorage.removeItem('access_token');
-    
+
     // Usuń z cookies
     document.cookie = 'access_token=; path=/; max-age=0';
   }
@@ -208,7 +208,9 @@ export const logout = () => {
 /**
  * Sprawdza czy użytkownik istnieje i czy jest zweryfikowany
  */
-export const checkUser = async (email: string): Promise<{ exists: boolean; verified: boolean; user_id?: number }> => {
+export const checkUser = async (
+  email: string
+): Promise<{ exists: boolean; verified: boolean; user_id?: number }> => {
   const response = await fetch(`${API_BASE_URL}/api/check-user`, {
     method: 'POST',
     headers: {
@@ -216,14 +218,17 @@ export const checkUser = async (email: string): Promise<{ exists: boolean; verif
     },
     body: JSON.stringify({ email }),
   });
-  
+
   return handleResponse(response);
 };
 
 /**
  * Wyszukuje użytkowników
  */
-export const searchUsers = async (query: string, limit: number = 10): Promise<UserSearchResult[]> => {
+export const searchUsers = async (
+  query: string,
+  limit: number = 10
+): Promise<UserSearchResult[]> => {
   if (!query || query.length < 2) return []; // minimalna długość
   const token = getToken();
 
@@ -234,8 +239,8 @@ export const searchUsers = async (query: string, limit: number = 10): Promise<Us
       {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       }
     );
@@ -256,46 +261,46 @@ export const searchUsers = async (query: string, limit: number = 10): Promise<Us
   }
 };
 
-
 /**
  * Sprawdza czy użytkownik może być zaproszony
  */
 export const checkUserInviteStatus = async (
-  workspaceId: number, 
+  workspaceId: number,
   userId: number
-): Promise<{is_member: boolean; has_pending_invite: boolean; can_invite: boolean}> => {
+): Promise<{ is_member: boolean; has_pending_invite: boolean; can_invite: boolean }> => {
   const token = localStorage.getItem('access_token');
-  
+
   if (!token) {
     throw new Error('Musisz być zalogowany');
   }
-  
+
   const response = await fetch(
     `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'}/api/workspaces/${workspaceId}/members/check/${userId}`,
     {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
     }
   );
-  
+
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.detail || 'Błąd sprawdzania statusu');
   }
-  
+
   return response.json();
 };
-
 
 // === PASSWORD RESET API ===
 
 /**
  * Wysyła żądanie resetu hasła - kod na email
  */
-export const requestPasswordReset = async (data: RequestPasswordResetData): Promise<{ message: string }> => {
+export const requestPasswordReset = async (
+  data: RequestPasswordResetData
+): Promise<{ message: string }> => {
   const response = await fetch(`${API_BASE_URL}/api/request-password-reset`, {
     method: 'POST',
     headers: {
@@ -303,14 +308,16 @@ export const requestPasswordReset = async (data: RequestPasswordResetData): Prom
     },
     body: JSON.stringify(data),
   });
-  
+
   return handleResponse(response);
 };
 
 /**
  * Weryfikuje kod resetowania hasła
  */
-export const verifyResetCode = async (data: VerifyResetCodeData): Promise<{ message: string; valid: boolean }> => {
+export const verifyResetCode = async (
+  data: VerifyResetCodeData
+): Promise<{ message: string; valid: boolean }> => {
   const response = await fetch(`${API_BASE_URL}/api/verify-reset-code`, {
     method: 'POST',
     headers: {
@@ -318,7 +325,7 @@ export const verifyResetCode = async (data: VerifyResetCodeData): Promise<{ mess
     },
     body: JSON.stringify(data),
   });
-  
+
   return handleResponse(response);
 };
 
@@ -333,6 +340,6 @@ export const resetPassword = async (data: ResetPasswordData): Promise<{ message:
     },
     body: JSON.stringify(data),
   });
-  
+
   return handleResponse(response);
 };

@@ -2,11 +2,11 @@
 
 import { X, Check, Clock, Building } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { 
-  fetchPendingInvites, 
-  acceptInvite, 
+import {
+  fetchPendingInvites,
+  acceptInvite,
   rejectInvite,
-  PendingInvite 
+  PendingInvite,
 } from '@/workspace_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { supabase } from '@/lib/supabase';
@@ -23,7 +23,7 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
 
   useEffect(() => {
     loadInvites();
-    
+
     // Realtime nasłuchiwanie nowych zaproszeń
     const channel = supabase
       .channel('workspace_invites_realtime')
@@ -32,7 +32,7 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'workspace_invites'
+          table: 'workspace_invites',
         },
         (payload) => {
           console.log('🔔 Nowe zaproszenie:', payload);
@@ -41,7 +41,7 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
         }
       )
       .subscribe();
-    
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -63,10 +63,9 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
     try {
       setProcessingInvite(invite.id);
       await acceptInvite(invite.invite_token);
-      
-      setInvites(prev => prev.filter(inv => inv.id !== invite.id));
+
+      setInvites((prev) => prev.filter((inv) => inv.id !== invite.id));
       await refreshWorkspaces();
-      
     } catch (error: any) {
       alert(error.message || 'Błąd akceptowania zaproszenia');
     } finally {
@@ -78,9 +77,8 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
     try {
       setProcessingInvite(invite.id);
       await rejectInvite(invite.invite_token);
-      
-      setInvites(prev => prev.filter(inv => inv.id !== invite.id));
-      
+
+      setInvites((prev) => prev.filter((inv) => inv.id !== invite.id));
     } catch (error: any) {
       alert(error.message || 'Błąd odrzucania zaproszenia');
     } finally {
@@ -100,18 +98,15 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
     if (diffMins < 60) return `${diffMins} min temu`;
     if (diffHours < 24) return `${diffHours} godz. temu`;
     if (diffDays < 7) return `${diffDays} dni temu`;
-    
+
     return date.toLocaleDateString('pl-PL');
   };
 
   return (
     <>
-      <div 
-        className="fixed inset-0 bg-black/15 backdrop-blur-sm z-[100]"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/15 backdrop-blur-sm z-[100]" onClick={onClose} />
 
-      <div 
+      <div
         className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[101] overflow-hidden flex flex-col animate-slide-in"
         onClick={(e) => e.stopPropagation()}
       >
@@ -142,7 +137,9 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
               {invites.map((invite) => (
                 <div key={invite.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
                   <div className="flex gap-3">
-                    <div className={`flex-shrink-0 w-12 h-12 ${invite.workspace_bg_color} rounded-lg flex items-center justify-center text-white`}>
+                    <div
+                      className={`flex-shrink-0 w-12 h-12 ${invite.workspace_bg_color} rounded-lg flex items-center justify-center text-white`}
+                    >
                       <Building size={24} />
                     </div>
 
@@ -153,8 +150,8 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
                             Zaproszenie do workspace
                           </h3>
                           <p className="text-sm text-gray-600">
-                            <span className="font-medium">{invite.inviter_name}</span> zaprasza Cię do{' '}
-                            <span className="font-medium">{invite.workspace_name}</span>
+                            <span className="font-medium">{invite.inviter_name}</span> zaprasza Cię
+                            do <span className="font-medium">{invite.workspace_name}</span>
                           </p>
                         </div>
                         <span className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-1.5"></span>
@@ -191,9 +188,7 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
                 <Check size={32} className="text-gray-400" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                Brak zaproszeń
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">Brak zaproszeń</h3>
               <p className="text-sm text-gray-500">
                 Nie masz żadnych oczekujących zaproszeń do workspace'ów
               </p>
@@ -204,8 +199,12 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
 
       <style jsx>{`
         @keyframes slide-in {
-          from { transform: translateX(100%); }
-          to { transform: translateX(0); }
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
         }
         .animate-slide-in {
           animation: slide-in 0.3s ease-out;

@@ -19,8 +19,8 @@ const mockAddresses: Address[] = [
     country: 'PL',
     email: 'whiteslopestudio@gmail.com',
     phone: '+48 123 123 123',
-    isDefault: true
-  }
+    isDefault: true,
+  },
 ];
 
 export default function AddressBook() {
@@ -30,31 +30,25 @@ export default function AddressBook() {
   const handleAddAddress = (newAddress: Omit<Address, 'id'>) => {
     const address: Address = {
       ...newAddress,
-      id: Math.max(...addresses.map(a => a.id)) + 1
+      id: Math.max(...addresses.map((a) => a.id)) + 1,
     };
-    setAddresses(prev => [...prev, address]);
+    setAddresses((prev) => [...prev, address]);
     setShowAddModal(false);
   };
 
   const handleEditAddress = (id: number, updatedAddress: Omit<Address, 'id'>) => {
-    setAddresses(prev => 
-      prev.map(addr => 
-        addr.id === id 
-          ? { ...updatedAddress, id }
-          : addr
-      )
-    );
+    setAddresses((prev) => prev.map((addr) => (addr.id === id ? { ...updatedAddress, id } : addr)));
   };
 
   const handleDeleteAddress = (id: number) => {
-    setAddresses(prev => prev.filter(addr => addr.id !== id));
+    setAddresses((prev) => prev.filter((addr) => addr.id !== id));
   };
 
   const handleSetDefault = (id: number) => {
-    setAddresses(prev => 
-      prev.map(addr => ({
+    setAddresses((prev) =>
+      prev.map((addr) => ({
         ...addr,
-        isDefault: addr.id === id
+        isDefault: addr.id === id,
       }))
     );
   };
@@ -64,9 +58,7 @@ export default function AddressBook() {
       {/* Nagłówek */}
       <div className="border-b border-gray-200 pb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Książka adresowa</h1>
-        <p className="text-gray-600">
-          Zarządzaj swoimi adresami do dostawy i fakturowania.
-        </p>
+        <p className="text-gray-600">Zarządzaj swoimi adresami do dostawy i fakturowania.</p>
       </div>
 
       {/* Lista adresów */}

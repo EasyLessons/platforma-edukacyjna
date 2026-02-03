@@ -2,24 +2,24 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/PDFTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useRef, useEffect, useImperativeHandle, forwardRef)
  * - ../whiteboard/types (ViewportTransform, PDFElement)
  * - ../whiteboard/viewport (zoomViewport, panViewportWithWheel, constrainViewport, inverseTransformPoint)
- * 
+ *
  * EKSPORTUJE:
  * - PDFToolRef (interface) - ref API dla toolbar buttons
  * - PDFTool (component) - narzędzie do wstawiania PDFów
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (główny komponent)
  * - Toolbar.tsx (przycisk Upload)
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - PDFElement interface
  * - viewport.ts - transformacje współrzędnych, pan/zoom
- * 
+ *
  * PRZEZNACZENIE:
  * Narzędzie do wstawiania dokumentów PDF na tablicę.
  * Obsługuje upload z dysku oraz drag&drop (globalnie w WhiteboardCanvas).
@@ -30,7 +30,12 @@
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { ViewportTransform, PDFElement } from '../whiteboard/types';
-import { zoomViewport, panViewportWithWheel, constrainViewport, inverseTransformPoint } from '../whiteboard/viewport';
+import {
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+  inverseTransformPoint,
+} from '../whiteboard/viewport';
 
 export interface PDFToolRef {
   triggerFileUpload: () => void;
@@ -59,7 +64,14 @@ export const PDFTool = forwardRef<PDFToolRef, PDFToolProps>(
         e.stopPropagation();
 
         if (e.ctrlKey) {
-          const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+          const newViewport = zoomViewport(
+            viewport,
+            e.deltaY,
+            e.clientX,
+            e.clientY,
+            canvasWidth,
+            canvasHeight
+          );
           onViewportChange(constrainViewport(newViewport));
         } else {
           const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
@@ -75,7 +87,7 @@ export const PDFTool = forwardRef<PDFToolRef, PDFToolProps>(
     useImperativeHandle(ref, () => ({
       triggerFileUpload: () => {
         fileInputRef.current?.click();
-      }
+      },
     }));
 
     // File upload handler
@@ -90,15 +102,20 @@ export const PDFTool = forwardRef<PDFToolRef, PDFToolProps>(
         const reader = new FileReader();
         reader.onload = async (evt) => {
           const pdfDataUrl = evt.target?.result as string;
-          
+
           // Wstaw w centrum widoku
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
-          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
-          
+          const centerWorld = inverseTransformPoint(
+            centerScreen,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+
           // Domyślny rozmiar PDF: 4 jednostki szerokości (A4 proporcje: ~1.414)
           const worldWidth = 4;
           const worldHeight = worldWidth * 1.414; // A4 aspect ratio
-          
+
           const newPDF: PDFElement = {
             id: `pdf-${Date.now()}`,
             type: 'pdf',

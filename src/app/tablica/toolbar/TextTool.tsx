@@ -2,34 +2,34 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/TextTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useState, useRef, useEffect)
  * - lucide-react (ikony: Bold, Italic, AlignLeft, AlignCenter, AlignRight)
  * - ../whiteboard/types (Point, ViewportTransform, TextElement)
  * - ../whiteboard/viewport (transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
- * 
+ *
  * EKSPORTUJE:
  * - TextTool (component) - narzędzie tworzenia/edycji tekstów
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (aktywne gdy tool === 'text')
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - używa TextElement (zmiana interfejsu wymaga aktualizacji)
  * - viewport.ts - używa funkcji transformacji i zoom/pan
  * - WhiteboardCanvas.tsx - dostarcza callback'i: onTextCreate, onTextUpdate, onTextDelete
- * 
+ *
  * ⚠️ WAŻNE - WHEEL EVENTS:
  * - Blokuje wheel gdy isEditing (scrollowanie w textarea)
  * - Obsługuje wheel gdy przeciąga ramkę (zoom/pan)
  * - touchAction: 'none' blokuje domyślny zoom przeglądarki
- * 
+ *
  * ⚠️ EDYCJA TEKSTU:
  * - editingTextId (z props) - ID tekstu do edycji (z double-click w SelectTool)
  * - Automatyczne zapisywanie przy kliknięciu poza edytor
  * - ESC anuluje edycję
- * 
+ *
  * PRZEZNACZENIE:
  * Tworzenie nowych tekstów (drag box → edytor) i edycja istniejących.
  * Mini toolbar z formatowaniem: rozmiar, kolor, bold, italic, wyrównanie.
@@ -41,7 +41,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import { Point, ViewportTransform, TextElement } from '../whiteboard/types';
-import { transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  transformPoint,
+  inverseTransformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { TextMiniToolbar } from './TextMiniToolbar';
 
 interface TextToolProps {
@@ -94,39 +100,39 @@ export function TextTool({
   // 🆕 Auto-resize textarea height based on content
   useEffect(() => {
     if (!isEditing || !textareaRef.current || !editorRef.current || !textDraft) return;
-    
+
     const textarea = textareaRef.current;
     const editor = editorRef.current;
-    
+
     // Reset height to recalculate
     textarea.style.height = 'auto';
-    
+
     // Get scroll height (content height)
     const scrollHeight = textarea.scrollHeight;
     const currentHeight = Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y);
-    
+
     // If content is taller than current box, expand
     if (scrollHeight > currentHeight) {
       // Calculate new height in world coordinates
       const newHeightWorld = scrollHeight / (viewport.scale * 100);
       const newScreenHeight = scrollHeight;
-      
+
       // Update textDraft with new height
-      setTextDraft(prev => {
+      setTextDraft((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
           screenEnd: {
             ...prev.screenEnd,
-            y: prev.screenStart.y + newScreenHeight
+            y: prev.screenStart.y + newScreenHeight,
           },
           worldEnd: {
             ...prev.worldEnd,
-            y: prev.worldStart.y + newHeightWorld
-          }
+            y: prev.worldStart.y + newHeightWorld,
+          },
         };
       });
-      
+
       // Update editor div height
       editor.style.height = `${newScreenHeight}px`;
       textarea.style.height = `${newScreenHeight}px`;
@@ -143,16 +149,23 @@ export function TextTool({
       e.stopPropagation();
       return;
     }
-    
+
     // Gdy tylko przeciągamy ramkę - obsłuż zoom/pan
     if (!onViewportChange) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (e.ctrlKey) {
       // Zoom
-      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+      const newViewport = zoomViewport(
+        viewport,
+        e.deltaY,
+        e.clientX,
+        e.clientY,
+        canvasWidth,
+        canvasHeight
+      );
       onViewportChange(constrainViewport(newViewport));
     } else {
       // Pan
@@ -165,7 +178,7 @@ export function TextTool({
   // Pozycja i rozmiar aktualizują się gdy viewport się zmienia
   useEffect(() => {
     if (editingTextId) {
-      const textToEdit = elements.find(el => el.id === editingTextId);
+      const textToEdit = elements.find((el) => el.id === editingTextId);
       if (textToEdit) {
         // Przelicz pozycję ekranową z współrzędnych świata
         const topLeft = transformPoint(
@@ -174,16 +187,19 @@ export function TextTool({
           canvasWidth,
           canvasHeight
         );
-        
+
         const width = (textToEdit.width || 3) * viewport.scale * 100;
         const height = (textToEdit.height || 1) * viewport.scale * 100;
-        
+
         setTextDraft({
           id: textToEdit.id,
           screenStart: topLeft,
           screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
           worldStart: { x: textToEdit.x, y: textToEdit.y },
-          worldEnd: { x: textToEdit.x + (textToEdit.width || 3), y: textToEdit.y + (textToEdit.height || 1) },
+          worldEnd: {
+            x: textToEdit.x + (textToEdit.width || 3),
+            y: textToEdit.y + (textToEdit.height || 1),
+          },
           fontSize: textToEdit.fontSize,
           color: textToEdit.color,
           fontFamily: textToEdit.fontFamily || 'Arial, sans-serif',
@@ -191,14 +207,14 @@ export function TextTool({
           fontStyle: textToEdit.fontStyle || 'normal',
           textAlign: textToEdit.textAlign || 'left',
         });
-        
+
         setEditingText(textToEdit.text);
         setEditingId(textToEdit.id);
         setIsEditing(true);
       }
     } else if (isEditing && textDraft && editingId) {
       // Jeśli edytujemy istniejący tekst i viewport się zmienił - zaktualizuj pozycję
-      const textToEdit = elements.find(el => el.id === editingId);
+      const textToEdit = elements.find((el) => el.id === editingId);
       if (textToEdit) {
         const topLeft = transformPoint(
           { x: textToEdit.x, y: textToEdit.y },
@@ -206,15 +222,19 @@ export function TextTool({
           canvasWidth,
           canvasHeight
         );
-        
+
         const width = (textToEdit.width || 3) * viewport.scale * 100;
         const height = (textToEdit.height || 1) * viewport.scale * 100;
-        
-        setTextDraft(prev => prev ? {
-          ...prev,
-          screenStart: topLeft,
-          screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
-        } : null);
+
+        setTextDraft((prev) =>
+          prev
+            ? {
+                ...prev,
+                screenStart: topLeft,
+                screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
+              }
+            : null
+        );
       }
     }
   }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing, editingId]);
@@ -223,7 +243,7 @@ export function TextTool({
   const handleMouseDown = (e: React.MouseEvent) => {
     // Jeśli już edytujemy - ignoruj
     if (isEditing) return;
-    
+
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
@@ -379,10 +399,7 @@ export function TextTool({
   }, [isEditing]);
 
   return (
-    <div
-      className="absolute inset-0 z-20"
-      style={{ cursor: isEditing ? 'default' : 'crosshair' }}
-    >
+    <div className="absolute inset-0 z-20" style={{ cursor: isEditing ? 'default' : 'crosshair' }}>
       {/* Overlay dla mouse events */}
       {!isEditing && (
         <div

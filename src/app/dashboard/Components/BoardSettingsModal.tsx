@@ -10,29 +10,90 @@ import * as LucideIcons from 'lucide-react';
 
 // Ikony dostępne dla tablic (dopasowane do iconGradientMap z LastBoards)
 const availableIcons = [
-  'PenTool', 'Calculator', 'Globe', 'Lightbulb', 'Target', 'Rocket',
-  'BookOpen', 'Presentation', 'Zap', 'Compass', 'Cpu',
-  'Palette', 'Camera', 'Music', 'Video', 'Film',
-  'Code', 'Terminal', 'Database', 'Server', 'Cloud', 'Wifi',
-  'Smartphone', 'Monitor', 'Laptop', 'Gamepad2',
-  'Trophy', 'Star', 'Heart', 'Flame', 'Sparkles', 'Award',
-  'Home', 'Users', 'Calendar', 'FileText', 'MessageCircle', 'Bell'
+  'PenTool',
+  'Calculator',
+  'Globe',
+  'Lightbulb',
+  'Target',
+  'Rocket',
+  'BookOpen',
+  'Presentation',
+  'Zap',
+  'Compass',
+  'Cpu',
+  'Palette',
+  'Camera',
+  'Music',
+  'Video',
+  'Film',
+  'Code',
+  'Terminal',
+  'Database',
+  'Server',
+  'Cloud',
+  'Wifi',
+  'Smartphone',
+  'Monitor',
+  'Laptop',
+  'Gamepad2',
+  'Trophy',
+  'Star',
+  'Heart',
+  'Flame',
+  'Sparkles',
+  'Award',
+  'Home',
+  'Users',
+  'Calendar',
+  'FileText',
+  'MessageCircle',
+  'Bell',
 ] as const;
 
 // Kolory tła (gradient mapping)
 const availableColors = [
   { name: 'gray', label: 'Szary', class: 'bg-gray-500', gradient: 'from-gray-400 to-gray-600' },
   { name: 'blue', label: 'Niebieski', class: 'bg-blue-500', gradient: 'from-blue-400 to-blue-600' },
-  { name: 'green', label: 'Zielony', class: 'bg-green-500', gradient: 'from-green-400 to-green-600' },
-  { name: 'purple', label: 'Fioletowy', class: 'bg-purple-500', gradient: 'from-purple-400 to-purple-600' },
+  {
+    name: 'green',
+    label: 'Zielony',
+    class: 'bg-green-500',
+    gradient: 'from-green-400 to-green-600',
+  },
+  {
+    name: 'purple',
+    label: 'Fioletowy',
+    class: 'bg-purple-500',
+    gradient: 'from-purple-400 to-purple-600',
+  },
   { name: 'pink', label: 'Różowy', class: 'bg-pink-500', gradient: 'from-pink-400 to-pink-600' },
   { name: 'red', label: 'Czerwony', class: 'bg-red-500', gradient: 'from-red-400 to-red-600' },
-  { name: 'orange', label: 'Pomarańczowy', class: 'bg-orange-500', gradient: 'from-orange-400 to-orange-600' },
-  { name: 'yellow', label: 'Żółty', class: 'bg-yellow-500', gradient: 'from-yellow-400 to-yellow-600' },
+  {
+    name: 'orange',
+    label: 'Pomarańczowy',
+    class: 'bg-orange-500',
+    gradient: 'from-orange-400 to-orange-600',
+  },
+  {
+    name: 'yellow',
+    label: 'Żółty',
+    class: 'bg-yellow-500',
+    gradient: 'from-yellow-400 to-yellow-600',
+  },
   { name: 'teal', label: 'Turkusowy', class: 'bg-teal-500', gradient: 'from-teal-400 to-teal-600' },
-  { name: 'indigo', label: 'Indygo', class: 'bg-indigo-500', gradient: 'from-indigo-400 to-indigo-600' },
+  {
+    name: 'indigo',
+    label: 'Indygo',
+    class: 'bg-indigo-500',
+    gradient: 'from-indigo-400 to-indigo-600',
+  },
   { name: 'cyan', label: 'Cyjan', class: 'bg-cyan-500', gradient: 'from-cyan-400 to-cyan-600' },
-  { name: 'emerald', label: 'Szmaragdowy', class: 'bg-emerald-500', gradient: 'from-emerald-400 to-emerald-600' },
+  {
+    name: 'emerald',
+    label: 'Szmaragdowy',
+    class: 'bg-emerald-500',
+    gradient: 'from-emerald-400 to-emerald-600',
+  },
 ] as const;
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -60,7 +121,7 @@ export default function BoardSettingsModal({
   onClose,
   onSave,
   mode,
-  initialData
+  initialData,
 }: BoardSettingsModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'PenTool');
@@ -130,7 +191,7 @@ export default function BoardSettingsModal({
       await onSave({
         name: name.trim(),
         icon: selectedIcon,
-        bg_color: selectedColor
+        bg_color: selectedColor,
       });
       onClose();
     } catch (err) {
@@ -148,7 +209,9 @@ export default function BoardSettingsModal({
 
   // Znajdź kolor po nazwie
   const getColorData = (colorName: string) => {
-    return availableColors.find(c => c.name === colorName.replace('-500', '')) || availableColors[0];
+    return (
+      availableColors.find((c) => c.name === colorName.replace('-500', '')) || availableColors[0]
+    );
   };
 
   if (!isOpen) return null;
@@ -183,16 +246,16 @@ export default function BoardSettingsModal({
         <div className="p-6 space-y-6">
           {/* Podgląd */}
           <div className="flex items-center justify-center">
-            <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${selectedColorData.gradient} flex items-center justify-center shadow-lg`}>
+            <div
+              className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${selectedColorData.gradient} flex items-center justify-center shadow-lg`}
+            >
               <SelectedIconComponent size={40} className="text-white drop-shadow" />
             </div>
           </div>
 
           {/* Nazwa */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Nazwa tablicy
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Nazwa tablicy</label>
             <input
               ref={inputRef}
               type="text"
@@ -202,16 +265,12 @@ export default function BoardSettingsModal({
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all text-gray-900 placeholder-gray-400"
               maxLength={50}
             />
-            <div className="text-right text-xs text-gray-400 mt-1">
-              {name.length}/50
-            </div>
+            <div className="text-right text-xs text-gray-400 mt-1">{name.length}/50</div>
           </div>
 
           {/* Ikona */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ikona
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Ikona</label>
             <div className="grid grid-cols-9 gap-2 max-h-32 overflow-y-auto p-1">
               {availableIcons.map((iconName) => {
                 const IconComponent = getIconComponent(iconName);
@@ -236,9 +295,7 @@ export default function BoardSettingsModal({
 
           {/* Kolor */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Kolor
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Kolor</label>
             <div className="flex flex-wrap gap-2">
               {availableColors.map((color) => {
                 const isSelected = selectedColor === `${color.name}-500`;
@@ -247,7 +304,9 @@ export default function BoardSettingsModal({
                     key={color.name}
                     onClick={() => setSelectedColor(`${color.name}-500`)}
                     className={`w-10 h-10 rounded-xl ${color.class} transition-all flex items-center justify-center ${
-                      isSelected ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : 'hover:scale-105'
+                      isSelected
+                        ? 'ring-2 ring-offset-2 ring-gray-900 scale-110'
+                        : 'hover:scale-105'
                     }`}
                     title={color.label}
                   >

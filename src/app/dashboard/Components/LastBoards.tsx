@@ -49,9 +49,17 @@ import {
   Calendar,
   FileText,
   MessageCircle,
-  Bell
+  Bell,
 } from 'lucide-react';
-import { fetchBoards, createBoard, updateBoard, deleteBoard, Board as APIBoard, fetchBoardOnlineUsers, OnlineUser as APIOnlineUser } from '@/boards_api/api';
+import {
+  fetchBoards,
+  createBoard,
+  updateBoard,
+  deleteBoard,
+  Board as APIBoard,
+  fetchBoardOnlineUsers,
+  OnlineUser as APIOnlineUser,
+} from '@/boards_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import BoardSettingsModal from './BoardSettingsModal';
 
@@ -61,18 +69,18 @@ interface OnlineUser {
 }
 
 interface Board {
-  id: number;  // ← ZMIANA: number zamiast string
+  id: number; // ← ZMIANA: number zamiast string
   name: string;
   icon: any;
-  iconName: string;  // Nazwa ikony do edycji
-  bgColor: string;   // Kolor tła do edycji
-  lastModified: string;  // Sformatowana data do wyświetlania
-  lastModifiedRaw: string | null;  // Surowa data ISO do sortowania
+  iconName: string; // Nazwa ikony do edycji
+  bgColor: string; // Kolor tła do edycji
+  lastModified: string; // Sformatowana data do wyświetlania
+  lastModifiedRaw: string | null; // Surowa data ISO do sortowania
   lastModifiedBy: string;
-  lastOpened: string;  // Sformatowana data do wyświetlania
-  lastOpenedRaw: string | null;  // Surowa data ISO do sortowania
+  lastOpened: string; // Sformatowana data do wyświetlania
+  lastOpenedRaw: string | null; // Surowa data ISO do sortowania
   owner: string;
-  onlineUsers: OnlineUser[];  // Lista użytkowników online
+  onlineUsers: OnlineUser[]; // Lista użytkowników online
   isFavorite: boolean;
 }
 
@@ -98,8 +106,17 @@ const getGradientFromColor = (color: string): string => {
 };
 
 const allIcons = [
-  PenTool, Calculator, Globe, Lightbulb, Target, Rocket, BookOpen, Presentation,
-  Zap, Compass, Cpu
+  PenTool,
+  Calculator,
+  Globe,
+  Lightbulb,
+  Target,
+  Rocket,
+  BookOpen,
+  Presentation,
+  Zap,
+  Compass,
+  Cpu,
 ];
 
 // Kolory awatarów (zgodnie z OnlineUsers.tsx)
@@ -113,7 +130,7 @@ const AVATAR_COLORS = [
   'bg-indigo-500',
   'bg-teal-500',
   'bg-orange-500',
-  'bg-cyan-500'
+  'bg-cyan-500',
 ];
 
 const getAvatarColor = (userId: number) => {
@@ -127,50 +144,86 @@ const getInitials = (username: string) => {
 export default function LastBoards() {
   const router = useRouter();
   const { workspaces, activeWorkspace } = useWorkspaces();
-  
+
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterOwner, setFilterOwner] = useState('all');
   const [sortBy, setSortBy] = useState('recent');
-  
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingBoard, setEditingBoard] = useState<{ id: number; name: string; icon: string; bg_color: string } | null>(null);
-  
+  const [editingBoard, setEditingBoard] = useState<{
+    id: number;
+    name: string;
+    icon: string;
+    bg_color: string;
+  } | null>(null);
+
   // Dropdown state
   const [openDropdownId, setOpenDropdownId] = useState<number | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  
+
   // Mapowanie nazwy ikony → komponent
   const getIconComponent = (iconName: string) => {
     const map: Record<string, any> = {
-      PenTool, Calculator, Globe, Lightbulb, Target, Rocket,
-      BookOpen, Presentation, Zap, Compass, Cpu,
-      Palette, Camera, Music, Video, Film,
-      Code, Terminal, Database, Server, Cloud, Wifi,
-      Smartphone, Monitor, Laptop, Gamepad2,
-      Trophy, Star, Heart, Flame, Sparkles, Award,
-      Home, Users, Calendar, FileText, MessageCircle, Bell
+      PenTool,
+      Calculator,
+      Globe,
+      Lightbulb,
+      Target,
+      Rocket,
+      BookOpen,
+      Presentation,
+      Zap,
+      Compass,
+      Cpu,
+      Palette,
+      Camera,
+      Music,
+      Video,
+      Film,
+      Code,
+      Terminal,
+      Database,
+      Server,
+      Cloud,
+      Wifi,
+      Smartphone,
+      Monitor,
+      Laptop,
+      Gamepad2,
+      Trophy,
+      Star,
+      Heart,
+      Flame,
+      Sparkles,
+      Award,
+      Home,
+      Users,
+      Calendar,
+      FileText,
+      MessageCircle,
+      Bell,
     };
     return map[iconName] || PenTool;
   };
-  
+
   // Formatowanie daty
   const formatDate = (dateString: string | null): string => {
     if (!dateString) return 'Nigdy';
-    
+
     try {
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return 'Nieznana data';
-      
+
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
       const diffMins = Math.floor(diffMs / 60000);
       const diffHours = Math.floor(diffMins / 60);
       const diffDays = Math.floor(diffHours / 24);
-      
+
       if (diffMins < 1) return 'Teraz';
       if (diffMins < 60) return `${diffMins} min temu`;
       if (diffHours < 24) return `${diffHours} godz. temu`;
@@ -181,7 +234,7 @@ export default function LastBoards() {
       return 'Nieznana data';
     }
   };
-  
+
   // Załaduj tablice z API
   useEffect(() => {
     const loadBoards = async () => {
@@ -189,45 +242,49 @@ export default function LastBoards() {
         setLoading(false);
         return;
       }
-      
+
       try {
         setLoading(true);
         setError(null);
         const data = await fetchBoards(activeWorkspace.id);
-        
+
         // Wczytaj ulubione z localStorage
         const savedFavorites = localStorage.getItem('board-favorites');
-        const favoritesMap: Record<number, boolean> = savedFavorites ? JSON.parse(savedFavorites) : {};
-        
+        const favoritesMap: Record<number, boolean> = savedFavorites
+          ? JSON.parse(savedFavorites)
+          : {};
+
         // Wczytaj czasy ostatniego otwarcia z localStorage
         const savedOpenedTimes = localStorage.getItem('board-opened-times');
-        const openedTimesMap: Record<number, string> = savedOpenedTimes ? JSON.parse(savedOpenedTimes) : {};
-        
+        const openedTimesMap: Record<number, string> = savedOpenedTimes
+          ? JSON.parse(savedOpenedTimes)
+          : {};
+
         // Mapuj API Board → UI Board
         const mappedBoards: Board[] = data.boards.map((b: APIBoard) => {
           // Użyj czasu z localStorage jeśli istnieje, w przeciwnym razie z API
           const lastOpenedTime = openedTimesMap[b.id] || b.last_opened || b.created_at;
-          
+
           // TODO: WebSocket - online users będą pobierani przez WebSocket
           // Na razie pusta lista (placeholder)
-          
+
           return {
             id: b.id,
             name: b.name,
             icon: getIconComponent(b.icon),
-            iconName: b.icon,  // Zachowaj nazwę ikony do edycji
-            bgColor: b.bg_color,  // Zachowaj kolor do edycji
+            iconName: b.icon, // Zachowaj nazwę ikony do edycji
+            bgColor: b.bg_color, // Zachowaj kolor do edycji
             lastModified: formatDate(b.last_modified),
-            lastModifiedRaw: b.last_modified,  // Surowa data do sortowania
+            lastModifiedRaw: b.last_modified, // Surowa data do sortowania
             lastModifiedBy: b.last_modified_by || b.created_by,
             lastOpened: formatDate(lastOpenedTime),
-            lastOpenedRaw: lastOpenedTime,  // Surowa data do sortowania
+            lastOpenedRaw: lastOpenedTime, // Surowa data do sortowania
             owner: b.owner_username,
-            onlineUsers: [],  // TODO: WebSocket - pusta lista (placeholder)
-            isFavorite: favoritesMap[b.id] !== undefined ? favoritesMap[b.id] : b.is_favourite
+            onlineUsers: [], // TODO: WebSocket - pusta lista (placeholder)
+            isFavorite: favoritesMap[b.id] !== undefined ? favoritesMap[b.id] : b.is_favourite,
           };
         });
-        
+
         setBoards(mappedBoards);
       } catch (err) {
         console.error('❌ Błąd ładowania tablic:', err);
@@ -236,7 +293,7 @@ export default function LastBoards() {
         setLoading(false);
       }
     };
-    
+
     loadBoards();
   }, [activeWorkspace?.id]);
 
@@ -244,7 +301,7 @@ export default function LastBoards() {
   useEffect(() => {
     if (boards.length > 0) {
       const favoritesMap: Record<number, boolean> = {};
-      boards.forEach(board => {
+      boards.forEach((board) => {
         favoritesMap[board.id] = board.isFavorite;
       });
       localStorage.setItem('board-favorites', JSON.stringify(favoritesMap));
@@ -258,7 +315,7 @@ export default function LastBoards() {
         setOpenDropdownId(null);
       }
     };
-    
+
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
@@ -266,9 +323,9 @@ export default function LastBoards() {
   // Helper do porównywania dat
   const compareDates = (dateA: string | null, dateB: string | null): number => {
     if (!dateA && !dateB) return 0;
-    if (!dateA) return 1;  // Brak daty = na końcu
+    if (!dateA) return 1; // Brak daty = na końcu
     if (!dateB) return -1;
-    return new Date(dateB).getTime() - new Date(dateA).getTime();  // Najnowsze pierwsze
+    return new Date(dateB).getTime() - new Date(dateA).getTime(); // Najnowsze pierwsze
   };
 
   // Sortowanie: ulubione na górze, potem wg wybranego kryterium
@@ -289,10 +346,11 @@ export default function LastBoards() {
     }
   });
 
-  const filteredBoards = sortedBoards.filter(board =>
-    filterOwner === 'all' ||
-    (filterOwner === 'me' && board.owner === 'Ty') ||
-    (filterOwner === 'others' && board.owner !== 'Ty')
+  const filteredBoards = sortedBoards.filter(
+    (board) =>
+      filterOwner === 'all' ||
+      (filterOwner === 'me' && board.owner === 'Ty') ||
+      (filterOwner === 'others' && board.owner !== 'Ty')
   );
 
   // Otwórz modal tworzenia tablicy
@@ -309,14 +367,14 @@ export default function LastBoards() {
     if (!activeWorkspace) {
       throw new Error('Brak aktywnego workspace');
     }
-    
+
     const newBoard = await createBoard({
       name: data.name,
       workspace_id: activeWorkspace.id,
       icon: data.icon,
-      bg_color: data.bg_color
+      bg_color: data.bg_color,
     });
-    
+
     // Przekieruj do tablicy z boardId
     router.push(`/tablica?boardId=${newBoard.id}`);
   };
@@ -327,7 +385,7 @@ export default function LastBoards() {
       id: board.id,
       name: board.name,
       icon: board.iconName,
-      bg_color: board.bgColor
+      bg_color: board.bgColor,
     });
     setOpenDropdownId(null);
     setShowEditModal(true);
@@ -336,21 +394,23 @@ export default function LastBoards() {
   // Aktualizacja tablicy
   const handleUpdateBoard = async (data: { name: string; icon: string; bg_color: string }) => {
     if (!editingBoard) return;
-    
+
     await updateBoard(editingBoard.id, data);
-    
+
     // Zaktualizuj lokalny stan
-    setBoards(prev => prev.map(b => 
-      b.id === editingBoard.id 
-        ? { 
-            ...b, 
-            name: data.name, 
-            icon: getIconComponent(data.icon),
-            iconName: data.icon,
-            bgColor: data.bg_color
-          }
-        : b
-    ));
+    setBoards((prev) =>
+      prev.map((b) =>
+        b.id === editingBoard.id
+          ? {
+              ...b,
+              name: data.name,
+              icon: getIconComponent(data.icon),
+              iconName: data.icon,
+              bgColor: data.bg_color,
+            }
+          : b
+      )
+    );
   };
 
   // Usuń tablicę
@@ -358,10 +418,10 @@ export default function LastBoards() {
     if (!confirm('Czy na pewno chcesz usunąć tę tablicę? Ta akcja jest nieodwracalna.')) {
       return;
     }
-    
+
     try {
       await deleteBoard(boardId);
-      setBoards(prev => prev.filter(b => b.id !== boardId));
+      setBoards((prev) => prev.filter((b) => b.id !== boardId));
       setOpenDropdownId(null);
     } catch (err) {
       console.error('❌ Błąd usuwania tablicy:', err);
@@ -375,23 +435,23 @@ export default function LastBoards() {
     const openedTimes = JSON.parse(localStorage.getItem('board-opened-times') || '{}');
     openedTimes[boardId] = now;
     localStorage.setItem('board-opened-times', JSON.stringify(openedTimes));
-    
+
     // Aktualizuj lokalnie
-    setBoards(prev =>
-      prev.map(b =>
+    setBoards((prev) =>
+      prev.map((b) =>
         b.id === boardId
           ? {
               ...b,
               lastOpened: formatDate(now),
-              lastOpenedRaw: now
+              lastOpenedRaw: now,
             }
           : b
       )
     );
-    
+
     router.push(`/tablica?boardId=${boardId}`);
   };
-  
+
   // Loading state
   if (loading) {
     return (
@@ -427,7 +487,10 @@ export default function LastBoards() {
         {/* Board skeletons */}
         <div className="space-y-2 md:space-y-3">
           {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="bg-white rounded-xl md:rounded-2xl p-3 md:p-5 border border-gray-200">
+            <div
+              key={i}
+              className="bg-white rounded-xl md:rounded-2xl p-3 md:p-5 border border-gray-200"
+            >
               {/* Mobile skeleton */}
               <div className="lg:hidden">
                 <div className="flex items-center justify-between mb-2">
@@ -474,7 +537,7 @@ export default function LastBoards() {
       </>
     );
   }
-  
+
   // Error state
   if (error) {
     return (
@@ -494,26 +557,20 @@ export default function LastBoards() {
 
   const toggleFavorite = async (e: React.MouseEvent, id: number) => {
     e.stopPropagation();
-    const board = boards.find(b => b.id === id);
+    const board = boards.find((b) => b.id === id);
     if (!board) return;
-    
+
     try {
       // Optymistyczna aktualizacja UI
-      setBoards(prev =>
-        prev.map(b =>
-          b.id === id ? { ...b, isFavorite: !b.isFavorite } : b
-        )
-      );
-      
+      setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, isFavorite: !b.isFavorite } : b)));
+
       // Wywołaj API
       // await toggleBoardFavourite(id, !board.isFavorite);  // TODO: gdy endpoint zadziała
     } catch (err) {
       console.error('❌ Błąd zmiany ulubionej:', err);
       // Cofnij zmianę przy błędzie
-      setBoards(prev =>
-        prev.map(b =>
-          b.id === id ? { ...b, isFavorite: board.isFavorite } : b
-        )
+      setBoards((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, isFavorite: board.isFavorite } : b))
       );
     }
   };
@@ -546,9 +603,7 @@ export default function LastBoards() {
 
       {/* Nagłówek */}
       <div className="flex items-center justify-between mb-4 md:mb-6 px-1">
-        <h2 className="text-lg md:text-2xl font-bold text-gray-900">
-          Tablice w tej przestrzeni
-        </h2>
+        <h2 className="text-lg md:text-2xl font-bold text-gray-900">Tablice w tej przestrzeni</h2>
         <button
           onClick={handleOpenCreateModal}
           className="bg-green-600 hover:bg-green-700 text-white font-medium px-3 md:px-4 py-2 rounded-md flex items-center gap-1 md:gap-2 transition-all duration-200 text-sm cursor-pointer shadow-sm hover:shadow"
@@ -564,7 +619,9 @@ export default function LastBoards() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-6 text-sm">
           <div className="flex items-center gap-2">
             <Filter size={14} className="md:w-4 md:h-4 text-gray-600" />
-            <span className="font-semibold text-gray-800 text-xs md:text-sm">Wszystkie tablice</span>
+            <span className="font-semibold text-gray-800 text-xs md:text-sm">
+              Wszystkie tablice
+            </span>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-1 sm:justify-end">
@@ -578,7 +635,10 @@ export default function LastBoards() {
                 <option value="me">Tylko moje</option>
                 <option value="others">Innych</option>
               </select>
-              <ChevronDown size={14} className="md:w-4 md:h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <ChevronDown
+                size={14}
+                className="md:w-4 md:h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+              />
             </div>
 
             <div className="relative">
@@ -591,7 +651,10 @@ export default function LastBoards() {
                 <option value="modified">Ostatnio zmieniona</option>
                 <option value="name">Nazwa</option>
               </select>
-              <ChevronDown size={14} className="md:w-4 md:h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+              <ChevronDown
+                size={14}
+                className="md:w-4 md:h-4 absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
+              />
             </div>
           </div>
         </div>
@@ -632,18 +695,26 @@ export default function LastBoards() {
                   {/* Top: Icon + Name + Actions */}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className={`w-10 h-10 flex-shrink-0 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}>
+                      <div
+                        className={`w-10 h-10 flex-shrink-0 rounded-lg bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}
+                      >
                         <Icon size={20} className="text-white drop-shadow-sm" />
                       </div>
-                      <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate flex-1">{board.name}</h3>
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight truncate flex-1">
+                        {board.name}
+                      </h3>
                     </div>
-                    
+
                     <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={(e) => toggleFavorite(e, board.id)}
                         className={`p-1.5 rounded-lg transition-all duration-200 cursor-pointer ${board.isFavorite ? 'text-yellow-500 bg-yellow-100' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'}`}
                       >
-                        <Star size={16} fill={board.isFavorite ? 'currentColor' : 'none'} strokeWidth={2} />
+                        <Star
+                          size={16}
+                          fill={board.isFavorite ? 'currentColor' : 'none'}
+                          strokeWidth={2}
+                        />
                       </button>
                       <button
                         onClick={(e) => {
@@ -656,10 +727,11 @@ export default function LastBoards() {
                       </button>
                     </div>
                   </div>
-                  
+
                   {/* Bottom: Info */}
                   <div className="text-xs text-gray-600 truncate">
-                    Ostatnio edytowana {board.lastModified} przez <span className="text-green-700 font-medium">{board.lastModifiedBy}</span>
+                    Ostatnio edytowana {board.lastModified} przez{' '}
+                    <span className="text-green-700 font-medium">{board.lastModifiedBy}</span>
                   </div>
                 </div>
 
@@ -667,13 +739,18 @@ export default function LastBoards() {
                 <div className="hidden lg:grid grid-cols-12 gap-4 items-center">
                   {/* Nazwa + ikona */}
                   <div className="col-span-4 flex items-center gap-3">
-                    <div className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}>
+                    <div
+                      className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-100 transition-transform duration-300`}
+                    >
                       <Icon size={24} className="text-white drop-shadow-sm" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <h3 className="font-semibold text-gray-900 text-base leading-tight truncate">{board.name}</h3>
+                      <h3 className="font-semibold text-gray-900 text-base leading-tight truncate">
+                        {board.name}
+                      </h3>
                       <p className="text-sm font-medium text-gray-700 mt-0.5 truncate">
-                        {board.lastModified} przez <span className="text-green-700">{board.lastModifiedBy}</span>
+                        {board.lastModified} przez{' '}
+                        <span className="text-green-700">{board.lastModifiedBy}</span>
                       </p>
                     </div>
                   </div>
@@ -701,7 +778,7 @@ export default function LastBoards() {
                         {board.onlineUsers.slice(0, 3).map((user, index) => {
                           const color = getAvatarColor(user.user_id);
                           const initials = getInitials(user.username);
-                          
+
                           return (
                             <div
                               key={`${user.user_id}-${index}`}
@@ -733,7 +810,11 @@ export default function LastBoards() {
                       onClick={(e) => toggleFavorite(e, board.id)}
                       className={`p-2 rounded-xl transition-all duration-200 cursor-pointer ${board.isFavorite ? 'text-yellow-500 bg-yellow-100 hover:bg-yellow-200 shadow-sm' : 'text-gray-400 hover:text-yellow-500 hover:bg-yellow-50'}`}
                     >
-                      <Star size={20} fill={board.isFavorite ? 'currentColor' : 'none'} strokeWidth={2} />
+                      <Star
+                        size={20}
+                        fill={board.isFavorite ? 'currentColor' : 'none'}
+                        strokeWidth={2}
+                      />
                     </button>
                   </div>
 
@@ -753,7 +834,10 @@ export default function LastBoards() {
 
                 {/* Dropdown menu - wspólne dla mobile i desktop */}
                 {openDropdownId === board.id && (
-                  <div className="absolute right-2 top-12 lg:right-0 lg:top-full mt-1 z-[100] bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[180px]" ref={openDropdownId === board.id ? dropdownRef : null}>
+                  <div
+                    className="absolute right-2 top-12 lg:right-0 lg:top-full mt-1 z-[100] bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[180px]"
+                    ref={openDropdownId === board.id ? dropdownRef : null}
+                  >
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -1,52 +1,52 @@
 /**
  * STRONA ODZYSKIWANIA HASŁA
  * =========================
- * 
+ *
  * Cel: Reset hasła użytkownika przez 6-cyfrowy kod wysłany na email
- * 
+ *
  * Przepływ:
  * 1. Użytkownik podaje email
  * 2. Dostaje 6-cyfrowy kod na email
  * 3. Wpisuje kod
  * 4. Ustawia nowe hasło
  * 5. Redirect do /login
- * 
+ *
  * Powiązane pliki:
  * - src/auth_api/api.ts (requestPasswordReset, verifyResetCode, resetPassword)
  * - src/app/login/page.tsx (link "Zapomniałeś hasła?")
  * - backend/auth/routes.py (endpointy /api/request-password-reset, etc.)
  */
 
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, Mail, ArrowLeft, Lock, Eye, EyeOff } from "lucide-react";
-import { requestPasswordReset, verifyResetCode, resetPassword } from "@/auth_api/api";
-import Link from "next/link";
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { Loader2, Mail, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
+import { requestPasswordReset, verifyResetCode, resetPassword } from '@/auth_api/api';
+import Link from 'next/link';
 
 export default function PasswordReset() {
   const router = useRouter();
 
   // Kroki: 'email' | 'code' | 'password'
   const [step, setStep] = useState<'email' | 'code' | 'password'>('email');
-  
+
   // Dane
-  const [email, setEmail] = useState("");
-  const [code, setCode] = useState(["", "", "", "", "", ""]);
-  const [password, setPassword] = useState("");
-  const [passwordConfirm, setPasswordConfirm] = useState("");
-  
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState(['', '', '', '', '', '']);
+  const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
+
   // UI stany
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   // Resend cooldown
   const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendMessage, setResendMessage] = useState("");
-  
+  const [resendMessage, setResendMessage] = useState('');
+
   // Referencje do inputów kodu
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -68,21 +68,21 @@ export default function PasswordReset() {
   // === KROK 1: WYSŁANIE EMAILA ===
   const handleSendEmail = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      setError("Podaj poprawny adres email");
+      setError('Podaj poprawny adres email');
       return;
     }
 
     setIsLoading(true);
-    setError("");
+    setError('');
 
     try {
       await requestPasswordReset({ email });
       setStep('code');
       setResendCooldown(60);
     } catch (error: any) {
-      setError(error.message || "Błąd wysyłania kodu");
+      setError(error.message || 'Błąd wysyłania kodu');
     } finally {
       setIsLoading(false);
     }
@@ -95,7 +95,7 @@ export default function PasswordReset() {
     const newCode = [...code];
     newCode[index] = value.slice(-1);
     setCode(newCode);
-    setError("");
+    setError('');
 
     // Auto focus na następny
     if (value && index < 5) {
@@ -104,7 +104,7 @@ export default function PasswordReset() {
 
     // Auto verify gdy wszystkie wypełnione
     if (index === 5 && value) {
-      const fullCode = [...newCode.slice(0, 5), value].join("");
+      const fullCode = [...newCode.slice(0, 5), value].join('');
       if (fullCode.length === 6) {
         handleVerifyCode(fullCode);
       }
@@ -112,18 +112,18 @@ export default function PasswordReset() {
   };
 
   const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !code[index] && index > 0) {
+    if (e.key === 'Backspace' && !code[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
     }
   };
 
   const handlePaste = (e: React.ClipboardEvent) => {
     e.preventDefault();
-    const pastedData = e.clipboardData.getData("text").slice(0, 6);
-    
+    const pastedData = e.clipboardData.getData('text').slice(0, 6);
+
     if (!/^\d+$/.test(pastedData)) return;
 
-    const newCode = pastedData.split("").concat(Array(6).fill("")).slice(0, 6);
+    const newCode = pastedData.split('').concat(Array(6).fill('')).slice(0, 6);
     setCode(newCode);
 
     const lastIndex = Math.min(pastedData.length, 5);
@@ -135,22 +135,22 @@ export default function PasswordReset() {
   };
 
   const handleVerifyCode = async (codeToVerify?: string) => {
-    const finalCode = codeToVerify || code.join("");
+    const finalCode = codeToVerify || code.join('');
 
     if (finalCode.length !== 6) {
-      setError("Wprowadź pełny 6-cyfrowy kod");
+      setError('Wprowadź pełny 6-cyfrowy kod');
       return;
     }
 
     setIsLoading(true);
-    setError("");
+    setError('');
 
     try {
       await verifyResetCode({ email, code: finalCode });
       setStep('password');
     } catch (error: any) {
-      setError(error.message || "Nieprawidłowy kod");
-      setCode(["", "", "", "", "", ""]);
+      setError(error.message || 'Nieprawidłowy kod');
+      setCode(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } finally {
       setIsLoading(false);
@@ -162,16 +162,16 @@ export default function PasswordReset() {
     if (resendCooldown > 0) return;
 
     setIsLoading(true);
-    setError("");
-    setResendMessage("");
+    setError('');
+    setResendMessage('');
 
     try {
       await requestPasswordReset({ email });
-      setResendMessage("✅ Nowy kod wysłany!");
+      setResendMessage('✅ Nowy kod wysłany!');
       setResendCooldown(60);
-      setTimeout(() => setResendMessage(""), 5000);
+      setTimeout(() => setResendMessage(''), 5000);
     } catch (error: any) {
-      setError(error.message || "Błąd wysyłania kodu");
+      setError(error.message || 'Błąd wysyłania kodu');
     } finally {
       setIsLoading(false);
     }
@@ -183,35 +183,35 @@ export default function PasswordReset() {
 
     // Walidacja
     if (!password || password.length < 8) {
-      setError("Hasło musi mieć co najmniej 8 znaków");
+      setError('Hasło musi mieć co najmniej 8 znaków');
       return;
     }
 
     if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      setError("Hasło musi zawierać małą i wielką literę oraz cyfrę");
+      setError('Hasło musi zawierać małą i wielką literę oraz cyfrę');
       return;
     }
 
     if (password !== passwordConfirm) {
-      setError("Hasła nie są identyczne");
+      setError('Hasła nie są identyczne');
       return;
     }
 
     setIsLoading(true);
-    setError("");
+    setError('');
 
     try {
       await resetPassword({
         email,
-        code: code.join(""),
+        code: code.join(''),
         password,
         password_confirm: passwordConfirm,
       });
 
       // Sukces - redirect do logowania
-      router.push("/login?reset=success");
+      router.push('/login?reset=success');
     } catch (error: any) {
-      setError(error.message || "Błąd resetowania hasła");
+      setError(error.message || 'Błąd resetowania hasła');
     } finally {
       setIsLoading(false);
     }
@@ -220,7 +220,7 @@ export default function PasswordReset() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-200 via-green-300 to-emerald-400 p-5">
       {/* Back button */}
-      <Link 
+      <Link
         href="/login"
         className="absolute top-8 left-8 text-white hover:text-white/80 transition-colors flex items-center gap-2"
       >
@@ -232,9 +232,9 @@ export default function PasswordReset() {
       <div className="mb-8 text-center">
         <h2 className="text-white text-2xl font-semibold">Odzyskiwanie hasła</h2>
         <p className="text-white/80 mt-2">
-          {step === 'email' && "Podaj swój adres email"}
-          {step === 'code' && "Wprowadź kod z emaila"}
-          {step === 'password' && "Ustaw nowe hasło"}
+          {step === 'email' && 'Podaj swój adres email'}
+          {step === 'code' && 'Wprowadź kod z emaila'}
+          {step === 'password' && 'Ustaw nowe hasło'}
         </p>
       </div>
 
@@ -255,7 +255,7 @@ export default function PasswordReset() {
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
-                    setError("");
+                    setError('');
                   }}
                   className="w-full pl-10 pr-4 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   placeholder="twoj@email.com"
@@ -281,7 +281,7 @@ export default function PasswordReset() {
                   Wysyłanie...
                 </>
               ) : (
-                "Wyślij kod"
+                'Wyślij kod'
               )}
             </button>
           </form>
@@ -292,9 +292,7 @@ export default function PasswordReset() {
           <div className="space-y-6">
             <div className="text-center">
               <Mail className="w-16 h-16 mx-auto text-green-500 mb-4" />
-              <p className="text-gray-600 text-sm">
-                Wysłaliśmy 6-cyfrowy kod na adres:
-              </p>
+              <p className="text-gray-600 text-sm">Wysłaliśmy 6-cyfrowy kod na adres:</p>
               <p className="font-semibold text-gray-800 mt-1">{email}</p>
             </div>
 
@@ -306,7 +304,9 @@ export default function PasswordReset() {
                 {code.map((digit, index) => (
                   <input
                     key={index}
-                    ref={(el) => { inputRefs.current[index] = el; }}
+                    ref={(el) => {
+                      inputRefs.current[index] = el;
+                    }}
                     type="text"
                     inputMode="numeric"
                     maxLength={1}
@@ -339,13 +339,13 @@ export default function PasswordReset() {
               >
                 {resendCooldown > 0
                   ? `Wyślij ponownie za ${resendCooldown}s`
-                  : "Wyślij kod ponownie"}
+                  : 'Wyślij kod ponownie'}
               </button>
             </div>
 
             <button
               onClick={() => handleVerifyCode()}
-              disabled={isLoading || code.join("").length !== 6}
+              disabled={isLoading || code.join('').length !== 6}
               className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isLoading ? (
@@ -354,7 +354,7 @@ export default function PasswordReset() {
                   Weryfikacja...
                 </>
               ) : (
-                "Zweryfikuj kod"
+                'Zweryfikuj kod'
               )}
             </button>
           </div>
@@ -370,12 +370,12 @@ export default function PasswordReset() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={showPassword ? "text" : "password"}
+                  type={showPassword ? 'text' : 'password'}
                   id="password"
                   value={password}
                   onChange={(e) => {
                     setPassword(e.target.value);
-                    setError("");
+                    setError('');
                   }}
                   className="w-full pl-10 pr-12 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   placeholder="••••••••"
@@ -395,18 +395,21 @@ export default function PasswordReset() {
             </div>
 
             <div>
-              <label htmlFor="passwordConfirm" className="block text-sm font-medium text-gray-700 mb-2">
+              <label
+                htmlFor="passwordConfirm"
+                className="block text-sm font-medium text-gray-700 mb-2"
+              >
                 Powtórz hasło
               </label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
-                  type={showConfirmPassword ? "text" : "password"}
+                  type={showConfirmPassword ? 'text' : 'password'}
                   id="passwordConfirm"
                   value={passwordConfirm}
                   onChange={(e) => {
                     setPasswordConfirm(e.target.value);
-                    setError("");
+                    setError('');
                   }}
                   className="w-full pl-10 pr-12 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
                   placeholder="••••••••"
@@ -417,7 +420,11 @@ export default function PasswordReset() {
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showConfirmPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -439,7 +446,7 @@ export default function PasswordReset() {
                   Zmiana hasła...
                 </>
               ) : (
-                "Zmień hasło"
+                'Zmień hasło'
               )}
             </button>
           </form>
@@ -449,7 +456,7 @@ export default function PasswordReset() {
       {/* Footer links */}
       <div className="mt-6 text-center text-white text-sm">
         <p>
-          Pamiętasz hasło?{" "}
+          Pamiętasz hasło?{' '}
           <Link href="/login" className="font-semibold underline hover:text-white/80">
             Zaloguj się
           </Link>

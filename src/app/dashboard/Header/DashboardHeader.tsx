@@ -1,23 +1,34 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import Image from "next/image";
-import Link from "next/link";
-import { Search, Bell, Gift, Crown, UserPlus, ChevronDown, Menu, X, LogOut, User as UserIcon } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import Link from 'next/link';
+import {
+  Search,
+  Bell,
+  Gift,
+  Crown,
+  UserPlus,
+  ChevronDown,
+  Menu,
+  X,
+  LogOut,
+  User as UserIcon,
+} from 'lucide-react';
 
 // Import funkcji API
-import { getUser, isAuthenticated, type User } from "@/auth_api/api";
-import { fetchPendingInvites } from "@/workspace_api/api";
-import { useAuth } from "@/app/context/AuthContext";
+import { getUser, isAuthenticated, type User } from '@/auth_api/api';
+import { fetchPendingInvites } from '@/workspace_api/api';
+import { useAuth } from '@/app/context/AuthContext';
 
 // Import popupów
-import InvitePopup from "./popups/InvitePopup";
-import GiftPopup from "./popups/GiftPopup";
-import NotificationsPopup from "./popups/NotificationsPopup";
-import UserMenuPopup from "./popups/UserMenuPopup";
+import InvitePopup from './popups/InvitePopup';
+import GiftPopup from './popups/GiftPopup';
+import NotificationsPopup from './popups/NotificationsPopup';
+import UserMenuPopup from './popups/UserMenuPopup';
 
-import { useWorkspaces } from "@/app/context/WorkspaceContext";
+import { useWorkspaces } from '@/app/context/WorkspaceContext';
 
 // Rozszerzony typ User z dodatkowymi polami dla UI
 interface ExtendedUser extends User {
@@ -51,7 +62,7 @@ export default function DashboardHeader() {
       try {
         // Sprawdź czy użytkownik jest zalogowany
         if (!isAuthenticated()) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
 
@@ -59,7 +70,7 @@ export default function DashboardHeader() {
         const userData = getUser();
 
         if (!userData) {
-          router.push("/login");
+          router.push('/login');
           return;
         }
 
@@ -67,12 +78,12 @@ export default function DashboardHeader() {
         setUser({
           ...userData,
           name: userData.full_name || userData.username,
-          avatar: userData.username?.charAt(0).toUpperCase() || "U",
+          avatar: userData.username?.charAt(0).toUpperCase() || 'U',
           isPremium: false, // Tutaj później sprawdzisz czy ma premium
         });
       } catch (error) {
-        console.error("Błąd pobierania danych użytkownika:", error);
-        router.push("/login");
+        console.error('Błąd pobierania danych użytkownika:', error);
+        router.push('/login');
       } finally {
         setLoading(false);
       }
@@ -88,7 +99,7 @@ export default function DashboardHeader() {
         const invites = await fetchPendingInvites();
         setInviteCount(invites.length);
       } catch (error) {
-        console.error("Błąd pobierania zaproszeń:", error);
+        console.error('Błąd pobierania zaproszeń:', error);
       }
     };
 
@@ -105,14 +116,13 @@ export default function DashboardHeader() {
   }, [activeWorkspace]);
 
   // Nazwa aktualnej przestrzeni (później dynamicznie)
-  const currentSpace = "Klasa 5A";
+  const currentSpace = 'Klasa 5A';
 
   // Loading state
   if (loading) {
     return (
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
-          
           {/* DESKTOP LOADING */}
           <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
             <div className="flex items-center gap-3">
@@ -158,7 +168,6 @@ export default function DashboardHeader() {
     <>
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
-          
           {/* DESKTOP VERSION */}
           <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
             {/* LEWA STRONA - Logo + Badge */}
@@ -210,7 +219,7 @@ export default function DashboardHeader() {
                   if (currentWorkspace) {
                     setShowInvitePopup(true);
                   } else {
-                    alert("Najpierw wybierz workspace");
+                    alert('Najpierw wybierz workspace');
                   }
                 }}
                 className="px-4 py-2 border-2 border-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 whitespace-nowrap cursor-pointer hover:border-gray-300"
@@ -258,7 +267,7 @@ export default function DashboardHeader() {
 
                   {inviteCount > 0 && (
                     <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
-                      {inviteCount > 9 ? "9+" : inviteCount}
+                      {inviteCount > 9 ? '9+' : inviteCount}
                     </span>
                   )}
                 </button>
@@ -272,19 +281,14 @@ export default function DashboardHeader() {
                     className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer"
                   >
                     <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
-                      <span className="text-white font-semibold text-sm">
-                        {user.avatar}
-                      </span>
+                      <span className="text-white font-semibold text-sm">{user.avatar}</span>
                     </div>
                     <ChevronDown size={14} className="text-gray-400" />
                   </button>
 
                   {/* User Menu Popup */}
                   {showUserMenu && (
-                    <UserMenuPopup
-                      onClose={() => setShowUserMenu(false)}
-                      user={user}
-                    />
+                    <UserMenuPopup onClose={() => setShowUserMenu(false)} user={user} />
                   )}
                 </div>
               )}
@@ -331,128 +335,126 @@ export default function DashboardHeader() {
                 </div>
 
                 <div className="p-4 space-y-3">
-                {/* Search Mobile */}
-                <button className="w-full px-4 py-3 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer">
-                  <Search
-                    size={18}
-                    className="text-gray-400 group-hover:text-green-600 transition-colors"
-                  />
-                  <span className="flex-1 text-left text-sm text-black group-hover:text-gray-700 font-medium">
-                    Wyszukaj wszystko...
-                  </span>
-                </button>
-
-                {/* User Info Mobile */}
-                {user && (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                    <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
-                      <span className="text-white font-semibold text-base">
-                        {user.avatar}
-                      </span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Menu Items Mobile */}
-                <div className="space-y-2">
-                  <button
-                    onClick={() => {
-                      if (currentWorkspace) {
-                        setShowInvitePopup(true);
-                        setShowMobileMenu(false);
-                      } else {
-                        alert("Najpierw wybierz workspace");
-                      }
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                  >
-                    <UserPlus size={20} />
-                    <span>Zaproś uczestników</span>
+                  {/* Search Mobile */}
+                  <button className="w-full px-4 py-3 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer">
+                    <Search
+                      size={18}
+                      className="text-gray-400 group-hover:text-green-600 transition-colors"
+                    />
+                    <span className="flex-1 text-left text-sm text-black group-hover:text-gray-700 font-medium">
+                      Wyszukaj wszystko...
+                    </span>
                   </button>
 
-                  {/* Premium Mobile */}
-                  {user && !user.isPremium && (
-                    <Link href="/#pricing">
-                      <button 
-                        onClick={() => setShowMobileMenu(false)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-all duration-200"
-                      >
-                        <Crown size={20} />
-                        <span>Przejdź na Premium</span>
-                      </button>
-                    </Link>
+                  {/* User Info Mobile */}
+                  {user && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
+                      <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
+                        <span className="text-white font-semibold text-base">{user.avatar}</span>
+                      </div>
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{user.name}</div>
+                        <div className="text-sm text-gray-500">{user.email}</div>
+                      </div>
+                    </div>
                   )}
 
-                  <button
-                    onClick={() => {
-                      setShowGiftPopup(true);
-                      setShowMobileMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                  >
-                    <Gift size={20} />
-                    <span>Dostań 10% zniżki</span>
-                  </button>
+                  {/* Menu Items Mobile */}
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => {
+                        if (currentWorkspace) {
+                          setShowInvitePopup(true);
+                          setShowMobileMenu(false);
+                        } else {
+                          alert('Najpierw wybierz workspace');
+                        }
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                    >
+                      <UserPlus size={20} />
+                      <span>Zaproś uczestników</span>
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      setShowNotifications(true);
-                      setShowMobileMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200 relative"
-                  >
-                    <Bell size={20} />
-                    <span>Powiadomienia</span>
-                    {inviteCount > 0 && (
-                      <span className="ml-auto min-w-[20px] h-[20px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
-                        {inviteCount > 9 ? "9+" : inviteCount}
-                      </span>
+                    {/* Premium Mobile */}
+                    {user && !user.isPremium && (
+                      <Link href="/#pricing">
+                        <button
+                          onClick={() => setShowMobileMenu(false)}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-all duration-200"
+                        >
+                          <Crown size={20} />
+                          <span>Przejdź na Premium</span>
+                        </button>
+                      </Link>
                     )}
-                  </button>
 
-                  <button
-                    onClick={() => {
-                      router.push('/clientPanel');
-                      setShowMobileMenu(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                  >
-                    <UserIcon size={20} />
-                    <span>Profil</span>
-                  </button>
+                    <button
+                      onClick={() => {
+                        setShowGiftPopup(true);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                    >
+                      <Gift size={20} />
+                      <span>Dostań 10% zniżki</span>
+                    </button>
 
-                  {/* Separator */}
-                  <div className="border-t border-gray-200 my-2"></div>
+                    <button
+                      onClick={() => {
+                        setShowNotifications(true);
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200 relative"
+                    >
+                      <Bell size={20} />
+                      <span>Powiadomienia</span>
+                      {inviteCount > 0 && (
+                        <span className="ml-auto min-w-[20px] h-[20px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                          {inviteCount > 9 ? '9+' : inviteCount}
+                        </span>
+                      )}
+                    </button>
 
-                  {/* Wyloguj */}
-                  <button
-                    onClick={() => {
-                      console.log('🚪 Wylogowywanie z mobile menu...');
-                      logout();
-                      setShowMobileMenu(false);
-                      router.push('/');
-                    }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
-                  >
-                    <LogOut size={20} />
-                    <span className="font-medium">Wyloguj się</span>
-                  </button>
-                </div>
+                    <button
+                      onClick={() => {
+                        router.push('/clientPanel');
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                    >
+                      <UserIcon size={20} />
+                      <span>Profil</span>
+                    </button>
 
-                {/* Badge Free Mobile */}
-                {user && !user.isPremium && (
-                  <div className="mt-4 px-4">
-                    <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
-                      FREE PLAN
-                    </div>
+                    {/* Separator */}
+                    <div className="border-t border-gray-200 my-2"></div>
+
+                    {/* Wyloguj */}
+                    <button
+                      onClick={() => {
+                        console.log('🚪 Wylogowywanie z mobile menu...');
+                        logout();
+                        setShowMobileMenu(false);
+                        router.push('/');
+                      }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                    >
+                      <LogOut size={20} />
+                      <span className="font-medium">Wyloguj się</span>
+                    </button>
                   </div>
-                )}
+
+                  {/* Badge Free Mobile */}
+                  {user && !user.isPremium && (
+                    <div className="mt-4 px-4">
+                      <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
+                        FREE PLAN
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
             </>
           )}
         </div>
@@ -469,9 +471,7 @@ export default function DashboardHeader() {
 
       {showGiftPopup && <GiftPopup onClose={() => setShowGiftPopup(false)} />}
 
-      {showNotifications && (
-        <NotificationsPopup onClose={() => setShowNotifications(false)} />
-      )}
+      {showNotifications && <NotificationsPopup onClose={() => setShowNotifications(false)} />}
     </>
   );
 }

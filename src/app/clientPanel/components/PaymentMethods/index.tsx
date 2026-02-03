@@ -20,31 +20,27 @@ export default function PaymentMethods() {
     // TODO: Integracja ze Stripe - dodanie karty przez Stripe Elements
     const method: PaymentMethod = {
       ...newMethod,
-      id: Math.max(...(paymentMethods.length > 0 ? paymentMethods.map(p => p.id) : [0])) + 1
+      id: Math.max(...(paymentMethods.length > 0 ? paymentMethods.map((p) => p.id) : [0])) + 1,
     };
-    setPaymentMethods(prev => [...prev, method]);
+    setPaymentMethods((prev) => [...prev, method]);
     setShowAddModal(false);
   };
 
   const handleEditPaymentMethod = (id: number, updatedMethod: Omit<PaymentMethod, 'id'>) => {
-    setPaymentMethods(prev => 
-      prev.map(method => 
-        method.id === id 
-          ? { ...updatedMethod, id }
-          : method
-      )
+    setPaymentMethods((prev) =>
+      prev.map((method) => (method.id === id ? { ...updatedMethod, id } : method))
     );
   };
 
   const handleDeletePaymentMethod = (id: number) => {
-    setPaymentMethods(prev => prev.filter(method => method.id !== id));
+    setPaymentMethods((prev) => prev.filter((method) => method.id !== id));
   };
 
   const handleSetDefault = (id: number) => {
-    setPaymentMethods(prev => 
-      prev.map(method => ({
+    setPaymentMethods((prev) =>
+      prev.map((method) => ({
         ...method,
-        isDefault: method.id === id
+        isDefault: method.id === id,
       }))
     );
   };
@@ -55,7 +51,8 @@ export default function PaymentMethods() {
       <div className="border-b border-gray-200 pb-6">
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Metody płatności</h1>
         <p className="text-gray-600">
-          Dodaj i zarządzaj swoimi metodami płatności za pomocą naszego bezpiecznego, szyfrowanego systemu płatności.
+          Dodaj i zarządzaj swoimi metodami płatności za pomocą naszego bezpiecznego, szyfrowanego
+          systemu płatności.
         </p>
       </div>
 
@@ -105,7 +102,7 @@ export default function PaymentMethods() {
       {/* Adres używany do faktury */}
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h2 className="text-lg font-semibold text-gray-900 mb-4">Adres używany do faktury</h2>
-        
+
         <div className="relative">
           <select
             value={selectedBillingAddress}
@@ -120,7 +117,7 @@ export default function PaymentMethods() {
             <MapPin size={20} className="text-gray-400" />
           </div>
         </div>
-        
+
         {selectedBillingAddress && (
           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
             <div className="flex items-center gap-2 text-green-700">
@@ -128,10 +125,9 @@ export default function PaymentMethods() {
               <span className="font-medium">Wybrany adres do faktury</span>
             </div>
             <p className="text-sm text-green-600 mt-1">
-              {selectedBillingAddress === 'home' 
+              {selectedBillingAddress === 'home'
                 ? 'Pietkiewicza 6D/61, 15-689 Białystok, PL'
-                : 'ul. Przykładowa 123, 00-000 Warszawa, PL'
-              }
+                : 'ul. Przykładowa 123, 00-000 Warszawa, PL'}
             </p>
           </div>
         )}

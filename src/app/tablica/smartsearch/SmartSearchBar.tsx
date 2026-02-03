@@ -2,7 +2,7 @@
  * ============================================================================
  * PLIK: src/app/tablica/smartsearch/SmartSearchBar.tsx
  * ============================================================================
- * 
+ *
  * SmartSearchBar - wyszukiwarka wzorów w toolbarze (FIXED EXPANSION + FANCY ANIMATIONS)
  * ============================================================================
  */
@@ -10,9 +10,28 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, X, BookOpen, Calculator, FileText, Table2, PieChart, Library, Sparkles, Copy, Check, Plus } from 'lucide-react';
+import {
+  Search,
+  X,
+  BookOpen,
+  Calculator,
+  FileText,
+  Table2,
+  PieChart,
+  Library,
+  Sparkles,
+  Copy,
+  Check,
+  Plus,
+} from 'lucide-react';
 import { loadManifest, searchResources, getResourceTypeColor } from './searchService';
-import { ResourceManifest, SearchResult, FormulaResource, CardResource, CalculationResult } from './types';
+import {
+  ResourceManifest,
+  SearchResult,
+  FormulaResource,
+  CardResource,
+  CalculationResult,
+} from './types';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
@@ -31,7 +50,14 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PieChart,
 };
 
-export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSelect, onBrowseAll, onActiveChange, userRole }: SmartSearchBarProps) {
+export function SmartSearchBar({
+  onFormulaSelect,
+  onCardSelect,
+  onCalculationSelect,
+  onBrowseAll,
+  onActiveChange,
+  userRole,
+}: SmartSearchBarProps) {
   // 🔒 Viewer nie ma dostępu do wyszukiwarki
   if (userRole === 'viewer') {
     return null;
@@ -47,7 +73,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
   const [isAnimatingSelection, setIsAnimatingSelection] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
   const [copiedCalculation, setCopiedCalculation] = useState(false); // 🆕 Stan kopiowania
-  
+
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
@@ -102,10 +128,10 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
     if (selectedItemRef.current && resultsContainerRef.current) {
       const container = resultsContainerRef.current;
       const item = selectedItemRef.current;
-      
+
       const containerRect = container.getBoundingClientRect();
       const itemRect = item.getBoundingClientRect();
-      
+
       // Scroll tylko gdy element jest poza widocznym obszarem
       // Używamy 'instant' zamiast 'smooth' żeby nie było lagu przy przytrzymaniu strzałek
       if (itemRect.bottom > containerRect.bottom) {
@@ -120,15 +146,15 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
   useEffect(() => {
     const hasResults = !!(query.trim() || isLoading); // Wymuś boolean
     const isActive = isOpen && hasResults;
-    
+
     // Informuj rodzica o zmianie stanu
     onActiveChange?.(isActive);
-    
+
     if (isActive) {
       // Blokuj scroll na całym body/document
       const originalOverflow = document.body.style.overflow;
       document.body.style.overflow = 'hidden';
-      
+
       return () => {
         // Przywróć scroll po zamknięciu
         document.body.style.overflow = originalOverflow;
@@ -138,20 +164,23 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
   }, [isOpen, query, isLoading, onActiveChange]);
 
   // Keyboard navigation
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      handleClose();
-    } else if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(prev => Math.min(prev + 1, results.length - 1));
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(prev => Math.max(prev - 1, 0));
-    } else if (e.key === 'Enter' && results[selectedIndex]) {
-      e.preventDefault();
-      handleSelect(results[selectedIndex]);
-    }
-  }, [results, selectedIndex]);
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.min(prev + 1, results.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex((prev) => Math.max(prev - 1, 0));
+      } else if (e.key === 'Enter' && results[selectedIndex]) {
+        e.preventDefault();
+        handleSelect(results[selectedIndex]);
+      }
+    },
+    [results, selectedIndex]
+  );
 
   // Zamknij przy kliknięciu poza
   useEffect(() => {
@@ -171,10 +200,10 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
   const handleWheel = useCallback((e: React.WheelEvent) => {
     const container = resultsContainerRef.current;
     if (!container) return;
-    
+
     // Zatrzymaj propagację do tablicy
     e.stopPropagation();
-    
+
     // Manualnie scrolluj kontener
     container.scrollTop += e.deltaY;
   }, []);
@@ -223,11 +252,11 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
       }, 500);
       return;
     }
-    
+
     // Rozpocznij fancy animację
     setSelectedItemId(result.id);
     setIsAnimatingSelection(true);
-    
+
     // Poczekaj 400ms na animację, potem wywołaj callback
     setTimeout(() => {
       if (result.resultType === 'card') {
@@ -263,7 +292,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             transform: translateY(0);
           }
         }
-        
+
         @keyframes slideOut {
           from {
             opacity: 1;
@@ -274,12 +303,16 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             transform: translateY(-8px);
           }
         }
-        
+
         @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
         }
-        
+
         @keyframes expandSearch {
           from {
             width: 500px;
@@ -290,7 +323,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             opacity: 1;
           }
         }
-        
+
         @keyframes expandSearchMobile {
           from {
             width: 56px;
@@ -301,7 +334,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             opacity: 1;
           }
         }
-        
+
         @keyframes shrinkSearch {
           from {
             width: 700px;
@@ -312,7 +345,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             opacity: 0.8;
           }
         }
-        
+
         @keyframes shrinkSearchMobile {
           from {
             width: 90vw;
@@ -323,37 +356,40 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             opacity: 0.8;
           }
         }
-        
 
-        
         @keyframes pulse {
-          0%, 100% {
+          0%,
+          100% {
             opacity: 1;
           }
           50% {
             opacity: 0.5;
           }
         }
-        
+
         @keyframes spin {
-          to { 
-            transform: rotate(360deg); 
+          to {
+            transform: rotate(360deg);
           }
         }
-        
+
         /* FANCY SELECTION ANIMATIONS - tylko glow i shimmer */
         @keyframes selectedItemGlow {
           0% {
             box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
           }
           50% {
-            box-shadow: 0 0 30px 10px rgba(59, 130, 246, 0.6), 0 0 60px 20px rgba(59, 130, 246, 0.3);
+            box-shadow:
+              0 0 30px 10px rgba(59, 130, 246, 0.6),
+              0 0 60px 20px rgba(59, 130, 246, 0.3);
           }
           100% {
-            box-shadow: 0 0 30px 10px rgba(59, 130, 246, 0.6), 0 0 60px 20px rgba(59, 130, 246, 0.3);
+            box-shadow:
+              0 0 30px 10px rgba(59, 130, 246, 0.6),
+              0 0 60px 20px rgba(59, 130, 246, 0.3);
           }
         }
-        
+
         @keyframes shimmer {
           0% {
             left: -100%;
@@ -362,41 +398,41 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             left: 100%;
           }
         }
-        
+
         @keyframes fadeOutOthers {
           to {
             opacity: 0;
             transform: scale(0.95);
           }
         }
-        
+
         /* Naprawiony scroll dla wyników */
         .results-scroll {
           overflow-y: auto;
           scrollbar-width: thin;
           scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
         }
-        
+
         .results-scroll::-webkit-scrollbar {
           width: 8px;
         }
-        
+
         .results-scroll::-webkit-scrollbar-track {
           background: transparent;
           margin: 8px 0;
         }
-        
+
         .results-scroll::-webkit-scrollbar-thumb {
           background-color: rgba(59, 130, 246, 0.3);
           border-radius: 10px;
           border: 2px solid transparent;
           background-clip: padding-box;
         }
-        
+
         .results-scroll::-webkit-scrollbar-thumb:hover {
           background-color: rgba(59, 130, 246, 0.5);
         }
-        
+
         /* Shimmer effect overlay */
         .shimmer-overlay {
           position: absolute;
@@ -426,35 +462,33 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                 setTimeout(() => inputRef.current?.focus(), 50);
               }}
               className={`flex items-center gap-3 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 shadow-lg hover:shadow-blue-200/50 hover:scale-[1.02] hover:cursor-pointer relative ${windowWidth > 1550 ? 'mx-auto' : ''}`}
-              style={{ 
-                width: windowWidth <= 760 ? '56px' : '100%', 
-                maxWidth: windowWidth <= 760 ? '56px' : '1000px', 
+              style={{
+                width: windowWidth <= 760 ? '56px' : '100%',
+                maxWidth: windowWidth <= 760 ? '56px' : '1000px',
                 height: '64px',
                 padding: windowWidth <= 760 ? '0' : '16px 24px',
                 justifyContent: windowWidth <= 760 ? 'center' : 'flex-start',
-                transition: 'all 0.3s ease-out'
+                transition: 'all 0.3s ease-out',
               }}
               title="Szukaj wzorów (Ctrl+K)"
             >
               <Search className="w-5 h-5 text-gray-400" />
-  
-              
-              
-              
 
               {/* Tekst i przyciski ukrywane przy 760px */}
               {windowWidth > 760 && (
                 <>
-                  <span className="text-base text-gray-500 flex-1 text-left">Szukaj wzorów matematycznych...</span>
-                  
+                  <span className="text-base text-gray-500 flex-1 text-left">
+                    Szukaj wzorów matematycznych...
+                  </span>
+
                   {/* Ctrl+K badge - WEWNĄTRZ buttona */}
                   <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
                     Ctrl+K
                   </kbd>
-                  
+
                   {/* Separator - WEWNĄTRZ buttona */}
                   <div className="w-px h-8 bg-gray-200/50 mx-2" />
-                  
+
                   {/* Ikonka wzorów - WEWNĄTRZ głównego buttona */}
                   <div
                     onClick={(e) => {
@@ -467,7 +501,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                     title="Przeglądaj karty wzorów"
                   >
                     <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
-                  
+
                     {/* Tooltip */}
                     <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
                       <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
@@ -481,18 +515,34 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
             </button>
           </>
         ) : (
-          <div 
+          <div
             className={`flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-lg px-6 ${windowWidth > 1550 ? 'mx-auto' : ''}`}
             style={{
               height: '64px',
               width: windowWidth <= 760 ? '90vw' : '100%',
-              maxWidth: windowWidth <= 760 ? '500px' : windowWidth <= 1550 ? '100%' : windowWidth<=1580 ? '500px' : windowWidth<= 1620 ? '550px' : windowWidth <= 1800 ? '620px' : '1000px',
+              maxWidth:
+                windowWidth <= 760
+                  ? '500px'
+                  : windowWidth <= 1550
+                    ? '100%'
+                    : windowWidth <= 1580
+                      ? '500px'
+                      : windowWidth <= 1620
+                        ? '550px'
+                        : windowWidth <= 1800
+                          ? '620px'
+                          : '1000px',
               position: 'relative',
-              animation: windowWidth > 760 && windowWidth <= 1550 
-                ? 'none' 
-                : (isClosing 
-                  ? (windowWidth <= 760 ? 'shrinkSearchMobile 0.3s ease-out forwards' : 'shrinkSearch 0.3s ease-out forwards')
-                  : (windowWidth <= 760 ? 'expandSearchMobile 0.3s ease-out forwards' : 'expandSearch 0.3s ease-out forwards'))
+              animation:
+                windowWidth > 760 && windowWidth <= 1550
+                  ? 'none'
+                  : isClosing
+                    ? windowWidth <= 760
+                      ? 'shrinkSearchMobile 0.3s ease-out forwards'
+                      : 'shrinkSearch 0.3s ease-out forwards'
+                    : windowWidth <= 760
+                      ? 'expandSearchMobile 0.3s ease-out forwards'
+                      : 'expandSearch 0.3s ease-out forwards',
             }}
           >
             <Search className="w-5 h-5 text-blue-500 animate-pulse" />
@@ -517,7 +567,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
 
         {/* Results Dropdown Z DZIAŁAJĄCYM SCROLLEM I FANCY ANIMATIONS */}
         {isOpen && (query.trim() || isLoading) && !isClosing && (
-          <div 
+          <div
             ref={resultsContainerRef}
             onWheel={handleWheel}
             className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-[60] results-scroll overflow-y-auto"
@@ -527,15 +577,15 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
               maxWidth: windowWidth <= 760 ? '500px' : 'none',
               left: windowWidth <= 760 ? '50%' : '0',
               right: windowWidth <= 760 ? 'auto' : '0',
-              transform: windowWidth <= 760 ? 'translateX(-50%)' : 'none'
+              transform: windowWidth <= 760 ? 'translateX(-50%)' : 'none',
             }}
           >
             {isLoading ? (
               <div className="p-6 text-center text-gray-500">
-                <div 
+                <div
                   className="w-6 h-6 border-3 border-blue-500 border-t-transparent rounded-full mx-auto mb-3"
                   style={{
-                    animation: 'spin 1s linear infinite, pulse 2s ease-in-out infinite'
+                    animation: 'spin 1s linear infinite, pulse 2s ease-in-out infinite',
                   }}
                 />
                 Ładowanie...
@@ -558,20 +608,21 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                         onMouseEnter={() => setSelectedIndex(index)}
                         className={`
                           flex items-center gap-4 px-5 py-4 mx-2 mb-2 rounded-2xl cursor-pointer transition-all duration-200 relative overflow-hidden
-                          ${index === selectedIndex 
-                            ? 'bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg border-2 border-emerald-300' 
-                            : 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200'
+                          ${
+                            index === selectedIndex
+                              ? 'bg-gradient-to-r from-emerald-100 to-teal-100 shadow-lg border-2 border-emerald-300'
+                              : 'bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 border border-emerald-200'
                           }
                         `}
                         style={{
-                          animation: `slideIn 0.2s ease-out both`
+                          animation: `slideIn 0.2s ease-out both`,
                         }}
                       >
                         {/* Ikona kalkulatora */}
                         <div className="p-3 rounded-2xl bg-emerald-500 shrink-0">
                           <Calculator className="w-6 h-6 text-white" />
                         </div>
-                        
+
                         {/* Wyrażenie i wynik */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
@@ -579,12 +630,16 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                             <Sparkles className="w-4 h-4 text-emerald-500" />
                           </div>
                           <div className="flex items-center gap-3">
-                            <span className="text-gray-600 font-mono text-lg">{result.expression}</span>
+                            <span className="text-gray-600 font-mono text-lg">
+                              {result.expression}
+                            </span>
                             <span className="text-emerald-600 font-bold">=</span>
-                            <span className="text-2xl font-bold text-emerald-700 font-mono">{result.result}</span>
+                            <span className="text-2xl font-bold text-emerald-700 font-mono">
+                              {result.result}
+                            </span>
                           </div>
                         </div>
-                        
+
                         {/* Przyciski akcji */}
                         <div className="flex items-center gap-2 shrink-0">
                           {/* Kopiuj */}
@@ -599,7 +654,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                               <Copy className="w-5 h-5 text-emerald-600" />
                             )}
                           </button>
-                          
+
                           {/* Dodaj do tablicy */}
                           {onCalculationSelect && (
                             <button
@@ -614,14 +669,14 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                       </li>
                     );
                   }
-                  
+
                   // Normalne renderowanie dla wzorów i kart
                   const Icon = getIcon(result.type);
                   const color = manifest ? getResourceTypeColor(manifest, result.type) : '#3B82F6';
                   const isCard = result.resultType === 'card';
                   const isSelected = selectedItemId === result.id;
                   const isOtherItem = isAnimatingSelection && !isSelected;
-                  
+
                   return (
                     <li
                       key={result.id}
@@ -630,36 +685,36 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                       onMouseEnter={() => setSelectedIndex(index)}
                       className={`
                         flex items-start gap-4 px-5 py-4 mx-2 mb-1 rounded-2xl cursor-pointer transition-all duration-200 relative overflow-hidden
-                        ${index === selectedIndex 
-                          ? 'bg-gray-200/50 shadow-lg' 
-                          : 'hover:bg-gray-50/80'
+                        ${
+                          index === selectedIndex
+                            ? 'bg-gray-200/50 shadow-lg'
+                            : 'hover:bg-gray-50/80'
                         }
                       `}
                       style={{
-                        animation: isSelected 
+                        animation: isSelected
                           ? 'selectedItemGlow 0.4s ease-out forwards'
                           : isOtherItem
-                          ? 'fadeOutOthers 0.3s ease-out forwards'
-                          : `slideIn 0.2s ease-out ${index * 0.03}s both`
+                            ? 'fadeOutOthers 0.3s ease-out forwards'
+                            : `slideIn 0.2s ease-out ${index * 0.03}s both`,
                       }}
                     >
                       {/* Shimmer effect gdy zaznaczony */}
                       {isSelected && <div className="shimmer-overlay" />}
-                      
+
                       {/* Icon z iskierkami */}
-                      <div 
+                      <div
                         className="p-3 rounded-2xl shrink-0 transition-transform duration-200 hover:scale-110 relative"
-                        style={{ 
+                        style={{
                           backgroundColor: `${color}20`,
-                          boxShadow: `0 4px 12px ${color}15`
+                          boxShadow: `0 4px 12px ${color}15`,
                         }}
                       >
                         <div style={{ color }}>
                           <Icon className="w-6 h-6" />
                         </div>
-                        
                       </div>
-                      
+
                       {/* Content */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -667,7 +722,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                             {result.title}
                           </span>
                           {isCard && (
-                            <span 
+                            <span
                               className="text-xs px-2.5 py-1 rounded-full text-white shrink-0 font-medium"
                               style={{ backgroundColor: color }}
                             >
@@ -675,11 +730,9 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 truncate mb-2">
-                          {result.description}
-                        </p>
+                        <p className="text-sm text-gray-600 truncate mb-2">{result.description}</p>
                         <div className="flex items-center gap-2">
-                          <span 
+                          <span
                             className="text-xs px-2 py-1 rounded-lg font-medium"
                             style={{ backgroundColor: `${color}15`, color }}
                           >
@@ -692,7 +745,7 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
                           )}
                         </div>
                       </div>
-                      
+
                       {/* Action hint */}
                       <div className="flex items-center gap-1 text-sm text-gray-400 shrink-0 self-center font-medium">
                         {isCard ? 'Przeglądaj' : 'Dodaj'}
@@ -708,10 +761,10 @@ export function SmartSearchBar({ onFormulaSelect, onCardSelect, onCalculationSel
 
         {/* Animacja zamykania wyników */}
         {isOpen && (query.trim() || isLoading) && isClosing && (
-          <div 
+          <div
             className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-50"
             style={{
-              animation: 'slideOut 0.2s ease-out forwards'
+              animation: 'slideOut 0.2s ease-out forwards',
             }}
           />
         )}

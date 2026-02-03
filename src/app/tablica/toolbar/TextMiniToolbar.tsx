@@ -2,14 +2,14 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/TextMiniToolbar.tsx
  * ============================================================================
- * 
+ *
  * EKSPORTUJE:
  * - TextMiniToolbar (component) - wspólny mini toolbar dla formatowania tekstu
- * 
+ *
  * UŻYWANE PRZEZ:
  * - TextTool.tsx (podczas tworzenia/edycji tekstu)
  * - SelectTool.tsx (gdy zaznaczony tekst)
- * 
+ *
  * PRZEZNACZENIE:
  * Reużywalny toolbar z opcjami formatowania tekstu:
  * - Rozmiar czcionki (8-120px)
@@ -38,22 +38,27 @@ interface TextMiniToolbarProps {
   className?: string;
 }
 
-export function TextMiniToolbar({ 
-  style, 
-  onChange, 
+export function TextMiniToolbar({
+  style,
+  onChange,
   position,
-  className = ''
+  className = '',
 }: TextMiniToolbarProps) {
-  const baseClasses = "bg-white rounded-lg shadow-lg border border-gray-200 flex items-center gap-1 p-1 z-50";
-  const positionClasses = position ? "absolute -translate-y-14" : "";
-  
+  const baseClasses =
+    'bg-white rounded-lg shadow-lg border border-gray-200 flex items-center gap-1 p-1 z-50';
+  const positionClasses = position ? 'absolute -translate-y-14' : '';
+
   return (
     <div
       className={`${baseClasses} ${positionClasses} ${className}`}
-      style={position ? {
-        left: position.x,
-        top: position.y,
-      } : undefined}
+      style={
+        position
+          ? {
+              left: position.x,
+              top: position.y,
+            }
+          : undefined
+      }
     >
       {/* Font size */}
       <input
@@ -99,9 +104,7 @@ export function TextMiniToolbar({
           })
         }
         className={`p-1.5 rounded transition-colors ${
-          style.fontWeight === 'bold'
-            ? 'bg-blue-500 text-white'
-            : 'text-gray-700 hover:bg-gray-100'
+          style.fontWeight === 'bold' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
         }`}
         title="Pogrubienie"
       >
@@ -131,9 +134,7 @@ export function TextMiniToolbar({
       <button
         onClick={() => onChange({ textAlign: 'left' })}
         className={`p-1.5 rounded transition-colors ${
-          style.textAlign === 'left'
-            ? 'bg-blue-500 text-white'
-            : 'text-gray-700 hover:bg-gray-100'
+          style.textAlign === 'left' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
         }`}
         title="Do lewej"
       >
@@ -157,9 +158,7 @@ export function TextMiniToolbar({
       <button
         onClick={() => onChange({ textAlign: 'right' })}
         className={`p-1.5 rounded transition-colors ${
-          style.textAlign === 'right'
-            ? 'bg-blue-500 text-white'
-            : 'text-gray-700 hover:bg-gray-100'
+          style.textAlign === 'right' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
         }`}
         title="Do prawej"
       >

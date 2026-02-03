@@ -9,39 +9,39 @@ const mockLocalizationData = {
   currency: 'PLN (Złoty polski)',
   timezone: 'Europe/Warsaw (GMT+1)',
   dateFormat: 'DD/MM/YYYY',
-  timeFormat: '24h'
+  timeFormat: '24h',
 };
 
 const languages = [
   { code: 'pl', name: 'Polski' },
   { code: 'en', name: 'English' },
   { code: 'de', name: 'Deutsch' },
-  { code: 'fr', name: 'Français' }
+  { code: 'fr', name: 'Français' },
 ];
 
 const currencies = [
   { code: 'PLN', name: 'PLN (Złoty polski)' },
   { code: 'EUR', name: 'EUR (Euro)' },
   { code: 'USD', name: 'USD (Dolar amerykański)' },
-  { code: 'GBP', name: 'GBP (Funt brytyjski)' }
+  { code: 'GBP', name: 'GBP (Funt brytyjski)' },
 ];
 
 const timezones = [
   { code: 'Europe/Warsaw', name: 'Europe/Warsaw (GMT+1)' },
   { code: 'Europe/London', name: 'Europe/London (GMT+0)' },
   { code: 'Europe/Berlin', name: 'Europe/Berlin (GMT+1)' },
-  { code: 'America/New_York', name: 'America/New_York (GMT-5)' }
+  { code: 'America/New_York', name: 'America/New_York (GMT-5)' },
 ];
 
 const dateFormats = [
   { code: 'DD/MM/YYYY', name: 'DD/MM/YYYY' },
   { code: 'MM/DD/YYYY', name: 'MM/DD/YYYY' },
-  { code: 'YYYY-MM-DD', name: 'YYYY-MM-DD' }
+  { code: 'YYYY-MM-DD', name: 'YYYY-MM-DD' },
 ];
 
 const timeFormats = [
   { code: '24h', name: '24h (14:30)' },
-  { code: '12h', name: '12h (2:30 PM)' }
+  { code: '12h', name: '12h (2:30 PM)' },
 ];
 
 export default function LocalizationInfo() {
@@ -51,7 +51,7 @@ export default function LocalizationInfo() {
     currency: 'PLN',
     timezone: 'Europe/Warsaw',
     dateFormat: 'DD/MM/YYYY',
-    timeFormat: '24h'
+    timeFormat: '24h',
   });
 
   const handleSave = () => {
@@ -66,7 +66,7 @@ export default function LocalizationInfo() {
       currency: 'PLN',
       timezone: 'Europe/Warsaw',
       dateFormat: 'DD/MM/YYYY',
-      timeFormat: '24h'
+      timeFormat: '24h',
     });
     setIsEditing(false);
   };
@@ -95,30 +95,30 @@ export default function LocalizationInfo() {
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Język
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Język</label>
                   <select
                     value={formData.language}
-                    onChange={(e) => setFormData(prev => ({ ...prev, language: e.target.value }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, language: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                   >
-                    {languages.map(lang => (
-                      <option key={lang.code} value={lang.code}>{lang.name}</option>
+                    {languages.map((lang) => (
+                      <option key={lang.code} value={lang.code}>
+                        {lang.name}
+                      </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Waluta
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Waluta</label>
                   <select
                     value={formData.currency}
-                    onChange={(e) => setFormData(prev => ({ ...prev, currency: e.target.value }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, currency: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                   >
-                    {currencies.map(curr => (
-                      <option key={curr.code} value={curr.code}>{curr.name}</option>
+                    {currencies.map((curr) => (
+                      <option key={curr.code} value={curr.code}>
+                        {curr.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -137,11 +137,13 @@ export default function LocalizationInfo() {
                   </label>
                   <select
                     value={formData.timezone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, timezone: e.target.value }))}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, timezone: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                   >
-                    {timezones.map(tz => (
-                      <option key={tz.code} value={tz.code}>{tz.name}</option>
+                    {timezones.map((tz) => (
+                      <option key={tz.code} value={tz.code}>
+                        {tz.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -152,11 +154,15 @@ export default function LocalizationInfo() {
                     </label>
                     <select
                       value={formData.dateFormat}
-                      onChange={(e) => setFormData(prev => ({ ...prev, dateFormat: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, dateFormat: e.target.value }))
+                      }
                       className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                     >
-                      {dateFormats.map(format => (
-                        <option key={format.code} value={format.code}>{format.name}</option>
+                      {dateFormats.map((format) => (
+                        <option key={format.code} value={format.code}>
+                          {format.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -166,11 +172,15 @@ export default function LocalizationInfo() {
                     </label>
                     <select
                       value={formData.timeFormat}
-                      onChange={(e) => setFormData(prev => ({ ...prev, timeFormat: e.target.value }))}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, timeFormat: e.target.value }))
+                      }
                       className="w-full px-3 py-2 border border-gray-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                     >
-                      {timeFormats.map(format => (
-                        <option key={format.code} value={format.code}>{format.name}</option>
+                      {timeFormats.map((format) => (
+                        <option key={format.code} value={format.code}>
+                          {format.name}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -203,9 +213,7 @@ export default function LocalizationInfo() {
               </h3>
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
-                    Język
-                  </label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Język</label>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <Globe size={20} className="text-blue-600" />
@@ -216,9 +224,7 @@ export default function LocalizationInfo() {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 mb-1">
-                    Waluta
-                  </label>
+                  <label className="block text-sm font-medium text-gray-500 mb-1">Waluta</label>
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
                       <DollarSign size={20} className="text-green-600" />

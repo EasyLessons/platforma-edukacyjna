@@ -2,7 +2,7 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/TableTool.tsx
  * ============================================================================
- * 
+ *
  * Narzędzie do tworzenia edytowalnych tabel na tablicy.
  * Przydatne do kombinatoryki, statystyki, danych.
  * ============================================================================
@@ -12,7 +12,12 @@
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, TableElement } from '../whiteboard/types';
-import { inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  inverseTransformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { Plus, Minus } from 'lucide-react';
 
 interface TableToolProps {
@@ -36,7 +41,7 @@ export function TableTool({
   const [cols, setCols] = useState(3);
   const [headerRow, setHeaderRow] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  
+
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
   useEffect(() => {
@@ -52,11 +57,18 @@ export function TableTool({
       if (showConfig) return; // Nie obsługuj scroll gdy jest popup
       e.preventDefault();
       e.stopPropagation();
-      
+
       const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(currentViewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(
+          currentViewport,
+          e.deltaY,
+          e.clientX,
+          e.clientY,
+          canvasWidth,
+          canvasHeight
+        );
         onViewportChange(constrainViewport(newViewport));
       } else {
         const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
@@ -83,7 +95,7 @@ export function TableTool({
     if (!configPosition) return;
 
     const worldPoint = inverseTransformPoint(configPosition, viewport, canvasWidth, canvasHeight);
-    
+
     // Utwórz pustą tablicę komórek
     const cells: string[][] = [];
     for (let r = 0; r < rows; r++) {
@@ -139,7 +151,7 @@ export function TableTool({
           onClick={(e) => e.stopPropagation()}
         >
           <h3 className="text-sm font-semibold text-gray-800 mb-3">Utwórz tabelę</h3>
-          
+
           {/* Wiersze */}
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs text-gray-600">Wiersze:</span>
@@ -198,7 +210,10 @@ export function TableTool({
                 {Array.from({ length: Math.min(rows, 4) }).map((_, r) => (
                   <tr key={r} className={r === 0 && headerRow ? 'bg-gray-100' : ''}>
                     {Array.from({ length: Math.min(cols, 4) }).map((_, c) => (
-                      <td key={c} className="border border-gray-200 px-2 py-1 text-center text-gray-400">
+                      <td
+                        key={c}
+                        className="border border-gray-200 px-2 py-1 text-center text-gray-400"
+                      >
                         {r === 0 && headerRow ? `K${c + 1}` : '...'}
                       </td>
                     ))}
@@ -236,101 +251,107 @@ interface TableViewProps {
   onCellChange: (row: number, col: number, value: string) => void;
 }
 
-export const TableView = memo(function TableView({ table, onCellChange }: TableViewProps) {
-  const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+export const TableView = memo(
+  function TableView({ table, onCellChange }: TableViewProps) {
+    const [editingCell, setEditingCell] = useState<{ row: number; col: number } | null>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (editingCell && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingCell]);
-
-  const handleCellClick = (row: number, col: number) => {
-    setEditingCell({ row, col });
-  };
-
-  const handleCellBlur = () => {
-    setEditingCell(null);
-  };
-
-  const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>, row: number, col: number) => {
-    onCellChange(row, col, e.target.value);
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' || e.key === 'Escape') {
-      setEditingCell(null);
-    } else if (e.key === 'Tab' && editingCell) {
-      e.preventDefault();
-      const { row, col } = editingCell;
-      const nextCol = col + 1;
-      const nextRow = row + 1;
-      
-      if (nextCol < table.cols) {
-        setEditingCell({ row, col: nextCol });
-      } else if (nextRow < table.rows) {
-        setEditingCell({ row: nextRow, col: 0 });
-      } else {
-        setEditingCell(null);
+    useEffect(() => {
+      if (editingCell && inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
       }
-    }
-  };
+    }, [editingCell]);
 
-  // Stały rozmiar czcionki - bez dynamicznego skalowania dla lepszej wydajności
-  const fontSize = 14;
+    const handleCellClick = (row: number, col: number) => {
+      setEditingCell({ row, col });
+    };
 
-  return (
-    <table
-      className="w-full h-full border-collapse"
-      style={{ fontSize }}
-    >
-      <tbody>
-        {table.cells.map((row, rowIndex) => (
-          <tr
-            key={rowIndex}
-            className={rowIndex === 0 && table.headerRow ? 'font-semibold' : ''}
-            style={{
-              backgroundColor: rowIndex === 0 && table.headerRow ? (table.headerBgColor || '#f3f4f6') : 'white',
-            }}
-          >
-            {row.map((cell, colIndex) => (
-              <td
-                key={colIndex}
-                className="border px-2 py-1 cursor-pointer"
-                style={{ 
-                  borderColor: table.borderColor || '#d1d5db',
-                  wordBreak: 'break-word',
-                }}
-                onDoubleClick={() => handleCellClick(rowIndex, colIndex)}
-              >
-                {editingCell?.row === rowIndex && editingCell?.col === colIndex ? (
-                  <input
-                    ref={inputRef}
-                    type="text"
-                    value={cell}
-                    onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
-                    onBlur={handleCellBlur}
-                    onKeyDown={handleKeyDown}
-                    className="w-full border-none outline-none bg-blue-50 px-1 text-black"
-                    style={{ fontSize }}
-                  />
-                ) : (
-                  <span className="block min-h-[1.2em] text-black" style={{ wordBreak: 'break-word' }}>{cell || '\u00A0'}</span>
-                )}
-              </td>
-            ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}, (prevProps, nextProps) => {
-  // Custom comparison - re-render only when table data changes
-  return (
-    prevProps.table.id === nextProps.table.id &&
-    prevProps.table.cells === nextProps.table.cells &&
-    prevProps.table.headerRow === nextProps.table.headerRow
-  );
-});
+    const handleCellBlur = () => {
+      setEditingCell(null);
+    };
+
+    const handleCellChange = (e: React.ChangeEvent<HTMLInputElement>, row: number, col: number) => {
+      onCellChange(row, col, e.target.value);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === 'Escape') {
+        setEditingCell(null);
+      } else if (e.key === 'Tab' && editingCell) {
+        e.preventDefault();
+        const { row, col } = editingCell;
+        const nextCol = col + 1;
+        const nextRow = row + 1;
+
+        if (nextCol < table.cols) {
+          setEditingCell({ row, col: nextCol });
+        } else if (nextRow < table.rows) {
+          setEditingCell({ row: nextRow, col: 0 });
+        } else {
+          setEditingCell(null);
+        }
+      }
+    };
+
+    // Stały rozmiar czcionki - bez dynamicznego skalowania dla lepszej wydajności
+    const fontSize = 14;
+
+    return (
+      <table className="w-full h-full border-collapse" style={{ fontSize }}>
+        <tbody>
+          {table.cells.map((row, rowIndex) => (
+            <tr
+              key={rowIndex}
+              className={rowIndex === 0 && table.headerRow ? 'font-semibold' : ''}
+              style={{
+                backgroundColor:
+                  rowIndex === 0 && table.headerRow ? table.headerBgColor || '#f3f4f6' : 'white',
+              }}
+            >
+              {row.map((cell, colIndex) => (
+                <td
+                  key={colIndex}
+                  className="border px-2 py-1 cursor-pointer"
+                  style={{
+                    borderColor: table.borderColor || '#d1d5db',
+                    wordBreak: 'break-word',
+                  }}
+                  onDoubleClick={() => handleCellClick(rowIndex, colIndex)}
+                >
+                  {editingCell?.row === rowIndex && editingCell?.col === colIndex ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={cell}
+                      onChange={(e) => handleCellChange(e, rowIndex, colIndex)}
+                      onBlur={handleCellBlur}
+                      onKeyDown={handleKeyDown}
+                      className="w-full border-none outline-none bg-blue-50 px-1 text-black"
+                      style={{ fontSize }}
+                    />
+                  ) : (
+                    <span
+                      className="block min-h-[1.2em] text-black"
+                      style={{ wordBreak: 'break-word' }}
+                    >
+                      {cell || '\u00A0'}
+                    </span>
+                  )}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    );
+  },
+  (prevProps, nextProps) => {
+    // Custom comparison - re-render only when table data changes
+    return (
+      prevProps.table.id === nextProps.table.id &&
+      prevProps.table.cells === nextProps.table.cells &&
+      prevProps.table.headerRow === nextProps.table.headerRow
+    );
+  }
+);

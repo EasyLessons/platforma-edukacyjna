@@ -2,22 +2,22 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/EraserTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useState, useRef, useEffect, useCallback)
  * - ../whiteboard/types (Point, ViewportTransform, DrawingElement)
  * - ../whiteboard/viewport (inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
- * 
+ *
  * EKSPORTUJE:
  * - EraserTool (component) - narzędzie gumki (usuwa elementy pod kursorem)
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (główny komponent)
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - wszystkie typy elementów
  * - viewport.ts - transformacje współrzędnych, pan/zoom
- * 
+ *
  * PRZEZNACZENIE:
  * Gumka do usuwania całych elementów - kliknięcie usuwa element pod kursorem.
  * ============================================================================
@@ -27,7 +27,13 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, DrawingElement } from '../whiteboard/types';
-import { inverseTransformPoint, transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  inverseTransformPoint,
+  transformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { useMultiTouchGestures } from '../whiteboard/useMultiTouchGestures';
 
 interface EraserToolProps {
@@ -70,7 +76,14 @@ export function EraserTool({
       e.stopPropagation();
 
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        const newViewport = zoomViewport(
+          viewport,
+          e.deltaY,
+          e.clientX,
+          e.clientY,
+          canvasWidth,
+          canvasHeight
+        );
         onViewportChange(constrainViewport(newViewport));
       } else {
         const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
@@ -105,10 +118,7 @@ export function EraserTool({
       const maxY = Math.max(element.startY, element.endY);
 
       return (
-        worldPoint.x >= minX &&
-        worldPoint.x <= maxX &&
-        worldPoint.y >= minY &&
-        worldPoint.y <= maxY
+        worldPoint.x >= minX && worldPoint.x <= maxX && worldPoint.y >= minY && worldPoint.y <= maxY
       );
     } else if (element.type === 'text') {
       const width = element.width || 3;
@@ -129,11 +139,11 @@ export function EraserTool({
     } else if (element.type === 'path') {
       // Dla path sprawdzamy czy punkt jest blisko któregokolwiek segmentu
       const threshold = 0.3; // tolerancja w jednostkach świata
-      
+
       for (let i = 0; i < element.points.length - 1; i++) {
         const p1 = element.points[i];
         const p2 = element.points[i + 1];
-        
+
         // Odległość punktu od odcinka
         const dist = pointToSegmentDistance(worldPoint, p1, p2);
         if (dist < threshold) return true;
@@ -145,12 +155,9 @@ export function EraserTool({
       const maxX = element.xRange;
       const minY = -element.yRange;
       const maxY = element.yRange;
-      
+
       return (
-        worldPoint.x >= minX &&
-        worldPoint.x <= maxX &&
-        worldPoint.y >= minY &&
-        worldPoint.y <= maxY
+        worldPoint.x >= minX && worldPoint.x <= maxX && worldPoint.y >= minY && worldPoint.y <= maxY
       );
     }
 
@@ -162,85 +169,98 @@ export function EraserTool({
     const dx = segEnd.x - segStart.x;
     const dy = segEnd.y - segStart.y;
     const lengthSquared = dx * dx + dy * dy;
-    
+
     if (lengthSquared === 0) {
       // Segment to punkt
       const distX = point.x - segStart.x;
       const distY = point.y - segStart.y;
       return Math.sqrt(distX * distX + distY * distY);
     }
-    
+
     // Projekcja punktu na odcinek
-    const t = Math.max(0, Math.min(1, 
-      ((point.x - segStart.x) * dx + (point.y - segStart.y) * dy) / lengthSquared
-    ));
-    
+    const t = Math.max(
+      0,
+      Math.min(1, ((point.x - segStart.x) * dx + (point.y - segStart.y) * dy) / lengthSquared)
+    );
+
     const projX = segStart.x + t * dx;
     const projY = segStart.y + t * dy;
-    
+
     const distX = point.x - projX;
     const distY = point.y - projY;
     return Math.sqrt(distX * distX + distY * distY);
   };
 
   // Znajduje element pod kursorem (od góry - ostatni rysowany)
-  const findElementAtPoint = useCallback((worldPoint: Point) => {
-    for (let i = elements.length - 1; i >= 0; i--) {
-      const el = elements[i];
-      if (isPointInElement(worldPoint, el)) {
-        return el;
+  const findElementAtPoint = useCallback(
+    (worldPoint: Point) => {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        const el = elements[i];
+        if (isPointInElement(worldPoint, el)) {
+          return el;
+        }
       }
-    }
-    return null;
-  }, [elements, isPointInElement]);
+      return null;
+    },
+    [elements, isPointInElement]
+  );
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    gestures.handlePointerDown(e);
-    if (gestures.isGestureActive()) return;
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      gestures.handlePointerDown(e);
+      if (gestures.isGestureActive()) return;
 
-    setIsDragging(true);
-    deletedDuringDrag.current.clear();
-    
-    // Usuń element pod kursorem natychmiast przy kliknięciu
-    if (hoveredElementId) {
-      deletedDuringDrag.current.add(hoveredElementId);
-      onElementDelete(hoveredElementId);
-      setHoveredElementId(null);
-    }
-  }, [hoveredElementId, onElementDelete, gestures]);
+      setIsDragging(true);
+      deletedDuringDrag.current.clear();
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    gestures.handlePointerUp(e);
-    
-    setIsDragging(false);
-    deletedDuringDrag.current.clear();
-  }, [gestures]);
+      // Usuń element pod kursorem natychmiast przy kliknięciu
+      if (hoveredElementId) {
+        deletedDuringDrag.current.add(hoveredElementId);
+        onElementDelete(hoveredElementId);
+        setHoveredElementId(null);
+      }
+    },
+    [hoveredElementId, onElementDelete, gestures]
+  );
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    gestures.handlePointerMove(e);
-    if (gestures.isGestureActive()) return;
+  const handlePointerUp = useCallback(
+    (e: React.PointerEvent) => {
+      gestures.handlePointerUp(e);
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-    setCursorPosition(screenPoint); // ✅ Zapisz screen position dla kursora
+      setIsDragging(false);
+      deletedDuringDrag.current.clear();
+    },
+    [gestures]
+  );
 
-    // Znajdź element pod kursorem
-    const element = findElementAtPoint(worldPoint);
-    setHoveredElementId(element?.id || null);
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      gestures.handlePointerMove(e);
+      if (gestures.isGestureActive()) return;
 
-    // Jeśli drag aktywny i najechaliśmy na nowy element → usuń go
-    if (isDragging && element && !deletedDuringDrag.current.has(element.id)) {
-      deletedDuringDrag.current.add(element.id);
-      onElementDelete(element.id);
-      setHoveredElementId(null);
-    }
-  }, [viewport, canvasWidth, canvasHeight, isDragging, elements, onElementDelete, gestures]);
+      const screenPoint = { x: e.clientX, y: e.clientY };
+      const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+      setCursorPosition(screenPoint); // ✅ Zapisz screen position dla kursora
+
+      // Znajdź element pod kursorem
+      const element = findElementAtPoint(worldPoint);
+      setHoveredElementId(element?.id || null);
+
+      // Jeśli drag aktywny i najechaliśmy na nowy element → usuń go
+      if (isDragging && element && !deletedDuringDrag.current.has(element.id)) {
+        deletedDuringDrag.current.add(element.id);
+        onElementDelete(element.id);
+        setHoveredElementId(null);
+      }
+    },
+    [viewport, canvasWidth, canvasHeight, isDragging, elements, onElementDelete, gestures]
+  );
 
   // Renderuj highlight dla hovered element
   const renderHighlight = () => {
     if (!hoveredElementId) return null;
 
-    const element = elements.find(el => el.id === hoveredElementId);
+    const element = elements.find((el) => el.id === hoveredElementId);
     if (!element) return null;
 
     let box: { x: number; y: number; width: number; height: number } | null = null;
@@ -322,9 +342,9 @@ export function EraserTool({
       {/* Interactive overlay */}
       <div
         className="absolute inset-0 z-30 pointer-events-auto"
-        style={{ 
+        style={{
           cursor: 'none', // Ukryj domyślny kursor - mamy własny
-          touchAction: 'none' 
+          touchAction: 'none',
         }}
         onPointerMove={handlePointerMove}
         onPointerDown={handlePointerDown}
@@ -354,4 +374,3 @@ export function EraserTool({
     </>
   );
 }
-

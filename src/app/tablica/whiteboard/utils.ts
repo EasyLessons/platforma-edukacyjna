@@ -2,19 +2,19 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/utils.ts
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - ./types (Point, ViewportTransform, DrawingElement)
- * 
+ *
  * EKSPORTUJE:
  * - clampLineWidth (function) - ogranicza szerokość linii (0.5-20px)
  * - clampFontSize (function) - ogranicza rozmiar czcionki (10-200px)
  * - evaluateExpression (function) - evaluator wyrażeń matematycznych
  * - isOutsideViewport (function) - sprawdza czy element poza viewport (TODO)
- * 
+ *
  * UŻYWANE PRZEZ:
  * - rendering.ts (clamp dla renderowania)
- * 
+ *
  * PRZEZNACZENIE:
  * Funkcje pomocnicze dla tablicy:
  * - Clamp dla rozmiaru linii/czcionek ze skalowaniem viewport
@@ -57,11 +57,11 @@ export function evaluateExpression(expr: string, x: number): number {
     // - stałe: pi, e
     // - automatyczne mnożenie: 2x = 2*x, 3(x+1) = 3*(x+1)
     const result = evaluate(expr, { x });
-    
+
     if (typeof result !== 'number' || !isFinite(result)) {
       throw new Error('Invalid result');
     }
-    
+
     return result;
   } catch (e) {
     throw new Error('Cannot evaluate expression');

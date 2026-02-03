@@ -2,14 +2,14 @@
  * ============================================================================
  * PLIK: src/app/tablica/utils/snapUtils.ts
  * ============================================================================
- * 
+ *
  * SNAP TO GUIDES - System przyciągania do linii prowadzących
- * 
+ *
  * LOGIKA:
  * - Tylko OBRAZKI emitują guide lines (vertical/horizontal)
  * - Wszystkie inne obiekty przyciągają się do tych linii
  * - Snap threshold: 10 jednostek canvas (0.1 w jednostkach świata)
- * 
+ *
  * ============================================================================
  */
 
@@ -38,7 +38,7 @@ export function collectGuidelinesFromImages(elements: DrawingElement[]): GuideLi
   const guidelines: GuideLine[] = [];
 
   // Filtruj tylko obrazki
-  const images = elements.filter(el => el.type === 'image') as ImageElement[];
+  const images = elements.filter((el) => el.type === 'image') as ImageElement[];
 
   for (const img of images) {
     const left = img.x;
@@ -91,10 +91,10 @@ export function snapToGuidelines(
   const activeGuides: GuideLine[] = [];
 
   // Filtruj guidelines (wykluczamy źródłowe obiekty jeśli to obrazek)
-  const validGuidelines = guidelines.filter(g => !excludeIds.includes(g.sourceId));
+  const validGuidelines = guidelines.filter((g) => !excludeIds.includes(g.sourceId));
 
   // Sprawdź vertical guides (snap X)
-  const verticalGuides = validGuidelines.filter(g => g.orientation === 'vertical');
+  const verticalGuides = validGuidelines.filter((g) => g.orientation === 'vertical');
   for (const guide of verticalGuides) {
     // Sprawdź left edge
     if (Math.abs(objectLeft - guide.value) < SNAP_THRESHOLD) {
@@ -120,7 +120,7 @@ export function snapToGuidelines(
   }
 
   // Sprawdź horizontal guides (snap Y)
-  const horizontalGuides = validGuidelines.filter(g => g.orientation === 'horizontal');
+  const horizontalGuides = validGuidelines.filter((g) => g.orientation === 'horizontal');
   for (const guide of horizontalGuides) {
     // Sprawdź top edge
     if (Math.abs(objectTop - guide.value) < SNAP_THRESHOLD) {

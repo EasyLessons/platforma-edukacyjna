@@ -2,22 +2,22 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/ToolbarUI.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react
  * - lucide-react (ikony)
  * - ./Toolbar (Tool, ShapeType)
- * 
+ *
  * EKSPORTUJE:
  * - ToolbarUI (component) - UI toolbara z narzędziami i ustawieniami
- * 
+ *
  * UŻYWANE PRZEZ:
  * - Toolbar.tsx (kontener logiki)
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - Toolbar.tsx - musi dostarczyć Tool i ShapeType
  * - Zmiana Tool/ShapeType wymaga synchronizacji z Toolbar.tsx
- * 
+ *
  * PRZEZNACZENIE:
  * Prezentacja UI toolbara - przyciski narzędzi, kolory, grubość linii,
  * rozmiar czcionki, undo/redo, clear. Responsywny (mobile + desktop).
@@ -28,10 +28,35 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  MousePointer2, Hand, PenTool, Type, Square, Circle, Triangle,
-  Minus, ArrowRight, Undo, Redo, Trash2, TrendingUp, Menu, X, Image as ImageIcon,
-  Upload, Clipboard as ClipboardIcon, Eraser, X as XIcon, Download, FolderOpen, Hexagon,
-  StickyNote, Table, Calculator, MessageCircle, FileText, MoreVertical
+  MousePointer2,
+  Hand,
+  PenTool,
+  Type,
+  Square,
+  Circle,
+  Triangle,
+  Minus,
+  ArrowRight,
+  Undo,
+  Redo,
+  Trash2,
+  TrendingUp,
+  Menu,
+  X,
+  Image as ImageIcon,
+  Upload,
+  Clipboard as ClipboardIcon,
+  Eraser,
+  X as XIcon,
+  Download,
+  FolderOpen,
+  Hexagon,
+  StickyNote,
+  Table,
+  Calculator,
+  MessageCircle,
+  FileText,
+  MoreVertical,
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -40,27 +65,27 @@ interface ToolbarUIProps {
   tool: Tool;
   selectedShape: ShapeType;
   polygonSides: number;
-  
+
   // Properties state
   color: string;
   lineWidth: number;
   fontSize: number;
   fillShape: boolean;
-  
+
   // 🆕 Kalkulator state
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
-  
+
   // History state
   canUndo: boolean;
   canRedo: boolean;
-  
+
   // Selection state
   hasSelection?: boolean;
-  
+
   // 🔒 Read-only mode
   isReadOnly?: boolean;
-  
+
   // Handlers
   onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
@@ -73,11 +98,11 @@ interface ToolbarUIProps {
   onRedo: () => void;
   onClear: () => void;
   onDeleteSelected?: () => void;
-  
+
   // Export/Import handlers
   onExport?: () => void;
   onImport?: () => void;
-  
+
   // 🖼️ ImageTool handlers
   onImagePaste?: () => void;
   onImageUpload?: () => void;
@@ -200,7 +225,6 @@ export function ToolbarUI({
       {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
         <div className="flex flex-col items-center gap-1.5 p-2">
-          
           {/* Main Tools */}
           {!isReadOnly && (
             <ToolButton
@@ -287,7 +311,7 @@ export function ToolbarUI({
               />
             </>
           )}
-          
+
           <ToolButton
             icon={Calculator}
             active={isCalculatorOpen ?? false}
@@ -298,18 +322,42 @@ export function ToolbarUI({
           <Divider />
 
           {/* History */}
-          <ToolButton icon={Undo} active={false} onClick={onUndo} title="Cofnij (Ctrl+Z)" disabled={!canUndo || isReadOnly} />
-          <ToolButton icon={Redo} active={false} onClick={onRedo} title="Ponów (Ctrl+Y)" disabled={!canRedo || isReadOnly} />
+          <ToolButton
+            icon={Undo}
+            active={false}
+            onClick={onUndo}
+            title="Cofnij (Ctrl+Z)"
+            disabled={!canUndo || isReadOnly}
+          />
+          <ToolButton
+            icon={Redo}
+            active={false}
+            onClick={onRedo}
+            title="Ponów (Ctrl+Y)"
+            disabled={!canRedo || isReadOnly}
+          />
 
           {/* Export/Import - UKRYTE w medium height */}
           {!isMediumHeight && !isMobile && (
             <>
               <Divider />
               {onExport && (
-                <ToolButton icon={Download} active={false} onClick={onExport} title="Eksportuj tablicę" disabled={isReadOnly} />
+                <ToolButton
+                  icon={Download}
+                  active={false}
+                  onClick={onExport}
+                  title="Eksportuj tablicę"
+                  disabled={isReadOnly}
+                />
               )}
               {onImport && (
-                <ToolButton icon={FolderOpen} active={false} onClick={onImport} title="Importuj tablicę" disabled={isReadOnly} />
+                <ToolButton
+                  icon={FolderOpen}
+                  active={false}
+                  onClick={onImport}
+                  title="Importuj tablicę"
+                  disabled={isReadOnly}
+                />
               )}
             </>
           )}
@@ -318,11 +366,11 @@ export function ToolbarUI({
           {(isMediumHeight || isMobile) && (
             <>
               <Divider />
-              <ToolButton 
-                icon={MoreVertical} 
-                active={isMoreMenuOpen} 
-                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)} 
-                title="Więcej narzędzi" 
+              <ToolButton
+                icon={MoreVertical}
+                active={isMoreMenuOpen}
+                onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                title="Więcej narzędzi"
                 disabled={isReadOnly}
               />
             </>
@@ -332,17 +380,23 @@ export function ToolbarUI({
 
           {/* Delete Selected - widoczne gdy coś zaznaczone */}
           {hasSelection && onDeleteSelected && (
-            <ToolButton 
-              icon={XIcon} 
-              active={false} 
-              onClick={onDeleteSelected} 
+            <ToolButton
+              icon={XIcon}
+              active={false}
+              onClick={onDeleteSelected}
               title="Usuń zaznaczone (Del)"
               disabled={isReadOnly}
             />
           )}
 
           {/* Clear */}
-          <ToolButton icon={Trash2} active={false} onClick={onClear} title="Wyczyść wszystko" disabled={isReadOnly} />
+          <ToolButton
+            icon={Trash2}
+            active={false}
+            onClick={onClear}
+            title="Wyczyść wszystko"
+            disabled={isReadOnly}
+          />
         </div>
       </div>
 
@@ -352,7 +406,7 @@ export function ToolbarUI({
           <div className="flex flex-col items-center gap-1.5 p-2">
             <div className="text-xs font-semibold text-gray-600 px-2 py-1">Więcej</div>
             <Divider />
-            
+
             <ToolButton
               icon={StickyNote}
               active={tool === 'markdown'}
@@ -373,29 +427,29 @@ export function ToolbarUI({
               title="Tabelka"
               disabled={isReadOnly}
             />
-            
+
             <Divider />
-            
+
             {onExport && (
-              <ToolButton 
-                icon={Download} 
-                active={false} 
+              <ToolButton
+                icon={Download}
+                active={false}
                 onClick={() => {
                   onExport();
                   setIsMoreMenuOpen(false);
-                }} 
+                }}
                 title="Eksportuj tablicę"
                 disabled={isReadOnly}
               />
             )}
             {onImport && (
-              <ToolButton 
-                icon={FolderOpen} 
-                active={false} 
+              <ToolButton
+                icon={FolderOpen}
+                active={false}
                 onClick={() => {
                   onImport();
                   setIsMoreMenuOpen(false);
-                }} 
+                }}
                 title="Importuj tablicę"
                 disabled={isReadOnly}
               />
@@ -412,7 +466,9 @@ export function ToolbarUI({
             {tool === 'pen' && (
               <>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Kolor
+                  </label>
                   <input
                     type="color"
                     value={color}
@@ -422,7 +478,9 @@ export function ToolbarUI({
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Grubość
+                  </label>
                   <input
                     type="range"
                     min="1"
@@ -441,12 +499,16 @@ export function ToolbarUI({
               <>
                 {/* Wybór kształtu - pionowo */}
                 <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kształt</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Kształt
+                  </label>
                   <div className="flex flex-col gap-1 bg-gray-100 rounded-lg p-1">
                     <button
                       onClick={() => onShapeChange('rectangle')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'rectangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'rectangle'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Prostokąt"
                     >
@@ -455,7 +517,9 @@ export function ToolbarUI({
                     <button
                       onClick={() => onShapeChange('circle')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'circle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'circle'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Koło"
                     >
@@ -464,7 +528,9 @@ export function ToolbarUI({
                     <button
                       onClick={() => onShapeChange('triangle')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'triangle' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'triangle'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Trójkąt"
                     >
@@ -473,7 +539,9 @@ export function ToolbarUI({
                     <button
                       onClick={() => onShapeChange('polygon')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'polygon' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'polygon'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title={`Wielokąt (${polygonSides} boków)`}
                     >
@@ -482,7 +550,9 @@ export function ToolbarUI({
                     <button
                       onClick={() => onShapeChange('line')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'line' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'line'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Linia"
                     >
@@ -491,7 +561,9 @@ export function ToolbarUI({
                     <button
                       onClick={() => onShapeChange('arrow')}
                       className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-200'
+                        selectedShape === 'arrow'
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-700 hover:bg-gray-200'
                       }`}
                       title="Strzałka"
                     >
@@ -503,20 +575,26 @@ export function ToolbarUI({
                 {/* Input na liczbę boków wielokąta */}
                 {selectedShape === 'polygon' && (
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Boki</label>
+                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Boki
+                    </label>
                     <input
                       type="number"
                       min="3"
                       max="20"
                       value={polygonSides}
-                      onChange={(e) => onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))}
+                      onChange={(e) =>
+                        onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))
+                      }
                       className="w-14 px-2 py-1 text-sm text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
                     />
                   </div>
                 )}
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Kolor</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Kolor
+                  </label>
                   <input
                     type="color"
                     value={color}
@@ -524,9 +602,11 @@ export function ToolbarUI({
                     className="w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
                   />
                 </div>
-                
+
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">Grubość</label>
+                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                    Grubość
+                  </label>
                   <input
                     type="range"
                     min="1"
@@ -537,12 +617,14 @@ export function ToolbarUI({
                   />
                   <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
                 </div>
-                
+
                 {selectedShape !== 'line' && selectedShape !== 'arrow' && (
                   <button
                     onClick={() => onFillShapeChange(!fillShape)}
                     className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
-                      fillShape ? 'bg-blue-500 text-white hover:bg-blue-600' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      fillShape
+                        ? 'bg-blue-500 text-white hover:bg-blue-600'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                     }`}
                   >
                     {fillShape ? '◼ Wypełniony' : '◻ Kontur'}
@@ -555,7 +637,7 @@ export function ToolbarUI({
             {/* 🔴 TEXT - properties panel usunięty, TextTool ma własny mini toolbar */}
 
             {/* 🔴 FUNCTION - usunięte z toolbara, FunctionTool ma własny panel */}
-            
+
             {/* 🖼️ IMAGE */}
             {tool === 'image' && (
               <div className="flex flex-col gap-1.5">

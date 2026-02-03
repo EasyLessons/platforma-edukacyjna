@@ -2,18 +2,18 @@
  * ============================================================================
  * PLIK: src/app/tablica/page.tsx - FINAL VERSION
  * ============================================================================
- * 
+ *
  * 🎯 SCALENIE:
  * - Oryginalny layout (przycisk powrotu, logo, tooltip)
  * - BoardRealtimeProvider (synchronizacja)
  * - boardId z query params
- * 
+ *
  * IMPORTUJE Z:
  * - next/navigation (useRouter, useSearchParams)
  * - next/image (Image)
  * - ./whiteboard/WhiteboardCanvas (główny komponent tablicy)
  * - ../context/BoardRealtimeContext (synchronizacja realtime)
- * 
+ *
  * PRZEZNACZENIE:
  * Strona /tablica z pełnoekranową tablicą, synchronizacją realtime,
  * i przyciskiem powrotu do dashboardu.
@@ -53,15 +53,15 @@ export function TablicaContent() {
   useEffect(() => {
     const id = searchParams.get('boardId') || 'demo-board';
     const arkusz = searchParams.get('arkusz');
-    
+
     setBoardId(id);
     setArkuszPath(arkusz);
-    
+
     console.log('📋 Board ID:', id);
     if (arkusz) {
       console.log('📄 Arkusz path:', arkusz);
     }
-    
+
     // Pobierz dane tablicy z bazy
     const loadBoardData = async () => {
       try {
@@ -72,7 +72,9 @@ export function TablicaContent() {
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {
-          console.warn('⚠️ fetchBoardById zwróciło null - spróbuj pobrać workspace_id z joinBoardWorkspace');
+          console.warn(
+            '⚠️ fetchBoardById zwróciło null - spróbuj pobrać workspace_id z joinBoardWorkspace'
+          );
         }
       } catch (error) {
         // Bardziej szczegółowe logowanie błędów
@@ -84,9 +86,9 @@ export function TablicaContent() {
         }
       }
     };
-    
+
     loadBoardData();
-    
+
     // Automatyczne dołączenie do workspace przy wejściu przez link
     const joinWorkspace = async () => {
       if (id && id !== 'demo-board') {
@@ -96,13 +98,13 @@ export function TablicaContent() {
             setIsJoining(true);
             const result = await joinBoardWorkspace(numericId);
             console.log('✅ Join workspace result:', result);
-            
+
             // Ustaw workspace_id z wyniku join (fallback jeśli fetchBoardById zawiódł)
             if (result.workspace_id && !workspaceId) {
               setWorkspaceId(result.workspace_id);
               console.log('📦 Workspace ID z join:', result.workspace_id);
             }
-            
+
             if (!result.already_member) {
               console.log('🆕 Dołączono do nowego workspace!');
             }
@@ -118,10 +120,10 @@ export function TablicaContent() {
         }
       }
     };
-    
+
     joinWorkspace();
   }, [searchParams]);
-  
+
   // Pobierz rolę użytkownika po załadowaniu workspace_id
   useEffect(() => {
     const fetchUserRole = async () => {
@@ -138,16 +140,16 @@ export function TablicaContent() {
         }
       }
     };
-    
+
     fetchUserRole();
   }, [workspaceId]);
-  
+
   // Realtime nasłuchiwanie zmian roli
   useEffect(() => {
     if (!workspaceId || workspaceId <= 0) return;
-    
+
     const { supabase } = require('@/lib/supabase');
-    
+
     const channel = supabase
       .channel(`workspace_members_${workspaceId}`)
       .on(
@@ -156,19 +158,19 @@ export function TablicaContent() {
           event: 'UPDATE',
           schema: 'public',
           table: 'workspace_members',
-          filter: `workspace_id=eq.${workspaceId}`
+          filter: `workspace_id=eq.${workspaceId}`,
         },
         async (payload: any) => {
           console.log('🔄 Zmiana roli workspace member:', payload);
           console.log('📊 Payload old:', payload.old, '| new:', payload.new);
-          
+
           // Odśwież rolę (API zwraca tylko rolę dla aktualnego użytkownika)
           try {
             const roleData = await getMyRoleInWorkspace(workspaceId);
             const oldRole = userRole;
             setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
             console.log('✅ Zaktualizowano rolę z', oldRole, '→', roleData.role);
-            
+
             // Reload strony jeśli rola się zmieniła na viewer (dla pewności)
             if (roleData.role === 'viewer' && oldRole !== 'viewer') {
               console.log('🔄 Rola zmieniona na viewer - przeładowanie strony...');
@@ -180,7 +182,7 @@ export function TablicaContent() {
         }
       )
       .subscribe();
-    
+
     return () => {
       supabase.removeChannel(channel);
     };
@@ -199,12 +201,14 @@ export function TablicaContent() {
   }
 
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'white',
-      overflow: 'hidden'
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'white',
+        overflow: 'hidden',
+      }}
+    >
       {/* Komunikat o dołączaniu / błędzie */}
       {isJoining && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg shadow-md z-[200] flex items-center gap-2">
@@ -217,7 +221,7 @@ export function TablicaContent() {
           {joinError}
         </div>
       )}
-      
+
       {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
       <HomeButton />
 
@@ -228,8 +232,8 @@ export function TablicaContent() {
       <BoardRealtimeProvider boardId={boardId}>
         {/* 🆕 VOICE CHAT PROVIDER - P2P audio */}
         <VoiceChatProvider boardId={boardId}>
-          <WhiteboardCanvas 
-            boardId={boardId} 
+          <WhiteboardCanvas
+            boardId={boardId}
             arkuszPath={arkuszPath}
             userRole={userRole || 'editor'}
           />
@@ -278,20 +282,20 @@ export default function TablicaPage() {
  * ═══════════════════════════════════════════════════════════════════════════
  * 📚 JAK UŻYWAĆ
  * ═══════════════════════════════════════════════════════════════════════════
- * 
+ *
  * URL:
  * /tablica?boardId=123  → Tablica o ID 123
  * /tablica              → Domyślna tablica "demo-board"
- * 
+ *
  * PRZYKŁAD LINKU Z DASHBOARD:
  * <Link href="/tablica?boardId=456">Otwórz tablicę</Link>
- * 
+ *
  * CO DZIAŁA:
  * ✅ Przycisk powrotu (logo EasyLesson) w lewym górnym rogu
  * ✅ Tooltip "Wróć do panelu" po najechaniu
  * ✅ Synchronizacja realtime przez BoardRealtimeProvider
  * ✅ boardId z URL query params
  * ✅ Lista użytkowników online (OnlineUsers w WhiteboardCanvas)
- * 
+ *
  * ═══════════════════════════════════════════════════════════════════════════
  */

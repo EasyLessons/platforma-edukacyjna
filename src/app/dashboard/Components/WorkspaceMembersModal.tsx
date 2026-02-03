@@ -1,21 +1,67 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Check, Users, Settings, Trash2, Crown, Calendar, Loader2, Eye, Edit3 } from 'lucide-react';
+import {
+  X,
+  Check,
+  Users,
+  Settings,
+  Trash2,
+  Crown,
+  Calendar,
+  Loader2,
+  Eye,
+  Edit3,
+} from 'lucide-react';
 import * as LucideIcons from 'lucide-react';
-import { fetchWorkspaceMembers, removeWorkspaceMember, updateMemberRole, WorkspaceMember } from '@/workspace_api/api';
+import {
+  fetchWorkspaceMembers,
+  removeWorkspaceMember,
+  updateMemberRole,
+  WorkspaceMember,
+} from '@/workspace_api/api';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 DOSTĘPNE IKONY I KOLORY DLA WORKSPACE'ÓW
 // ═══════════════════════════════════════════════════════════════════════════
 
 const availableIcons = [
-  'BookOpen', 'Briefcase', 'Code', 'Coffee', 'Compass', 'Crown',
-  'Gamepad2', 'Heart', 'Home', 'Lightbulb', 'Music', 'Palette',
-  'Rocket', 'Sparkles', 'Target', 'Zap', 'Users', 'Calendar',
-  'FileText', 'MessageCircle', 'Bell', 'Star', 'Trophy', 'Award',
-  'Globe', 'Calculator', 'Camera', 'Monitor', 'Laptop', 'Cloud',
-  'Database', 'Server', 'Wifi', 'Smartphone', 'PenTool', 'Presentation'
+  'BookOpen',
+  'Briefcase',
+  'Code',
+  'Coffee',
+  'Compass',
+  'Crown',
+  'Gamepad2',
+  'Heart',
+  'Home',
+  'Lightbulb',
+  'Music',
+  'Palette',
+  'Rocket',
+  'Sparkles',
+  'Target',
+  'Zap',
+  'Users',
+  'Calendar',
+  'FileText',
+  'MessageCircle',
+  'Bell',
+  'Star',
+  'Trophy',
+  'Award',
+  'Globe',
+  'Calculator',
+  'Camera',
+  'Monitor',
+  'Laptop',
+  'Cloud',
+  'Database',
+  'Server',
+  'Wifi',
+  'Smartphone',
+  'PenTool',
+  'Presentation',
 ] as const;
 
 const availableColors = [
@@ -62,18 +108,18 @@ export default function WorkspaceMembersModal({
   onSave,
   workspaceId,
   isOwner,
-  initialData
+  initialData,
 }: WorkspaceMembersModalProps) {
   // Aktywna zakładka
   const [activeTab, setActiveTab] = useState<TabType>('settings');
-  
+
   // Stan dla zakładki ustawień
   const [name, setName] = useState(initialData?.name || '');
   const [selectedIcon, setSelectedIcon] = useState(initialData?.icon || 'Home');
   const [selectedColor, setSelectedColor] = useState(initialData?.bg_color || 'green-500');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Stan dla zakładki członków
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -81,11 +127,11 @@ export default function WorkspaceMembersModal({
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState<number | null>(null);
   const [changingRoleUserId, setChangingRoleUserId] = useState<number | null>(null);
-  
+
   // Animacja usunięcia
   const [removedMember, setRemovedMember] = useState<WorkspaceMember | null>(null);
   const [showRemovedAnimation, setShowRemovedAnimation] = useState(false);
-  
+
   const modalRef = useRef<HTMLDivElement>(null);
   const confirmModalRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -113,7 +159,7 @@ export default function WorkspaceMembersModal({
   const loadMembers = async () => {
     setLoadingMembers(true);
     setMembersError(null);
-    
+
     try {
       const response = await fetchWorkspaceMembers(workspaceId);
       setMembers(response.members);
@@ -126,24 +172,24 @@ export default function WorkspaceMembersModal({
 
   const handleRemoveMember = async (userId: number) => {
     // Znajdź członka przed usunięciem (do animacji)
-    const memberToRemove = members.find(m => m.user_id === userId);
-    
+    const memberToRemove = members.find((m) => m.user_id === userId);
+
     setRemovingMemberId(userId);
-    
+
     try {
       await removeWorkspaceMember(workspaceId, userId);
-      
+
       // Zamknij modal potwierdzenia
       setShowRemoveConfirm(null);
-      
+
       // Usuń z listy
-      setMembers(members.filter(m => m.user_id !== userId));
-      
+      setMembers(members.filter((m) => m.user_id !== userId));
+
       // Pokaż animację usunięcia
       if (memberToRemove) {
         setRemovedMember(memberToRemove);
         setShowRemovedAnimation(true);
-        
+
         // Ukryj animację po 2.5 sekundy
         setTimeout(() => {
           setShowRemovedAnimation(false);
@@ -159,16 +205,16 @@ export default function WorkspaceMembersModal({
 
   const handleRoleChange = async (userId: number, newRole: 'owner' | 'editor' | 'viewer') => {
     setChangingRoleUserId(userId);
-    
+
     try {
       await updateMemberRole(workspaceId, userId, newRole);
-      
+
       // Aktualizuj listę członków
-      setMembers(members.map(m => 
-        m.user_id === userId 
-          ? { ...m, role: newRole, is_owner: newRole === 'owner' }
-          : m
-      ));
+      setMembers(
+        members.map((m) =>
+          m.user_id === userId ? { ...m, role: newRole, is_owner: newRole === 'owner' } : m
+        )
+      );
     } catch (err) {
       setMembersError(err instanceof Error ? err.message : 'Nie udało się zmienić roli');
     } finally {
@@ -178,28 +224,40 @@ export default function WorkspaceMembersModal({
 
   const getRoleLabel = (role: string) => {
     switch (role) {
-      case 'owner': return 'Właściciel';
-      case 'editor': return 'Edytor';
-      case 'viewer': return 'Widz';
-      default: return role;
+      case 'owner':
+        return 'Właściciel';
+      case 'editor':
+        return 'Edytor';
+      case 'viewer':
+        return 'Widz';
+      default:
+        return role;
     }
   };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
-      case 'owner': return <Crown size={12} />;
-      case 'editor': return <Edit3 size={12} />;
-      case 'viewer': return <Eye size={12} />;
-      default: return null;
+      case 'owner':
+        return <Crown size={12} />;
+      case 'editor':
+        return <Edit3 size={12} />;
+      case 'viewer':
+        return <Eye size={12} />;
+      default:
+        return null;
     }
   };
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'owner': return 'bg-amber-200 text-amber-800';
-      case 'editor': return 'bg-blue-200 text-blue-800';
-      case 'viewer': return 'bg-gray-200 text-gray-800';
-      default: return 'bg-gray-200 text-gray-800';
+      case 'owner':
+        return 'bg-amber-200 text-amber-800';
+      case 'editor':
+        return 'bg-blue-200 text-blue-800';
+      case 'viewer':
+        return 'bg-gray-200 text-gray-800';
+      default:
+        return 'bg-gray-200 text-gray-800';
     }
   };
 
@@ -210,7 +268,7 @@ export default function WorkspaceMembersModal({
       if (showRemoveConfirm !== null) {
         return;
       }
-      
+
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         onClose();
       }
@@ -260,7 +318,7 @@ export default function WorkspaceMembersModal({
       await onSave({
         name: name.trim(),
         icon: selectedIcon,
-        bg_color: selectedColor
+        bg_color: selectedColor,
       });
       onClose();
     } catch (err) {
@@ -279,16 +337,16 @@ export default function WorkspaceMembersModal({
   // Znajdź kolor po nazwie
   const getColorData = (colorName: string) => {
     const normalizedColor = colorName.replace('bg-', '').replace('-500', '');
-    return availableColors.find(c => c.name === normalizedColor) || availableColors[0];
+    return availableColors.find((c) => c.name === normalizedColor) || availableColors[0];
   };
 
   // Formatuj datę
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('pl-PL', { 
-      day: 'numeric', 
-      month: 'long', 
-      year: 'numeric' 
+    return date.toLocaleDateString('pl-PL', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
     });
   };
 
@@ -314,9 +372,7 @@ export default function WorkspaceMembersModal({
       >
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-100">
-          <h2 className="text-xl font-bold text-gray-900">
-            Ustawienia przestrzeni
-          </h2>
+          <h2 className="text-xl font-bold text-gray-900">Ustawienia przestrzeni</h2>
           <button
             onClick={onClose}
             className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
@@ -364,7 +420,9 @@ export default function WorkspaceMembersModal({
           <div className="p-6 space-y-6">
             {/* Podgląd */}
             <div className="flex items-center justify-center">
-              <div className={`w-20 h-20 rounded-2xl ${selectedColorData.class} flex items-center justify-center shadow-lg`}>
+              <div
+                className={`w-20 h-20 rounded-2xl ${selectedColorData.class} flex items-center justify-center shadow-lg`}
+              >
                 <SelectedIconComponent size={40} className="text-white drop-shadow" />
               </div>
             </div>
@@ -384,16 +442,12 @@ export default function WorkspaceMembersModal({
                 maxLength={200}
                 disabled={!isOwner}
               />
-              <div className="text-right text-xs text-gray-400 mt-1">
-                {name.length}/200
-              </div>
+              <div className="text-right text-xs text-gray-400 mt-1">{name.length}/200</div>
             </div>
 
             {/* Ikona */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Ikona
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ikona</label>
               <div className="grid grid-cols-9 gap-2 max-h-32 overflow-y-auto p-1">
                 {availableIcons.map((iconName) => {
                   const IconComponent = getIconComponent(iconName);
@@ -419,19 +473,20 @@ export default function WorkspaceMembersModal({
 
             {/* Kolor */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Kolor
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Kolor</label>
               <div className="flex flex-wrap gap-2">
                 {availableColors.map((color) => {
-                  const isSelected = selectedColor === `${color.name}-500` || selectedColor === color.name;
+                  const isSelected =
+                    selectedColor === `${color.name}-500` || selectedColor === color.name;
                   return (
                     <button
                       key={color.name}
                       onClick={() => isOwner && setSelectedColor(`${color.name}-500`)}
                       disabled={!isOwner}
                       className={`w-10 h-10 rounded-xl ${color.class} transition-all flex items-center justify-center ${
-                        isSelected ? 'ring-2 ring-offset-2 ring-gray-900 scale-110' : 'hover:scale-105'
+                        isSelected
+                          ? 'ring-2 ring-offset-2 ring-gray-900 scale-110'
+                          : 'hover:scale-105'
                       } ${!isOwner ? 'cursor-not-allowed opacity-60' : ''}`}
                       title={color.label}
                     >
@@ -482,13 +537,17 @@ export default function WorkspaceMembersModal({
                   <div
                     key={member.id}
                     className={`flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                      member.is_owner ? 'bg-amber-50 border border-amber-200' : 'bg-gray-50 hover:bg-gray-100'
+                      member.is_owner
+                        ? 'bg-amber-50 border border-amber-200'
+                        : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                   >
                     {/* Avatar */}
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      member.is_owner ? 'bg-amber-500' : 'bg-green-500'
-                    } text-white font-bold text-lg shadow-sm`}>
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        member.is_owner ? 'bg-amber-500' : 'bg-green-500'
+                      } text-white font-bold text-lg shadow-sm`}
+                    >
                       {getInitial(member.username)}
                     </div>
 
@@ -498,12 +557,17 @@ export default function WorkspaceMembersModal({
                         <span className="font-medium text-gray-900 truncate">
                           {member.full_name || member.username}
                         </span>
-                        
+
                         {/* Dropdown roli (tylko dla właściciela, ukryty dla samego siebie) */}
                         {isOwner && !member.is_owner ? (
                           <select
                             value={member.role}
-                            onChange={(e) => handleRoleChange(member.user_id, e.target.value as 'owner' | 'editor' | 'viewer')}
+                            onChange={(e) =>
+                              handleRoleChange(
+                                member.user_id,
+                                e.target.value as 'owner' | 'editor' | 'viewer'
+                              )
+                            }
                             disabled={changingRoleUserId === member.user_id}
                             className={`text-xs px-2 py-1 rounded-full border cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-wait ${getRoleColor(member.role)}`}
                           >
@@ -512,7 +576,9 @@ export default function WorkspaceMembersModal({
                             <option value="owner">👑 Właściciel</option>
                           </select>
                         ) : (
-                          <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${getRoleColor(member.role)}`}>
+                          <span
+                            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${getRoleColor(member.role)}`}
+                          >
                             {getRoleIcon(member.role)}
                             {getRoleLabel(member.role)}
                           </span>
@@ -557,7 +623,12 @@ export default function WorkspaceMembersModal({
             {/* Podsumowanie */}
             {!loadingMembers && members.length > 0 && (
               <div className="mt-4 pt-4 border-t border-gray-200 text-center text-sm text-gray-500">
-                Łącznie {members.length} {members.length === 1 ? 'uczestnik' : members.length < 5 ? 'uczestników' : 'uczestników'}
+                Łącznie {members.length}{' '}
+                {members.length === 1
+                  ? 'uczestnik'
+                  : members.length < 5
+                    ? 'uczestników'
+                    : 'uczestników'}
               </div>
             )}
           </div>
@@ -606,23 +677,25 @@ export default function WorkspaceMembersModal({
 
       {/* Modal potwierdzenia usunięcia */}
       {showRemoveConfirm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[10000]"
           onClick={() => setShowRemoveConfirm(null)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl max-w-sm w-full mx-4 shadow-2xl p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
-              Usuń uczestnika?
-            </h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Usuń uczestnika?</h3>
             <p className="text-gray-600 mb-6">
-              Czy na pewno chcesz usunąć <strong>{members.find(m => m.user_id === showRemoveConfirm)?.username}</strong> z tej przestrzeni?
+              Czy na pewno chcesz usunąć{' '}
+              <strong>{members.find((m) => m.user_id === showRemoveConfirm)?.username}</strong> z
+              tej przestrzeni?
               <br />
-              <span className="text-sm text-gray-500">Użytkownik straci dostęp do wszystkich tablic.</span>
+              <span className="text-sm text-gray-500">
+                Użytkownik straci dostęp do wszystkich tablic.
+              </span>
             </p>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowRemoveConfirm(null)}
@@ -652,10 +725,10 @@ export default function WorkspaceMembersModal({
       {/* Animacja usunięcia użytkownika - OVERLAY nad całym dashboardem */}
       {showRemovedAnimation && removedMember && (
         <div className="fixed inset-0 z-[10001] pointer-events-none flex items-start justify-center pt-20">
-          <div 
+          <div
             className="animate-fall-away"
             style={{
-              animation: 'fallAway 2.5s ease-in forwards'
+              animation: 'fallAway 2.5s ease-in forwards',
             }}
           >
             <div className="bg-white border-4 border-red-500 rounded-2xl shadow-2xl p-6 min-w-[300px]">
@@ -666,28 +739,26 @@ export default function WorkspaceMembersModal({
                   <X size={20} className="text-red-600" />
                 </div>
               </div>
-              
+
               {/* Użytkownik */}
               <div className="flex items-center gap-4">
                 {/* Avatar */}
                 <div className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white font-bold text-2xl shadow-lg">
                   {removedMember.username.charAt(0).toUpperCase()}
                 </div>
-                
+
                 {/* Info */}
                 <div>
                   <div className="font-bold text-gray-900 text-lg">
                     {removedMember.full_name || removedMember.username}
                   </div>
                   <div className="text-gray-500">@{removedMember.username}</div>
-                  <div className="text-red-600 text-sm mt-1">
-                    Usunięty z przestrzeni
-                  </div>
+                  <div className="text-red-600 text-sm mt-1">Usunięty z przestrzeni</div>
                 </div>
               </div>
             </div>
           </div>
-          
+
           {/* CSS Animation */}
           <style jsx>{`
             @keyframes fallAway {

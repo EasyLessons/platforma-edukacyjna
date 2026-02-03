@@ -2,7 +2,7 @@
  * ============================================================================
  * PLIK: src/app/tablica/smartsearch/types.ts
  * ============================================================================
- * 
+ *
  * Typy dla SmartSearch - wyszukiwanie wzorów i kart wzorów
  * ============================================================================
  */
@@ -59,7 +59,7 @@ export interface ResourceManifest {
   cards: CardResource[];
 }
 
-export type SearchResult = 
+export type SearchResult =
   | (FormulaResource & { resultType: 'formula' })
   | (CardResource & { resultType: 'card' })
   | CalculationResult;

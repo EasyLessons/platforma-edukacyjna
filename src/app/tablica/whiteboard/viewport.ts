@@ -2,10 +2,10 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/viewport.ts
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - ./types (Point, ViewportTransform)
- * 
+ *
  * EKSPORTUJE:
  * - transformPoint (function) - world coords → screen coords
  * - inverseTransformPoint (function) - screen coords → world coords
@@ -13,12 +13,12 @@
  * - panViewportWithWheel (function) - przesuwanie touchpadem (2 palce)
  * - zoomViewport (function) - zoom pinch (2 palce do/od siebie)
  * - constrainViewport (function) - ograniczenia viewport (obecnie brak)
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (obsługa myszy/touchpada)
  * - rendering.ts (transformacje przy renderowaniu)
  * - Grid.tsx (transformacje siatki)
- * 
+ *
  * PRZEZNACZENIE:
  * Moduł transformacji współrzędnych i viewport management:
  * - Konwersja między współrzędnymi świata i ekranu
@@ -44,34 +44,34 @@ export const updateMomentum = (
   }
 
   const deltaTime = (currentTime - momentum.lastTimestamp) / 16; // Normalizuj do 60fps
-  
+
   // Zastosuj tarcie
-  let newVelocityX = momentum.velocityX * Math.pow(MOMENTUM_FRICTION, deltaTime);
-  let newVelocityY = momentum.velocityY * Math.pow(MOMENTUM_FRICTION, deltaTime);
-  
+  const newVelocityX = momentum.velocityX * Math.pow(MOMENTUM_FRICTION, deltaTime);
+  const newVelocityY = momentum.velocityY * Math.pow(MOMENTUM_FRICTION, deltaTime);
+
   // Sprawdź czy prędkość jest poniżej progu zatrzymania
   const speed = Math.sqrt(newVelocityX * newVelocityX + newVelocityY * newVelocityY);
   if (speed < MOMENTUM_THRESHOLD) {
     return {
       momentum: { ...momentum, isActive: false, velocityX: 0, velocityY: 0 },
-      viewport: null
+      viewport: null,
     };
   }
-  
+
   // Oblicz przesunięcie viewport na podstawie prędkości
   const viewportChange = {
     x: newVelocityX * deltaTime,
-    y: newVelocityY * deltaTime
+    y: newVelocityY * deltaTime,
   };
-  
+
   return {
     momentum: {
       ...momentum,
       velocityX: newVelocityX,
       velocityY: newVelocityY,
-      lastTimestamp: currentTime
+      lastTimestamp: currentTime,
     },
-    viewport: viewportChange
+    viewport: viewportChange,
   };
 };
 
@@ -88,12 +88,12 @@ export const startMomentum = (
     velocityX *= scale;
     velocityY *= scale;
   }
-  
+
   return {
     velocityX,
     velocityY,
     isActive: true,
-    lastTimestamp: performance.now()
+    lastTimestamp: performance.now(),
   };
 };
 
@@ -103,7 +103,7 @@ export const stopMomentum = (momentum: MomentumState): MomentumState => {
     ...momentum,
     isActive: false,
     velocityX: 0,
-    velocityY: 0
+    velocityY: 0,
   };
 };
 
@@ -120,10 +120,10 @@ export function transformPoint(
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;
   const scale = viewport.scale * 100; // WAŻNE: *100
-  
+
   return {
     x: (point.x - viewport.x) * scale + centerX,
-    y: (point.y - viewport.y) * scale + centerY
+    y: (point.y - viewport.y) * scale + centerY,
   };
 }
 
@@ -140,10 +140,10 @@ export function inverseTransformPoint(
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;
   const scale = viewport.scale * 100;
-  
+
   return {
     x: (point.x - centerX) / scale + viewport.x,
-    y: (point.y - centerY) / scale + viewport.y
+    y: (point.y - centerY) / scale + viewport.y,
   };
 }
 
@@ -160,7 +160,7 @@ export function panViewportWithMouse(
   return {
     ...viewport,
     x: viewport.x - (dx * mousePanSpeed) / (viewport.scale * 100),
-    y: viewport.y - (dy * mousePanSpeed) / (viewport.scale * 100)
+    y: viewport.y - (dy * mousePanSpeed) / (viewport.scale * 100),
   };
 }
 
@@ -176,11 +176,11 @@ export function panViewportWithWheel(
   const panSpeed = 1.0;
   const dx = deltaX * panSpeed;
   const dy = deltaY * panSpeed;
-  
+
   return {
     ...viewport,
     x: viewport.x + dx / (viewport.scale * 100),
-    y: viewport.y + dy / (viewport.scale * 100)
+    y: viewport.y + dy / (viewport.scale * 100),
   };
 }
 
@@ -200,26 +200,26 @@ export function zoomViewport(
   const zoomIntensity = 0.1;
   const delta = -deltaY;
   const scaleChange = 1 + (delta > 0 ? zoomIntensity : -zoomIntensity);
-  
+
   const oldScale = viewport.scale;
   const newScale = Math.min(Math.max(oldScale * scaleChange, 0.2), 5.0);
-  
+
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;
   const mouseRelX = mouseX - centerX;
   const mouseRelY = mouseY - centerY;
-  
+
   // POPRAWKA: 100px = 1 jednostka
   const worldX = viewport.x + mouseRelX / (oldScale * 100);
   const worldY = viewport.y + mouseRelY / (oldScale * 100);
-  
+
   const newViewportX = worldX - mouseRelX / (newScale * 100);
   const newViewportY = worldY - mouseRelY / (newScale * 100);
-  
+
   return {
     x: newViewportX,
     y: newViewportY,
-    scale: newScale
+    scale: newScale,
   };
 }
 
@@ -234,11 +234,11 @@ export function constrainViewport(viewport: ViewportTransform): ViewportTransfor
 /**
  * 🆕 VIEWPORT CULLING - sprawdza czy element jest widoczny w viewport
  * Zwraca true jeśli element (lub jego część) jest w widocznym obszarze
- * 
+ *
  * OPTYMALIZACJA: Elementy poza ekranem nie są renderowane
- * 
+ *
  * @param elementX - pozycja X elementu (world coords)
- * @param elementY - pozycja Y elementu (world coords)  
+ * @param elementY - pozycja Y elementu (world coords)
  * @param elementWidth - szerokość elementu (world coords)
  * @param elementHeight - wysokość elementu (world coords)
  * @param viewport - aktualny viewport
@@ -257,31 +257,26 @@ export function isElementInViewport(
   margin: number = 100
 ): boolean {
   // Transformuj rogi elementu do screen coordinates
-  const topLeft = transformPoint(
-    { x: elementX, y: elementY },
-    viewport,
-    canvasWidth,
-    canvasHeight
-  );
-  
+  const topLeft = transformPoint({ x: elementX, y: elementY }, viewport, canvasWidth, canvasHeight);
+
   const bottomRight = transformPoint(
     { x: elementX + elementWidth, y: elementY + elementHeight },
     viewport,
     canvasWidth,
     canvasHeight
   );
-  
+
   // Sprawdź czy prostokąt elementu przecina się z prostokątem ekranu (+ margines)
   const screenLeft = -margin;
   const screenTop = -margin;
   const screenRight = canvasWidth + margin;
   const screenBottom = canvasHeight + margin;
-  
+
   // Jeśli element jest całkowicie poza ekranem - zwróć false
-  if (bottomRight.x < screenLeft) return false;  // Element całkowicie po lewej
-  if (topLeft.x > screenRight) return false;     // Element całkowicie po prawej
-  if (bottomRight.y < screenTop) return false;   // Element całkowicie powyżej
-  if (topLeft.y > screenBottom) return false;    // Element całkowicie poniżej
-  
+  if (bottomRight.x < screenLeft) return false; // Element całkowicie po lewej
+  if (topLeft.x > screenRight) return false; // Element całkowicie po prawej
+  if (bottomRight.y < screenTop) return false; // Element całkowicie powyżej
+  if (topLeft.y > screenBottom) return false; // Element całkowicie poniżej
+
   return true;
 }

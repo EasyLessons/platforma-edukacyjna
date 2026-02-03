@@ -1,5 +1,5 @@
-@import "tailwindcss";
-@import "katex/dist/katex.min.css";
+@import 'tailwindcss';
+@import 'katex/dist/katex.min.css';
 
 :root {
   --background: #ffffff;
@@ -23,7 +23,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), sans-serif;  /* Teraz używamy Geist! */
+  font-family: var(--font-geist-sans), sans-serif; /* Teraz używamy Geist! */
 }
 
 @keyframes shimmer {

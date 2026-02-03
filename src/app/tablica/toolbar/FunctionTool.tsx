@@ -2,30 +2,30 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/FunctionTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useState, useCallback, useRef, useEffect)
  * - ../whiteboard/types (ViewportTransform, FunctionPlot)
  * - ../whiteboard/viewport (transformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
  * - ../whiteboard/utils (evaluateExpression)
- * 
+ *
  * EKSPORTUJE:
  * - FunctionTool (component) - narzędzie rysowania funkcji matematycznych
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (aktywne gdy tool === 'function')
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - używa FunctionPlot
  * - viewport.ts - używa funkcji transformacji i zoom/pan
  * - utils.ts - używa evaluateExpression do parsowania wyrażeń
  * - WhiteboardCanvas.tsx - dostarcza callback'i: onFunctionCreate, onViewportChange
- * 
+ *
  * ⚠️ WAŻNE - WHEEL EVENTS:
  * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
  * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
  * - Współdzieli viewport z WhiteboardCanvas przez onViewportChange
- * 
+ *
  * PRZEZNACZENIE:
  * Rysowanie wykresów funkcji matematycznych z live preview i edycją parametrów.
  * ============================================================================
@@ -35,7 +35,12 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ViewportTransform, FunctionPlot } from '../whiteboard/types';
-import { transformPoint, zoomViewport, panViewportWithWheel, constrainViewport } from '../whiteboard/viewport';
+import {
+  transformPoint,
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '../whiteboard/viewport';
 import { evaluateExpression } from '../whiteboard/utils';
 
 interface FunctionToolProps {
@@ -77,22 +82,32 @@ export function FunctionTool({
   }, []);
 
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!onViewportChange) return;
-    
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (e.ctrlKey) {
-      // Zoom
-      const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
-      onViewportChange(constrainViewport(newViewport));
-    } else {
-      // Pan
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      onViewportChange(constrainViewport(newViewport));
-    }
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      if (!onViewportChange) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (e.ctrlKey) {
+        // Zoom
+        const newViewport = zoomViewport(
+          viewport,
+          e.deltaY,
+          e.clientX,
+          e.clientY,
+          canvasWidth,
+          canvasHeight
+        );
+        onViewportChange(constrainViewport(newViewport));
+      } else {
+        // Pan
+        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        onViewportChange(constrainViewport(newViewport));
+      }
+    },
+    [viewport, canvasWidth, canvasHeight, onViewportChange]
+  );
 
   // Walidacja wyrażenia matematycznego
   const validateExpression = useCallback((expr: string): boolean => {
@@ -149,7 +164,7 @@ export function FunctionTool({
         try {
           const worldY = evaluateExpression(expression, worldX);
           if (!isFinite(worldY) || Math.abs(worldY) > yRange) continue;
-          
+
           const screenPos = transformPoint(
             { x: worldX, y: -worldY },
             viewport,
@@ -204,9 +219,7 @@ export function FunctionTool({
 
         {/* Input wyrażenia */}
         <div className="mb-4">
-          <label className="block text-base font-medium text-gray-600 mb-2">
-            Wyrażenie f(x):
-          </label>
+          <label className="block text-base font-medium text-gray-600 mb-2">Wyrażenie f(x):</label>
           <input
             ref={inputRef}
             type="text"
@@ -228,9 +241,7 @@ export function FunctionTool({
             }`}
           />
           {error && (
-            <p className="text-base text-red-600 mt-2 flex items-center gap-1">
-              ⚠️ {error}
-            </p>
+            <p className="text-base text-red-600 mt-2 flex items-center gap-1">⚠️ {error}</p>
           )}
           <p className="text-base text-gray-500 mt-2">
             Dostępne: sin, cos, tan, sqrt, abs, log, ^, pi, e
@@ -289,7 +300,9 @@ export function FunctionTool({
               onChange={(e) => onLineWidthChange(Number(e.target.value))}
               className="flex-1 h-4 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
-            <span className="text-base text-gray-700 font-semibold w-12 text-right">{lineWidth}px</span>
+            <span className="text-base text-gray-700 font-semibold w-12 text-right">
+              {lineWidth}px
+            </span>
           </div>
 
           {/* Przycisk pomocy */}
@@ -333,11 +346,11 @@ export function FunctionTool({
 
       {/* Modal pomocy */}
       {isHelpOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[1000]"
           onClick={() => setIsHelpOpen(false)}
         >
-          <div 
+          <div
             className="bg-white rounded-lg shadow-2xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
@@ -358,8 +371,9 @@ export function FunctionTool({
               <div>
                 <h3 className="text-2xl font-semibold text-black mb-3">Co to narzędzie robi?</h3>
                 <p className="text-black text-base leading-relaxed">
-                  Narzędzie <strong>Function</strong> pozwala rysować wykresy funkcji matematycznych na tablicy. 
-                  Wpisz wyrażenie matematyczne (np. <code className="bg-gray-100 px-2 py-0.5 rounded text-black">sin(x)</code>), 
+                  Narzędzie <strong>Function</strong> pozwala rysować wykresy funkcji matematycznych
+                  na tablicy. Wpisz wyrażenie matematyczne (np.{' '}
+                  <code className="bg-gray-100 px-2 py-0.5 rounded text-black">sin(x)</code>),
                   dostosuj zakres i kolory, a funkcja zostanie narysowana na wykresie kartezjańskim.
                 </p>
               </div>
@@ -369,7 +383,9 @@ export function FunctionTool({
                 <h3 className="text-2xl font-semibold text-black mb-4">🧪 Wypróbuj funkcję</h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-black mb-2">Wyrażenie matematyczne:</label>
+                    <label className="block text-sm font-semibold text-black mb-2">
+                      Wyrażenie matematyczne:
+                    </label>
                     <input
                       type="text"
                       value={expression}
@@ -386,14 +402,14 @@ export function FunctionTool({
                       placeholder="np. sin(x), x^2, sqrt(x)"
                       className="w-full px-4 py-3 text-base text-black border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
                     />
-                    {error && (
-                      <p className="text-red-600 text-sm mt-2 font-medium">⚠️ {error}</p>
-                    )}
+                    {error && <p className="text-red-600 text-sm mt-2 font-medium">⚠️ {error}</p>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Zakres X: ±{xRange}</label>
+                      <label className="block text-sm font-semibold text-black mb-2">
+                        Zakres X: ±{xRange}
+                      </label>
                       <input
                         type="range"
                         min="5"
@@ -404,7 +420,9 @@ export function FunctionTool({
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-semibold text-black mb-2">Zakres Y: ±{yRange}</label>
+                      <label className="block text-sm font-semibold text-black mb-2">
+                        Zakres Y: ±{yRange}
+                      </label>
                       <input
                         type="range"
                         min="10"
@@ -436,7 +454,9 @@ export function FunctionTool({
                         onChange={(e) => onLineWidthChange(Number(e.target.value))}
                         className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
                       />
-                      <span className="text-sm text-black font-bold w-10 text-right">{lineWidth}px</span>
+                      <span className="text-sm text-black font-bold w-10 text-right">
+                        {lineWidth}px
+                      </span>
                     </div>
                   </div>
 
@@ -571,8 +591,12 @@ export function FunctionTool({
                     <span className="text-black ml-4 text-xl">- pierwiastek kwadratowy</span>
                   </div>
                   <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-orange-800 text-2xl">2*sin(x) + cos(x)</code>
-                    <span className="text-black ml-4 text-xl">- kombinacja funkcji trygonometrycznych</span>
+                    <code className="font-mono font-bold text-orange-800 text-2xl">
+                      2*sin(x) + cos(x)
+                    </code>
+                    <span className="text-black ml-4 text-xl">
+                      - kombinacja funkcji trygonometrycznych
+                    </span>
                   </div>
                   <div className="bg-gradient-to-r from-red-50 to-red-100 p-5 rounded-lg">
                     <code className="font-mono font-bold text-red-800 text-2xl">1/x</code>
@@ -580,7 +604,9 @@ export function FunctionTool({
                   </div>
                   <div className="bg-gradient-to-r from-pink-50 to-pink-100 p-5 rounded-lg">
                     <code className="font-mono font-bold text-pink-800 text-2xl">abs(x)</code>
-                    <span className="text-black ml-4 text-xl">- wartość bezwzględna (kształt V)</span>
+                    <span className="text-black ml-4 text-xl">
+                      - wartość bezwzględna (kształt V)
+                    </span>
                   </div>
                   <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-5 rounded-lg">
                     <code className="font-mono font-bold text-indigo-800 text-2xl">log(x)</code>
@@ -598,11 +624,25 @@ export function FunctionTool({
                 <ul className="space-y-3 text-xl">
                   <li className="flex items-start gap-2">
                     <span className="text-white font-bold">•</span>
-                    <span>Możesz łączyć funkcje: <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">sin(x^2)</code></span>
+                    <span>
+                      Możesz łączyć funkcje:{' '}
+                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
+                        sin(x^2)
+                      </code>
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-white font-bold">•</span>
-                    <span>Automatyczne mnożenie działa: <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">2x</code> = <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">2*x</code></span>
+                    <span>
+                      Automatyczne mnożenie działa:{' '}
+                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
+                        2x
+                      </code>{' '}
+                      ={' '}
+                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
+                        2*x
+                      </code>
+                    </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-white font-bold">•</span>

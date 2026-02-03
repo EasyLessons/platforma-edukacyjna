@@ -2,25 +2,25 @@
  * ============================================================================
  * PLIK: src/app/tablica/toolbar/ImageTool.tsx
  * ============================================================================
- * 
+ *
  * IMPORTUJE Z:
  * - react (useRef, useEffect, useImperativeHandle, forwardRef)
  * - lucide-react (Upload, Clipboard)
  * - ../whiteboard/types (ViewportTransform, ImageElement)
  * - ../whiteboard/viewport (zoomViewport, panViewportWithWheel, constrainViewport, inverseTransformPoint)
- * 
+ *
  * EKSPORTUJE:
  * - ImageToolRef (interface) - ref API dla toolbar buttons
  * - ImageTool (component) - narzędzie do wstawiania obrazów
- * 
+ *
  * UŻYWANE PRZEZ:
  * - WhiteboardCanvas.tsx (główny komponent)
  * - Toolbar.tsx (przyciski Paste/Upload)
- * 
+ *
  * ⚠️ ZALEŻNOŚCI:
  * - types.ts - ImageElement interface
  * - viewport.ts - transformacje współrzędnych, pan/zoom
- * 
+ *
  * ✅ POPRAWKI:
  * - USUNIĘTO: Preview logic (previewImage, previewPosition)
  * - USUNIĘTO: Lokalne handlePaste/handleDrop (duplikacja globalnych funkcji)
@@ -28,7 +28,7 @@
  * - USUNIĘTO: UI z instrukcjami (niepotrzebne wizualnie)
  * - ZOSTAWIONO: File upload przez input (jedyna unikalna funkcja)
  * - ZOSTAWIONO: Wheel events (pan/zoom)
- * 
+ *
  * PRZEZNACZENIE:
  * Narzędzie do wstawiania obrazów - obsługuje tylko upload z dysku.
  * Ctrl+V i drag&drop obsługiwane są GLOBALNIE w WhiteboardCanvas.
@@ -40,7 +40,12 @@
 
 import React, { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { ViewportTransform, ImageElement } from '../whiteboard/types';
-import { zoomViewport, panViewportWithWheel, constrainViewport, inverseTransformPoint } from '../whiteboard/viewport';
+import {
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+  inverseTransformPoint,
+} from '../whiteboard/viewport';
 
 export interface ImageToolRef {
   handlePasteFromClipboard: () => void;
@@ -70,7 +75,14 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
         e.stopPropagation();
 
         if (e.ctrlKey) {
-          const newViewport = zoomViewport(viewport, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+          const newViewport = zoomViewport(
+            viewport,
+            e.deltaY,
+            e.clientX,
+            e.clientY,
+            canvasWidth,
+            canvasHeight
+          );
           onViewportChange(constrainViewport(newViewport));
         } else {
           const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
@@ -104,7 +116,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
       },
       triggerFileUpload: () => {
         fileInputRef.current?.click();
-      }
+      },
     }));
 
     // 🆕 Konwersja PDF → obrazki (wszystkie strony)
@@ -158,14 +170,19 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
         if (isPDF) {
           console.log('📄 Converting PDF to images...');
           const images = await convertPDFToImages(file);
-          
+
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
-          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
-          
+          const centerWorld = inverseTransformPoint(
+            centerScreen,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+
           const worldWidth = 3;
           const padding = 0.5; // Odstęp między stronami
           let currentY = centerWorld.y;
-          
+
           // Dodaj każdą stronę jako osobny obrazek
           for (let i = 0; i < images.length; i++) {
             const dataUrl = images[i];
@@ -175,10 +192,10 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
               img.onerror = reject;
               img.src = dataUrl;
             });
-            
+
             const aspectRatio = img.height / img.width;
             const worldHeight = worldWidth * aspectRatio;
-            
+
             const newImage: ImageElement = {
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-page-${i + 1}`,
               type: 'image',
@@ -193,11 +210,11 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
             console.log(`✅ Creating page ${i + 1}/${images.length}, ID: ${newImage.id}`);
             onImageCreate(newImage);
             currentY += worldHeight + padding; // Następna strona niżej
-            
+
             // Małe opóźnienie żeby ID były unikalne i state się zaktualizował
-            await new Promise(resolve => setTimeout(resolve, 50));
+            await new Promise((resolve) => setTimeout(resolve, 50));
           }
-          
+
           console.log(`✅ Dodano ${images.length} stron z PDF`);
         } else {
           // Obsługa zwykłego obrazka
@@ -217,16 +234,21 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           });
           const width = img.width;
           const height = img.height;
-          
+
           // Wstaw w centrum widoku
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
-          const centerWorld = inverseTransformPoint(centerScreen, viewport, canvasWidth, canvasHeight);
-          
+          const centerWorld = inverseTransformPoint(
+            centerScreen,
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+
           // Domyślny rozmiar: 3 jednostki szerokości (zachowaj proporcje)
           const aspectRatio = height / width;
           const worldWidth = 3;
           const worldHeight = worldWidth * aspectRatio;
-          
+
           const newImage: ImageElement = {
             id: Date.now().toString(),
             type: 'image',
@@ -241,7 +263,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           // ✅ Od razu tworzy element - BEZ PREVIEW!
           onImageCreate(newImage);
         }
-        
+
         console.log('✅ Image created from', isPDF ? 'PDF' : 'image');
       } catch (err) {
         console.error('File upload error:', err);

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Plus, 
+import {
+  Search,
+  Plus,
   Star,
   X,
   BookOpen,
@@ -28,7 +28,7 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
-  GripVertical
+  GripVertical,
 } from 'lucide-react';
 import { Fragment } from 'react';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
@@ -53,7 +53,7 @@ const iconMap: Record<string, any> = {
   Rocket,
   Sparkles,
   Target,
-  Zap
+  Zap,
 };
 
 // Mapowanie kolorów - Tailwind nie obsługuje dynamicznych klas
@@ -91,7 +91,7 @@ const getColorClass = (color: string): string => {
 };
 
 export default function WorkspaceSidebar() {
-  const { 
+  const {
     workspaces,
     activeWorkspace,
     setActiveWorkspace: setActiveWorkspaceContext,
@@ -101,27 +101,40 @@ export default function WorkspaceSidebar() {
     updateWorkspace,
     deleteWorkspace,
     leaveWorkspace,
-    toggleFavourite  
+    toggleFavourite,
   } = useWorkspaces();
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<number | null>(null);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState<number | null>(null);
   const [hoveredSpace, setHoveredSpace] = useState<number | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showTooltip, setShowTooltip] = useState<{visible: boolean, text: string, x: number, y: number}>({
-    visible: false, text: '', x: 0, y: 0
+  const [showTooltip, setShowTooltip] = useState<{
+    visible: boolean;
+    text: string;
+    x: number;
+    y: number;
+  }>({
+    visible: false,
+    text: '',
+    x: 0,
+    y: 0,
   });
-  
+
   // Drag & Drop states
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [customOrder, setCustomOrder] = useState<number[]>([]);
-  
+
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingWorkspace, setEditingWorkspace] = useState<{ id: number; name: string; icon: string; bg_color: string } | null>(null);
+  const [editingWorkspace, setEditingWorkspace] = useState<{
+    id: number;
+    name: string;
+    icon: string;
+    bg_color: string;
+  } | null>(null);
 
   // Wczytaj kolejność z localStorage przy starcie
   useEffect(() => {
@@ -138,12 +151,12 @@ export default function WorkspaceSidebar() {
   // Aktualizuj customOrder gdy zmienią się workspace (nowe zostały dodane)
   useEffect(() => {
     if (workspaces.length > 0) {
-      setCustomOrder(prevOrder => {
-        const workspaceIds = workspaces.map(w => w.id);
+      setCustomOrder((prevOrder) => {
+        const workspaceIds = workspaces.map((w) => w.id);
         // Dodaj nowe workspace na koniec
-        const newIds = workspaceIds.filter(id => !prevOrder.includes(id));
+        const newIds = workspaceIds.filter((id) => !prevOrder.includes(id));
         // Usuń nieistniejące workspace
-        const filteredOrder = prevOrder.filter(id => workspaceIds.includes(id));
+        const filteredOrder = prevOrder.filter((id) => workspaceIds.includes(id));
         return [...filteredOrder, ...newIds];
       });
     }
@@ -161,7 +174,7 @@ export default function WorkspaceSidebar() {
     await createWorkspace({
       name: data.name,
       icon: data.icon,
-      bg_color: data.bg_color // format: "green-500"
+      bg_color: data.bg_color, // format: "green-500"
     });
     console.log('✅ Workspace utworzony w bazie danych!');
   };
@@ -172,7 +185,7 @@ export default function WorkspaceSidebar() {
       id: space.id,
       name: space.name,
       icon: space.icon,
-      bg_color: space.bg_color
+      bg_color: space.bg_color,
     });
     setShowEditModal(true);
   };
@@ -180,24 +193,23 @@ export default function WorkspaceSidebar() {
   // Aktualizacja workspace przez modal
   const handleUpdateWorkspace = async (data: { name: string; icon: string; bg_color: string }) => {
     if (!editingWorkspace) return;
-    
+
     await updateWorkspace(editingWorkspace.id, {
       name: data.name,
       icon: data.icon,
-      bg_color: data.bg_color
+      bg_color: data.bg_color,
     });
     console.log('✅ Workspace zaktualizowany!');
   };
 
   const toggleFavorite = async (id: number) => {
     try {
-      const workspace = workspaces.find(ws => ws.id === id);
+      const workspace = workspaces.find((ws) => ws.id === id);
       if (!workspace) throw new Error('Workspace nie znaleziony');
-      
-      await toggleFavourite(id, !workspace.is_favourite);
-      
-      console.log(`✅ Zmieniono status ulubionego dla workspace ID: ${id}`);
 
+      await toggleFavourite(id, !workspace.is_favourite);
+
+      console.log(`✅ Zmieniono status ulubionego dla workspace ID: ${id}`);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Nie udało się zmienić statusu';
       console.error('❌ Błąd zmiany ulubionego:', errorMsg);
@@ -207,25 +219,25 @@ export default function WorkspaceSidebar() {
   // Tooltip functions for collapsed workspace names
   const showWorkspaceTooltip = (e: React.MouseEvent, workspaceName: string) => {
     if (!isCollapsed) return; // Only show in collapsed mode
-    
+
     const rect = e.currentTarget.getBoundingClientRect();
     setShowTooltip({
       visible: true,
       text: workspaceName,
       x: rect.right + 8, // Position tooltip to the right of the element
-      y: rect.top + rect.height / 2 // Center vertically
+      y: rect.top + rect.height / 2, // Center vertically
     });
   };
 
   const hideWorkspaceTooltip = () => {
-    setShowTooltip({visible: false, text: '', x: 0, y: 0});
+    setShowTooltip({ visible: false, text: '', x: 0, y: 0 });
   };
 
   const handleDeleteSpace = async (id: number) => {
     try {
       await deleteWorkspace(id);
       setShowDeleteConfirm(null);
-      
+
       // Jeśli usuwamy aktywny workspace, ustaw pierwszy
       if (activeWorkspace?.id === id) {
         setActiveWorkspaceContext(workspaces[0] || null);
@@ -239,10 +251,10 @@ export default function WorkspaceSidebar() {
     try {
       await leaveWorkspace(id);
       setShowLeaveConfirm(null);
-      
+
       // Jeśli opuszczamy aktywny workspace, ustaw pierwszy z pozostałych
       if (activeWorkspace?.id === id) {
-        const remaining = workspaces.filter(ws => ws.id !== id);
+        const remaining = workspaces.filter((ws) => ws.id !== id);
         setActiveWorkspaceContext(remaining[0] || null);
       }
     } catch (err) {
@@ -255,17 +267,17 @@ export default function WorkspaceSidebar() {
     if (activeWorkspace?.id === id) {
       return;
     }
-    
+
     // Znajdź workspace
-    const workspace = workspaces.find(ws => ws.id === id);
+    const workspace = workspaces.find((ws) => ws.id === id);
     if (!workspace) {
       console.error('❌ Workspace nie znaleziony:', id);
       return;
     }
-    
+
     // Ustaw w kontekście (lokalnie)
     setActiveWorkspaceContext(workspace);
-    
+
     try {
       // Zapisz w bazie
       await setActiveWorkspace(id);
@@ -293,7 +305,7 @@ export default function WorkspaceSidebar() {
   const handleDragOver = (e: React.DragEvent, id: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    
+
     if (draggedId && draggedId !== id) {
       setDragOverId(id);
     }
@@ -305,7 +317,7 @@ export default function WorkspaceSidebar() {
 
   const handleDrop = (e: React.DragEvent, targetId: number) => {
     e.preventDefault();
-    
+
     if (!draggedId || draggedId === targetId) {
       setDragOverId(null);
       return;
@@ -324,12 +336,12 @@ export default function WorkspaceSidebar() {
 
     setCustomOrder(newOrder);
     setDragOverId(null);
-    
+
     console.log('✅ Zaktualizowano kolejność workspace w localStorage');
   };
 
   // Filtrowanie i sortowanie workspace'ów z backendu + custom order z localStorage
-  const filteredSpaces = workspaces.filter(space =>
+  const filteredSpaces = workspaces.filter((space) =>
     space.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -337,23 +349,24 @@ export default function WorkspaceSidebar() {
     // Najpierw ulubione na górze
     if (a.is_favourite && !b.is_favourite) return -1;
     if (!a.is_favourite && b.is_favourite) return 1;
-    
+
     // Potem według customOrder z localStorage
     const aIndex = customOrder.indexOf(a.id);
     const bIndex = customOrder.indexOf(b.id);
-    
+
     if (aIndex !== -1 && bIndex !== -1) {
       return aIndex - bIndex;
     }
-    
+
     // Jeśli nie ma w customOrder, zostaw domyślną kolejność
     return 0;
   });
 
   if (loading) {
     return (
-      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
-        
+      <div
+        className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}
+      >
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between mb-3">
@@ -367,11 +380,11 @@ export default function WorkspaceSidebar() {
                 </span>
               </div>
             )}
-            
+
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
-              title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+              title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
               {isCollapsed ? (
                 <PanelLeftOpen size={18} className="text-gray-600" />
@@ -383,7 +396,10 @@ export default function WorkspaceSidebar() {
 
           {!isCollapsed && (
             <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+              />
               <input
                 type="text"
                 placeholder="Wyszukaj przestrzenie..."
@@ -402,13 +418,14 @@ export default function WorkspaceSidebar() {
               <div className="flex items-center gap-3 p-3 rounded-lg bg-white">
                 {/* IKONA SKELETON */}
                 <div className="w-10 h-10 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded-xl animate-shimmer bg-[length:200%_100%]"></div>
-                
+
                 {/* NAZWA SKELETON - tylko gdy nie zwinięty */}
                 {!isCollapsed && (
                   <div className="flex-1">
-                    <div className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]" 
-                        style={{ width: `${60 + Math.random() * 30}%` }}>
-                    </div>
+                    <div
+                      className="h-4 bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 rounded animate-shimmer bg-[length:200%_100%]"
+                      style={{ width: `${60 + Math.random() * 30}%` }}
+                    ></div>
                   </div>
                 )}
               </div>
@@ -439,10 +456,10 @@ export default function WorkspaceSidebar() {
 
   if (error) {
     return (
-      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex items-center justify-center transition-all duration-300`}>
-        <div className="text-red-500 text-center p-4">
-          {isCollapsed ? '❌' : `Błąd: ${error}`}
-        </div>
+      <div
+        className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex items-center justify-center transition-all duration-300`}
+      >
+        <div className="text-red-500 text-center p-4">{isCollapsed ? '❌' : `Błąd: ${error}`}</div>
       </div>
     );
   }
@@ -451,8 +468,9 @@ export default function WorkspaceSidebar() {
   if (workspaces.length === 0) {
     return (
       <>
-        <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
-          
+        <div
+          className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}
+        >
           {/* HEADER */}
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
@@ -466,11 +484,11 @@ export default function WorkspaceSidebar() {
                   </span>
                 </div>
               )}
-              
+
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
                 className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
-                title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+                title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
               >
                 {isCollapsed ? (
                   <PanelLeftOpen size={18} className="text-gray-600" />
@@ -482,7 +500,10 @@ export default function WorkspaceSidebar() {
 
             {!isCollapsed && (
               <div className="relative">
-                <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+                <Search
+                  size={18}
+                  className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                />
                 <input
                   type="text"
                   placeholder="Wyszukaj przestrzenie..."
@@ -501,15 +522,15 @@ export default function WorkspaceSidebar() {
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
                 <Users size={32} className="text-green-600" />
               </div>
-              
+
               <h3 className="text-xl font-bold text-gray-800 mb-3">
                 Stwórz swoją pierwszą przestrzeń
               </h3>
-              
+
               <p className="text-gray-600 mb-2">
                 Przestrzenie pomagają organizować Twoją pracę i współpracować z innymi.
               </p>
-              
+
               <div className="flex items-center gap-4 mt-6 mb-8">
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Calendar size={16} />
@@ -565,8 +586,9 @@ export default function WorkspaceSidebar() {
   // ✅ NORMALNY EKRAN GDY SĄ WORKSPACE'E
   return (
     <>
-      <div className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}>
-        
+      <div
+        className={`${isCollapsed ? 'w-[72px]' : 'w-[350px]'} h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}
+      >
         {/* HEADER */}
         <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between mb-3">
@@ -580,11 +602,11 @@ export default function WorkspaceSidebar() {
                 </span>
               </div>
             )}
-            
+
             <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
-              title={isCollapsed ? "Rozwiń sidebar" : "Zwiń sidebar"}
+              title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
               {isCollapsed ? (
                 <PanelLeftOpen size={18} className="text-gray-600" />
@@ -596,7 +618,10 @@ export default function WorkspaceSidebar() {
 
           {!isCollapsed && (
             <div className="relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500" />
+              <Search
+                size={18}
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+              />
               <input
                 type="text"
                 placeholder="Wyszukaj przestrzenie..."
@@ -623,7 +648,7 @@ export default function WorkspaceSidebar() {
 
         {/* SCROLLUJĄCA LISTA */}
         <div className="flex-1 overflow-y-auto px-2 py-2">
-          {!isCollapsed && sortedSpaces.filter(s => s.is_favourite).length > 0 && (
+          {!isCollapsed && sortedSpaces.filter((s) => s.is_favourite).length > 0 && (
             <div className="px-4 pt-4 pb-2">
               <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
                 <Star size={14} className="text-yellow-500 fill-yellow-500" />
@@ -644,7 +669,7 @@ export default function WorkspaceSidebar() {
                   onMouseEnter={() => setHoveredSpace(space.id)}
                   onMouseLeave={() => setHoveredSpace(null)}
                 >
-                  <div 
+                  <div
                     className={`absolute left-0 top-1/2 -translate-y-1/2 h-10 bg-green-600 rounded-r-full transition-all duration-200 ${
                       isActive ? 'w-1' : isHovered ? 'w-0.5' : 'w-0'
                     }`}
@@ -663,19 +688,21 @@ export default function WorkspaceSidebar() {
                     onDragLeave={handleDragLeave}
                     onDrop={(e) => handleDrop(e, space.id)}
                     className={`flex items-center ${isCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2.5 ml-2 rounded-lg transition-all duration-200 cursor-pointer group ${
-                      isActive 
-                        ? 'bg-green-100 border-2 border-green-300' 
+                      isActive
+                        ? 'bg-green-100 border-2 border-green-300'
                         : isHovered
                           ? 'bg-gray-200/50 '
-                          : space.is_favourite 
-                            ? 'bg-yellow-50' 
+                          : space.is_favourite
+                            ? 'bg-yellow-50'
                             : ''
                     } ${draggedId === space.id ? 'opacity-100' : ''}`}
                     onClick={() => handleWorkspaceClick(space.id)}
                     onMouseEnter={(e) => showWorkspaceTooltip(e, space.name)}
                     onMouseLeave={hideWorkspaceTooltip}
                   >
-                    <div className={`w-10 h-10 ${getColorClass(space.bg_color)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <div
+                      className={`w-10 h-10 ${getColorClass(space.bg_color)} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}
+                    >
                       <IconComponent size={20} className="text-white" />
                     </div>
 
@@ -683,16 +710,16 @@ export default function WorkspaceSidebar() {
                       <>
                         {/* Ikona przeciągania przy hover */}
                         {isHovered && (
-                          <div 
-                            className="flex items-center text-gray-400 cursor-move"
-                          >
+                          <div className="flex items-center text-gray-400 cursor-move">
                             <GripVertical size={16} />
                           </div>
                         )}
 
-                        <span className={`text-sm font-medium flex-1 truncate ${
-                          isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
-                        }`}>
+                        <span
+                          className={`text-sm font-medium flex-1 truncate ${
+                            isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
+                          }`}
+                        >
                           {space.name}
                         </span>
 
@@ -716,15 +743,21 @@ export default function WorkspaceSidebar() {
                                 toggleFavorite(space.id);
                               }}
                               className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-                                space.is_favourite 
-                                  ? 'bg-yellow-100 hover:bg-yellow-200' 
+                                space.is_favourite
+                                  ? 'bg-yellow-100 hover:bg-yellow-200'
                                   : 'bg-gray-200 hover:bg-gray-300'
                               }`}
-                              title={space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+                              title={
+                                space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'
+                              }
                             >
-                              <Star 
-                                size={14} 
-                                className={space.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'} 
+                              <Star
+                                size={14}
+                                className={
+                                  space.is_favourite
+                                    ? 'text-yellow-600 fill-yellow-600'
+                                    : 'text-gray-600'
+                                }
                               />
                             </button>
 
@@ -750,10 +783,12 @@ export default function WorkspaceSidebar() {
                   </div>
                 </div>
 
-                {!isCollapsed && space.is_favourite && 
-                 sortedSpaces.indexOf(space) === sortedSpaces.filter(s => s.is_favourite).length - 1 && (
-                  <div className="h-px bg-gray-300 my-3 mx-4"></div>
-                )}
+                {!isCollapsed &&
+                  space.is_favourite &&
+                  sortedSpaces.indexOf(space) ===
+                    sortedSpaces.filter((s) => s.is_favourite).length - 1 && (
+                    <div className="h-px bg-gray-300 my-3 mx-4"></div>
+                  )}
               </Fragment>
             );
           })}
@@ -769,7 +804,7 @@ export default function WorkspaceSidebar() {
         {!isCollapsed && (
           <div className="border-t border-gray-200 p-4 bg-gray-50">
             <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
-              <span>Ulubione: {workspaces.filter(s => s.is_favourite).length}</span>
+              <span>Ulubione: {workspaces.filter((s) => s.is_favourite).length}</span>
               <span>Wszystkie: {workspaces.length}</span>
             </div>
 
@@ -815,31 +850,32 @@ export default function WorkspaceSidebar() {
           }}
           onSave={handleUpdateWorkspace}
           workspaceId={editingWorkspace.id}
-          isOwner={workspaces.find(ws => ws.id === editingWorkspace.id)?.is_owner || false}
+          isOwner={workspaces.find((ws) => ws.id === editingWorkspace.id)?.is_owner || false}
           initialData={editingWorkspace}
         />
       )}
 
       {/* POPUP - Usuń przestrzeń (tylko dla owner) */}
       {showDeleteConfirm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
           style={{ zIndex: 9999 }}
           onClick={() => setShowDeleteConfirm(null)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold text-gray-800 mb-2">
-              Usuń przestrzeń?
-            </h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Usuń przestrzeń?</h2>
             <p className="text-gray-600 mb-6">
-              Czy na pewno chcesz usunąć przestrzeń <strong>"{workspaces.find(s => s.id === showDeleteConfirm)?.name}"</strong>?
+              Czy na pewno chcesz usunąć przestrzeń{' '}
+              <strong>"{workspaces.find((s) => s.id === showDeleteConfirm)?.name}"</strong>?
               <br />
-              <span className="text-red-500 text-sm">To usunie wszystkie tablice i dane w tej przestrzeni!</span>
+              <span className="text-red-500 text-sm">
+                To usunie wszystkie tablice i dane w tej przestrzeni!
+              </span>
             </p>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(null)}
@@ -860,24 +896,25 @@ export default function WorkspaceSidebar() {
 
       {/* POPUP - Opuść przestrzeń (tylko dla member) */}
       {showLeaveConfirm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black/20 backdrop-blur-md flex items-center justify-center z-[9999] px-4"
           style={{ zIndex: 9999 }}
           onClick={() => setShowLeaveConfirm(null)}
         >
-          <div 
+          <div
             className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-gray-200 p-6"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-xl font-bold text-gray-800 mb-2">
-              Opuść przestrzeń?
-            </h2>
+            <h2 className="text-xl font-bold text-gray-800 mb-2">Opuść przestrzeń?</h2>
             <p className="text-gray-600 mb-6">
-              Czy na pewno chcesz opuścić przestrzeń <strong>"{workspaces.find(s => s.id === showLeaveConfirm)?.name}"</strong>?
+              Czy na pewno chcesz opuścić przestrzeń{' '}
+              <strong>"{workspaces.find((s) => s.id === showLeaveConfirm)?.name}"</strong>?
               <br />
-              <span className="text-gray-500 text-sm">Przestrzeń nie zostanie usunięta - tylko stracisz do niej dostęp.</span>
+              <span className="text-gray-500 text-sm">
+                Przestrzeń nie zostanie usunięta - tylko stracisz do niej dostęp.
+              </span>
             </p>
-            
+
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLeaveConfirm(null)}
@@ -898,11 +935,11 @@ export default function WorkspaceSidebar() {
 
       {/* Tooltip for collapsed workspace names */}
       {showTooltip.visible && (
-        <div 
+        <div
           className="fixed z-[9999] bg-gray-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium shadow-lg pointer-events-none transform -translate-y-1/2"
           style={{
             left: `${showTooltip.x}px`,
-            top: `${showTooltip.y}px`
+            top: `${showTooltip.y}px`,
           }}
         >
           {showTooltip.text}

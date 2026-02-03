@@ -2,10 +2,10 @@
  * ============================================================================
  * PLIK: src/app/tablica/smartsearch/CardViewer.tsx
  * ============================================================================
- * 
+ *
  * CardViewer - modal do przeglądania karty wzorów z bocznym spisem treści
  * Użytkownik może zaznaczyć sekcje do dodania na tablicę
- * 
+ *
  * ✅ NAPRAWIONY SCROLL MYSZKĄ
  * ============================================================================
  */
@@ -29,7 +29,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const sidebarRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
 
@@ -44,11 +44,11 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   // Informuj rodzica że modal jest aktywny (blokuj scroll tablicy)
   useEffect(() => {
     onActiveChange?.(true);
-    
+
     // Blokuj scroll tablicy w tle
     const originalOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    
+
     return () => {
       onActiveChange?.(false);
       document.body.style.overflow = originalOverflow;
@@ -58,14 +58,14 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   // Rozwiń wszystkie sekcje domyślnie
   useEffect(() => {
     if (card.sections) {
-      setExpandedSections(new Set(card.sections.map(s => s.id)));
+      setExpandedSections(new Set(card.sections.map((s) => s.id)));
     }
   }, [card]);
 
   // Pobierz wszystkie wzory z sekcji
   const sectionFormulas = useMemo(() => {
     if (!manifest) return new Map<string, FormulaResource[]>();
-    
+
     const map = new Map<string, FormulaResource[]>();
     for (const section of card.sections) {
       const formulas: FormulaResource[] = [];
@@ -84,7 +84,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   }, []);
 
   const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => {
+    setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(sectionId)) {
         next.delete(sectionId);
@@ -96,7 +96,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   };
 
   const toggleFormula = (formulaId: string) => {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(formulaId)) {
         next.delete(formulaId);
@@ -109,14 +109,14 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
 
   const toggleAllInSection = (section: CardSection) => {
     const formulas = sectionFormulas.get(section.id) || [];
-    const allSelected = formulas.every(f => selectedIds.has(f.id));
-    
-    setSelectedIds(prev => {
+    const allSelected = formulas.every((f) => selectedIds.has(f.id));
+
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       if (allSelected) {
-        formulas.forEach(f => next.delete(f.id));
+        formulas.forEach((f) => next.delete(f.id));
       } else {
-        formulas.forEach(f => next.add(f.id));
+        formulas.forEach((f) => next.add(f.id));
       }
       return next;
     });
@@ -124,13 +124,13 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
 
   const handleAddSelected = () => {
     if (!manifest || selectedIds.size === 0) return;
-    
+
     const formulas: FormulaResource[] = [];
     for (const id of selectedIds) {
       const formula = getFormulaById(manifest, id);
       if (formula) formulas.push(formula);
     }
-    
+
     onAddFormulas(formulas);
     onClose();
   };
@@ -145,29 +145,29 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
           scrollbar-width: thin;
           scrollbar-color: rgba(59, 130, 246, 0.3) transparent;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar {
           width: 8px;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-track {
           background: transparent;
           margin: 8px 0;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
           background-color: rgba(59, 130, 246, 0.3);
           border-radius: 10px;
           border: 2px solid transparent;
           background-clip: padding-box;
         }
-        
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
           background-color: rgba(59, 130, 246, 0.5);
         }
       `}</style>
 
-      <div 
+      <div
         className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm cursor-default"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -180,7 +180,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
           e.preventDefault();
         }}
       >
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-2xl w-[95vw] max-w-5xl h-[85vh] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
@@ -201,7 +201,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
           {/* Content */}
           <div className="flex-1 flex overflow-hidden">
             {/* Sidebar - Spis treści */}
-            <div 
+            <div
               ref={sidebarRef}
               onWheel={handleWheel}
               className="w-64 border-r border-gray-200 bg-gray-50 overflow-y-auto custom-scrollbar"
@@ -211,11 +211,11 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                   Spis treści
                 </h3>
                 <ul className="space-y-1">
-                  {card.sections.map(section => {
+                  {card.sections.map((section) => {
                     const formulas = sectionFormulas.get(section.id) || [];
-                    const selectedInSection = formulas.filter(f => selectedIds.has(f.id)).length;
+                    const selectedInSection = formulas.filter((f) => selectedIds.has(f.id)).length;
                     const isExpanded = expandedSections.has(section.id);
-                    
+
                     return (
                       <li key={section.id}>
                         <button
@@ -238,28 +238,34 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                             </span>
                           )}
                         </button>
-                        
+
                         {/* Lista wzorów w sekcji */}
                         {isExpanded && (
                           <ul className="ml-6 mt-1 space-y-0.5">
-                            {formulas.map(formula => (
+                            {formulas.map((formula) => (
                               <li key={formula.id}>
                                 <button
                                   onClick={() => toggleFormula(formula.id)}
                                   className={`
                                     w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm cursor-pointer
                                     transition-colors
-                                    ${selectedIds.has(formula.id) 
-                                      ? 'bg-green-100 text-green-700' 
-                                      : 'text-gray-600 hover:bg-white'}
+                                    ${
+                                      selectedIds.has(formula.id)
+                                        ? 'bg-green-100 text-green-700'
+                                        : 'text-gray-600 hover:bg-white'
+                                    }
                                   `}
                                 >
-                                  <div className={`
+                                  <div
+                                    className={`
                                     w-4 h-4 rounded border-2 flex items-center justify-center shrink-0
-                                    ${selectedIds.has(formula.id)
-                                      ? 'bg-green-500 border-green-500'
-                                      : 'border-gray-300'}
-                                  `}>
+                                    ${
+                                      selectedIds.has(formula.id)
+                                        ? 'bg-green-500 border-green-500'
+                                        : 'border-gray-300'
+                                    }
+                                  `}
+                                  >
                                     {selectedIds.has(formula.id) && (
                                       <Check className="w-3 h-3 text-white" />
                                     )}
@@ -278,7 +284,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
             </div>
 
             {/* Main content - Preview Z NAPRAWIONYM SCROLLEM */}
-            <div 
+            <div
               ref={contentRef}
               onWheel={handleWheel}
               className="flex-1 overflow-y-auto p-6 custom-scrollbar"
@@ -289,27 +295,27 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                 </div>
               ) : (
                 <div className="space-y-8">
-                  {card.sections.map(section => {
+                  {card.sections.map((section) => {
                     const formulas = sectionFormulas.get(section.id) || [];
                     if (formulas.length === 0) return null;
-                    
-                    const allSelected = formulas.every(f => selectedIds.has(f.id));
-                    
+
+                    const allSelected = formulas.every((f) => selectedIds.has(f.id));
+
                     return (
                       <div key={section.id} className="space-y-4">
                         {/* Section header */}
                         <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-800">
-                            {section.name}
-                          </h3>
+                          <h3 className="text-lg font-semibold text-gray-800">{section.name}</h3>
                           <button
                             onClick={() => toggleAllInSection(section)}
                             className={`
                               flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer
                               transition-colors
-                              ${allSelected
-                                ? 'bg-green-500 text-white hover:bg-green-600'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}
+                              ${
+                                allSelected
+                                  ? 'bg-green-500 text-white hover:bg-green-600'
+                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                              }
                             `}
                           >
                             {allSelected ? (
@@ -325,13 +331,15 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                             )}
                           </button>
                         </div>
-                        
+
                         {/* Formulas grid */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {formulas.map(formula => {
+                          {formulas.map((formula) => {
                             const isSelected = selectedIds.has(formula.id);
-                            const color = manifest ? getResourceTypeColor(manifest, formula.type) : '#3B82F6';
-                            
+                            const color = manifest
+                              ? getResourceTypeColor(manifest, formula.type)
+                              : '#3B82F6';
+
                             return (
                               <div
                                 key={formula.id}
@@ -339,9 +347,11 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                                 className={`
                                   relative rounded-xl overflow-hidden cursor-pointer
                                   border-2 transition-all
-                                  ${isSelected 
-                                    ? 'border-green-500 ring-2 ring-green-200' 
-                                    : 'border-gray-200 hover:border-gray-300'}
+                                  ${
+                                    isSelected
+                                      ? 'border-green-500 ring-2 ring-green-200'
+                                      : 'border-gray-200 hover:border-gray-300'
+                                  }
                                 `}
                               >
                                 {/* Selection indicator */}
@@ -350,7 +360,7 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                                     <Check className="w-4 h-4" />
                                   </div>
                                 )}
-                                
+
                                 {/* Image preview */}
                                 <div className="bg-gray-50 p-4 flex items-center justify-center min-h-[150px]">
                                   <img
@@ -358,15 +368,16 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                                     alt={formula.title}
                                     className="max-w-full max-h-[200px] object-contain"
                                     onError={(e) => {
-                                      (e.target as HTMLImageElement).src = '/resources/placeholder.svg';
+                                      (e.target as HTMLImageElement).src =
+                                        '/resources/placeholder.svg';
                                     }}
                                   />
                                 </div>
-                                
+
                                 {/* Info */}
                                 <div className="p-3 bg-white border-t border-gray-100">
                                   <div className="flex items-center gap-2">
-                                    <span 
+                                    <span
                                       className="text-xs px-2 py-0.5 rounded-full text-white"
                                       style={{ backgroundColor: color }}
                                     >
@@ -394,7 +405,8 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
             <div className="text-sm text-gray-500">
               {selectedCount > 0 ? (
                 <span className="text-green-600 font-medium">
-                  Wybrano {selectedCount} {selectedCount === 1 ? 'wzór' : selectedCount < 5 ? 'wzory' : 'wzorów'}
+                  Wybrano {selectedCount}{' '}
+                  {selectedCount === 1 ? 'wzór' : selectedCount < 5 ? 'wzory' : 'wzorów'}
                 </span>
               ) : (
                 'Kliknij na wzór lub użyj checkboxów, aby wybrać'
@@ -412,9 +424,11 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                 disabled={selectedCount === 0}
                 className={`
                   flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors
-                  ${selectedCount > 0
-                    ? 'bg-green-500 text-white hover:bg-green-600 cursor-pointer'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'}
+                  ${
+                    selectedCount > 0
+                      ? 'bg-green-500 text-white hover:bg-green-600 cursor-pointer'
+                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                  }
                 `}
               >
                 <Check className="w-5 h-5" />
