@@ -78,6 +78,11 @@ async def get_board(
     # Pobierz informacje o właścicielu
     owner = db.query(User).filter(User.id == board.created_by).first()
     
+    # Pobierz informacje o ostatnim modyfikatorze
+    last_modifier = None
+    if board.last_modified_by:
+        last_modifier = db.query(User).filter(User.id == board.last_modified_by).first()
+    
     # Pobierz dane użytkownika dla tego boardu (is_favourite, last_opened)
     board_user = db.query(BoardUsers).filter(
         BoardUsers.board_id == board_id,
@@ -94,7 +99,7 @@ async def get_board(
         owner_username=owner.username if owner else "Unknown",
         is_favourite=board_user.is_favourite if board_user else False,
         last_modified=board.last_modified,
-        last_modified_by=board.last_modified_by,
+        last_modified_by=last_modifier.username if last_modifier else None,
         last_opened=board_user.last_opened if board_user else None,
         created_at=board.created_at,
         created_by=owner.username if owner else "Unknown"
