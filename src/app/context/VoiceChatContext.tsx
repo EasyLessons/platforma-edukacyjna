@@ -338,6 +338,11 @@ export function VoiceChatProvider({
   // Refs do śledzenia aktualnego stanu (potrzebne w event listenerach)
   const isInVoiceChatRef = useRef(false);
   const isMutedRef = useRef(false);
+  
+  // Refs do funkcji (rozwiązuje circular dependency w setupVoiceChannel)
+  const createPeerConnectionRef = useRef<((remoteUserId: number, remoteUsername: string, isInitiator: boolean) => Promise<void>) | null>(null);
+  const handleOfferRef = useRef<((fromUserId: number, fromUsername: string, offer: RTCSessionDescriptionInit) => Promise<void>) | null>(null);
+  const leaveVoiceChatRef = useRef<(() => void) | null>(null);
 
   // Debounce i throttling
   const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -396,11 +401,25 @@ export function VoiceChatProvider({
   }, [isMuted]);
 
   // ───────────────────────────────────────────────────────────────────────
-  // 📡 SUPABASE CHANNEL DLA VOICE
+  // 📡 SUPABASE CHANNEL DLA VOICE - LAZY INITIALIZATION
   // ───────────────────────────────────────────────────────────────────────
+  // 🛡️ OPTYMALIZACJA: Kanał tworzony TYLKO gdy użytkownik dołączy do voice chat
+  // To zapobiega tworzeniu niepotrzebnych kanałów Supabase dla każdego użytkownika
 
-  useEffect(() => {
-    if (!user || !boardId) return;
+  const setupVoiceChannel = useCallback((): Promise<RealtimeChannel | null> => {
+    return new Promise((resolve) => {
+      if (!user || !boardId) {
+        resolve(null);
+        return;
+      }
+      
+      // Jeśli kanał już istnieje i jest subskrybowany, użyj go
+      if (channelRef.current) {
+        resolve(channelRef.current);
+        return;
+      }
+
+      console.log(`🎤 [VOICE] Tworzę kanał voice:${boardId}`);
 
     const channel = supabase.channel(`voice:${boardId}`, {
       config: {
@@ -464,8 +483,8 @@ export function VoiceChatProvider({
               },
             });
 
-            // Utwórz NOWE połączenie P2P (jako initiator)
-            createPeerConnection(userId, username, true);
+            // Utwórz NOWE połączenie P2P (jako initiator) - używamy ref
+            createPeerConnectionRef.current?.(userId, username, true);
           }, 300);
         }
       })
@@ -482,8 +501,7 @@ export function VoiceChatProvider({
         const now = Date.now();
         const lastSync = lastSyncTimeRef.current.get(userId) || 0;
         if (now - lastSync < 2000) {
-          console.log(`🎤 [VOICE] ⚠️ Throttling voice-sync od ${username}`);
-          return;
+          return; // Throttle - ignore
         }
         lastSyncTimeRef.current.set(userId, now);
 
@@ -499,7 +517,6 @@ export function VoiceChatProvider({
         });
 
         // Jeśli jesteśmy w voice chat i NIE mamy połączenia - utwórz jako responder
-        // Ale jeśli mamy połączenie w złym stanie - też utwórz na nowo
         if (isInVoiceChatRef.current && localStreamRef.current) {
           const existingConn = peerConnectionsRef.current.get(userId);
           const needsConnection =
@@ -509,10 +526,6 @@ export function VoiceChatProvider({
             existingConn.pc.connectionState === 'closed';
 
           if (needsConnection && !pendingConnectionsRef.current.has(userId)) {
-            console.log(
-              `🎤 [VOICE] Tworzę połączenie P2P z ${username} (jako responder, state: ${existingConn?.pc.connectionState || 'brak'})`
-            );
-
             // Wyczyść stare jeśli istnieje
             if (existingConn) {
               if (existingConn.audioElement) {
@@ -523,24 +536,17 @@ export function VoiceChatProvider({
               peerConnectionsRef.current.delete(userId);
             }
 
-            // Reset retry counter
             connectionRetriesRef.current.delete(userId);
-
-            // Utwórz nowe połączenie
-            createPeerConnection(userId, username, false);
+            createPeerConnectionRef.current?.(userId, username, false);
           }
         }
       })
-      // Obsługa voice-request-sync - ktoś prosi o informację kto jest w voice chat
+      // Obsługa voice-request-sync
       .on('broadcast', { event: 'voice-request-sync' }, ({ payload }) => {
         const { userId: requestingUserId } = payload as VoiceEvent & { type: 'voice-request-sync' };
         if (requestingUserId === user.id) return;
 
-        // Jeśli my jesteśmy w voice chat, odpowiedz voice-sync
         if (isInVoiceChatRef.current && localStreamRef.current) {
-          console.log(`🎤 [VOICE] Odpowiadam na request-sync od user ${requestingUserId}`);
-
-          // Małe losowe opóźnienie żeby uniknąć collision (100-400ms)
           const delay = Math.random() * 300 + 100;
           setTimeout(() => {
             channel.send({
@@ -561,8 +567,6 @@ export function VoiceChatProvider({
         if (userId === user.id) return;
 
         console.log(`🎤 [VOICE] User ${userId} opuścił voice chat`);
-
-        // Wyczyść wszystkie połączenia tego użytkownika
         cleanupUserConnections(userId);
       })
       .on('broadcast', { event: 'voice-offer' }, async ({ payload }) => {
@@ -571,16 +575,11 @@ export function VoiceChatProvider({
         };
         if (toUserId !== user.id) return;
 
-        console.log(`🎤 [VOICE] Otrzymano offer od ${fromUsername} (${fromUserId})`);
-
-        // Utwórz peer connection i odpowiedz (używamy fromUsername z payloadu)
-        await handleOffer(fromUserId, fromUsername, offer);
+        await handleOfferRef.current?.(fromUserId, fromUsername, offer);
       })
       .on('broadcast', { event: 'voice-answer' }, async ({ payload }) => {
         const { fromUserId, toUserId, answer } = payload as VoiceEvent & { type: 'voice-answer' };
         if (toUserId !== user.id) return;
-
-        console.log(`🎤 [VOICE] Otrzymano answer od ${fromUserId}`);
 
         const pc = peerConnectionsRef.current.get(fromUserId)?.pc;
         if (pc) {
@@ -610,15 +609,37 @@ export function VoiceChatProvider({
           prev.map((p) => (p.odUserId === userId ? { ...p, isSpeaking } : p))
         );
       })
-      .subscribe();
-
-    channelRef.current = channel;
-
-    return () => {
-      channel.unsubscribe();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log(`🎤 [VOICE] ✅ Kanał voice:${boardId} SUBSCRIBED`);
+          channelRef.current = channel;
+          resolve(channel);
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          console.error(`🎤 [VOICE] ❌ Kanał voice błąd: ${status}`);
+          resolve(null);
+        }
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [boardId, user?.id, user?.username, cleanupUserConnections]);
+
+  // 🛡️ Cleanup kanału przy zmianie boardId - wywołaj pełny leaveVoiceChat
+  const prevBoardIdRef = useRef(boardId);
+  useEffect(() => {
+    // Jeśli boardId się zmienił i byliśmy w voice chat - opuść
+    if (prevBoardIdRef.current !== boardId && prevBoardIdRef.current !== null) {
+      if (isInVoiceChatRef.current) {
+        console.log('🎤 [VOICE] BoardId się zmienił - opuszczam voice chat');
+        leaveVoiceChatRef.current?.();
+      } else if (channelRef.current) {
+        // Nie byliśmy w voice chat ale kanał istnieje - wyczyść
+        console.log('🎤 [VOICE] Czyszczę kanał voice przy zmianie boardId');
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+      }
+    }
+    prevBoardIdRef.current = boardId;
+  }, [boardId]);
 
   // ───────────────────────────────────────────────────────────────────────
   // 🎙️ WEBRTC PEER CONNECTIONS
@@ -877,7 +898,7 @@ export function VoiceChatProvider({
         });
       }
     },
-    [user, settings.speakerVolume]
+    [user, settings.speakerVolume, cleanupUserConnections]
   );
 
   const handleOffer = useCallback(
@@ -932,6 +953,15 @@ export function VoiceChatProvider({
     },
     [user, createPeerConnection, cleanupUserConnections]
   );
+
+  // 🔄 Sync refs z funkcjami (pozwala setupVoiceChannel używać aktualnych wersji)
+  useEffect(() => {
+    createPeerConnectionRef.current = createPeerConnection;
+  }, [createPeerConnection]);
+
+  useEffect(() => {
+    handleOfferRef.current = handleOffer;
+  }, [handleOffer]);
 
   // Funkcja została zastąpiona przez cleanupUserConnections (zdefiniowana wyżej)
 
@@ -1005,6 +1035,15 @@ export function VoiceChatProvider({
     setIsConnecting(true);
 
     try {
+      // 🛡️ LAZY INIT: Utwórz kanał voice dopiero teraz (czekamy na SUBSCRIBED)
+      const channel = await setupVoiceChannel();
+      if (!channel) {
+        console.error('🎤 [VOICE] Nie można utworzyć kanału voice');
+        setIsConnecting(false);
+        return;
+      }
+      console.log('🎤 [VOICE] ✅ Kanał voice gotowy, kontynuuję...');
+
       // 🧹 CLEAN START - wyczyść WSZYSTKO przed dołączeniem
       console.log('🎤 [VOICE] 🧹 Clean start - czyszczę wszystkie poprzednie połączenia...');
 
@@ -1200,7 +1239,7 @@ export function VoiceChatProvider({
     } finally {
       setIsConnecting(false);
     }
-  }, [user, isInVoiceChat, settings, startVoiceDetection, createPeerConnection]);
+  }, [user, isInVoiceChat, settings, startVoiceDetection, createPeerConnection, setupVoiceChannel]);
 
   const leaveVoiceChat = useCallback(() => {
     if (!user) return;
@@ -1246,6 +1285,17 @@ export function VoiceChatProvider({
         userId: user.id,
       },
     });
+
+    // 🛡️ LAZY CLEANUP: Usuń kanał voice po opłszczeniu
+    // Małe opóźnienie żeby voice-leave zdążyło się wysłać
+    const channelToClose = channelRef.current;
+    channelRef.current = null;
+    if (channelToClose) {
+      setTimeout(() => {
+        console.log('🎤 [VOICE] Czyszczę kanał voice po opuszczeniu');
+        channelToClose.unsubscribe();
+      }, 100);
+    }
 
     setIsInVoiceChat(false);
     setParticipants([]);
@@ -1377,9 +1427,15 @@ export function VoiceChatProvider({
   // 🧹 CLEANUP
   // ───────────────────────────────────────────────────────────────────────
 
+  // Sync ref z aktualną wersją funkcji (ref zdefiniowany wyżej z innymi refami)
+  useEffect(() => {
+    leaveVoiceChatRef.current = leaveVoiceChat;
+  }, [leaveVoiceChat]);
+
   useEffect(() => {
     return () => {
-      leaveVoiceChat();
+      // Użyj ref żeby zawsze mieć aktualną wersję funkcji
+      leaveVoiceChatRef.current?.();
     };
   }, []);
 

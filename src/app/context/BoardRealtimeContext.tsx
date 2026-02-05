@@ -536,6 +536,8 @@ export function BoardRealtimeProvider({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
+        // 🛡️ RESET licznika przy udanym połączeniu!
+        reconnectAttemptRef.current = 0;
         setIsConnected(true);
         console.log('✅ Połączono z kanałem tablicy');
 
@@ -554,7 +556,12 @@ export function BoardRealtimeProvider({
             presenceData.viewport_scale = viewport.scale;
           }
 
-          await channel.track(presenceData);
+          try {
+            await channel.track(presenceData);
+          } catch (err) {
+            // Ignoruj błędy track - kanał może być w trakcie reconnect
+            console.debug('Track presence skipped - channel reconnecting');
+          }
         };
 
         await trackPresence();
@@ -564,29 +571,25 @@ export function BoardRealtimeProvider({
           trackPresence({ x, y, scale });
         };
 
-        // Heartbeat co 15 sekund żeby utrzymać obecność
-        presenceHeartbeat = setInterval(() => trackPresence(), 15000);
+        // Heartbeat co 30 sekund (zwiększone z 15s dla stabilności)
+        if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+        presenceHeartbeat = setInterval(() => trackPresence(), 30000);
       } else if (status === 'CHANNEL_ERROR') {
-        console.warn('⚠️ Błąd kanału - Supabase spróbuje automatycznie reconnect');
-        // NIE ustawiaj isConnected na false od razu - Supabase ma auto-reconnect
-        // Daj mu szansę na reconnect przez 5 sekund
+        // 🛡️ Supabase ma auto-reconnect - nie panikuj
+        // Loguj tylko przy pierwszym błędzie w serii
+        if (reconnectAttemptRef.current === 0) {
+          console.debug('⚠️ Tymczasowy błąd kanału - Supabase reconnecting...');
+        }
         reconnectAttemptRef.current++;
         
-        if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+        // Ustaw isConnected na false tylko po wielu nieudanych próbach
+        if (reconnectAttemptRef.current >= 10) {
           setIsConnected(false);
-          console.error('❌ Przekroczono limit prób reconnect');
-        } else {
-          console.log(`🔄 Próba reconnect ${reconnectAttemptRef.current}/${maxReconnectAttempts}`);
+          console.warn('⚠️ Niestabilne połączenie realtime - używam fallback');
         }
       } else if (status === 'TIMED_OUT') {
-        console.warn('⏰ Timeout połączenia z kanałem - próba reconnect');
-        // Podobnie jak CHANNEL_ERROR - daj szansę na reconnect
+        console.debug('⏰ Timeout - Supabase reconnecting...');
         reconnectAttemptRef.current++;
-        
-        if (reconnectAttemptRef.current >= maxReconnectAttempts) {
-          setIsConnected(false);
-          console.error('❌ Przekroczono limit prób reconnect po timeout');
-        }
       } else if (status === 'CLOSED') {
         console.log('🔒 Kanał zamknięty');
         setIsConnected(false);
@@ -630,26 +633,40 @@ export function BoardRealtimeProvider({
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  const broadcastElementCreated = useCallback(
-    async (element: DrawingElement) => {
-      if (!channelRef.current || !user) return;
-
+  // 🛡️ RESILIENT BROADCAST - ignoruje błędy gdy kanał jest niestabilny
+  const safeBroadcast = useCallback(async (event: string, payload: any) => {
+    if (!channelRef.current) return false;
+    
+    try {
       await channelRef.current.send({
         type: 'broadcast',
-        event: 'element-created',
-        payload: {
-          element,
-          userId: user.id,
-          username: user.username,
-        },
+        event,
+        payload,
+      });
+      return true;
+    } catch (err) {
+      // Kanał może być w trakcie reconnect - to normalne
+      console.debug(`Broadcast ${event} skipped - channel reconnecting`);
+      return false;
+    }
+  }, []);
+
+  const broadcastElementCreated = useCallback(
+    async (element: DrawingElement) => {
+      if (!user) return;
+
+      await safeBroadcast('element-created', {
+        element,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   const broadcastElementUpdated = useCallback(
     async (element: DrawingElement) => {
-      if (!channelRef.current || !user) return;
+      if (!user) return;
 
       const now = Date.now();
       const timeSinceLastBroadcast = now - lastBroadcastTimeRef.current.elementUpdate;
@@ -668,14 +685,10 @@ export function BoardRealtimeProvider({
         lastBroadcastTimeRef.current.elementUpdate = now;
         pendingElementUpdateRef.current = null;
 
-        await channelRef.current.send({
-          type: 'broadcast',
-          event: 'element-updated',
-          payload: {
-            element,
-            userId: user.id,
-            username: user.username,
-          },
+        await safeBroadcast('element-updated', {
+          element,
+          userId: user.id,
+          username: user.username,
         });
       } else {
         // 🛡️ TRAILING: zaplanuj wysłanie ostatniej wartości po throttle window
@@ -687,63 +700,51 @@ export function BoardRealtimeProvider({
             pendingElementUpdateTimeoutRef.current = null;
             pendingElementUpdateRef.current = null;
 
-            if (pendingElement && channelRef.current && user) {
+            if (pendingElement && user) {
               lastBroadcastTimeRef.current.elementUpdate = Date.now();
 
-              await channelRef.current.send({
-                type: 'broadcast',
-                event: 'element-updated',
-                payload: {
-                  element: pendingElement,
-                  userId: user.id,
-                  username: user.username,
-                },
+              await safeBroadcast('element-updated', {
+                element: pendingElement,
+                userId: user.id,
+                username: user.username,
               });
             }
           }, remainingTime);
         }
       }
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   const broadcastElementDeleted = useCallback(
     async (elementId: string) => {
-      if (!channelRef.current || !user) return;
+      if (!user) return;
 
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'element-deleted',
-        payload: {
-          elementId,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('element-deleted', {
+        elementId,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   const broadcastElementsBatch = useCallback(
     async (elements: DrawingElement[]) => {
-      if (!channelRef.current || !user) return;
+      if (!user) return;
 
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'elements-batch',
-        payload: {
-          elements,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('elements-batch', {
+        elements,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   const broadcastCursorMove = useCallback(
     async (x: number, y: number) => {
-      if (!channelRef.current || !user) return;
+      if (!user) return;
 
       // 🛡️ THROTTLE: ograniczenie częstotliwości kursorów
       const now = Date.now();
@@ -753,18 +754,14 @@ export function BoardRealtimeProvider({
 
       lastBroadcastTimeRef.current.cursorMove = now;
 
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'cursor-moved',
-        payload: {
-          x,
-          y,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('cursor-moved', {
+        x,
+        y,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   // ───────────────────────────────────────────────────────────────────────
@@ -826,46 +823,28 @@ export function BoardRealtimeProvider({
 
   const broadcastTypingStarted = useCallback(
     async (elementId: string) => {
-      if (!channelRef.current || !user) {
-        console.log(`⚠️ [TYPING] Nie można wysłać typing-started - brak kanału lub użytkownika`);
-        return;
-      }
+      if (!user) return;
 
-      console.log(`📤 [TYPING] Wysyłam typing-started dla elementu ${elementId}`);
-
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'typing-started',
-        payload: {
-          elementId,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('typing-started', {
+        elementId,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   const broadcastTypingStopped = useCallback(
     async (elementId: string) => {
-      if (!channelRef.current || !user) {
-        console.log(`⚠️ [TYPING] Nie można wysłać typing-stopped - brak kanału lub użytkownika`);
-        return;
-      }
+      if (!user) return;
 
-      console.log(`📤 [TYPING] Wysyłam typing-stopped dla elementu ${elementId}`);
-
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'typing-stopped',
-        payload: {
-          elementId,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('typing-stopped', {
+        elementId,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   // 🆕 SUBSKRYPCJA TYPING - dla komponentów które chcą wiedzieć kto edytuje
@@ -888,7 +867,7 @@ export function BoardRealtimeProvider({
 
   const broadcastViewportChange = useCallback(
     async (x: number, y: number, scale: number) => {
-      if (!channelRef.current || !user) return;
+      if (!user) return;
 
       // 🛡️ THROTTLE: ograniczenie częstotliwości viewport updates
       const now = Date.now();
@@ -898,19 +877,15 @@ export function BoardRealtimeProvider({
 
       lastBroadcastTimeRef.current.viewportChange = now;
 
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'viewport-changed',
-        payload: {
-          x,
-          y,
-          scale,
-          userId: user.id,
-          username: user.username,
-        },
+      await safeBroadcast('viewport-changed', {
+        x,
+        y,
+        scale,
+        userId: user.id,
+        username: user.username,
       });
     },
-    [user]
+    [user, safeBroadcast]
   );
 
   // 🆕 SUBSKRYPCJA VIEWPORTÓW - dla Follow Mode

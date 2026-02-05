@@ -48,10 +48,15 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
-      eventsPerSecond: 25, // Zwiększono z 10 dla lepszej responsywności
+      eventsPerSecond: 10, // Domyślna wartość - zbyt dużo może powodować niestabilność
+    },
+    // 🛡️ Dodatkowa konfiguracja dla stabilności
+    heartbeatIntervalMs: 25000, // Heartbeat co 25s (domyślnie 30s)
+    reconnectAfterMs: (tries: number) => {
+      // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
+      return Math.min(1000 * Math.pow(2, tries), 30000);
     },
   },
-  // 🛡️ Lepsza konfiguracja dla stabilności połączenia
   global: {
     headers: {
       'X-Client-Info': 'easylesson-web',
