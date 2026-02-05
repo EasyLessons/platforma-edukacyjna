@@ -53,13 +53,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
-      eventsPerSecond: 10, // Domyślna wartość - zbyt dużo może powodować niestabilność
+      eventsPerSecond: 100, // Zwiększone dla płynnego rysowania (domyślnie 10)
     },
-    // 🛡️ Dodatkowa konfiguracja dla stabilności
-    heartbeatIntervalMs: 25000, // Heartbeat co 25s (domyślnie 30s)
+    // 🛡️ Konfiguracja dla stabilności - NIE zmieniaj heartbeat (domyślny 30s jest OK)
+    // heartbeatIntervalMs jest wewnętrzny - nie nadpisujemy
     reconnectAfterMs: (tries: number) => {
-      // Exponential backoff: 1s, 2s, 4s, 8s, max 30s
-      return Math.min(1000 * Math.pow(2, tries), 30000);
+      // Szybki reconnect: 500ms, 1s, 2s, 4s, max 10s
+      return Math.min(500 * Math.pow(2, tries), 10000);
     },
   },
   global: {
