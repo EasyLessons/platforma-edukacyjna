@@ -633,20 +633,17 @@ export function BoardRealtimeProvider({
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🛡️ RESILIENT BROADCAST - sprawdza stan kanału przed wysłaniem
+  // 🛡️ RESILIENT BROADCAST - zawsze próbuje wysłać (Supabase fallbackuje do REST jeśli trzeba)
   const safeBroadcast = useCallback(async (event: string, payload: any) => {
     const channel = channelRef.current;
-    if (!channel) return false;
-    
-    // 🛡️ Sprawdź czy kanał jest faktycznie SUBSCRIBED
-    // Jeśli nie - Supabase fallbackuje do REST API (wolniejsze + warnings)
-    const channelState = (channel as any).state;
-    if (channelState !== 'joined') {
-      console.debug(`⚠️ Broadcast ${event} pominięty - kanał nie jest gotowy (state: ${channelState})`);
+    if (!channel) {
+      console.warn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
       return false;
     }
     
     try {
+      // Supabase automatycznie fallbackuje do REST API jeśli WebSocket nie jest gotowy
+      // To jest OK - wiadomość dotrze, tylko wolniej
       await channel.send({
         type: 'broadcast',
         event,
@@ -655,7 +652,7 @@ export function BoardRealtimeProvider({
       return true;
     } catch (err) {
       // Kanał może być w trakcie reconnect - to normalne
-      console.debug(`Broadcast ${event} skipped - channel reconnecting`);
+      console.warn(`📤 [BROADCAST] ❌ Błąd ${event}:`, err);
       return false;
     }
   }, []);
@@ -664,11 +661,17 @@ export function BoardRealtimeProvider({
     async (element: DrawingElement) => {
       if (!user) return;
 
-      await safeBroadcast('element-created', {
+      console.log(`📤 [BROADCAST] Wysyłam element-created: ${element.id} (typ: ${element.type})`);
+
+      const success = await safeBroadcast('element-created', {
         element,
         userId: user.id,
         username: user.username,
       });
+
+      if (!success) {
+        console.warn(`📤 [BROADCAST] ❌ Nie udało się wysłać element-created: ${element.id}`);
+      }
     },
     [user, safeBroadcast]
   );
