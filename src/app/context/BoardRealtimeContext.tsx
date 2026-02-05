@@ -609,9 +609,9 @@ export function BoardRealtimeProvider({
           trackPresence({ x, y, scale });
         };
 
-        // Heartbeat co 30 sekund (zwiększone z 15s dla stabilności)
+        // Heartbeat co 60 sekund - Supabase ma własny heartbeat, nie potrzebujemy częstego
         if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-        presenceHeartbeat = setInterval(() => trackPresence(), 30000);
+        presenceHeartbeat = setInterval(() => trackPresence(), 60000);
       } else if (status === 'CHANNEL_ERROR') {
         // 🛡️ Supabase ma auto-reconnect - nie panikuj
         // Loguj tylko przy pierwszym błędzie w serii
@@ -675,9 +675,9 @@ export function BoardRealtimeProvider({
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🛡️ RESILIENT BROADCAST - zawsze próbuje wysłać (Supabase fallbackuje do REST jeśli trzeba)
-  // WAŻNE: Nie dodajemy żadnych checków ani kolejek - to DODAJE latency!
-  // Supabase sam wie kiedy użyć WebSocket (instant) a kiedy REST (wolniejszy fallback)
+  // 🛡️ RESILIENT BROADCAST z automatycznym retry w tle
+  // - Wysyła natychmiast (0 latency)
+  // - Jeśli nie uda się wysłać, próbuje ponownie w tle
   const safeBroadcast = useCallback(async (event: string, payload: any): Promise<boolean> => {
     const channel = channelRef.current;
     if (!channel) {
@@ -685,20 +685,42 @@ export function BoardRealtimeProvider({
       return false;
     }
 
-    try {
-      // Supabase automatycznie fallbackuje do REST API jeśli WebSocket nie jest gotowy
-      // To jest OK - wiadomość dotrze, tylko wolniej (ale zwykle WebSocket działa = 0 latency)
-      await channel.send({
-        type: 'broadcast',
-        event,
-        payload,
-      });
-      return true;
-    } catch (err) {
-      // Kanał może być w trakcie reconnect - to normalne
-      console.warn(`📤 [BROADCAST] ❌ Błąd ${event}:`, err);
-      return false;
+    const sendMessage = async (): Promise<boolean> => {
+      try {
+        await channel.send({
+          type: 'broadcast',
+          event,
+          payload,
+        });
+        return true;
+      } catch (err) {
+        return false;
+      }
+    };
+
+    // Pierwsza próba - natychmiastowa
+    const success = await sendMessage();
+    
+    if (!success) {
+      // Retry w tle - nie blokuje, nie dodaje latency do UI
+      // Tylko dla ważnych eventów (nie cursor/viewport)
+      const isImportant = event.startsWith('element-');
+      if (isImportant) {
+        setTimeout(async () => {
+          const retry1 = await sendMessage();
+          if (!retry1) {
+            setTimeout(async () => {
+              const retry2 = await sendMessage();
+              if (!retry2) {
+                console.warn(`📤 [BROADCAST] ❌ Nie udało się wysłać ${event} po 3 próbach`);
+              }
+            }, 200);
+          }
+        }, 100);
+      }
     }
+    
+    return success;
   }, []);
 
   const broadcastElementCreated = useCallback(
