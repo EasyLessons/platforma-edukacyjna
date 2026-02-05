@@ -214,22 +214,9 @@ export function BoardRealtimeProvider({
   const isSubscribedRef = useRef<boolean>(false);
   const currentBoardIdRef = useRef<string | null>(null);
   
-  // Promise do czekania na gotowość kanału
+  // Promise do czekania na gotowość kanału (używane tylko wewnętrznie w subscribe)
   const channelReadyPromiseRef = useRef<Promise<void> | null>(null);
   const channelReadyResolveRef = useRef<(() => void) | null>(null);
-  
-  // KOLEJKA WIADOMOŚCI - buforuj gdy WebSocket nie jest gotowy
-  interface QueuedMessage {
-    event: string;
-    payload: any;
-    timestamp: number;
-    retries: number;
-  }
-  const messageQueueRef = useRef<QueuedMessage[]>([]);
-  const isProcessingQueueRef = useRef<boolean>(false);
-  const processMessageQueueRef = useRef<(() => Promise<void>) | null>(null);
-  const MAX_RETRIES = 3;
-  const MESSAGE_TTL = 10000; // 10 sekund - po tym czasie wiadomość jest porzucana
 
   // Ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
   const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
@@ -591,19 +578,6 @@ export function BoardRealtimeProvider({
         if (channelReadyResolveRef.current) {
           channelReadyResolveRef.current();
         }
-        
-        // Po reconnect: przetwórz zaległe wiadomości z kolejki
-        if (messageQueueRef.current.length > 0) {
-          console.log(`[QUEUE] Przetwarzam ${messageQueueRef.current.length} zaległych wiadomości`);
-          // Daj WebSocketowi chwilę na pełne ustabilizowanie
-          setTimeout(() => {
-            // Sprawdź ponownie stan socketa
-            // @ts-ignore
-            if (channel.socket?.conn?.readyState === 1 && processMessageQueueRef.current) {
-              processMessageQueueRef.current();
-            }
-          }, 200);
-        }
 
         // Wyślij swoją obecność (Presence) z viewport
         const trackPresence = async (viewport?: { x: number; y: number; scale: number }) => {
@@ -692,151 +666,40 @@ export function BoardRealtimeProvider({
       previousUsersRef.current = new Map();
       reconnectAttemptRef.current = 0;
       pendingElementUpdateRef.current = null;
-      messageQueueRef.current = []; // Wyczyść kolejkę wiadomości
-      isProcessingQueueRef.current = false;
       // Notyfikuj subscriberów o pustej liście kursorów
       cursorSubscribersRef.current.forEach((callback) => callback([]));
     };
-  }, [boardId, user?.id, user?.username]); // processMessageQueue nie potrzebne - używamy ref
+  }, [boardId, user?.id, user?.username]);
 
   // ───────────────────────────────────────────────────────────────────────
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // Funkcja do przetwarzania kolejki wiadomości
-  const processMessageQueue = useCallback(async () => {
-    if (isProcessingQueueRef.current) return;
-    if (messageQueueRef.current.length === 0) return;
-    
-    const channel = channelRef.current;
-    if (!channel) return;
-    
-    // @ts-ignore
-    const socket = channel.socket;
-    // @ts-ignore
-    if (!socket?.conn || socket.conn.readyState !== 1) {
-      // WebSocket nie jest gotowy - spróbuj później
-      setTimeout(() => processMessageQueue(), 500);
-      return;
-    }
-    
-    isProcessingQueueRef.current = true;
-    const now = Date.now();
-    
-    // Filtruj przeterminowane wiadomości
-    messageQueueRef.current = messageQueueRef.current.filter(msg => {
-      if (now - msg.timestamp > MESSAGE_TTL) {
-        console.warn(`[QUEUE] Wiadomość ${msg.event} przeterminowana`);
-        return false;
-      }
-      return true;
-    });
-    
-    // Wyślij wiadomości z kolejki
-    const failedMessages: typeof messageQueueRef.current = [];
-    
-    for (const msg of messageQueueRef.current) {
-      try {
-        await channel.send({
-          type: 'broadcast',
-          event: msg.event,
-          payload: msg.payload,
-        });
-        console.log(`[QUEUE] ✅ Wysłano z kolejki: ${msg.event}`);
-      } catch (err) {
-        msg.retries++;
-        if (msg.retries < MAX_RETRIES) {
-          failedMessages.push(msg);
-        } else {
-          console.warn(`[QUEUE] ❌ Porzucono po ${MAX_RETRIES} próbach: ${msg.event}`);
-        }
-      }
-    }
-    
-    messageQueueRef.current = failedMessages;
-    isProcessingQueueRef.current = false;
-    
-    // Jeśli są jeszcze wiadomości, spróbuj ponownie za chwilę
-    if (failedMessages.length > 0) {
-      setTimeout(() => processMessageQueue(), 200);
-    }
-  }, []);
-  
-  // Przypisz do ref, żeby było dostępne z subscribe callback
-  processMessageQueueRef.current = processMessageQueue;
-
-  // BROADCAST Z KOLEJKĄ - gwarantuje dostarczenie
+  // 🛡️ RESILIENT BROADCAST - zawsze próbuje wysłać (Supabase fallbackuje do REST jeśli trzeba)
+  // WAŻNE: Nie dodajemy żadnych checków ani kolejek - to DODAJE latency!
+  // Supabase sam wie kiedy użyć WebSocket (instant) a kiedy REST (wolniejszy fallback)
   const safeBroadcast = useCallback(async (event: string, payload: any): Promise<boolean> => {
     const channel = channelRef.current;
-    
-    // Dla mniej ważnych eventów (viewport, cursor) - nie kolejkuj
-    const isLowPriority = event === 'viewport-changed' || event === 'cursor-moved';
-    
-    // Jeśli kanał nie istnieje
-    if (!channel || !channelReadyPromiseRef.current) {
-      if (!isLowPriority) {
-        // Dodaj do kolejki ważne wiadomości
-        messageQueueRef.current.push({
-          event,
-          payload,
-          timestamp: Date.now(),
-          retries: 0,
-        });
-        console.log(`[QUEUE] Dodano do kolejki (brak kanału): ${event}`);
-      }
+    if (!channel) {
+      console.warn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
       return false;
     }
-    
-    // Sprawdź stan WebSocket
-    // @ts-ignore
-    const socket = channel.socket;
-    // @ts-ignore
-    const socketReady = socket?.conn?.readyState === 1;
-    
-    if (!socketReady) {
-      if (!isLowPriority) {
-        // WebSocket nie gotowy - dodaj do kolejki
-        messageQueueRef.current.push({
-          event,
-          payload,
-          timestamp: Date.now(),
-          retries: 0,
-        });
-        console.log(`[QUEUE] Dodano do kolejki (socket nie gotowy): ${event}`);
-        // Spróbuj przetworzyć kolejkę za chwilę
-        setTimeout(() => processMessageQueue(), 100);
-      }
-      return false;
-    }
-    
+
     try {
+      // Supabase automatycznie fallbackuje do REST API jeśli WebSocket nie jest gotowy
+      // To jest OK - wiadomość dotrze, tylko wolniej (ale zwykle WebSocket działa = 0 latency)
       await channel.send({
         type: 'broadcast',
         event,
         payload,
       });
-      
-      // Po udanym wysłaniu, przetwórz kolejkę jeśli są zaległe wiadomości
-      if (messageQueueRef.current.length > 0) {
-        processMessageQueue();
-      }
-      
       return true;
     } catch (err) {
-      if (!isLowPriority) {
-        // Błąd wysyłania - dodaj do kolejki z retry
-        messageQueueRef.current.push({
-          event,
-          payload,
-          timestamp: Date.now(),
-          retries: 1,
-        });
-        console.warn(`[QUEUE] Błąd wysyłania, dodano do kolejki: ${event}`);
-        setTimeout(() => processMessageQueue(), 200);
-      }
+      // Kanał może być w trakcie reconnect - to normalne
+      console.warn(`📤 [BROADCAST] ❌ Błąd ${event}:`, err);
       return false;
     }
-  }, [processMessageQueue]);
+  }, []);
 
   const broadcastElementCreated = useCallback(
     async (element: DrawingElement) => {
