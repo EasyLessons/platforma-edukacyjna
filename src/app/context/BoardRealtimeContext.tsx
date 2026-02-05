@@ -633,12 +633,21 @@ export function BoardRealtimeProvider({
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🛡️ RESILIENT BROADCAST - ignoruje błędy gdy kanał jest niestabilny
+  // 🛡️ RESILIENT BROADCAST - sprawdza stan kanału przed wysłaniem
   const safeBroadcast = useCallback(async (event: string, payload: any) => {
-    if (!channelRef.current) return false;
+    const channel = channelRef.current;
+    if (!channel) return false;
+    
+    // 🛡️ Sprawdź czy kanał jest faktycznie SUBSCRIBED
+    // Jeśli nie - Supabase fallbackuje do REST API (wolniejsze + warnings)
+    const channelState = (channel as any).state;
+    if (channelState !== 'joined') {
+      console.debug(`⚠️ Broadcast ${event} pominięty - kanał nie jest gotowy (state: ${channelState})`);
+      return false;
+    }
     
     try {
-      await channelRef.current.send({
+      await channel.send({
         type: 'broadcast',
         event,
         payload,

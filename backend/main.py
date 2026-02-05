@@ -36,6 +36,7 @@ async def shutdown_event():
     logger.info("🛑 Aplikacja Education Platform zatrzymana!")
 
 # CORS - ZAKTUALIZOWANE DLA TWOICH DOMEN
+# 🛡️ Używamy allow_origin_regex dla elastyczności z subdomenami
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -44,13 +45,15 @@ app.add_middleware(
         "http://localhost:8000",
         
         # Production - Vercel domains
-        "https://platforma-edukacyjna-five.vercel.app",  # ← TWOJA GŁÓWNA DOMENA VERCEL
-        "https://platforma-edukacyjna-one.vercel.app",   # ← Stara/dodatkowa (możesz usunąć jeśli nie używasz)
+        "https://platforma-edukacyjna-five.vercel.app",
+        "https://platforma-edukacyjna-one.vercel.app",
         
-        # Production - Custom domain
-        "https://easylesson.app",                         # ← TWOJA CUSTOM DOMAIN
-        "https://www.easylesson.app",                     # ← Z www (dla pewności)
+        # Production - Custom domain (z i bez www)
+        "https://easylesson.app",
+        "https://www.easylesson.app",
     ],
+    # 🛡️ REGEX: akceptuj wszystkie subdomeny easylesson.app i vercel.app
+    allow_origin_regex=r"https://(www\.)?easylesson\.app|https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
