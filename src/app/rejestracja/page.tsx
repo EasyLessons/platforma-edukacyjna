@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Lock, Mail, User, X } from 'lucide-react';
 import Link from 'next/link';
+import { Button } from '@/_new/shared/ui/button';
 
 export default function Register() {
   const router = useRouter();
@@ -270,14 +271,16 @@ export default function Register() {
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                 <Lock className="w-5 h-5" />
               </span>
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
                 title={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
               >
                 {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-              </button>
+              </Button>
             </div>
             {errors.password && (
               <span className="text-red-500 text-xs mt-1 block">{errors.password}</span>
@@ -304,14 +307,16 @@ export default function Register() {
               <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
                 <Lock className="w-5 h-5" />
               </span>
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none"
+                className="absolute right-3 top-1/2 -translate-y-1/2"
                 title={showConfirmPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
               >
                 {showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-              </button>
+              </Button>
             </div>
             {errors.confirmPassword && (
               <span className="text-red-500 text-xs mt-1 block">{errors.confirmPassword}</span>
@@ -351,34 +356,15 @@ export default function Register() {
           </div>
 
           {/* Register Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className={`w-full py-3 px-4 text-white font-semibold rounded-lg transition-all duration-200 transform mb-5
-              ${
-                isLoading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-green-500 hover:bg-green-600 hover:-translate-y-0.5 hover:shadow-lg active:translate-y-0'
-              }`}
-          >
-            {isLoading ? (
-              <div className="flex items-center justify-center gap-3">
-                <Loader2 className="h-5 w-5 animate-spin" />
-                <span>Rejestrowanie...</span>
-              </div>
-            ) : (
-              'Zarejestruj się'
-            )}
-          </button>
+          <Button type="submit" loading={isLoading} className="w-full mb-5">
+            {isLoading ? 'Rejestrowanie...' : 'Zarejestruj się'}
+          </Button>
 
           {/* Login Link */}
           <div className="text-center text-gray-600">
             Masz już konto?{' '}
-            <Link
-              href="/login"
-              className="text-green-600 font-semibold hover:text-green-700 hover:underline transition-colors duration-200"
-            >
-              Zaloguj się
+            <Link href="/login">
+                <Button variant="link">Zaloguj się</Button>
             </Link>
           </div>
         </form>

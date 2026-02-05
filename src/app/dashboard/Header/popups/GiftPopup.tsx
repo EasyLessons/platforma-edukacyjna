@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Gift, Copy, Check, X, Info, UserPlus, Crown } from 'lucide-react';
+import { Button } from '@/_new/shared/ui/button';
 
 interface GiftPopupProps {
   onClose: () => void;
@@ -39,12 +40,9 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
               <p className="text-sm text-gray-600 mt-1">Na konto Premium</p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-green-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <Button variant="destructive" size="icon" onClick={onClose}>
+            <X size={20} />
+          </Button>
         </div>
 
         {/* Content */}
@@ -58,16 +56,15 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
           </div>
 
           {/* Jak to działa */}
-          <button
+          <Button
+            variant="secondary"
+            rightIcon={<Info size={18} />}
+            leftIcon={showInfo ? '−' : '+'}
             onClick={() => setShowInfo(!showInfo)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors cursor-pointer"
+            className="w-full items-center justify-between bg-blue-50 hover:bg-blue-100 border border-blue-200"
           >
-            <div className="flex items-center gap-2 text-blue-700 font-medium">
-              <Info size={18} />
-              <span>Jak to działa?</span>
-            </div>
-            <span className="text-blue-400 text-xl">{showInfo ? '−' : '+'}</span>
-          </button>
+            Jak to działa?
+          </Button>
 
           {/* 3 kroki */}
           {showInfo && (
@@ -124,22 +121,16 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
                 onClick={(e) => e.currentTarget.select()}
               />
 
-              <button
+              <Button
+                variant="primary"
+                leftIcon={copied ? <Check size={18} /> : <Copy size={18} />}
                 onClick={handleCopy}
-                className="px-4 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors cursor-pointer flex items-center gap-2 whitespace-nowrap shadow-sm hover:shadow-md"
               >
-                {copied ? (
-                  <>
-                    <Check size={18} />
+                {copied ? 
                     <span className="hidden sm:inline">Skopiowano!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy size={18} />
-                    <span className="hidden sm:inline">Kopiuj</span>
-                  </>
-                )}
-              </button>
+                 : <span className="hidden sm:inline">Kopiuj</span>
+                }
+              </Button>
             </div>
           </div>
 
@@ -159,13 +150,14 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
           </div>
 
           {/* CTA */}
-          <button
+          <Button
+            variant="primary"
+            leftIcon={<UserPlus size={18} />}
             onClick={handleCopy}
-            className="w-full px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg cursor-pointer flex items-center justify-center gap-2"
+            className="w-full"
           >
-            <UserPlus size={18} />
             <span>Zaproś znajomych teraz</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

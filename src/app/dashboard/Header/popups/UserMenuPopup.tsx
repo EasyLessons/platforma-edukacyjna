@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { User, Settings, Crown, LogOut } from 'lucide-react';
 // 🔥 DODAJ TEN IMPORT - 3 poziomy w górę do app/, potem context/
 import { useAuth } from '../../../context/AuthContext';
+import { Button } from '@/_new/shared/ui/button';
 
 interface UserMenuPopupProps {
   onClose: () => void;
@@ -85,48 +86,36 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
 
       {/* Menu opcje */}
       <div className="py-2">
-        <button
+        <Button
+          variant="secondary"
+          leftIcon={<User size={16} />}
           onClick={() => handleNavigation('/clientPanel')}
-          className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 transition-colors cursor-pointer group"
+          className="w-full justify-start rounded-sm"
         >
-          <div className="w-8 h-8 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-green-100 transition-colors">
-            <User size={16} className="text-gray-600 group-hover:text-green-600" />
-          </div>
-          <span className="text-gray-700 font-medium text-sm">Profil</span>
-        </button>
+          Profil
+        </Button>
 
         {!user.isPremium && (
-          <>
-            <div className="my-2 border-t border-gray-100"></div>
-            <Link href="/#pricing">
-              <button
-                onClick={onClose}
-                className="w-full text-left px-4 py-2.5 hover:bg-yellow-50 flex items-center gap-3 transition-colors cursor-pointer group"
+              <Button
+                variant="secondary"
+                leftIcon={<Crown size={16} />}
+                onClick={() => handleNavigation('/#pricing')}
+                className="w-full justify-start bg-yellow-100 py-7 hover:bg-yellow-200 text-yellow-800 rounded-sm"
               >
-                <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center group-hover:bg-yellow-200 transition-colors">
-                  <Crown size={16} className="text-yellow-600" />
-                </div>
-                <div className="flex-1">
-                  <div className="text-yellow-700 font-semibold text-sm">Przejdź na Premium</div>
-                  <div className="text-xs text-yellow-600">Więcej funkcji</div>
-                </div>
-              </button>
-            </Link>
-          </>
+              Przejdź na Premium
+              </Button>
         )}
 
         <div className="my-2 border-t border-gray-100"></div>
 
         {/* Wyloguj */}
-        <button
+        <Button
+          variant="destructive"
+          leftIcon={<LogOut size={16} />}
           onClick={handleLogout}
-          className="w-full text-left px-4 py-2.5 hover:bg-red-50 flex items-center gap-3 transition-colors cursor-pointer group"
-        >
-          <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center group-hover:bg-red-200 transition-colors">
-            <LogOut size={16} className="text-red-600" />
-          </div>
-          <span className="text-red-600 font-medium text-sm">Wyloguj się</span>
-        </button>
+          className="w-full justify-center rounded-sm">
+          Wyloguj się
+        </Button>
       </div>
     </div>
   );

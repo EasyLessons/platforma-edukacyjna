@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
 import { createInvite } from '@/workspace_api/api';
 import { checkUserInviteStatus, UserSearchResult, getToken, searchUsers } from '@/auth_api/api';
+import { Button } from '@/_new/shared/ui/button';
 
 interface InvitePopupProps {
   onClose: () => void;
@@ -111,32 +112,6 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
     return null;
   };
 
-  const getInviteButtonContent = (user: UserWithStatus) => {
-    const justInvited = invitedUsers.includes(user.id);
-    const isInviting = inviting === user.id;
-
-    if (isInviting)
-      return (
-        <>
-          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-          <span>Wysyłanie...</span>
-        </>
-      );
-    if (justInvited)
-      return (
-        <>
-          <Check size={16} />
-          <span>Wysłano!</span>
-        </>
-      );
-    return (
-      <>
-        <UserPlus size={16} />
-        <span>Zaproś</span>
-      </>
-    );
-  };
-
   return (
     <div
       className="fixed inset-0 bg-black/15 backdrop-blur-sm flex items-center justify-center z-[100] px-4"
@@ -154,12 +129,9 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
               do workspace'a: <span className="font-medium text-gray-700">{workspaceName}</span>
             </p>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <Button variant="secondary" size="icon" onClick={onClose}>
+            <X size={20} />
+          </Button>
         </div>
 
         {/* Search */}
@@ -201,6 +173,9 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
             <div className="divide-y divide-gray-100">
               {users.map((user) => {
                 const canInvite = user.can_invite !== false;
+                const isInviting = inviting === user.id;
+                const justInvited = invitedUsers.includes(user.id);
+
                 return (
                   <div
                     key={user.id}
@@ -223,21 +198,28 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
                         )}
                       </div>
                     </div>
-                    <button
+
+                    <Button
+                      variant={!canInvite || justInvited ? 'secondary' : 'primary'}
                       onClick={() => handleInvite(user.id)}
-                      disabled={
-                        inviting === user.id || invitedUsers.includes(user.id) || !canInvite
-                      }
-                      className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 flex-shrink-0 ml-3 ${
-                        !canInvite
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : invitedUsers.includes(user.id)
-                            ? 'bg-green-100 text-green-700 cursor-default'
-                            : 'bg-green-600 text-white hover:bg-green-700 cursor-pointer'
-                      } disabled:opacity-50 disabled:cursor-not-allowed`}
+                      disabled={isInviting || justInvited || !canInvite}
+                      loading={isInviting}
+                      className={`flex-shrink-0 ml-3 ${
+                        justInvited ? 'bg-green-100 text-green-700 hover:bg-green-200' : ''
+                      }`}
                     >
-                      {getInviteButtonContent(user)}
-                    </button>
+                      {justInvited ? (
+                        <>
+                          <Check size={16} />
+                          <span>Wysłano!</span>
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus size={16} />
+                          <span>Zaproś</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
                 );
               })}

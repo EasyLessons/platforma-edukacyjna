@@ -10,6 +10,7 @@ import {
 } from '@/workspace_api/api';
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { supabase } from '@/lib/supabase';
+import { Button } from '@/_new/shared/ui/button';
 
 interface NotificationsPopupProps {
   onClose: () => void;
@@ -119,12 +120,9 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
-          >
-            <X size={20} className="text-gray-500" />
-          </button>
+          <Button variant="secondary" size="icon" onClick={onClose}>
+            <X size={20} />
+          </Button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -163,20 +161,24 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
                       </div>
 
                       <div className="flex gap-2">
-                        <button
+                        <Button
+                          variant="primary"
+                          size="sm"
                           onClick={() => handleAccept(invite)}
-                          disabled={processingInvite === invite.id}
-                          className="flex-1 px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          loading={processingInvite === invite.id}
+                          className="flex-1"
                         >
                           {processingInvite === invite.id ? 'Akceptuję...' : 'Akceptuj'}
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
                           onClick={() => handleReject(invite)}
                           disabled={processingInvite === invite.id}
-                          className="flex-1 px-3 py-1.5 bg-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="flex-1"
                         >
                           Odrzuć
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

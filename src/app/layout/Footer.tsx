@@ -2,6 +2,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Youtube, Instagram, Facebook, Mail, Phone } from 'lucide-react';
+import { Button } from '@/_new/shared/ui/button';
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -227,9 +228,7 @@ const Footer = () => {
                 placeholder="Twój email"
                 className="px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 w-full md:w-64"
               />
-              <button className="px-6 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 whitespace-nowrap">
-                Zapisz się
-              </button>
+              <Button variant="primary">Zapisz się</Button>
             </div>
           </div>
         </div>

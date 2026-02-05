@@ -24,6 +24,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Mail, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
 import { requestPasswordReset, verifyResetCode, resetPassword } from '@/auth_api/api';
 import Link from 'next/link';
+import { Button } from '@/_new/shared/ui/button';
 
 export default function PasswordReset() {
   const router = useRouter();
@@ -270,20 +271,9 @@ export default function PasswordReset() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Wysyłanie...
-                </>
-              ) : (
-                'Wyślij kod'
-              )}
-            </button>
+            <Button type="submit" loading={isLoading} className="w-full">
+              {isLoading ? 'Wysyłanie...' : 'Wyślij kod'}
+            </Button>
           </form>
         )}
 
@@ -332,31 +322,26 @@ export default function PasswordReset() {
             )}
 
             <div className="text-center">
-              <button
+              <Button
+                variant="link"
                 onClick={handleResendCode}
                 disabled={resendCooldown > 0 || isLoading}
-                className="text-sm text-green-600 hover:text-green-700 font-medium disabled:text-gray-400 disabled:cursor-not-allowed"
+                className="text-sm"
               >
                 {resendCooldown > 0
                   ? `Wyślij ponownie za ${resendCooldown}s`
                   : 'Wyślij kod ponownie'}
-              </button>
+              </Button>
             </div>
 
-            <button
+            <Button
               onClick={() => handleVerifyCode()}
-              disabled={isLoading || code.join('').length !== 6}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              disabled={code.join('').length !== 6}
+              loading={isLoading}
+              className="w-full"
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Weryfikacja...
-                </>
-              ) : (
-                'Zweryfikuj kod'
-              )}
-            </button>
+              {isLoading ? 'Weryfikacja...' : 'Zweryfikuj kod'}
+            </Button>
           </div>
         )}
 
@@ -381,13 +366,15 @@ export default function PasswordReset() {
                   placeholder="••••••••"
                   required
                 />
-                <button
+                <Button
+                  variant="secondary"
+                  size="icon"
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+                </Button>
               </div>
               <p className="text-xs text-gray-500 mt-1">
                 Min. 8 znaków, wielka i mała litera, cyfra
@@ -415,7 +402,9 @@ export default function PasswordReset() {
                   placeholder="••••••••"
                   required
                 />
-                <button
+                <Button
+                  variant="secondary"
+                  size="icon"
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
@@ -425,7 +414,7 @@ export default function PasswordReset() {
                   ) : (
                     <Eye className="w-5 h-5" />
                   )}
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -435,20 +424,9 @@ export default function PasswordReset() {
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white font-semibold py-3 rounded-lg hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Zmiana hasła...
-                </>
-              ) : (
-                'Zmień hasło'
-              )}
-            </button>
+            <Button type="submit" loading={isLoading} className="w-full">
+              {isLoading ? 'Zmiana hasła...' : 'Zmień hasło'}
+            </Button>
           </form>
         )}
       </div>

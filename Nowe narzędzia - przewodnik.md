@@ -103,7 +103,7 @@ git add package-lock.json
 
 ---
 
-## 📦 VS CODE SETUP (5 minut)
+## VS CODE SETUP (5 minut)
 
 ### 1. Zainstaluj rozszerzenia:
 

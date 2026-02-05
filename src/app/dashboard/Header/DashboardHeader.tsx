@@ -29,6 +29,7 @@ import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
 
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
+import { Button } from '@/_new/shared/ui/button';
 
 // Rozszerzony typ User z dodatkowymi polami dla UI
 interface ExtendedUser extends User {
@@ -214,7 +215,9 @@ export default function DashboardHeader() {
             {/* PRAWA STRONA - Przyciski i ikony */}
             <div className="flex items-center justify-end gap-2">
               {/* Zaproś uczestników */}
-              <button
+              <Button
+                variant="secondary"
+                leftIcon={<UserPlus size={16} />}
                 onClick={() => {
                   if (currentWorkspace) {
                     setShowInvitePopup(true);
@@ -222,19 +225,17 @@ export default function DashboardHeader() {
                     alert('Najpierw wybierz workspace');
                   }
                 }}
-                className="px-4 py-2 border-2 border-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-all duration-200 flex items-center gap-2 whitespace-nowrap cursor-pointer hover:border-gray-300"
+                className="border-2 border-gray-200"
               >
-                <UserPlus size={16} />
-                <span>Zaproś uczestników</span>
-              </button>
+                Zaproś uczestników
+              </Button>
 
               {/* Premium Button */}
               {user && !user.isPremium && (
                 <Link href="/#pricing">
-                  <button className="px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-sm hover:shadow-md flex items-center gap-2 whitespace-nowrap cursor-pointer">
-                    <Crown size={16} />
-                    <span>Premium</span>
-                  </button>
+                  <Button variant="primary" leftIcon={<Crown size={16} />}>
+                    Premium
+                  </Button>
                 </Link>
               )}
 
@@ -242,49 +243,40 @@ export default function DashboardHeader() {
               <div className="w-px h-6 bg-gray-200 mx-1"></div>
 
               {/* Ikonka Prezentu */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowGiftPopup(true)}
-                  className="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-all duration-200 relative group cursor-pointer"
-                  title="Dostań 10% zniżki"
-                >
-                  <Gift size={20} />
 
-                  {/* Tooltip */}
-                  <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-10">
-                    Dostań 10% zniżki
-                  </div>
-                </button>
-              </div>
+              <Button
+                variant="secondary"
+                onClick={() => setShowGiftPopup(true)}
+                title="Dostań 10% zniżki"
+              >
+                <Gift size={20} />
+              </Button>
 
               {/* Dzwonek */}
               <div className="relative">
-                <button
+                <Button
+                  variant="secondary"
                   onClick={() => setShowNotifications(!showNotifications)}
-                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200 relative cursor-pointer"
                 >
                   <Bell size={20} />
-
-                  {inviteCount > 0 && (
-                    <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
-                      {inviteCount > 9 ? '9+' : inviteCount}
-                    </span>
-                  )}
-                </button>
+                </Button>
+                {inviteCount > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                    {inviteCount > 9 ? '9+' : inviteCount}
+                  </span>
+                )}
               </div>
 
               {/* Avatar */}
               {user && (
                 <div className="relative">
-                  <button
+                  <Button
+                    variant="primary"
+                    size="icon"
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="flex items-center gap-2 hover:bg-gray-50 rounded-lg px-2 py-1.5 transition-all duration-200 cursor-pointer"
                   >
-                    <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
-                      <span className="text-white font-semibold text-sm">{user.avatar}</span>
-                    </div>
-                    <ChevronDown size={14} className="text-gray-400" />
-                  </button>
+                    <span>{user.avatar}</span>
+                  </Button>
 
                   {/* User Menu Popup */}
                   {showUserMenu && (
@@ -310,12 +302,13 @@ export default function DashboardHeader() {
             </Link>
 
             {/* Hamburger Menu */}
-            <button
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setShowMobileMenu(!showMobileMenu)}
-              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-all duration-200 cursor-pointer"
             >
-              {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
-            </button>
+              <Menu size={24} />
+            </Button>
           </div>
 
           {/* MOBILE MENU DRAWER */}
@@ -326,26 +319,12 @@ export default function DashboardHeader() {
                 {/* Header drawera */}
                 <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
                   <span className="font-semibold text-gray-800">Menu</span>
-                  <button
-                    onClick={() => setShowMobileMenu(false)}
-                    className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200"
-                  >
+                  <Button variant="secondary" size="icon" onClick={() => setShowMobileMenu(false)}>
                     <X size={20} />
-                  </button>
+                  </Button>
                 </div>
 
                 <div className="p-4 space-y-3">
-                  {/* Search Mobile */}
-                  <button className="w-full px-4 py-3 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer">
-                    <Search
-                      size={18}
-                      className="text-gray-400 group-hover:text-green-600 transition-colors"
-                    />
-                    <span className="flex-1 text-left text-sm text-black group-hover:text-gray-700 font-medium">
-                      Wyszukaj wszystko...
-                    </span>
-                  </button>
-
                   {/* User Info Mobile */}
                   {user && (
                     <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
@@ -361,7 +340,9 @@ export default function DashboardHeader() {
 
                   {/* Menu Items Mobile */}
                   <div className="space-y-2">
-                    <button
+                    <Button
+                      variant="secondary"
+                      leftIcon={<UserPlus size={20} />}
                       onClick={() => {
                         if (currentWorkspace) {
                           setShowInvitePopup(true);
@@ -370,79 +351,71 @@ export default function DashboardHeader() {
                           alert('Najpierw wybierz workspace');
                         }
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                      className="w-full justify-start py-8"
                     >
-                      <UserPlus size={20} />
-                      <span>Zaproś uczestników</span>
-                    </button>
+                      Zaproś uczestników
+                    </Button>
 
                     {/* Premium Mobile */}
                     {user && !user.isPremium && (
                       <Link href="/#pricing">
-                        <button
+                        <Button
+                          variant="secondary"
+                          leftIcon={<Crown size={20} />}
                           onClick={() => setShowMobileMenu(false)}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-left bg-green-50 text-green-700 hover:bg-green-100 rounded-lg transition-all duration-200"
+                          className="w-full justify-start bg-green-50 text-green-700 py-8"
                         >
-                          <Crown size={20} />
-                          <span>Przejdź na Premium</span>
-                        </button>
+                          Przejdź na Premium
+                        </Button>
                       </Link>
                     )}
 
-                    <button
-                      onClick={() => {
-                        setShowGiftPopup(true);
-                        setShowMobileMenu(false);
-                      }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
-                    >
-                      <Gift size={20} />
-                      <span>Dostań 10% zniżki</span>
-                    </button>
-
-                    <button
+                    {/* Powiadomienia */}
+                    <Button
+                      variant="secondary"
+                      leftIcon={<Bell size={20} />}
                       onClick={() => {
                         setShowNotifications(true);
                         setShowMobileMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200 relative"
+                      className="w-full justify-start py-8"
                     >
-                      <Bell size={20} />
                       <span>Powiadomienia</span>
                       {inviteCount > 0 && (
-                        <span className="ml-auto min-w-[20px] h-[20px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
+                        <span className="absolute top-2 right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
                           {inviteCount > 9 ? '9+' : inviteCount}
                         </span>
                       )}
-                    </button>
+                    </Button>
 
-                    <button
+                    <Button
+                      variant="secondary"
+                      leftIcon={<UserIcon size={20} />}
                       onClick={() => {
                         router.push('/clientPanel');
                         setShowMobileMenu(false);
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-gray-700 hover:bg-gray-50 rounded-lg transition-all duration-200"
+                      className="w-full justify-start py-8"
                     >
-                      <UserIcon size={20} />
-                      <span>Profil</span>
-                    </button>
+                      Profil
+                    </Button>
 
                     {/* Separator */}
                     <div className="border-t border-gray-200 my-2"></div>
 
                     {/* Wyloguj */}
-                    <button
+                    <Button
+                      variant="destructive"
+                      leftIcon={<LogOut size={20} />}
                       onClick={() => {
-                        console.log('🚪 Wylogowywanie z mobile menu...');
                         logout();
                         setShowMobileMenu(false);
                         router.push('/');
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg transition-all duration-200"
+                      className="w-full py-8"
                     >
-                      <LogOut size={20} />
-                      <span className="font-medium">Wyloguj się</span>
-                    </button>
+                      Wyloguj się
+                    </Button>
                   </div>
 
                   {/* Badge Free Mobile */}

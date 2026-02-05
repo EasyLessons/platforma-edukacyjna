@@ -4,15 +4,14 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-// 🔥 POPRAWIONA ŚCIEŻKA - idź 1 poziom wyżej, potem do context
-import { useAuth } from '../context/AuthContext'; // ✅ POPRAWNA ŚCIEŻKA!
+import { useAuth } from '../context/AuthContext';
+import { Button } from '@/_new/shared/ui/button';
 
 export default function AuthHeader() {
   const router = useRouter();
   const { logout, user } = useAuth();
 
   const handleLogout = () => {
-    console.log('🚪 Wylogowywanie...');
     logout();
     console.log('✅ Wylogowano!');
     router.push('/');
@@ -50,17 +49,10 @@ export default function AuthHeader() {
             </Link>
 
             <Link href="/dashboard">
-              <button className="px-4 py-2 text-gray-700 font-medium hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all duration-200">
-                Panel
-              </button>
+              <Button variant="secondary">Panel</Button>
             </Link>
 
-            <button
-              onClick={handleLogout}
-              className="px-5 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all duration-200 shadow-md hover:shadow-lg"
-            >
-              Wyloguj
-            </button>
+            <Button onClick={handleLogout}>Wyloguj</Button>
           </div>
         </div>
       </div>

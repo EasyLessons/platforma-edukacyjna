@@ -35,6 +35,7 @@ import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { setActiveWorkspace } from '@/workspace_api/api';
 import WorkspaceSettingsModal from './WorkspaceSettingsModal';
 import WorkspaceMembersModal from './WorkspaceMembersModal';
+import { Button } from '@/_new/shared/ui/button';
 
 // Mapowanie ikon z nazw na komponenty
 const iconMap: Record<string, any> = {
@@ -381,17 +382,15 @@ export default function WorkspaceSidebar() {
               </div>
             )}
 
-            <button
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+              className="border border-gray-200 shadow-sm"
               title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
-              {isCollapsed ? (
-                <PanelLeftOpen size={18} className="text-gray-600" />
-              ) : (
-                <PanelLeftClose size={18} className="text-gray-600" />
-              )}
-            </button>
+              {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </Button>
           </div>
 
           {!isCollapsed && (
@@ -485,17 +484,15 @@ export default function WorkspaceSidebar() {
                 </div>
               )}
 
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+                className="border border-gray-200 shadow-sm"
                 title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
               >
-                {isCollapsed ? (
-                  <PanelLeftOpen size={18} className="text-gray-600" />
-                ) : (
-                  <PanelLeftClose size={18} className="text-gray-600" />
-                )}
-              </button>
+                {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              </Button>
             </div>
 
             {!isCollapsed && (
@@ -546,13 +543,13 @@ export default function WorkspaceSidebar() {
                 </div>
               </div>
 
-              <button
+              <Button
+                size="lg"
+                leftIcon={<Plus size={24} />}
                 onClick={() => setShowCreateModal(true)}
-                className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer transform hover:scale-105"
               >
-                <Plus size={24} />
                 <span className="text-lg">Stwórz pierwszą przestrzeń</span>
-              </button>
+              </Button>
 
               <p className="text-xs text-gray-500 mt-4 max-w-xs">
                 Możesz później zaprosić członków zespołu i dodawać tablice
@@ -561,13 +558,9 @@ export default function WorkspaceSidebar() {
           ) : (
             // Collapsed version - tylko plusik
             <div className="flex-1 flex items-center justify-center">
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-sm"
-                title="Dodaj przestrzeń"
-              >
+              <Button size="icon" onClick={() => setShowCreateModal(true)} title="Dodaj przestrzeń">
                 <Plus size={20} />
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -603,17 +596,15 @@ export default function WorkspaceSidebar() {
               </div>
             )}
 
-            <button
+            <Button
+              variant="secondary"
+              size="icon"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+              className="border border-gray-200 shadow-sm"
               title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
-              {isCollapsed ? (
-                <PanelLeftOpen size={18} className="text-gray-600" />
-              ) : (
-                <PanelLeftClose size={18} className="text-gray-600" />
-              )}
-            </button>
+              {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+            </Button>
           </div>
 
           {!isCollapsed && (
@@ -635,13 +626,15 @@ export default function WorkspaceSidebar() {
           {/* COLLAPSED SEARCH - tylko ikona lupy */}
           {isCollapsed && (
             <div className="flex justify-center mt-2">
-              <button
+              <Button
+                variant="secondary"
+                size="icon"
                 onClick={() => setIsCollapsed(false)}
-                className="p-2 bg-white hover:bg-gray-100 rounded-lg shadow-sm transition-all cursor-pointer border border-gray-200"
+                className="border border-gray-200 shadow-sm"
                 title="Rozwiń aby wyszukać"
               >
-                <Search size={18} className="text-gray-600" />
-              </button>
+                <Search size={18} />
+              </Button>
             </div>
           )}
         </div>
@@ -725,28 +718,33 @@ export default function WorkspaceSidebar() {
 
                         {isHovered && (
                           <div className="flex items-center gap-1">
-                            {/* Przycisk ustawień - dostępny dla wszystkich, ale edycja tylko dla właściciela */}
-                            <button
+                            {/* Settings */}
+                            <Button
+                              variant="secondary"
+                              size="iconSm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenEditModal(space);
                               }}
-                              className="w-7 h-7 bg-gray-200 hover:bg-blue-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                              className="bg-gray-200 hover:bg-blue-100"
                               title="Ustawienia przestrzeni"
                             >
                               <Settings size={14} className="text-gray-600 hover:text-blue-600" />
-                            </button>
+                            </Button>
 
-                            <button
+                            {/* Star */}
+                            <Button
+                              variant="secondary"
+                              size="iconSm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 toggleFavorite(space.id);
                               }}
-                              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                              className={
                                 space.is_favourite
                                   ? 'bg-yellow-100 hover:bg-yellow-200'
                                   : 'bg-gray-200 hover:bg-gray-300'
-                              }`}
+                              }
                               title={
                                 space.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'
                               }
@@ -759,10 +757,12 @@ export default function WorkspaceSidebar() {
                                     : 'text-gray-600'
                                 }
                               />
-                            </button>
+                            </Button>
 
-                            {/* Przycisk usunięcia/opuszczenia - różna akcja dla owner vs member */}
-                            <button
+                            {/* Delete/Leave */}
+                            <Button
+                              variant="secondary"
+                              size="iconSm"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (space.is_owner) {
@@ -771,11 +771,11 @@ export default function WorkspaceSidebar() {
                                   setShowLeaveConfirm(space.id);
                                 }
                               }}
-                              className="w-7 h-7 bg-gray-200 hover:bg-red-100 rounded-lg flex items-center justify-center transition-all cursor-pointer"
+                              className="bg-gray-200 hover:bg-red-100"
                               title={space.is_owner ? 'Usuń przestrzeń' : 'Opuść przestrzeń'}
                             >
                               <X size={14} className="text-gray-600 hover:text-red-600" />
-                            </button>
+                            </Button>
                           </div>
                         )}
                       </>
@@ -808,26 +808,22 @@ export default function WorkspaceSidebar() {
               <span>Wszystkie: {workspaces.length}</span>
             </div>
 
-            <button
+            <Button
+              leftIcon={<Plus size={20} />}
               onClick={() => setShowCreateModal(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-all duration-200 shadow-sm hover:shadow-md cursor-pointer"
+              className="w-full"
             >
-              <Plus size={20} />
-              <span>Dodaj przestrzeń</span>
-            </button>
+              Dodaj przestrzeń
+            </Button>
           </div>
         )}
 
         {/* COLLAPSED FOOTER */}
         {isCollapsed && (
           <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-center">
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="w-10 h-10 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer shadow-sm"
-              title="Dodaj przestrzeń"
-            >
+            <Button size="icon" onClick={() => setShowCreateModal(true)} title="Dodaj przestrzeń">
               <Plus size={20} />
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -877,18 +873,22 @@ export default function WorkspaceSidebar() {
             </p>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
-              >
-                Nie
-              </button>
-              <button
-                onClick={() => handleDeleteSpace(showDeleteConfirm)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors cursor-pointer"
-              >
-                Usuń
-              </button>
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowDeleteConfirm(null)}
+                  className="flex-1"
+                >
+                  Nie
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => handleDeleteSpace(showDeleteConfirm)}
+                  className="flex-1"
+                >
+                  Usuń
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -916,18 +916,21 @@ export default function WorkspaceSidebar() {
             </p>
 
             <div className="flex gap-3">
-              <button
-                onClick={() => setShowLeaveConfirm(null)}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-semibold rounded-lg hover:bg-gray-300 transition-colors cursor-pointer"
-              >
-                Zostań
-              </button>
-              <button
-                onClick={() => handleLeaveSpace(showLeaveConfirm)}
-                className="flex-1 px-4 py-2 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 transition-colors cursor-pointer"
-              >
-                Opuść
-              </button>
+              <div className="flex gap-3">
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowLeaveConfirm(null)}
+                  className="flex-1"
+                >
+                  Zostań
+                </Button>
+                <Button
+                  onClick={() => handleLeaveSpace(showLeaveConfirm)}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700"
+                >
+                  Opuść
+                </Button>
+              </div>
             </div>
           </div>
         </div>
