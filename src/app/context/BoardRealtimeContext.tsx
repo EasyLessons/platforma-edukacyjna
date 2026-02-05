@@ -210,7 +210,15 @@ export function BoardRealtimeProvider({
 
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  // 🛡️ STABILNOŚĆ - ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
+  // Refs do zapobiegania wielokrotnym polaczeniom
+  const isSubscribedRef = useRef<boolean>(false);
+  const currentBoardIdRef = useRef<string | null>(null);
+  
+  // Promise do czekania na gotowość kanału
+  const channelReadyPromiseRef = useRef<Promise<void> | null>(null);
+  const channelReadyResolveRef = useRef<(() => void) | null>(null);
+
+  // Ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
   const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
   const presenceSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
@@ -292,11 +300,29 @@ export function BoardRealtimeProvider({
 
   useEffect(() => {
     if (!user || !boardId) return;
+    
+    // Zapobiegaj wielokrotnemu połączeniu z tym samym boardem
+    if (isSubscribedRef.current && currentBoardIdRef.current === boardId) {
+      return;
+    }
+    
+    // Jeśli zmieniamy board, zamknij poprzedni kanał
+    if (channelRef.current && currentBoardIdRef.current !== boardId) {
+      channelRef.current.unsubscribe();
+      channelRef.current = null;
+      isSubscribedRef.current = false;
+    }
 
     console.log(`🔌 Łączenie z kanałem tablicy: board:${boardId}`);
+    currentBoardIdRef.current = boardId;
 
     // Reset reconnect counter przy nowym połączeniu
     reconnectAttemptRef.current = 0;
+    
+    // Utwórz Promise do czekania na gotowość kanału
+    channelReadyPromiseRef.current = new Promise<void>((resolve) => {
+      channelReadyResolveRef.current = resolve;
+    });
 
     // Utwórz kanał dla tej tablicy z lepszą konfiguracją
     const channel = supabase.channel(`board:${boardId}`, {
@@ -536,10 +562,20 @@ export function BoardRealtimeProvider({
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        // 🛡️ RESET licznika przy udanym połączeniu!
+        // RESET licznika przy udanym połączeniu!
         reconnectAttemptRef.current = 0;
         setIsConnected(true);
-        console.log('✅ Połączono z kanałem tablicy');
+        
+        // Loguj tylko pierwsze połączenie, nie reconnecty
+        if (!isSubscribedRef.current) {
+          console.log('✅ Połączono z kanałem tablicy');
+          isSubscribedRef.current = true;
+        }
+        
+        // KLUCZOWE: Rozwiąż Promise - kanał jest gotowy do broadcast!
+        if (channelReadyResolveRef.current) {
+          channelReadyResolveRef.current();
+        }
 
         // Wyślij swoją obecność (Presence) z viewport
         const trackPresence = async (viewport?: { x: number; y: number; scale: number }) => {
@@ -620,30 +656,50 @@ export function BoardRealtimeProvider({
       if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
       channel.unsubscribe();
+      channelRef.current = null;
+      isSubscribedRef.current = false;
+      currentBoardIdRef.current = null;
       setIsConnected(false);
       remoteCursorsRef.current = [];
       previousUsersRef.current = new Map();
       reconnectAttemptRef.current = 0;
       pendingElementUpdateRef.current = null;
-      notifyCursorSubscribers();
+      // Notyfikuj subscriberów o pustej liście kursorów
+      cursorSubscribersRef.current.forEach((callback) => callback([]));
     };
-  }, [boardId, user, notifyCursorSubscribers]);
+  }, [boardId, user?.id, user?.username]); // Usunięte notifyCursorSubscribers z dependencies
 
   // ───────────────────────────────────────────────────────────────────────
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🛡️ RESILIENT BROADCAST - zawsze próbuje wysłać (Supabase fallbackuje do REST jeśli trzeba)
+  // FAST BROADCAST - czeka na gotowość kanału, używa WebSocket (nie REST fallback!)
   const safeBroadcast = useCallback(async (event: string, payload: any) => {
     const channel = channelRef.current;
     if (!channel) {
-      console.warn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
+      console.warn(`[BROADCAST] Brak kanału dla ${event}`);
       return false;
     }
     
+    // KLUCZOWE: Poczekaj na gotowość kanału (max 3s)
+    if (channelReadyPromiseRef.current) {
+      const timeoutPromise = new Promise<'timeout'>((resolve) => 
+        setTimeout(() => resolve('timeout'), 3000)
+      );
+      
+      const result = await Promise.race([
+        channelReadyPromiseRef.current.then(() => 'ready' as const),
+        timeoutPromise
+      ]);
+      
+      if (result === 'timeout') {
+        console.warn(`[BROADCAST] Timeout - kanał nie gotowy dla ${event}`);
+        return false;
+      }
+    }
+    
     try {
-      // Supabase automatycznie fallbackuje do REST API jeśli WebSocket nie jest gotowy
-      // To jest OK - wiadomość dotrze, tylko wolniej
+      // Kanał jest gotowy - użyj WebSocket (szybko!)
       await channel.send({
         type: 'broadcast',
         event,
@@ -651,8 +707,7 @@ export function BoardRealtimeProvider({
       });
       return true;
     } catch (err) {
-      // Kanał może być w trakcie reconnect - to normalne
-      console.warn(`📤 [BROADCAST] ❌ Błąd ${event}:`, err);
+      console.warn(`[BROADCAST] Błąd ${event}:`, err);
       return false;
     }
   }, []);
