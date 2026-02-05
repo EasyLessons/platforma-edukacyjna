@@ -48,7 +48,13 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   realtime: {
     params: {
-      eventsPerSecond: 10, // Limit eventów (dla optymalizacji)
+      eventsPerSecond: 25, // Zwiększono z 10 dla lepszej responsywności
+    },
+  },
+  // 🛡️ Lepsza konfiguracja dla stabilności połączenia
+  global: {
+    headers: {
+      'X-Client-Info': 'easylesson-web',
     },
   },
 });

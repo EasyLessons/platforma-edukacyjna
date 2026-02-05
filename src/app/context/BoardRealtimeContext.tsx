@@ -210,6 +210,12 @@ export function BoardRealtimeProvider({
 
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  // 🛡️ STABILNOŚĆ - ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
+  const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
+  const presenceSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectAttemptRef = useRef<number>(0);
+  const maxReconnectAttempts = 5;
+
   const { user } = useAuth();
 
   // Kolory dla kursorów (cyklicznie przydzielane)
@@ -230,6 +236,10 @@ export function BoardRealtimeProvider({
     cursorMove: 0,
     viewportChange: 0,
   });
+
+  // 🛡️ TRAILING THROTTLE - przechowuj ostatnią wartość do wysłania
+  const pendingElementUpdateRef = useRef<DrawingElement | null>(null);
+  const pendingElementUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 🛡️ THROTTLE - Limity częstotliwości (w ms)
   const THROTTLE_MS = {
@@ -285,11 +295,19 @@ export function BoardRealtimeProvider({
 
     console.log(`🔌 Łączenie z kanałem tablicy: board:${boardId}`);
 
-    // Utwórz kanał dla tej tablicy
+    // Reset reconnect counter przy nowym połączeniu
+    reconnectAttemptRef.current = 0;
+
+    // Utwórz kanał dla tej tablicy z lepszą konfiguracją
     const channel = supabase.channel(`board:${boardId}`, {
       config: {
-        broadcast: { ack: false }, // Bez potwierdzenia (szybsze)
-        presence: { key: user.id.toString() },
+        broadcast: { 
+          self: false,  // Nie odbieraj własnych broadcast (już mamy lokalnie)
+          ack: false,   // Bez potwierdzenia (szybsze)
+        },
+        presence: { 
+          key: user.id.toString(),
+        },
       },
     });
 
@@ -297,40 +315,75 @@ export function BoardRealtimeProvider({
     // 👥 PRESENCE - Śledzenie użytkowników online
     // ═══════════════════════════════════════════════════════════════════════
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
+    // 🛡️ DEBOUNCED PRESENCE SYNC - zapobiega "migotaniu" przy niestabilnym połączeniu
+    const handlePresenceSync = () => {
+      // Anuluj poprzedni timeout jeśli istnieje
+      if (presenceSyncTimeoutRef.current) {
+        clearTimeout(presenceSyncTimeoutRef.current);
+      }
+
+      // Debounce 300ms - poczekaj na stabilizację
+      presenceSyncTimeoutRef.current = setTimeout(() => {
         const state = channel.presenceState();
-        const usersMap = new Map<number, OnlineUser>(); // Deduplikacja przez Map
+        const usersMap = new Map<number, OnlineUser>();
 
         // Konwertuj state na listę użytkowników (bez duplikatów)
         Object.values(state).forEach((presences: any) => {
           presences.forEach((presence: any) => {
             const onlineUser = presence as OnlineUser;
-            // Zachowaj tylko jednego użytkownika z danym user_id (najnowszy)
             usersMap.set(onlineUser.user_id, onlineUser);
           });
         });
 
-        // Konwertuj Map na Array
-        const users = Array.from(usersMap.values());
+        // Porównaj z poprzednim stanem - aktualizuj tylko jeśli się zmienił
+        const prevUserIds = Array.from(previousUsersRef.current.keys()).sort().join(',');
+        const newUserIds = Array.from(usersMap.keys()).sort().join(',');
 
-        setOnlineUsers(users);
-        console.log(
-          `👥 Użytkownicy online (${users.length}):`,
-          users.map((u) => u.username)
-        );
-      })
+        if (prevUserIds !== newUserIds) {
+          // Stan faktycznie się zmienił
+          const users = Array.from(usersMap.values());
+          previousUsersRef.current = usersMap;
+          setOnlineUsers(users);
+          console.log(
+            `👥 Użytkownicy online (${users.length}):`,
+            users.map((u) => u.username)
+          );
+        }
+      }, 300); // 300ms debounce
+    };
+
+    channel
+      .on('presence', { event: 'sync' }, handlePresenceSync)
       .on('presence', { event: 'join' }, ({ newPresences }) => {
-        console.log('🟢 Użytkownik dołączył:', newPresences);
+        // Filtruj własne joiny i loguj tylko rzeczywiste nowe joiny
+        const realNewUsers = newPresences.filter((p: any) => p.user_id !== user.id);
+        if (realNewUsers.length > 0) {
+          console.log('🟢 Użytkownik dołączył:', realNewUsers.map((p: any) => p.username));
+        }
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        console.log('🔴 Użytkownik wyszedł:', leftPresences);
-        // Usuń kursory użytkowników którzy wyszli
-        const leftUserIds = leftPresences.map((p: any) => p.user_id);
-        remoteCursorsRef.current = remoteCursorsRef.current.filter(
-          (c) => !leftUserIds.includes(c.userId)
-        );
-        notifyCursorSubscribers();
+        // 🛡️ Filtruj "ghost" leave events - sprawdź czy user naprawdę wyszedł
+        // Ghost leave może wystąpić przy reconnect kanału
+        const realLeftUsers = leftPresences.filter((p: any) => {
+          // Nie reaguj na własne leave
+          if (p.user_id === user.id) return false;
+          // Sprawdź czy user nie jest już ponownie w presence state
+          const currentState = channel.presenceState();
+          const userStillPresent = Object.values(currentState).some((presences: any) =>
+            presences.some((presence: any) => presence.user_id === p.user_id)
+          );
+          return !userStillPresent; // Tylko jeśli naprawdę wyszedł
+        });
+
+        if (realLeftUsers.length > 0) {
+          console.log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
+          // Usuń kursory tylko naprawdę wychodzących użytkowników
+          const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
+          remoteCursorsRef.current = remoteCursorsRef.current.filter(
+            (c) => !leftUserIds.includes(c.userId)
+          );
+          notifyCursorSubscribers();
+        }
       });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -514,11 +567,29 @@ export function BoardRealtimeProvider({
         // Heartbeat co 15 sekund żeby utrzymać obecność
         presenceHeartbeat = setInterval(() => trackPresence(), 15000);
       } else if (status === 'CHANNEL_ERROR') {
-        setIsConnected(false);
-        console.error('❌ Błąd połączenia z kanałem');
+        console.warn('⚠️ Błąd kanału - Supabase spróbuje automatycznie reconnect');
+        // NIE ustawiaj isConnected na false od razu - Supabase ma auto-reconnect
+        // Daj mu szansę na reconnect przez 5 sekund
+        reconnectAttemptRef.current++;
+        
+        if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+          setIsConnected(false);
+          console.error('❌ Przekroczono limit prób reconnect');
+        } else {
+          console.log(`🔄 Próba reconnect ${reconnectAttemptRef.current}/${maxReconnectAttempts}`);
+        }
       } else if (status === 'TIMED_OUT') {
+        console.warn('⏰ Timeout połączenia z kanałem - próba reconnect');
+        // Podobnie jak CHANNEL_ERROR - daj szansę na reconnect
+        reconnectAttemptRef.current++;
+        
+        if (reconnectAttemptRef.current >= maxReconnectAttempts) {
+          setIsConnected(false);
+          console.error('❌ Przekroczono limit prób reconnect po timeout');
+        }
+      } else if (status === 'CLOSED') {
+        console.log('🔒 Kanał zamknięty');
         setIsConnected(false);
-        console.error('⏰ Timeout połączenia z kanałem');
       }
     });
 
@@ -543,10 +614,14 @@ export function BoardRealtimeProvider({
     return () => {
       console.log('🔌 Rozłączanie z kanału tablicy');
       if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+      if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
+      if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
       channel.unsubscribe();
-      // clearInterval(cursorCleanupInterval)
       setIsConnected(false);
       remoteCursorsRef.current = [];
+      previousUsersRef.current = new Map();
+      reconnectAttemptRef.current = 0;
+      pendingElementUpdateRef.current = null;
       notifyCursorSubscribers();
     };
   }, [boardId, user, notifyCursorSubscribers]);
@@ -576,24 +651,58 @@ export function BoardRealtimeProvider({
     async (element: DrawingElement) => {
       if (!channelRef.current || !user) return;
 
-      // 🛡️ THROTTLE: sprawdź czy minęło wystarczająco czasu od ostatniego broadcast
       const now = Date.now();
-      if (now - lastBroadcastTimeRef.current.elementUpdate < THROTTLE_MS.ELEMENT_UPDATE) {
-        // console.log('⏱️ Throttle: Pomijam element-updated (zbyt szybko)');
-        return; // Zbyt szybko - pomiń ten update
+      const timeSinceLastBroadcast = now - lastBroadcastTimeRef.current.elementUpdate;
+
+      // 🛡️ TRAILING THROTTLE: zawsze zapisz ostatnią wartość
+      pendingElementUpdateRef.current = element;
+
+      // Jeśli możemy wysłać od razu (minął throttle window)
+      if (timeSinceLastBroadcast >= THROTTLE_MS.ELEMENT_UPDATE) {
+        // Wyczyść pending timeout jeśli istnieje
+        if (pendingElementUpdateTimeoutRef.current) {
+          clearTimeout(pendingElementUpdateTimeoutRef.current);
+          pendingElementUpdateTimeoutRef.current = null;
+        }
+
+        lastBroadcastTimeRef.current.elementUpdate = now;
+        pendingElementUpdateRef.current = null;
+
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'element-updated',
+          payload: {
+            element,
+            userId: user.id,
+            username: user.username,
+          },
+        });
+      } else {
+        // 🛡️ TRAILING: zaplanuj wysłanie ostatniej wartości po throttle window
+        if (!pendingElementUpdateTimeoutRef.current) {
+          const remainingTime = THROTTLE_MS.ELEMENT_UPDATE - timeSinceLastBroadcast;
+
+          pendingElementUpdateTimeoutRef.current = setTimeout(async () => {
+            const pendingElement = pendingElementUpdateRef.current;
+            pendingElementUpdateTimeoutRef.current = null;
+            pendingElementUpdateRef.current = null;
+
+            if (pendingElement && channelRef.current && user) {
+              lastBroadcastTimeRef.current.elementUpdate = Date.now();
+
+              await channelRef.current.send({
+                type: 'broadcast',
+                event: 'element-updated',
+                payload: {
+                  element: pendingElement,
+                  userId: user.id,
+                  username: user.username,
+                },
+              });
+            }
+          }, remainingTime);
+        }
       }
-
-      lastBroadcastTimeRef.current.elementUpdate = now;
-
-      await channelRef.current.send({
-        type: 'broadcast',
-        event: 'element-updated',
-        payload: {
-          element,
-          userId: user.id,
-          username: user.username,
-        },
-      });
     },
     [user]
   );
