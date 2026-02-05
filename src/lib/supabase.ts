@@ -23,11 +23,16 @@ import { createClient } from '@supabase/supabase-js';
 // 🔧 KONFIGURACJA
 // ═══════════════════════════════════════════════════════════════════════════
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://shqfitnzlrtpqgabtzgv.supabase.co';
-const supabaseAnonKey =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNocWZpdG56bHJ0cHFnYWJ0emd2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI3MTQxMTUsImV4cCI6MjA3ODI5MDExNX0.XxFU28lAjvjig_SzeGsydp_BVvcLTabhfzcK83r_HjI';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// ⚠️ WALIDACJA: Sprawdź czy zmienne środowiskowe są ustawione
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error(
+    '❌ Brak zmiennych środowiskowych Supabase!\n' +
+    'Ustaw NEXT_PUBLIC_SUPABASE_URL i NEXT_PUBLIC_SUPABASE_ANON_KEY w pliku .env.local'
+  );
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🚀 KLIENT SUPABASE

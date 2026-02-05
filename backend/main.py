@@ -1,6 +1,7 @@
 """
 MAIN.PY - Entry point aplikacji
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
@@ -13,7 +14,9 @@ from fastapi import HTTPException
 from datetime import datetime
 
 # Inicjalizuj logging PRZED utworzeniem app
-setup_logging(log_level="DEBUG")  # DEBUG żeby widzieć wszystko
+# W produkcji używaj INFO, w development DEBUG
+log_level = "DEBUG" if os.getenv("ENV", "production") == "development" else "INFO"
+setup_logging(log_level=log_level)
 
 # Pobierz logger
 logger = logging.getLogger(__name__)
@@ -80,10 +83,12 @@ if __name__ == "__main__":
     # Konfiguracja uvicorn z poprawnym logowaniem
     logger.info("🔧 Uruchamianie serwera uvicorn...")
     
+    uvicorn_log_level = "debug" if os.getenv("ENV", "production") == "development" else "info"
+    
     uvicorn.run(
         app, 
         host="0.0.0.0", 
         port=8000,
         log_config=None,  # ← KLUCZ! Nie nadpisuj naszej konfiguracji
-        log_level="debug"  # poziom dla uvicorn
+        log_level=uvicorn_log_level
     )
