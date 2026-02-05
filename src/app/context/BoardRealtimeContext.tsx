@@ -673,33 +673,59 @@ export function BoardRealtimeProvider({
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // FAST BROADCAST - czeka na gotowość kanału, używa WebSocket (nie REST fallback!)
+  // FAST BROADCAST - czeka na gotowość kanału I WebSocket!
   const safeBroadcast = useCallback(async (event: string, payload: any) => {
-    const channel = channelRef.current;
-    if (!channel) {
-      console.warn(`[BROADCAST] Brak kanału dla ${event}`);
+    // Kanał jeszcze nie został utworzony - to normalne przy pierwszym renderze
+    if (!channelReadyPromiseRef.current) {
+      // Nie loguj warning dla viewport-changed i cursor-moved (spamuje)
+      if (event !== 'viewport-changed' && event !== 'cursor-moved') {
+        console.warn(`[BROADCAST] Kanał nie istnieje dla ${event}`);
+      }
       return false;
     }
     
-    // KLUCZOWE: Poczekaj na gotowość kanału (max 3s)
-    if (channelReadyPromiseRef.current) {
-      const timeoutPromise = new Promise<'timeout'>((resolve) => 
-        setTimeout(() => resolve('timeout'), 3000)
-      );
-      
-      const result = await Promise.race([
-        channelReadyPromiseRef.current.then(() => 'ready' as const),
-        timeoutPromise
-      ]);
-      
-      if (result === 'timeout') {
-        console.warn(`[BROADCAST] Timeout - kanał nie gotowy dla ${event}`);
-        return false;
+    // Poczekaj na SUBSCRIBED status (max 3s)
+    const timeoutPromise = new Promise<'timeout'>((resolve) => 
+      setTimeout(() => resolve('timeout'), 3000)
+    );
+    
+    const result = await Promise.race([
+      channelReadyPromiseRef.current.then(() => 'ready' as const),
+      timeoutPromise
+    ]);
+    
+    if (result === 'timeout') {
+      console.warn(`[BROADCAST] Timeout - kanał nie gotowy dla ${event}`);
+      return false;
+    }
+    
+    const channel = channelRef.current;
+    if (!channel) {
+      console.warn(`[BROADCAST] Kanał null po czekaniu dla ${event}`);
+      return false;
+    }
+    
+    // Sprawdź czy WebSocket jest połączony (nie tylko SUBSCRIBED!)
+    // @ts-ignore - socket jest wewnętrzną właściwością
+    const socket = channel.socket;
+    if (socket && socket.conn) {
+      const socketState = socket.conn.readyState;
+      // WebSocket.OPEN === 1
+      if (socketState !== 1) {
+        // Socket nie jest otwarty - poczekaj chwilę na reconnect
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // @ts-ignore
+        if (socket.conn.readyState !== 1) {
+          // Nadal nie połączony - loguj tylko dla ważnych eventów
+          if (event === 'element-created' || event === 'element-deleted') {
+            console.warn(`[BROADCAST] WebSocket nie gotowy (state: ${socketState}) dla ${event}`);
+          }
+          // Pozwól Supabase użyć REST fallback - wiadomość dotrze, tylko wolniej
+        }
       }
     }
     
     try {
-      // Kanał jest gotowy - użyj WebSocket (szybko!)
       await channel.send({
         type: 'broadcast',
         event,
