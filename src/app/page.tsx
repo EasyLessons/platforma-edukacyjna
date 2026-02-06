@@ -8,6 +8,7 @@ import PricingSection from './sections/PricingSection';
 import SocialProofSection from './sections/SocialProofSection';
 import FAQSection from './sections/FAQSection';
 import LastCTASection from './sections/LastCTASection';
+import TestimonialsSection from './sections/TestimonialsSection';
 
 export default function Home() {
   return (
@@ -21,6 +22,8 @@ export default function Home() {
       <div className="block lg:hidden">
         <HeroMobileSection />
       </div>
+
+      <TestimonialsSection />
 
       {/* Sekcja problemów i rozwiązań - pokazuje się na wszystkich urządzeniach */}
       <ProblemsAndSolutionsSection />
