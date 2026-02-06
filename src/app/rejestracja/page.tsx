@@ -4,20 +4,22 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Lock, Mail, User, X } from 'lucide-react';
 import Link from 'next/link';
+
 import { Button } from '@/_new/shared/ui/button';
+import { Input } from '@/_new/shared/ui/input';
 
 export default function Register() {
   const router = useRouter();
 
   // State management
   const [formData, setFormData] = useState({
-    fullName: '',
+    login: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
   const [errors, setErrors] = useState({
-    fullName: '',
+    login: '',
     email: '',
     password: '',
     confirmPassword: '',
@@ -57,17 +59,17 @@ export default function Register() {
   const validateForm = () => {
     let isValid = true;
     const newErrors = {
-      fullName: '',
+      login: '',
       email: '',
       password: '',
       confirmPassword: '',
     };
 
-    if (!formData.fullName.trim()) {
-      newErrors.fullName = 'Login jest wymagany';
+    if (!formData.login.trim()) {
+      newErrors.login = 'Login jest wymagany';
       isValid = false;
-    } else if (formData.fullName.trim().length < 3) {
-      newErrors.fullName = 'Login musi mieć co najmniej 3 znaki';
+    } else if (formData.login.trim().length < 3) {
+      newErrors.login = 'Login musi mieć co najmniej 3 znaki';
       isValid = false;
     }
 
@@ -107,11 +109,6 @@ export default function Register() {
     return isValid;
   };
 
-  // Handle registration - POŁĄCZENIE Z PRAWDZIWYM API
-  // Logika:
-  // 1. Sprawdza czy email już istnieje
-  // 2. Jeśli istnieje ale niezweryfikowany → wysyła nowy kod i redirect do weryfikacji
-  // 3. Jeśli nowy → tworzy konto i redirect do weryfikacji
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -123,7 +120,7 @@ export default function Register() {
     try {
       // Wywołanie API rejestracji
       const response = await registerUser({
-        username: formData.fullName,
+        username: formData.login,
         email: formData.email,
         password: formData.password,
         password_confirm: formData.confirmPassword,
@@ -199,129 +196,61 @@ export default function Register() {
             </div>
           )}
 
-          {/* Full Name Input */}
-          <div className="mb-4">
-            <label className="block mb-2 text-sm font-medium text-gray-700">Login</label>
-            <div className="relative">
-              <input
-                type="text"
-                name="fullName"
-                value={formData.fullName}
-                onChange={handleChange}
-                placeholder="User123"
-                className={`w-full pl-10 pr-4 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                  ${
-                    errors.fullName
-                      ? 'border-red-500 bg-red-50 focus:border-red-500'
-                      : 'border-gray-200 focus:border-green-500'
-                  }`}
-              />
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <User className="w-5 h-5" />
-              </span>
-            </div>
-            {errors.fullName && (
-              <span className="text-red-500 text-xs mt-1 block">{errors.fullName}</span>
-            )}
-          </div>
+          {/* Login Input */}
+          <Input 
+            label='Login'
+            type='text'
+            name='login'
+            value={formData.login}
+            onChange={handleChange}
+            placeholder='User123'
+            leftIcon={<User className="w-5 h-5" />}
+            error={errors.login}
+            wrapperClassName="mb-4"
+          />
 
           {/* Email Input */}
-          <div className="mb-4">
-            <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
-            <div className="relative">
-              <input
-                type="email"
-                name="email"
-                value={formData.email}
-                onChange={handleChange}
-                placeholder="nazwa@example.com"
-                className={`w-full pl-10 pr-4 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                  ${
-                    errors.email
-                      ? 'border-red-500 bg-red-50 focus:border-red-500'
-                      : 'border-gray-200 focus:border-green-500'
-                  }`}
-              />
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <Mail className="w-5 h-5" />
-              </span>
-            </div>
-            {errors.email && (
-              <span className="text-red-500 text-xs mt-1 block">{errors.email}</span>
-            )}
-          </div>
+          <Input 
+            label='Email'
+            type='email'
+            name='email'
+            value={formData.email}
+            onChange={handleChange}
+            placeholder='email@example.com'
+            leftIcon={<Mail className="w-5 h-5" />}
+            error={errors.email}
+            wrapperClassName="mb-4"
+          />
 
           {/* Password Input */}
-          <div className="mb-4">
-            <label className="block mb-2 text-sm font-medium text-gray-700">Hasło</label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className={`w-full pl-10 pr-12 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                  ${
-                    errors.password
-                      ? 'border-red-500 bg-red-50 focus:border-red-500'
-                      : 'border-gray-200 focus:border-green-500'
-                  }`}
-              />
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <Lock className="w-5 h-5" />
-              </span>
-              <Button
-                variant="secondary"
-                size="icon"
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                title={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
-              >
-                {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-              </Button>
-            </div>
-            {errors.password && (
-              <span className="text-red-500 text-xs mt-1 block">{errors.password}</span>
-            )}
-          </div>
+          <Input 
+            label='Hasło'
+            type={showPassword ? 'text' : 'password'}
+            name='password'
+            value={formData.password}
+            onChange={handleChange}
+            placeholder='••••••••'
+            leftIcon={<Lock className="w-5 h-5" />}
+            rightIcon={showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+            onRightIconClick={() => setShowPassword(!showPassword)}
+            error={errors.password}
+            wrapperClassName="mb-4"
+          />
 
           {/* Confirm Password Input */}
-          <div className="mb-6">
-            <label className="block mb-2 text-sm font-medium text-gray-700">Powtórz hasło</label>
-            <div className="relative">
-              <input
-                type={showConfirmPassword ? 'text' : 'password'}
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="••••••••"
-                className={`w-full pl-10 pr-12 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                  ${
-                    errors.confirmPassword
-                      ? 'border-red-500 bg-red-50 focus:border-red-500'
-                      : 'border-gray-200 focus:border-green-500'
-                  }`}
-              />
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <Lock className="w-5 h-5" />
-              </span>
-              <Button
-                variant="secondary"
-                size="icon"
-                type="button"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                title={showConfirmPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
-              >
-                {showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-              </Button>
-            </div>
-            {errors.confirmPassword && (
-              <span className="text-red-500 text-xs mt-1 block">{errors.confirmPassword}</span>
-            )}
-          </div>
+          <Input 
+            label='Powtórz hasło'
+            type={showConfirmPassword ? 'text' : 'password'}
+            name='confirmPassword'
+            value={formData.confirmPassword}
+            onChange={handleChange}
+            placeholder='••••••••'
+            leftIcon={<Lock className="w-5 h-5" />}
+            rightIcon={showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+            onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            error={errors.confirmPassword}
+            wrapperClassName="mb-4"
+          />
 
           {/* Terms & Conditions Checkbox */}
           <div className="mb-6">

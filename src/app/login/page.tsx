@@ -5,7 +5,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react';
 import Link from 'next/link';
+
 import { Button } from '@/_new/shared/ui/button';
+import { Input } from '@/_new/shared/ui/input';
 
 export default function Login() {
   const router = useRouter();
@@ -156,68 +158,40 @@ export default function Login() {
         )}
 
         {/* Email Input */}
-        <div className="mb-4">
-          <label className="block mb-2 text-sm font-medium text-gray-700">Email</label>
-          <div className="relative">
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="nazwa@example.com"
-              className={`w-full pl-10 pr-4 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                ${
-                  errors.email
-                    ? 'border-red-500 bg-red-50 focus:border-red-500'
-                    : 'border-gray-200 focus:border-green-500'
-                }`}
-            />
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              <Mail className="w-5 h-5" />
-            </span>
-          </div>
-          {errors.email && <span className="text-red-500 text-xs mt-1 block">{errors.email}</span>}
-        </div>
+        <Input
+          label="Email"
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          placeholder="email@example.com"
+          leftIcon={<Mail className="w-5 h-5" />}
+          error={errors.email}
+          wrapperClassName="mb-4"
+        />
 
         {/* Password Input */}
         <div className="mb-6">
-          <label className="block mb-2 text-sm font-medium text-gray-700">Hasło</label>
-          <div className="relative">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              placeholder="••••••••"
-              className={`w-full pl-10 pr-12 py-3 text-gray-700 bg-white border-2 rounded-lg outline-none transition-colors duration-200
-                ${
-                  errors.password
-                    ? 'border-red-500 bg-red-50 focus:border-red-500'
-                    : 'border-gray-200 focus:border-green-500'
-                }`}
-            />
-            <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-              <Lock className="w-5 h-5" />
-            </span>
-            <Button
-              variant="secondary"
-              size="icon"
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2"
-              title={showPassword ? 'Ukryj hasło' : 'Pokaż hasło'}
-            >
-              {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
-            </Button>
-          </div>
-          {errors.password && (
-            <span className="text-red-500 text-xs mt-1 block">{errors.password}</span>
-          )}
+          <Input
+            label="Hasło"
+            type={showPassword ? 'text' : 'password'}
+            name="password"
+            value={formData.password}
+            onChange={handleChange}
+            placeholder="••••••••"
+            leftIcon={<Lock className="w-5 h-5" />}
+            rightIcon={showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+            onRightIconClick={() => setShowPassword(!showPassword)}
+            error={errors.password}
+          />
 
           {/* Forgot Password Link */}
           <div className="mt-2 text-right">
-            <Link href="/odzyskiwanie-hasla">
-              <Button variant="link" className="text-sm">Zapomniałeś hasła?</Button>
+            <Link
+              href="/odzyskiwanie-hasla"
+              className="text-sm text-green-600 hover:text-green-700 font-medium hover:underline transition-colors duration-200"
+            >
+              Zapomniałeś hasła?
             </Link>
           </div>
         </div>

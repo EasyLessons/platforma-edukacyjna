@@ -1,22 +1,3 @@
-/**
- * STRONA ODZYSKIWANIA HASŁA
- * =========================
- *
- * Cel: Reset hasła użytkownika przez 6-cyfrowy kod wysłany na email
- *
- * Przepływ:
- * 1. Użytkownik podaje email
- * 2. Dostaje 6-cyfrowy kod na email
- * 3. Wpisuje kod
- * 4. Ustawia nowe hasło
- * 5. Redirect do /login
- *
- * Powiązane pliki:
- * - src/auth_api/api.ts (requestPasswordReset, verifyResetCode, resetPassword)
- * - src/app/login/page.tsx (link "Zapomniałeś hasła?")
- * - backend/auth/routes.py (endpointy /api/request-password-reset, etc.)
- */
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -24,7 +5,9 @@ import { useRouter } from 'next/navigation';
 import { Loader2, Mail, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
 import { requestPasswordReset, verifyResetCode, resetPassword } from '@/auth_api/api';
 import Link from 'next/link';
+
 import { Button } from '@/_new/shared/ui/button';
+import { Input } from '@/_new/shared/ui/input';
 
 export default function PasswordReset() {
   const router = useRouter();
@@ -244,32 +227,20 @@ export default function PasswordReset() {
         {/* KROK 1: EMAIL */}
         {step === 'email' && (
           <form onSubmit={handleSendEmail} className="space-y-6">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Adres email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={(e) => {
-                    setEmail(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full pl-10 pr-4 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  placeholder="twoj@email.com"
-                  required
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
+            <Input 
+              label='Adres email'
+              type='email'
+              name='email'
+              value={email}
+              error={error}
+              onChange={(e) => {
+                setEmail(e.target.value);
+                setError('');
+              }}
+              leftIcon={<Mail className="w-5 h-5" />}
+              placeholder='twoj@email.com'
+              required
+            />
 
             <Button type="submit" loading={isLoading} className="w-full">
               {isLoading ? 'Wysyłanie...' : 'Wyślij kod'}
@@ -348,81 +319,40 @@ export default function PasswordReset() {
         {/* KROK 3: NOWE HASŁO */}
         {step === 'password' && (
           <form onSubmit={handleResetPassword} className="space-y-6">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Nowe hasło
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  value={password}
-                  onChange={(e) => {
-                    setPassword(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full pl-10 pr-12 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-500 mt-1">
-                Min. 8 znaków, wielka i mała litera, cyfra
-              </p>
-            </div>
+            <Input 
+              label='Nowe hasło'
+              type={showPassword ? 'text' : 'password'}
+              name='password'
+              value={password}
+              error={error}
+              onChange={(e) => {
+                setPassword(e.target.value);
+                setError('');
+              }}
+              leftIcon={<Lock className="w-5 h-5" />}
+              rightIcon={showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              onRightIconClick={() => setShowPassword(!showPassword)}
+              placeholder='••••••••'
+              helperText='Min. 8 znaków, wielka i mała litera, cyfra'
+              required
+            />
 
-            <div>
-              <label
-                htmlFor="passwordConfirm"
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                Powtórz hasło
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  id="passwordConfirm"
-                  value={passwordConfirm}
-                  onChange={(e) => {
-                    setPasswordConfirm(e.target.value);
-                    setError('');
-                  }}
-                  className="w-full pl-10 pr-12 py-3 text-gray-800 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
-                  placeholder="••••••••"
-                  required
-                />
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showConfirmPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </Button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
-                {error}
-              </div>
-            )}
+            <Input 
+              label='Powtórz hasło'
+              type={showConfirmPassword ? 'text' : 'password'}
+              name='passwordConfirm'
+              value={passwordConfirm}
+              error={error}
+              onChange={(e) => {
+                setPasswordConfirm(e.target.value);
+                setError('');
+              }}
+              leftIcon={<Lock className="w-5 h-5" />}
+              rightIcon={showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
+              placeholder='••••••••'
+              required
+            />
 
             <Button type="submit" loading={isLoading} className="w-full">
               {isLoading ? 'Zmiana hasła...' : 'Zmień hasło'}

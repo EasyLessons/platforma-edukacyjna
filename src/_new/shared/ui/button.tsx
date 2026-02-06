@@ -1,9 +1,23 @@
+/*
+    KOMPONENT BUTTON
+
+    Uniwersalny przycisk, który obsługuje różne warianty stylów, rozmiary oraz stany ładowania.
+    Dzięki niemu można łatwo tworzyć spójne i dostępne przyciski w całej aplikacji, bez konieczności powtarzania kodu CSS.
+    Zapobiega duplikacji kodu i zapewnia jednolity wygląd interfejsu użytkownika.
+
+    UWAGA:
+    Można nadpisywać style przycisku za pomocą propsa className, 
+    ale należy unikać to ograniczać aby utrzymać spójność systemu designu.
+    Jeżeli wprowadzać zmiany to najlepiej globalnie tutaj lub dodać tu nowy wariant.
+*/
+
 'use client';
 
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@new/lib/utils';
 
+// Warianty designu
 const buttonVariants = cva(
     [
         // Style ogólne wspólne dla wszystkich przycisków
@@ -65,6 +79,7 @@ const buttonVariants = cva(
     }
 );
 
+// Dodatkowe propsy
 export interface ButtonProps
     extends React.ButtonHTMLAttributes<HTMLButtonElement>,
         VariantProps<typeof buttonVariants> {
@@ -73,6 +88,7 @@ export interface ButtonProps
     rightIcon?: React.ReactNode;   
 }
 
+// Komponent ===============================
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     (
         {
@@ -114,6 +130,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 
 Button.displayName = 'Button';
 
+// Komponent spinnera ładowania
 function LoadingSpinner({ size }: { size?: ButtonProps['size'] }) {
     const spinnerSize = size === 'iconSm' ? 'w-4 h-4' : size === 'lg' ? 'w-5 h-5' : 'w-4 h-4';
 
