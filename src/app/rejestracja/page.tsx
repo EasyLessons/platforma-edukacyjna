@@ -197,39 +197,39 @@ export default function Register() {
           )}
 
           {/* Login Input */}
-          <Input 
-            label='Login'
-            type='text'
-            name='login'
+          <Input
+            label="Login"
+            type="text"
+            name="login"
             value={formData.login}
             onChange={handleChange}
-            placeholder='User123'
+            placeholder="User123"
             leftIcon={<User className="w-5 h-5" />}
             error={errors.login}
             wrapperClassName="mb-4"
           />
 
           {/* Email Input */}
-          <Input 
-            label='Email'
-            type='email'
-            name='email'
+          <Input
+            label="Email"
+            type="email"
+            name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder='email@example.com'
+            placeholder="email@example.com"
             leftIcon={<Mail className="w-5 h-5" />}
             error={errors.email}
             wrapperClassName="mb-4"
           />
 
           {/* Password Input */}
-          <Input 
-            label='Hasło'
+          <Input
+            label="Hasło"
             type={showPassword ? 'text' : 'password'}
-            name='password'
+            name="password"
             value={formData.password}
             onChange={handleChange}
-            placeholder='••••••••'
+            placeholder="••••••••"
             leftIcon={<Lock className="w-5 h-5" />}
             rightIcon={showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
             onRightIconClick={() => setShowPassword(!showPassword)}
@@ -238,15 +238,17 @@ export default function Register() {
           />
 
           {/* Confirm Password Input */}
-          <Input 
-            label='Powtórz hasło'
+          <Input
+            label="Powtórz hasło"
             type={showConfirmPassword ? 'text' : 'password'}
-            name='confirmPassword'
+            name="confirmPassword"
             value={formData.confirmPassword}
             onChange={handleChange}
-            placeholder='••••••••'
+            placeholder="••••••••"
             leftIcon={<Lock className="w-5 h-5" />}
-            rightIcon={showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+            rightIcon={
+              showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />
+            }
             onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
             error={errors.confirmPassword}
             wrapperClassName="mb-4"
@@ -293,7 +295,7 @@ export default function Register() {
           <div className="text-center text-gray-600">
             Masz już konto?{' '}
             <Link href="/login">
-                <Button variant="link">Zaloguj się</Button>
+              <Button variant="link">Zaloguj się</Button>
             </Link>
           </div>
         </form>

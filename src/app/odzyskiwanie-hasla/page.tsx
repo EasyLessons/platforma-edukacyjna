@@ -227,10 +227,10 @@ export default function PasswordReset() {
         {/* KROK 1: EMAIL */}
         {step === 'email' && (
           <form onSubmit={handleSendEmail} className="space-y-6">
-            <Input 
-              label='Adres email'
-              type='email'
-              name='email'
+            <Input
+              label="Adres email"
+              type="email"
+              name="email"
               value={email}
               error={error}
               onChange={(e) => {
@@ -238,7 +238,7 @@ export default function PasswordReset() {
                 setError('');
               }}
               leftIcon={<Mail className="w-5 h-5" />}
-              placeholder='twoj@email.com'
+              placeholder="twoj@email.com"
               required
             />
 
@@ -319,10 +319,10 @@ export default function PasswordReset() {
         {/* KROK 3: NOWE HASŁO */}
         {step === 'password' && (
           <form onSubmit={handleResetPassword} className="space-y-6">
-            <Input 
-              label='Nowe hasło'
+            <Input
+              label="Nowe hasło"
               type={showPassword ? 'text' : 'password'}
-              name='password'
+              name="password"
               value={password}
               error={error}
               onChange={(e) => {
@@ -330,17 +330,19 @@ export default function PasswordReset() {
                 setError('');
               }}
               leftIcon={<Lock className="w-5 h-5" />}
-              rightIcon={showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              rightIcon={
+                showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />
+              }
               onRightIconClick={() => setShowPassword(!showPassword)}
-              placeholder='••••••••'
-              helperText='Min. 8 znaków, wielka i mała litera, cyfra'
+              placeholder="••••••••"
+              helperText="Min. 8 znaków, wielka i mała litera, cyfra"
               required
             />
 
-            <Input 
-              label='Powtórz hasło'
+            <Input
+              label="Powtórz hasło"
               type={showConfirmPassword ? 'text' : 'password'}
-              name='passwordConfirm'
+              name="passwordConfirm"
               value={passwordConfirm}
               error={error}
               onChange={(e) => {
@@ -348,9 +350,11 @@ export default function PasswordReset() {
                 setError('');
               }}
               leftIcon={<Lock className="w-5 h-5" />}
-              rightIcon={showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              rightIcon={
+                showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />
+              }
               onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              placeholder='••••••••'
+              placeholder="••••••••"
               required
             />
 
