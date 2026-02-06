@@ -27,20 +27,20 @@ export default function HeroSection() {
             </div>
 
             {/* Główny nagłówek */}
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
-              Korepetycje online,
+            <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
+              Prowadź korepetycje na inteligentnej tablicy
               <br />
-              które{' '}
+              
               <span className="text-green-600 relative">
-                naprawdę&nbsp;działają
+                Przejdź na Easy Lesson&nbsp;
                 <svg
                   className="absolute -bottom-2 left-0 w-full"
                   height="12"
-                  viewBox="0 0 300 12"
+                  viewBox="0 0 700 1"
                   fill="none"
                 >
                   <path
-                    d="M2 10C50 5 100 2 150 5C200 8 250 4 298 7"
+                    d="M3 10C50 5 200 2 150 5C300 8 1000 4 298 7"
                     stroke="#4ade80"
                     strokeWidth="3"
                     strokeLinecap="round"
