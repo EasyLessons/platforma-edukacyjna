@@ -38,3 +38,256 @@ body {
 .animate-shimmer {
   animation: shimmer 2s infinite linear;
 }
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes backdropFadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes megaMenuFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes hoverShine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.2s ease-out forwards;
+}
+
+.animate-slideUp {
+  animation: slideUp 0.2s ease-in forwards;
+}
+
+.animate-fadeInUp {
+  animation: fadeInUp 0.4s ease-out forwards;
+  opacity: 0;
+}
+
+.animate-backdropFadeIn {
+  animation: backdropFadeIn 0.6s cubic-bezier(0.4, 0, 0.2, 1) 0.01s forwards;
+  opacity: 0;
+}
+
+.animate-backdropFadeOut {
+  animation: backdropFadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 1;
+}
+
+.animate-megaMenuFadeOut {
+  animation: megaMenuFadeOut 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  opacity: 1;
+}
+
+.animate-newsletterFadeIn {
+  animation: newsletterFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) 0.15s forwards;
+  opacity: 0;
+}
+
+.hover-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.hover-shine::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transition: left 0.7s ease;
+}
+
+.hover-shine:hover::after {
+  animation: hoverShine 0.6s ease;
+}
+
+/* Kolorowe glow effects na tekście dla przycisków menu - falka koloru */
+button.text-glow-blue {
+  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(59, 130, 246) 50%, #6b7280 70%, #6b7280 100%);
+  background-size: 300% 100%;
+  background-position: -100% center;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+button.text-glow-blue:hover {
+  animation: textWaveBlue 1s ease-in-out;
+}
+
+button.text-glow-purple {
+  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(168, 85, 247) 50%, #6b7280 70%, #6b7280 100%);
+  background-size: 300% 100%;
+  background-position: -100% center;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+button.text-glow-purple:hover {
+  animation: textWavePurple 1s ease-in-out;
+}
+
+button.text-glow-orange {
+  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(249, 115, 22) 50%, #6b7280 70%, #6b7280 100%);
+  background-size: 300% 100%;
+  background-position: -100% center;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+button.text-glow-orange:hover {
+  animation: textWaveOrange 1s ease-in-out;
+}
+
+button.text-glow-green {
+  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(34, 197, 94) 50%, #6b7280 70%, #6b7280 100%);
+  background-size: 300% 100%;
+  background-position: -100% center;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+button.text-glow-green:hover {
+  animation: textWaveGreen 1s ease-in-out;
+}
+
+@keyframes parallaxZoom {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes textWaveBlue {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes textWavePurple {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes textWaveOrange {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes textWaveGreen {
+  0% {
+    background-position: -100% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes newsletterFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.parallax-image {
+  transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+.parallax-container:hover .parallax-image {
+  transform: scale(1.1);
+}
+
+/* Rozszerzenie obszaru hover mega menu w górę */
+.mega-menu-extend::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 100%;
+  height: 8px;
+  pointer-events: auto;
+}

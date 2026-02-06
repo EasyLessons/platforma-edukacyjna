@@ -1,0 +1,14 @@
+WygladTemplate
+Grain Brown	#CBB8A2	█
+Tinny Tin	#44492B	█
+Marshland	#252922	█
+Vast Desert	#C2AF96
+Black #000000
+White #FFFFFF
+
+Przyciski buttony 
+Tinny Tin i rozjaśniony Tinny Tin
+
+Tło stron ma być:
+Masrhland albo grain Brown
+

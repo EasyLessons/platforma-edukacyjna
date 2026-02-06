@@ -1,6 +1,6 @@
 'use client';
 
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import Ad from './layout/ad';
 import Header from './layout/Header';
@@ -18,6 +18,12 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+});
+
+const playfair = Playfair_Display({
+  variable: '--font-playfair',
+  subsets: ['latin'],
+  style: ['normal', 'italic'],
 });
 
 function LayoutContent({ children }: { children: React.ReactNode }) {
@@ -74,7 +80,7 @@ export default function RootLayout({
           content="Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online"
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}>
         <AuthProvider>
           <WorkspaceProvider>
             <LayoutContent>{children}</LayoutContent>
