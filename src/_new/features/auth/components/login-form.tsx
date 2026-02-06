@@ -1,12 +1,3 @@
-/**
- * ============================================================================
- * LOGIN FORM COMPONENT
- * ============================================================================
- *
- * Reusable login form component
- * Wyciągnięty z src/app/login/page.tsx
- */
-
 'use client';
 
 import { useState } from 'react';
