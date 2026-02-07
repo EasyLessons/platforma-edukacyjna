@@ -9,6 +9,9 @@ import SocialProofSection from './sections/SocialProofSection';
 import FAQSection from './sections/FAQSection';
 import LastCTASection from './sections/LastCTASection';
 import TestimonialsSection from './sections/TestimonialsSection';
+import EasyLessonInfoSection from './sections/EasyLessonInfoSection';
+import QuickNavSection from './sections/QuickNavSection';
+import BenefitsSection from './sections/BenefitsSection';
 
 export default function Home() {
   return (
@@ -24,6 +27,12 @@ export default function Home() {
       </div>
 
       <TestimonialsSection />
+
+      <QuickNavSection />
+
+      <EasyLessonInfoSection />
+
+      <BenefitsSection />
 
       {/* Sekcja problemów i rozwiązań - pokazuje się na wszystkich urządzeniach */}
       <ProblemsAndSolutionsSection />
