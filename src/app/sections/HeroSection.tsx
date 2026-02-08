@@ -75,12 +75,13 @@ export default function HeroSection() {
                  bg-gradient-to-tr from-gray-300 via-white to-white 
                  bg-clip-text text-transparent">
     <span className="inline-block px-2 py-1">
-      Ucz się efektywniej na <span style={{ 
+      Ucz się efektywniej na 
+      <span style={{ 
         fontFamily: 'Prata, serif', 
         fontStyle: 'italic', 
-        fontWeight: '400', 
+        fontWeight: '600', 
         fontSize: '1.15em'
-      }}>Easylesson</span>,              
+      }}>{" "}Easylesson</span>,              
     </span>
     <br />
     <span className="inline-block px-2">

@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Mail, ArrowLeft, Lock, Eye, EyeOff } from 'lucide-react';
-
-import { Input } from '@new/shared/ui/input';
-import { Button } from '@new/shared/ui/button';
+import Image from 'next/image';
+import { Eye, EyeOff } from 'lucide-react';
 import { requestPasswordReset, verifyResetCode, resetPassword } from '../api/auth-api';
 
 type Step = 'email' | 'code' | 'password';
@@ -56,6 +54,18 @@ export function PasswordResetForm() {
       inputRefs.current[0]?.focus();
     }
   }, [step]);
+
+  useEffect(() => {
+    const prevBodyOverflow = document.body.style.overflow;
+    const prevHtmlOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = prevBodyOverflow;
+      document.documentElement.style.overflow = prevHtmlOverflow;
+    };
+  }, []);
 
   // STEP 1: EMAIL
   // ============================================================================
@@ -219,62 +229,99 @@ export function PasswordResetForm() {
   // RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-200 via-green-300 to-emerald-400 p-5">
-      {/* Back Button */}
-      <Link
-        href="/login"
-        className="absolute top-8 left-8 text-white hover:text-white/80 transition-colors flex items-center gap-2"
-      >
-        <ArrowLeft className="w-5 h-5" />
-        <span>Powrót do logowania</span>
-      </Link>
+      <div className="h-screen flex flex-col items-center justify-center relative overflow-hidden bg-white">
+      {/* Gradient blobs - większe i bardziej widoczne */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Zielonkawy - lewy górny */}
+        <div 
+          className="absolute -top-20 -left-20 w-[700px] h-[700px] rounded-full opacity-40 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(134, 239, 172, 0.7) 0%, rgba(134, 239, 172, 0) 70%)'
+          }}
+        />
+        
+        {/* Niebieski - prawy górny */}
+        <div 
+          className="absolute -top-32 -right-32 w-[650px] h-[650px] rounded-full opacity-40 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(147, 197, 253, 0.7) 0%, rgba(147, 197, 253, 0) 70%)'
+          }}
+        />
+        
+        {/* Żółty - lewy dół */}
+        <div 
+          className="absolute -bottom-32 -left-20 w-[600px] h-[600px] rounded-full opacity-35 blur-3xl"
+          style={{
+            background: 'radial-gradient(circle, rgba(253, 224, 71, 0.6) 0%, rgba(253, 224, 71, 0) 70%)'
+          }}
+        />
+      </div>
 
-      {/* Header */}
-      <div className="mb-8 text-center">
-        <h2 className="text-white text-2xl font-semibold">Odzyskiwanie hasła</h2>
-        <p className="text-white/80 mt-2">
+      {/* Content */}
+      <div className="relative z-10 w-full max-w-md px-6 -mt-40">
+        {/* Logo */}
+        <div className="text-center mb-10">
+          <Image 
+            src="/resources/LogoEasyLesson.webp"
+            alt="EasyLesson"
+            width={200}
+            height={60}
+            className="mx-auto"
+          />
+        </div>
+
+        {/* Title */}
+        <h2 className="text-2xl font-light text-gray-900 text-center mb-3">
+          {step === 'email' && 'Odzyskiwanie hasła'}
+          {step === 'code' && 'Weryfikacja kodu'}
+          {step === 'password' && 'Ustaw nowe hasło'}
+        </h2>
+        <p className="text-center text-gray-600 font-light mb-8">
           {step === 'email' && 'Podaj swój adres email'}
           {step === 'code' && 'Wprowadź kod z emaila'}
           {step === 'password' && 'Ustaw nowe hasło'}
         </p>
-      </div>
 
-      {/* Main Card */}
-      <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
         {/* STEP 1: EMAIL */}
         {step === 'email' && (
-          <form onSubmit={handleSendEmail} className="space-y-6">
-            <Input
-              label="Adres email"
-              type="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                setError('');
-              }}
-              leftIcon={<Mail className="w-5 h-5" />}
-              placeholder="twoj@email.com"
-              error={error}
-              required
-            />
+          <form onSubmit={handleSendEmail} className="space-y-3">
+            <div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
+                  setError('');
+                }}
+                placeholder="Email"
+                className="w-full h-10 px-4 bg-white border border-gray-300 rounded-lg text-gray-900 font-light placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all"
+                required
+              />
+              {error && (
+                <p className="mt-1 text-sm text-red-600 font-light">{error}</p>
+              )}
+            </div>
 
-            <Button type="submit" loading={isLoading} className="w-full">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="hover-shine w-full h-10 bg-gray-900 text-white font-light rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:cursor-pointer"
+            >
               {isLoading ? 'Wysyłanie...' : 'Wyślij kod'}
-            </Button>
+            </button>
           </form>
         )}
 
         {/* STEP 2: CODE */}
         {step === 'code' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <div className="text-center">
-              <Mail className="w-16 h-16 mx-auto text-green-500 mb-4" />
-              <p className="text-gray-600 text-sm">Wysłaliśmy 6-cyfrowy kod na adres:</p>
-              <p className="font-semibold text-gray-800 mt-1">{email}</p>
+              <p className="text-gray-600 text-sm font-light">Wysłaliśmy 6-cyfrowy kod na adres:</p>
+              <p className="text-gray-900 font-normal mt-1">{email}</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3 text-center">
+              <label className="block text-sm font-light text-gray-600 mb-3 text-center">
                 Wprowadź kod
               </label>
               <div className="flex gap-2 justify-center" onPaste={handlePaste}>
@@ -290,100 +337,122 @@ export function PasswordResetForm() {
                     value={digit}
                     onChange={(e) => handleChange(index, e.target.value)}
                     onKeyDown={(e) => handleKeyDown(index, e)}
-                    className="w-12 h-14 text-center text-2xl font-bold text-gray-800 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition-all"
+                    className="w-10 h-10 text-center text-lg font-light text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all"
                   />
                 ))}
               </div>
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm text-center">
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm text-center font-light">
                 {error}
               </div>
             )}
 
             {resendMessage && (
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm text-center">
+              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm text-center font-light">
                 {resendMessage}
               </div>
             )}
 
             <div className="text-center">
-              <Button
-                variant="link"
+              <button
+                type="button"
                 onClick={handleResendCode}
                 disabled={resendCooldown > 0 || isLoading}
-                className="text-sm"
+                className="hover-shine text-sm text-blue-600 font-light hover:text-blue-700 hover:underline transition-colors hover:cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {resendCooldown > 0
                   ? `Wyślij ponownie za ${resendCooldown}s`
                   : 'Wyślij kod ponownie'}
-              </Button>
+              </button>
             </div>
 
-            <Button
+            <button
+              type="button"
               onClick={() => handleVerifyCode()}
               disabled={code.join('').length !== 6}
-              loading={isLoading}
-              className="w-full"
+              className="hover-shine w-full h-10 bg-gray-900 text-white font-light rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:cursor-pointer"
             >
               {isLoading ? 'Weryfikacja...' : 'Zweryfikuj kod'}
-            </Button>
+            </button>
           </div>
         )}
 
         {/* STEP 3: PASSWORD */}
         {step === 'password' && (
-          <form onSubmit={handleResetPassword} className="space-y-6">
-            <Input
-              label="Nowe hasło"
-              type={showPassword ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => {
-                setPassword(e.target.value);
-                setError('');
-              }}
-              leftIcon={<Lock className="w-5 h-5" />}
-              rightIcon={showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              onRightIconClick={() => setShowPassword(!showPassword)}
-              placeholder="••••••••"
-              helperText="Min. 8 znaków, wielka i mała litera, cyfra"
-              error={error}
-              required
-            />
+          <form onSubmit={handleResetPassword} className="space-y-3">
+            <div>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Nowe hasło"
+                  className="w-full h-10 px-4 pr-12 bg-white border border-gray-300 rounded-lg text-gray-900 font-light placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
+                >
+                  {showPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-500 font-light">
+                Min. 8 znaków, wielka i mała litera, cyfra
+              </p>
+              {error && (
+                <p className="mt-1 text-sm text-red-600 font-light">{error}</p>
+              )}
+            </div>
 
-            <Input
-              label="Powtórz hasło"
-              type={showConfirmPassword ? 'text' : 'password'}
-              value={passwordConfirm}
-              onChange={(e) => {
-                setPasswordConfirm(e.target.value);
-                setError('');
-              }}
-              leftIcon={<Lock className="w-5 h-5" />}
-              rightIcon={
-                showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />
-              }
-              onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              placeholder="••••••••"
-              required
-            />
+            <div>
+              <div className="relative">
+                <input
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={passwordConfirm}
+                  onChange={(e) => {
+                    setPasswordConfirm(e.target.value);
+                    setError('');
+                  }}
+                  placeholder="Powtórz hasło"
+                  className="w-full h-10 px-4 pr-12 bg-white border border-gray-300 rounded-lg text-gray-900 font-light placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent transition-all"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors hover:cursor-pointer"
+                >
+                  {showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
 
-            <Button type="submit" loading={isLoading} className="w-full">
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="hover-shine w-full h-10 bg-gray-900 text-white font-light rounded-lg hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors hover:cursor-pointer"
+            >
               {isLoading ? 'Zmiana hasła...' : 'Zmień hasło'}
-            </Button>
+            </button>
           </form>
         )}
       </div>
 
-      {/* Footer */}
-      <div className="mt-6 text-center text-white text-sm">
-        <p>
-          Pamiętasz hasło?{' '}
-          <Link href="/login" className="font-semibold underline hover:text-white/80">
-            Zaloguj się
-          </Link>
-        </p>
+      {/* Help text at bottom */}
+      <div className="absolute bottom-6 left-0 right-0 text-center">
+        <Link 
+          href="/login"
+          className="hover-shine text-sm text-gray-600 font-light hover:text-gray-900 hover:underline transition-colors hover:cursor-pointer"
+        >
+          Powrót do logowania
+        </Link>
       </div>
     </div>
   );
