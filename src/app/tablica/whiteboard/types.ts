@@ -120,6 +120,7 @@ export interface PDFElement {
   fileName?: string;
   currentPage?: number; // Aktualnie wyświetlana strona
   totalPages?: number; // Łączna liczba stron
+  rotation?: number; // Kąt obrotu w radianach
 }
 
 // 🆕 Notatka Markdown - dla chatbota i notatek użytkownika
