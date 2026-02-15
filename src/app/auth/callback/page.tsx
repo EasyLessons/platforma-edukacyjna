@@ -32,7 +32,7 @@ export default function AuthCallbackPage() {
             window.location.origin
           );
           console.log('✅ postMessage wysłany! Zamykam popup...');
-          setTimeout(() => window.close(), 500); // Daj chwilę na wysłanie
+          window.close();
         } else {
           // Jeśli to główne okno - zapisz token i userData, następnie przekieruj
           console.log('💾 Zapisuję do localStorage (główne okno)...');

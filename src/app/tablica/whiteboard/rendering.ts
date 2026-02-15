@@ -106,6 +106,8 @@ export function drawShape(
   );
   const end = transformPoint({ x: shape.endX, y: shape.endY }, viewport, canvasWidth, canvasHeight);
 
+  // 🚫 Usunięta obsługa rotacji dla shape - tylko dla image/text
+
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
   ctx.lineWidth = clampLineWidth(shape.strokeWidth, viewport.scale);
@@ -208,6 +210,11 @@ export function drawShape(
       }
       break;
   }
+
+  // 🆕 Restore context jeśli była rotacja
+  if (shape.rotation && shape.rotation !== 0) {
+    ctx.restore();
+  }
 }
 
 /**
@@ -290,6 +297,21 @@ export function drawText(
   debug: boolean = false
 ): { requiredHeight?: number } {
   const pos = transformPoint({ x: textEl.x, y: textEl.y }, viewport, canvasWidth, canvasHeight);
+
+  // 🆕 Obsługa rotacji
+  if (textEl.rotation && textEl.rotation !== 0) {
+    ctx.save();
+    
+    // Środek tekstu w screen space
+    const width = (textEl.width || 3) * viewport.scale * 100;
+    const height = (textEl.height || 1) * viewport.scale * 100;
+    const centerX = pos.x + width / 2;
+    const centerY = pos.y + height / 2;
+    
+    ctx.translate(centerX, centerY);
+    ctx.rotate(textEl.rotation);
+    ctx.translate(-centerX, -centerY);
+  }
 
   // 🆕 Font styling
   const fontWeight = textEl.fontWeight || 'normal';
@@ -453,8 +475,15 @@ export function drawText(
 
     // Return required height for auto-expand
     if (needsExpand) {
+      if (textEl.rotation && textEl.rotation !== 0) {
+        ctx.restore();
+      }
       return { requiredHeight: requiredHeightPx / (viewport.scale * 100) };
     }
+  }
+
+  if (textEl.rotation && textEl.rotation !== 0) {
+    ctx.restore();
   }
 
   return {};
@@ -533,6 +562,21 @@ export function drawImage(
   const screenHeight = bottomRight.y - topLeft.y;
 
   const htmlImg = loadedImages.get(img.id);
+
+  // 🆕 Obsługa rotacji
+  if (img.rotation && img.rotation !== 0) {
+    ctx.save();
+    
+    // Środek obrazu w screen space
+    const centerX = topLeft.x + screenWidth / 2;
+    const centerY = topLeft.y + screenHeight / 2;
+    
+    // Przesuń do środka, obróć, przesuń z powrotem
+    ctx.translate(centerX, centerY);
+    ctx.rotate(img.rotation);
+    ctx.translate(-centerX, -centerY);
+  }
+
   if (htmlImg && htmlImg.complete) {
     ctx.drawImage(htmlImg, topLeft.x, topLeft.y, screenWidth, screenHeight);
   } else {
@@ -542,6 +586,10 @@ export function drawImage(
     ctx.strokeStyle = '#ccc';
     ctx.lineWidth = 2;
     ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  }
+
+  if (img.rotation && img.rotation !== 0) {
+    ctx.restore();
   }
 }
 
@@ -557,7 +605,8 @@ export function drawElement(
   canvasHeight: number,
   loadedImages?: Map<string, HTMLImageElement>,
   debug?: boolean,
-  onAutoExpand?: (elementId: string, newHeight: number) => void
+  onAutoExpand?: (elementId: string, newHeight: number) => void,
+  elements?: DrawingElement[]
 ): void {
   if (element.type === 'path') {
     drawPath(ctx, element, viewport, canvasWidth, canvasHeight);

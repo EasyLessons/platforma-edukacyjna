@@ -42,10 +42,8 @@ export function RegisterForm() {
         
         console.log('✅ authLogin() wywołany! Przekierowuję...');
         
-        // Krótkie opóźnienie dla pewności
-        setTimeout(() => {
-          window.location.href = '/dashboard';
-        }, 500);
+        // Przekieruj natychmiast
+        window.location.href = '/dashboard';
       } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
         console.error('❌ Błąd logowania Google:', event.data.error);
         setGeneralError('Błąd logowania przez Google. Spróbuj ponownie.');

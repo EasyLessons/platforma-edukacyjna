@@ -86,6 +86,17 @@ export function SelectTool({
     new Map()
   );
 
+  const [isRotating, setIsRotating] = useState(false);
+  const [rotationStartAngle, setRotationStartAngle] = useState<number>(0);
+  const [rotationPivot, setRotationPivot] = useState<Point | null>(null);
+  const [rotationOriginalElements, setRotationOriginalElements] = useState<
+    Map<string, DrawingElement>
+  >(new Map());
+  const [currentRotationAngle, setCurrentRotationAngle] = useState<number>(0); // 🆕 Aktualny kąt podczas przeciągania
+
+  // 🆕 Preview selection - podgląd zaznaczenia podczas przeciągania selection box
+  const [previewSelectedIds, setPreviewSelectedIds] = useState<Set<string>>(new Set());
+
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // 🆕 Multi-touch gestures
@@ -147,9 +158,9 @@ export function SelectTool({
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
-  // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag
+  // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
   useEffect(() => {
-    if (!isResizing && !isDragging) return;
+    if (!isResizing && !isDragging && !isRotating) return;
 
     const handleGlobalPointerMove = (e: PointerEvent) => {
       // 🆕 Obsługa gestów multitouch - blokuj drag/resize podczas gestów
@@ -509,6 +520,173 @@ export function SelectTool({
 
           onElementsUpdate(updates);
         }
+      } else if (isRotating && rotationPivot && rotationOriginalElements.size > 0) {
+        // 🆕 ROTATION - obracanie zaznaczonych elementów wokół pivota
+        const screenPoint = { x: e.clientX, y: e.clientY };
+        const worldPoint = inverseTransformPoint(
+          screenPoint,
+          viewportRef.current,
+          canvasWidth,
+          canvasHeight
+        );
+
+        // Oblicz kąt między punktem a pivotem
+        const dx = worldPoint.x - rotationPivot.x;
+        const dy = worldPoint.y - rotationPivot.y;
+        const currentAngle = Math.atan2(dy, dx);
+
+        // Kąt rotacji to różnica między obecnym kątem a początkowym
+        let rotationAngle = currentAngle - rotationStartAngle;
+
+        // 🆕 Snap do globalnych osi X/Y (0°, 90°, 180°, 270°)
+        const SNAP_ANGLE = Math.PI / 2; // 90° w radianach
+        const SNAP_THRESHOLD = (5 * Math.PI) / 180; // 5° w radianach
+
+        // Oblicz średnią początkową rotację elementów
+        let avgOriginalRotation = 0;
+        let rotCount = 0;
+        rotationOriginalElements.forEach((el) => {
+          if (
+            (el.type === 'shape' || el.type === 'text' || el.type === 'image') &&
+            el.rotation !== undefined
+          ) {
+            avgOriginalRotation += el.rotation;
+            rotCount++;
+          }
+        });
+        if (rotCount > 0) {
+          avgOriginalRotation = avgOriginalRotation / rotCount;
+        }
+
+        // Oblicz finalny kąt (oryginalna rotacja + nowa rotacja)
+        let finalAngle = avgOriginalRotation + rotationAngle;
+
+        // Normalizuj do zakresu [-π, π]
+        while (finalAngle > Math.PI) finalAngle -= 2 * Math.PI;
+        while (finalAngle < -Math.PI) finalAngle += 2 * Math.PI;
+
+        // Znajdź najbliższą globalną oś (0°, 90°, 180°, 270°)
+        const nearestSnapAngle = Math.round(finalAngle / SNAP_ANGLE) * SNAP_ANGLE;
+        const distanceToSnap = Math.abs(finalAngle - nearestSnapAngle);
+
+        // Jeśli jesteśmy w granicach bufora, snap do najbliższej osi
+        if (distanceToSnap < SNAP_THRESHOLD) {
+          // Oblicz korektę - różnicę między snappedFinal a current final
+          rotationAngle = nearestSnapAngle - avgOriginalRotation;
+        }
+
+        // 🆕 Zapamiętaj aktualny kąt dla live preview selection box (względny, nie absolutny)
+        setCurrentRotationAngle(rotationAngle);
+
+        const cos = Math.cos(rotationAngle);
+        const sin = Math.sin(rotationAngle);
+
+        // Funkcja pomocnicza do rotacji punktu wokół pivota
+        const rotatePointAroundPivot = (point: Point, pivot: Point): Point => {
+          const dx = point.x - pivot.x;
+          const dy = point.y - pivot.y;
+          return {
+            x: pivot.x + dx * cos - dy * sin,
+            y: pivot.y + dx * sin + dy * cos,
+          };
+        };
+
+        const updates = new Map<string, Partial<DrawingElement>>();
+
+        rotationOriginalElements.forEach((originalEl, id) => {
+          if (originalEl.type === 'shape') {
+            // Dla shape: obróć oba punkty wokół środka shape, potem obróć środek wokół pivota
+            const centerX = (originalEl.startX + originalEl.endX) / 2;
+            const centerY = (originalEl.startY + originalEl.endY) / 2;
+
+            // Obróć środek shape wokół pivota zaznaczenia
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            // Obróć punkty shape wokół jego własnego środka
+            const localStart = rotatePointAroundPivot(
+              { x: originalEl.startX, y: originalEl.startY },
+              { x: centerX, y: centerY }
+            );
+            const localEnd = rotatePointAroundPivot(
+              { x: originalEl.endX, y: originalEl.endY },
+              { x: centerX, y: centerY }
+            );
+
+            // Przesunięcie od starego środka do nowego
+            const offsetX = newCenter.x - centerX;
+            const offsetY = newCenter.y - centerY;
+
+            updates.set(id, {
+              startX: localStart.x + offsetX,
+              startY: localStart.y + offsetY,
+              endX: localEnd.x + offsetX,
+              endY: localEnd.y + offsetY,
+              // 🚫 Usunięte: rotation dla shape
+            });
+          } else if (originalEl.type === 'path') {
+            // Dla path: oblicz środek, obróć wszystkie punkty wokół środka, potem obróć środek wokół pivota
+            const xs = originalEl.points.map((p: Point) => p.x);
+            const ys = originalEl.points.map((p: Point) => p.y);
+            const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+            const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+            // Obróć środek path wokół pivota zaznaczenia
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            // Obróć każdy punkt wokół własnego środka path
+            const rotatedPoints = originalEl.points.map((p: Point) =>
+              rotatePointAroundPivot(p, { x: centerX, y: centerY })
+            );
+
+            // Przesunięcie od starego środka do nowego
+            const offsetX = newCenter.x - centerX;
+            const offsetY = newCenter.y - centerY;
+
+            const newPoints = rotatedPoints.map((p) => ({
+              x: p.x + offsetX,
+              y: p.y + offsetY,
+            }));
+
+            updates.set(id, { points: newPoints });
+          } else if (originalEl.type === 'text') {
+            // Dla text: obróć środek wokół pivota
+            const centerX = originalEl.x + (originalEl.width || 3) / 2;
+            const centerY = originalEl.y + (originalEl.height || 1) / 2;
+
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            updates.set(id, {
+              x: newCenter.x - (originalEl.width || 3) / 2,
+              y: newCenter.y - (originalEl.height || 1) / 2,
+              rotation: (originalEl.rotation || 0) + rotationAngle,
+            });
+          } else if (originalEl.type === 'image') {
+            // Dla image: obróć środek wokół pivota + zapisz rotation
+            const centerX = originalEl.x + originalEl.width / 2;
+            const centerY = originalEl.y + originalEl.height / 2;
+
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            updates.set(id, {
+              x: newCenter.x - originalEl.width / 2,
+              y: newCenter.y - originalEl.height / 2,
+              rotation: (originalEl.rotation || 0) + rotationAngle,
+            });
+          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+            // Dla markdown/table: obróć środek wokół pivota
+            const centerX = originalEl.x + originalEl.width / 2;
+            const centerY = originalEl.y + originalEl.height / 2;
+
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            updates.set(id, {
+              x: newCenter.x - originalEl.width / 2,
+              y: newCenter.y - originalEl.height / 2,
+            });
+          }
+        });
+
+        onElementsUpdate(updates);
       }
     };
 
@@ -526,6 +704,39 @@ export function SelectTool({
         onOperationFinish?.();
       }
 
+      if (isRotating && rotationOriginalElements.size > 0) {
+        // 🆕 Zaktualizuj bounding boxy po rotacji
+        const finalUpdates = new Map<string, Partial<DrawingElement>>();
+        
+        elements.forEach((el) => {
+          if (selectedIds.has(el.id)) {
+            if (el.type === 'shape') {
+              // Normalizuj współrzędne shape (startX < endX, startY < endY)
+              const minX = Math.min(el.startX, el.endX);
+              const maxX = Math.max(el.startX, el.endX);
+              const minY = Math.min(el.startY, el.endY);
+              const maxY = Math.max(el.startY, el.endY);
+              
+              if (minX !== el.startX || maxX !== el.endX || minY !== el.startY || maxY !== el.endY) {
+                finalUpdates.set(el.id, {
+                  startX: minX,
+                  startY: minY,
+                  endX: maxX,
+                  endY: maxY,
+                });
+              }
+            }
+            // Path, Text i Image już mają poprawne współrzędne
+          }
+        });
+        
+        if (finalUpdates.size > 0) {
+          onElementsUpdate(finalUpdates);
+        }
+        
+        onOperationFinish?.();
+      }
+
       setIsDragging(false);
       setDragStart(null);
       setDraggedElementsOriginal(new Map());
@@ -534,6 +745,12 @@ export function SelectTool({
       setResizeHandle(null);
       setResizeOriginalBox(null);
       setResizeOriginalElements(new Map());
+
+      setIsRotating(false);
+      setRotationStartAngle(0);
+      setRotationPivot(null);
+      setRotationOriginalElements(new Map());
+      setCurrentRotationAngle(0); // 🆕 Wyczyść aktualny kąt rotacji
 
       // Wyczyść active guides po zakończeniu operacji
       onActiveGuidesChange?.([]);
@@ -558,11 +775,15 @@ export function SelectTool({
   }, [
     isResizing,
     isDragging,
+    isRotating,
     resizeHandle,
     resizeOriginalBox,
     resizeOriginalElements,
     dragStart,
     draggedElementsOriginal,
+    rotationStartAngle,
+    rotationPivot,
+    rotationOriginalElements,
     canvasWidth,
     canvasHeight,
     onElementsUpdate,
@@ -570,6 +791,118 @@ export function SelectTool({
     elements,
     onActiveGuidesChange,
   ]);
+
+  // 🆕 Oblicz bounding box dla preview selection
+  const getPreviewBoundingBox = useCallback((): BoundingBox | null => {
+    if (previewSelectedIds.size === 0) return null;
+
+    const previewElements = elements.filter((el) => previewSelectedIds.has(el.id));
+    if (previewElements.length === 0) return null;
+
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    previewElements.forEach((el) => {
+      if (el.type === 'path') {
+        el.points.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          minY = Math.min(minY, p.y);
+          maxX = Math.max(maxX, p.x);
+          maxY = Math.max(maxY, p.y);
+        });
+      } else if (el.type === 'shape') {
+        minX = Math.min(minX, el.startX, el.endX);
+        minY = Math.min(minY, el.startY, el.endY);
+        maxX = Math.max(maxX, el.startX, el.endX);
+        maxY = Math.max(maxY, el.startY, el.endY);
+      } else if (el.type === 'text') {
+        const width = el.width || 3;
+        const height = el.height || 1;
+        
+        // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
+        if (el.rotation && el.rotation !== 0) {
+          const centerX = el.x + width / 2;
+          const centerY = el.y + height / 2;
+          
+          const corners = [
+            { x: el.x, y: el.y },
+            { x: el.x + width, y: el.y },
+            { x: el.x + width, y: el.y + height },
+            { x: el.x, y: el.y + height },
+          ];
+          
+          const cos = Math.cos(el.rotation);
+          const sin = Math.sin(el.rotation);
+          
+          corners.forEach((corner) => {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const rotatedX = centerX + dx * cos - dy * sin;
+            const rotatedY = centerY + dx * sin + dy * cos;
+            
+            minX = Math.min(minX, rotatedX);
+            minY = Math.min(minY, rotatedY);
+            maxX = Math.max(maxX, rotatedX);
+            maxY = Math.max(maxY, rotatedY);
+          });
+        } else {
+          minX = Math.min(minX, el.x);
+          minY = Math.min(minY, el.y);
+          maxX = Math.max(maxX, el.x + width);
+          maxY = Math.max(maxY, el.y + height);
+        }
+      } else if (el.type === 'image') {
+        // 🆕 Dla obróconych obrazków oblicz rotowane narożniki
+        if (el.rotation && el.rotation !== 0) {
+          const centerX = el.x + el.width / 2;
+          const centerY = el.y + el.height / 2;
+          
+          const corners = [
+            { x: el.x, y: el.y },
+            { x: el.x + el.width, y: el.y },
+            { x: el.x + el.width, y: el.y + el.height },
+            { x: el.x, y: el.y + el.height },
+          ];
+          
+          const cos = Math.cos(el.rotation);
+          const sin = Math.sin(el.rotation);
+          
+          corners.forEach((corner) => {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const rotatedX = centerX + dx * cos - dy * sin;
+            const rotatedY = centerY + dx * sin + dy * cos;
+            
+            minX = Math.min(minX, rotatedX);
+            minY = Math.min(minY, rotatedY);
+            maxX = Math.max(maxX, rotatedX);
+            maxY = Math.max(maxY, rotatedY);
+          });
+        } else {
+          minX = Math.min(minX, el.x);
+          minY = Math.min(minY, el.y);
+          maxX = Math.max(maxX, el.x + el.width);
+          maxY = Math.max(maxY, el.y + el.height);
+        }
+      } else if (el.type === 'markdown' || el.type === 'table') {
+        minX = Math.min(minX, el.x);
+        minY = Math.min(minY, el.y);
+        maxX = Math.max(maxX, el.x + el.width);
+        maxY = Math.max(maxY, el.y + el.height);
+      }
+    });
+
+    if (minX === Infinity || minY === Infinity) return null;
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }, [elements, previewSelectedIds]);
 
   const getSelectionBoundingBox = useCallback((): BoundingBox | null => {
     if (selectedIds.size === 0) return null;
@@ -596,15 +929,74 @@ export function SelectTool({
         maxX = Math.max(maxX, el.startX, el.endX);
         maxY = Math.max(maxY, el.startY, el.endY);
       } else if (el.type === 'text') {
-        minX = Math.min(minX, el.x);
-        minY = Math.min(minY, el.y);
-        maxX = Math.max(maxX, el.x + (el.width || 3));
-        maxY = Math.max(maxY, el.y + (el.height || 1));
+        const width = el.width || 3;
+        const height = el.height || 1;
+        
+        // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
+        if (el.rotation && el.rotation !== 0) {
+          const centerX = el.x + width / 2;
+          const centerY = el.y + height / 2;
+          
+          const corners = [
+            { x: el.x, y: el.y },
+            { x: el.x + width, y: el.y },
+            { x: el.x + width, y: el.y + height },
+            { x: el.x, y: el.y + height },
+          ];
+          
+          const cos = Math.cos(el.rotation);
+          const sin = Math.sin(el.rotation);
+          
+          corners.forEach((corner) => {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const rotatedX = centerX + dx * cos - dy * sin;
+            const rotatedY = centerY + dx * sin + dy * cos;
+            
+            minX = Math.min(minX, rotatedX);
+            minY = Math.min(minY, rotatedY);
+            maxX = Math.max(maxX, rotatedX);
+            maxY = Math.max(maxY, rotatedY);
+          });
+        } else {
+          minX = Math.min(minX, el.x);
+          minY = Math.min(minY, el.y);
+          maxX = Math.max(maxX, el.x + width);
+          maxY = Math.max(maxY, el.y + height);
+        }
       } else if (el.type === 'image') {
-        minX = Math.min(minX, el.x);
-        minY = Math.min(minY, el.y);
-        maxX = Math.max(maxX, el.x + el.width);
-        maxY = Math.max(maxY, el.y + el.height);
+        // 🆕 Dla obróconych obrazków oblicz rotowane narożniki
+        if (el.rotation && el.rotation !== 0) {
+          const centerX = el.x + el.width / 2;
+          const centerY = el.y + el.height / 2;
+          
+          const corners = [
+            { x: el.x, y: el.y },
+            { x: el.x + el.width, y: el.y },
+            { x: el.x + el.width, y: el.y + el.height },
+            { x: el.x, y: el.y + el.height },
+          ];
+          
+          const cos = Math.cos(el.rotation);
+          const sin = Math.sin(el.rotation);
+          
+          corners.forEach((corner) => {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            const rotatedX = centerX + dx * cos - dy * sin;
+            const rotatedY = centerY + dx * sin + dy * cos;
+            
+            minX = Math.min(minX, rotatedX);
+            minY = Math.min(minY, rotatedY);
+            maxX = Math.max(maxX, rotatedX);
+            maxY = Math.max(maxY, rotatedY);
+          });
+        } else {
+          minX = Math.min(minX, el.x);
+          minY = Math.min(minY, el.y);
+          maxX = Math.max(maxX, el.x + el.width);
+          maxY = Math.max(maxY, el.y + el.height);
+        }
       } else if (el.type === 'markdown' || el.type === 'table') {
         // 🆕 Obsługa markdown i table - mają x, y, width, height
         minX = Math.min(minX, el.x);
@@ -640,6 +1032,30 @@ export function SelectTool({
     } else if (element.type === 'text') {
       const width = element.width || 3;
       const height = element.height || 1;
+      
+      // 🆕 Obsługa rotacji dla text
+      if (element.rotation && element.rotation !== 0) {
+        // Środek elementu
+        const centerX = element.x + width / 2;
+        const centerY = element.y + height / 2;
+        
+        // Odwróć punkt o -rotation wokół środka
+        const cos = Math.cos(-element.rotation);
+        const sin = Math.sin(-element.rotation);
+        const dx = worldPoint.x - centerX;
+        const dy = worldPoint.y - centerY;
+        const rotatedX = centerX + dx * cos - dy * sin;
+        const rotatedY = centerY + dx * sin + dy * cos;
+        
+        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
+        return (
+          rotatedX >= element.x &&
+          rotatedX <= element.x + width &&
+          rotatedY >= element.y &&
+          rotatedY <= element.y + height
+        );
+      }
+      
       return (
         worldPoint.x >= element.x &&
         worldPoint.x <= element.x + width &&
@@ -647,6 +1063,29 @@ export function SelectTool({
         worldPoint.y <= element.y + height
       );
     } else if (element.type === 'image') {
+      // 🆕 Obsługa rotacji dla image
+      if (element.rotation && element.rotation !== 0) {
+        // Środek elementu
+        const centerX = element.x + element.width / 2;
+        const centerY = element.y + element.height / 2;
+        
+        // Odwróć punkt o -rotation wokół środka
+        const cos = Math.cos(-element.rotation);
+        const sin = Math.sin(-element.rotation);
+        const dx = worldPoint.x - centerX;
+        const dy = worldPoint.y - centerY;
+        const rotatedX = centerX + dx * cos - dy * sin;
+        const rotatedY = centerY + dx * sin + dy * cos;
+        
+        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
+        return (
+          rotatedX >= element.x &&
+          rotatedX <= element.x + element.width &&
+          rotatedY >= element.y &&
+          rotatedY <= element.y + element.height
+        );
+      }
+      
       return (
         worldPoint.x >= element.x &&
         worldPoint.x <= element.x + element.width &&
@@ -822,7 +1261,236 @@ export function SelectTool({
 
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
-      setSelectionEnd({ x: e.clientX, y: e.clientY });
+      const currentEnd = { x: e.clientX, y: e.clientY };
+      setSelectionEnd(currentEnd);
+
+      // 🆕 Live preview - oblicz które elementy będą zaznaczone
+      const worldStart = inverseTransformPoint(selectionStart, viewport, canvasWidth, canvasHeight);
+      const worldEnd = inverseTransformPoint(currentEnd, viewport, canvasWidth, canvasHeight);
+
+      const minX = Math.min(worldStart.x, worldEnd.x);
+      const maxX = Math.max(worldStart.x, worldEnd.x);
+      const minY = Math.min(worldStart.y, worldEnd.y);
+      const maxY = Math.max(worldStart.y, worldEnd.y);
+
+      // Funkcja sprawdzająca czy prostokąty się przecinają
+      const rectanglesIntersect = (
+        ax: number,
+        ay: number,
+        aw: number,
+        ah: number,
+        bx: number,
+        by: number,
+        bw: number,
+        bh: number
+      ): boolean => {
+        return !(ax + aw < bx || bx + bw < ax || ay + ah < by || by + bh < ay);
+      };
+
+      // 🆕 Funkcja pomocnicza: czy rotowany prostokąt przecina się z selection box
+      const rotatedRectIntersects = (
+        selectX: number,
+        selectY: number,
+        selectW: number,
+        selectH: number,
+        elemX: number,
+        elemY: number,
+        elemW: number,
+        elemH: number,
+        rotation: number
+      ): boolean => {
+        // Znajdź 4 narożniki rotowanego elementu
+        const centerX = elemX + elemW / 2;
+        const centerY = elemY + elemH / 2;
+        
+        const corners = [
+          { x: elemX, y: elemY },
+          { x: elemX + elemW, y: elemY },
+          { x: elemX + elemW, y: elemY + elemH },
+          { x: elemX, y: elemY + elemH },
+        ];
+        
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        
+        const rotatedCorners = corners.map((corner) => {
+          const dx = corner.x - centerX;
+          const dy = corner.y - centerY;
+          return {
+            x: centerX + dx * cos - dy * sin,
+            y: centerY + dx * sin + dy * cos,
+          };
+        });
+        
+        // Sprawdź czy którykolwiek narożnik rotowanego elementu jest w selection box
+        for (const corner of rotatedCorners) {
+          if (
+            corner.x >= selectX &&
+            corner.x <= selectX + selectW &&
+            corner.y >= selectY &&
+            corner.y <= selectY + selectH
+          ) {
+            return true;
+          }
+        }
+        
+        // Sprawdź czy środek elementu jest w selection box
+        if (
+          centerX >= selectX &&
+          centerX <= selectX + selectW &&
+          centerY >= selectY &&
+          centerY <= selectY + selectH
+        ) {
+          return true;
+        }
+        
+        // Sprawdź czy środek selection box jest w rotowanym elemencie (odwróć punkt)
+        const selectCenterX = selectX + selectW / 2;
+        const selectCenterY = selectY + selectH / 2;
+        const dx = selectCenterX - centerX;
+        const dy = selectCenterY - centerY;
+        const cosNeg = Math.cos(-rotation);
+        const sinNeg = Math.sin(-rotation);
+        const rotatedSelectX = centerX + dx * cosNeg - dy * sinNeg;
+        const rotatedSelectY = centerY + dx * sinNeg + dy * cosNeg;
+        
+        if (
+          rotatedSelectX >= elemX &&
+          rotatedSelectX <= elemX + elemW &&
+          rotatedSelectY >= elemY &&
+          rotatedSelectY <= elemY + elemH
+        ) {
+          return true;
+        }
+        
+        return false;
+      };
+
+      const preview = new Set<string>();
+      elements.forEach((el) => {
+        if (el.type === 'shape') {
+          const elMinX = Math.min(el.startX, el.endX);
+          const elMaxX = Math.max(el.startX, el.endX);
+          const elMinY = Math.min(el.startY, el.endY);
+          const elMaxY = Math.max(el.startY, el.endY);
+
+          if (
+            rectanglesIntersect(
+              minX,
+              minY,
+              maxX - minX,
+              maxY - minY,
+              elMinX,
+              elMinY,
+              elMaxX - elMinX,
+              elMaxY - elMinY
+            )
+          ) {
+            preview.add(el.id);
+          }
+        } else if (el.type === 'text') {
+          const elWidth = el.width || 3;
+          const elHeight = el.height || 1;
+
+          // 🆕 Obsługa rotacji dla text
+          if (el.rotation && el.rotation !== 0) {
+            if (
+              rotatedRectIntersects(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                elWidth,
+                elHeight,
+                el.rotation
+              )
+            ) {
+              preview.add(el.id);
+            }
+          } else {
+            if (
+              rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)
+            ) {
+              preview.add(el.id);
+            }
+          }
+        } else if (el.type === 'image') {
+          // 🆕 Obsługa rotacji dla image
+          if (el.rotation && el.rotation !== 0) {
+            if (
+              rotatedRectIntersects(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                el.width,
+                el.height,
+                el.rotation
+              )
+            ) {
+              preview.add(el.id);
+            }
+          } else {
+            if (
+              rectanglesIntersect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                el.width,
+                el.height
+              )
+            ) {
+              preview.add(el.id);
+            }
+          }
+        } else if (el.type === 'path') {
+          const xs = el.points.map((p: Point) => p.x);
+          const ys = el.points.map((p: Point) => p.y);
+          const elMinX = Math.min(...xs);
+          const elMaxX = Math.max(...xs);
+          const elMinY = Math.min(...ys);
+          const elMaxY = Math.max(...ys);
+
+          if (
+            rectanglesIntersect(
+              minX,
+              minY,
+              maxX - minX,
+              maxY - minY,
+              elMinX,
+              elMinY,
+              elMaxX - elMinX,
+              elMaxY - elMinY
+            )
+          ) {
+            preview.add(el.id);
+          }
+        } else if (el.type === 'markdown' || el.type === 'table') {
+          if (
+            rectanglesIntersect(
+              minX,
+              minY,
+              maxX - minX,
+              maxY - minY,
+              el.x,
+              el.y,
+              el.width,
+              el.height
+            )
+          ) {
+            preview.add(el.id);
+          }
+        }
+      });
+
+      setPreviewSelectedIds(preview);
     }
   };
 
@@ -856,6 +1524,85 @@ export function SelectTool({
         return !(ax + aw < bx || bx + bw < ax || ay + ah < by || by + bh < ay);
       };
 
+      // 🆕 Funkcja pomocnicza: czy rotowany prostokąt przecina się z selection box
+      const rotatedRectIntersects = (
+        selectX: number,
+        selectY: number,
+        selectW: number,
+        selectH: number,
+        elemX: number,
+        elemY: number,
+        elemW: number,
+        elemH: number,
+        rotation: number
+      ): boolean => {
+        // Znajdź 4 narożniki rotowanego elementu
+        const centerX = elemX + elemW / 2;
+        const centerY = elemY + elemH / 2;
+        
+        const corners = [
+          { x: elemX, y: elemY },
+          { x: elemX + elemW, y: elemY },
+          { x: elemX + elemW, y: elemY + elemH },
+          { x: elemX, y: elemY + elemH },
+        ];
+        
+        const cos = Math.cos(rotation);
+        const sin = Math.sin(rotation);
+        
+        const rotatedCorners = corners.map((corner) => {
+          const dx = corner.x - centerX;
+          const dy = corner.y - centerY;
+          return {
+            x: centerX + dx * cos - dy * sin,
+            y: centerY + dx * sin + dy * cos,
+          };
+        });
+        
+        // Sprawdź czy którykolwiek narożnik rotowanego elementu jest w selection box
+        for (const corner of rotatedCorners) {
+          if (
+            corner.x >= selectX &&
+            corner.x <= selectX + selectW &&
+            corner.y >= selectY &&
+            corner.y <= selectY + selectH
+          ) {
+            return true;
+          }
+        }
+        
+        // Sprawdź czy środek elementu jest w selection box
+        if (
+          centerX >= selectX &&
+          centerX <= selectX + selectW &&
+          centerY >= selectY &&
+          centerY <= selectY + selectH
+        ) {
+          return true;
+        }
+        
+        // Sprawdź czy środek selection box jest w rotowanym elemencie (odwróć punkt)
+        const selectCenterX = selectX + selectW / 2;
+        const selectCenterY = selectY + selectH / 2;
+        const dx = selectCenterX - centerX;
+        const dy = selectCenterY - centerY;
+        const cosNeg = Math.cos(-rotation);
+        const sinNeg = Math.sin(-rotation);
+        const rotatedSelectX = centerX + dx * cosNeg - dy * sinNeg;
+        const rotatedSelectY = centerY + dx * sinNeg + dy * cosNeg;
+        
+        if (
+          rotatedSelectX >= elemX &&
+          rotatedSelectX <= elemX + elemW &&
+          rotatedSelectY >= elemY &&
+          rotatedSelectY <= elemY + elemH
+        ) {
+          return true;
+        }
+        
+        return false;
+      };
+
       const newSelection = new Set<string>();
       elements.forEach((el) => {
         if (el.type === 'shape') {
@@ -883,25 +1630,63 @@ export function SelectTool({
           const elWidth = el.width || 3;
           const elHeight = el.height || 1;
 
-          if (
-            rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)
-          ) {
-            newSelection.add(el.id);
+          // 🆕 Obsługa rotacji dla text
+          if (el.rotation && el.rotation !== 0) {
+            if (
+              rotatedRectIntersects(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                elWidth,
+                elHeight,
+                el.rotation
+              )
+            ) {
+              newSelection.add(el.id);
+            }
+          } else {
+            if (
+              rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)
+            ) {
+              newSelection.add(el.id);
+            }
           }
         } else if (el.type === 'image') {
-          if (
-            rectanglesIntersect(
-              minX,
-              minY,
-              maxX - minX,
-              maxY - minY,
-              el.x,
-              el.y,
-              el.width,
-              el.height
-            )
-          ) {
-            newSelection.add(el.id);
+          // 🆕 Obsługa rotacji dla image
+          if (el.rotation && el.rotation !== 0) {
+            if (
+              rotatedRectIntersects(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                el.width,
+                el.height,
+                el.rotation
+              )
+            ) {
+              newSelection.add(el.id);
+            }
+          } else {
+            if (
+              rectanglesIntersect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                el.width,
+                el.height
+              )
+            ) {
+              newSelection.add(el.id);
+            }
           }
         } else if (el.type === 'path') {
           // Dla ścieżki sprawdzamy czy jakikolwiek punkt jest w zaznaczeniu
@@ -935,6 +1720,7 @@ export function SelectTool({
     setIsSelecting(false);
     setSelectionStart(null);
     setSelectionEnd(null);
+    setPreviewSelectedIds(new Set()); // Wyczyść preview po finalizacji
   };
 
   const handlePointerCancel = (e: React.PointerEvent) => {
@@ -975,6 +1761,201 @@ export function SelectTool({
     );
   };
 
+  // 🆕 Renderuj główny bounding box dla preview selection (gdy więcej niż 1 element)
+  const renderPreviewBoundingBox = () => {
+    if (previewSelectedIds.size <= 1) return null;
+
+    const bbox = getPreviewBoundingBox();
+    if (!bbox) return null;
+
+    const topLeft = transformPoint({ x: bbox.x, y: bbox.y }, viewport, canvasWidth, canvasHeight);
+    const bottomRight = transformPoint(
+      { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
+
+    const width = bottomRight.x - topLeft.x;
+    const height = bottomRight.y - topLeft.y;
+
+    return (
+      <div
+        className="absolute border-2 z-36 border-blue-500 pointer-events-none"
+        style={{
+          left: topLeft.x,
+          top: topLeft.y,
+          width: width,
+          height: height,
+        }}
+      />
+    );
+  };
+
+  // 🆕 Renderuj podgląd zaznaczenia podczas przeciągania selection box
+  const renderPreviewSelectionBoxes = () => {
+    if (previewSelectedIds.size === 0) return null;
+
+    return (
+      <>
+        {Array.from(previewSelectedIds).map((id) => {
+          const element = elements.find((el) => el.id === id);
+          if (!element) return null;
+
+          // Oblicz bounding box dla elementu
+          let bbox: BoundingBox;
+
+          if (element.type === 'shape') {
+            const minX = Math.min(element.startX, element.endX);
+            const maxX = Math.max(element.startX, element.endX);
+            const minY = Math.min(element.startY, element.endY);
+            const maxY = Math.max(element.startY, element.endY);
+
+            bbox = {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            };
+          } else if (element.type === 'text') {
+            const width = element.width || 3;
+            const height = element.height || 1;
+            
+            // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
+            if (element.rotation && element.rotation !== 0) {
+              const centerX = element.x + width / 2;
+              const centerY = element.y + height / 2;
+              
+              const corners = [
+                { x: element.x, y: element.y },
+                { x: element.x + width, y: element.y },
+                { x: element.x + width, y: element.y + height },
+                { x: element.x, y: element.y + height },
+              ];
+              
+              const cos = Math.cos(element.rotation);
+              const sin = Math.sin(element.rotation);
+              
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              
+              corners.forEach((corner) => {
+                const dx = corner.x - centerX;
+                const dy = corner.y - centerY;
+                const rotatedX = centerX + dx * cos - dy * sin;
+                const rotatedY = centerY + dx * sin + dy * cos;
+                
+                minX = Math.min(minX, rotatedX);
+                minY = Math.min(minY, rotatedY);
+                maxX = Math.max(maxX, rotatedX);
+                maxY = Math.max(maxY, rotatedY);
+              });
+              
+              bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            } else {
+              bbox = {
+                x: element.x,
+                y: element.y,
+                width: width,
+                height: height,
+              };
+            }
+          } else if (element.type === 'image') {
+            // 🆕 Dla obróconych obrazków oblicz rotowane narożniki
+            if (element.rotation && element.rotation !== 0) {
+              const centerX = element.x + element.width / 2;
+              const centerY = element.y + element.height / 2;
+              
+              const corners = [
+                { x: element.x, y: element.y },
+                { x: element.x + element.width, y: element.y },
+                { x: element.x + element.width, y: element.y + element.height },
+                { x: element.x, y: element.y + element.height },
+              ];
+              
+              const cos = Math.cos(element.rotation);
+              const sin = Math.sin(element.rotation);
+              
+              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+              
+              corners.forEach((corner) => {
+                const dx = corner.x - centerX;
+                const dy = corner.y - centerY;
+                const rotatedX = centerX + dx * cos - dy * sin;
+                const rotatedY = centerY + dx * sin + dy * cos;
+                
+                minX = Math.min(minX, rotatedX);
+                minY = Math.min(minY, rotatedY);
+                maxX = Math.max(maxX, rotatedX);
+                maxY = Math.max(maxY, rotatedY);
+              });
+              
+              bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+            } else {
+              bbox = {
+                x: element.x,
+                y: element.y,
+                width: element.width,
+                height: element.height,
+              };
+            }
+          } else if (element.type === 'path') {
+            const xs = element.points.map((p: Point) => p.x);
+            const ys = element.points.map((p: Point) => p.y);
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+
+            bbox = {
+              x: minX,
+              y: minY,
+              width: maxX - minX,
+              height: maxY - minY,
+            };
+          } else if (element.type === 'markdown' || element.type === 'table') {
+            bbox = {
+              x: element.x,
+              y: element.y,
+              width: element.width,
+              height: element.height,
+            };
+          } else {
+            return null;
+          }
+
+          const topLeft = transformPoint(
+            { x: bbox.x, y: bbox.y },
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+          const bottomRight = transformPoint(
+            { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+            viewport,
+            canvasWidth,
+            canvasHeight
+          );
+
+          const width = bottomRight.x - topLeft.x;
+          const height = bottomRight.y - topLeft.y;
+
+          return (
+            <div
+              key={`preview-${id}`}
+              className="absolute border-2 z-35 border-blue-400 bg-blue-50/10 pointer-events-none"
+              style={{
+                left: topLeft.x,
+                top: topLeft.y,
+                width: width,
+                height: height,
+              }}
+            />
+          );
+        })}
+      </>
+    );
+  };
+
   const renderSelectionBox = () => {
     const bbox = getSelectionBoundingBox();
     if (!bbox || selectedIds.size === 0) return null;
@@ -989,30 +1970,40 @@ export function SelectTool({
 
     const width = bottomRight.x - topLeft.x;
     const height = bottomRight.y - topLeft.y;
+    const centerX = topLeft.x + width / 2;
+    const centerY = topLeft.y + height / 2;
 
     const handleSize = 10;
 
+    // Rogi selection box (bez rotacji - bbox już uwzględnia obrócone elementy)
+    const corners = [
+      { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
+      { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
+      { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
+      { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
+    ];
+
     return (
       <>
-        <div
-          className="absolute border-2 z-40 border-blue-500 pointer-events-none"
-          style={{
-            left: topLeft.x,
-            top: topLeft.y,
-            width: width,
-            height: height,
-          }}
-        />
+        {/* Selection box - prosty prostokąt */}
+        {!isRotating && (
+          <div
+            className="absolute border border-blue-500 pointer-events-none z-40"
+            style={{
+              left: topLeft.x,
+              top: topLeft.y,
+              width: width,
+              height: height,
+              boxSizing: 'border-box',
+            }}
+          />
+        )}
 
-        {[
-          { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
-          { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
-          { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
-          { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
-        ].map(({ pos, x, y, cursor }) => (
+        {/* Resize handles w rogach */}
+        {!isRotating && corners.map(({ pos, x, y, cursor }) => (
           <div
             key={pos}
-            className="absolute bg-white z-50 border-2 border-blue-500 rounded-full pointer-events-auto"
+            className="absolute bg-white z-50 border border-gray-400 rounded-full pointer-events-auto"
             style={{
               left: x - handleSize / 2,
               top: y - handleSize / 2,
@@ -1036,6 +2027,82 @@ export function SelectTool({
             }}
           />
         ))}
+
+        {/* 🆕 Rotation handle - ukryj podczas rotacji */}
+        {!isRotating && (() => {
+          // Lewy górny róg
+          const nwCorner = corners.find((c) => c.pos === 'nw');
+          if (!nwCorner) return null;
+
+          // Wektor od środka do NW corner
+          const dx = nwCorner.x - centerX;
+          const dy = nwCorner.y - centerY;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          
+          // Wydłuż wektor o 50px
+          const extendedX = centerX + (dx / dist) * (dist + 50);
+          const extendedY = centerY + (dy / dist) * (dist + 50);
+
+          return (
+            <div
+              className="absolute z-50 pointer-events-auto cursor-grab"
+              style={{
+                left: extendedX,
+                top: extendedY - 12,
+                width: 12,
+                height: 12,
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+
+                // Oblicz pivot - środek zaznaczenia
+                const pivot = {
+                  x: bbox.x + bbox.width / 2,
+                  y: bbox.y + bbox.height / 2,
+                };
+
+                // Oblicz początkowy kąt
+                const screenPoint = { x: e.clientX, y: e.clientY };
+                const worldPoint = inverseTransformPoint(
+                  screenPoint,
+                  viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                const dx = worldPoint.x - pivot.x;
+                const dy = worldPoint.y - pivot.y;
+                const startAngle = Math.atan2(dy, dx);
+
+                setIsRotating(true);
+                setRotationStartAngle(startAngle);
+                setRotationPivot(pivot);
+
+                const originalElements = new Map<string, DrawingElement>();
+                elements.forEach((el) => {
+                  if (selectedIds.has(el.id)) {
+                    originalElements.set(el.id, { ...el });
+                  }
+                });
+                setRotationOriginalElements(originalElements);
+              }}
+            >
+            <svg 
+              width="18"      // Zmień na swoją wartość
+              height="18"     // Zmień na swoją wartość
+              viewBox="0 0 24 24" 
+              fill="none" 
+              xmlns="http://www.w3.org/2000/svg" 
+              transform="matrix(-1, 0, 0, 1, 0, 0)"
+            >
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
+              <g id="SVGRepo_iconCarrier"> 
+                <path d="M4.06189 13C4.02104 12.6724 4 12.3387 4 12C4 7.58172 7.58172 4 12 4C14.5006 4 16.7332 5.14727 18.2002 6.94416M19.9381 11C19.979 11.3276 20 11.6613 20 12C20 16.4183 16.4183 20 12 20C9.61061 20 7.46589 18.9525 6 17.2916M9 17H6V17.2916M18.2002 4V6.94416M18.2002 6.94416V6.99993L15.2002 7M6 20V17.2916" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> 
+              </g>
+            </svg>            
+          </div>
+          );
+        })()}
       </>
     );
   };
@@ -1103,7 +2170,7 @@ export function SelectTool({
 
       {isSelecting && selectionStart && selectionEnd && (
         <div
-          className="absolute border-2 z-40 border-dashed border-blue-500 bg-blue-50/20 pointer-events-none"
+          className="absolute border z-40 border-blue-500 bg-blue-500/20 pointer-events-none"
           style={{
             left: Math.min(selectionStart.x, selectionEnd.x),
             top: Math.min(selectionStart.y, selectionEnd.y),
@@ -1115,6 +2182,8 @@ export function SelectTool({
 
       {renderTextToolbar()}
       {renderPropertiesPanel()}
+      {renderPreviewSelectionBoxes()}
+      {renderPreviewBoundingBox()}
       {renderSelectionBox()}
     </>
   );
