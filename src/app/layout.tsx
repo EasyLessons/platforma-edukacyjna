@@ -74,6 +74,7 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
+        <meta name="google-site-verification" content="VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y" />
         <title>EasyLesson - Korepetycje online z AI</title>
         <meta
           name="description"
