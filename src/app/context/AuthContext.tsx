@@ -182,6 +182,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * [] na końcu = "wykonaj TYLKO RAZ przy starcie"
    */
   useEffect(() => {
+    console.log('🔍 AuthContext: Sprawdzam localStorage przy starcie...');
+    
     // Krok 1: Pobierz token z localStorage
     // getToken() zwraca token (string) lub null jeśli go nie ma
     const token = getToken();
@@ -189,6 +191,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Krok 2: Pobierz dane użytkownika z localStorage
     // getUser() zwraca obiekt User lub null jeśli go nie ma
     const userData = getUser();
+
+    console.log('🔍 AuthContext: token:', token ? '✅ Jest' : '❌ Brak');
+    console.log('🔍 AuthContext: userData:', userData ? '✅ Jest' : '❌ Brak');
+    if (userData) {
+      console.log('👤 AuthContext: userData =', userData);
+    }
 
     // Krok 3: Sprawdź czy OBA istnieją
     if (token && userData) {
@@ -200,8 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Zapisz dane użytkownika do stanu (żeby komponenty mogły je odczytać)
       setUser(userData);
 
-      // 📝 Możesz odkomentować te linie żeby zobaczyć w konsoli co się dzieje:
-      // console.log('✅ Użytkownik ZALOGOWANY:', userData.username);
+      console.log('✅ AuthContext: Użytkownik ZALOGOWANY:', userData.username);
     } else {
       // ❌ BRAK TOKENA lub DANYCH → Użytkownik NIEZALOGOWANY
 
@@ -211,8 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ustaw user na null (brak użytkownika)
       setUser(null);
 
-      // 📝 Możesz odkomentować tę linię:
-      // console.log('❌ Użytkownik NIEZALOGOWANY');
+      console.log('❌ AuthContext: Użytkownik NIEZALOGOWANY');
     }
 
     // Krok 4: Zakończ ładowanie (przestań pokazywać "Ładowanie...")

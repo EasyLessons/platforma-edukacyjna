@@ -112,6 +112,12 @@ class Settings(BaseSettings):
     # Development: onboarding@resend.dev (testowy, działa od razu)
     # Production: noreply@twoja-domena.com (wymaga weryfikacji domeny w Resend)
 
+    # === GOOGLE OAUTH ===
+    google_client_id: str  # WYMAGANE - Client ID z Google Cloud Console
+    google_client_secret: str  # WYMAGANE - Client Secret z Google Cloud Console
+    google_redirect_uri: str  # WYMAGANE - URI callback (np. http://localhost:8000/api/auth/google/callback)
+    frontend_url: str = "http://localhost:3000"  # Opcjonalne - URL frontendu (do przekierowania po logowaniu)
+
     port: int = 8000
     
     # === KONFIGURACJA PYDANTIC ===

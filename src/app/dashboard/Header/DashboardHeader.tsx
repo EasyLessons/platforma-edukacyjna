@@ -97,14 +97,22 @@ export default function DashboardHeader() {
   useEffect(() => {
     const loadInviteCount = async () => {
       try {
+        console.log('🔍 DashboardHeader: Pobieram zaproszenia...');
+        const token = localStorage.getItem('access_token');
+        console.log('🔍 DashboardHeader: Token w localStorage:', token ? '✅ Jest' : '❌ Brak');
+        
         const invites = await fetchPendingInvites();
         setInviteCount(invites.length);
+        console.log('✅ DashboardHeader: Zaproszenia pobrane:', invites.length);
       } catch (error) {
-        console.error('Błąd pobierania zaproszeń:', error);
+        console.error('❌ DashboardHeader: Błąd pobierania zaproszeń:', error);
+        // Nie pokazuj błędu użytkownikowi - może być niezalogowany podczas przekierowania
       }
     };
 
-    loadInviteCount();
+    // Opóźnienie 500ms przed pierwszym request (daj czas na załadowanie tokenu)
+    setTimeout(loadInviteCount, 500);
+    
     const interval = setInterval(loadInviteCount, 30000);
     return () => clearInterval(interval);
   }, []);

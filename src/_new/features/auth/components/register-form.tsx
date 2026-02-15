@@ -8,9 +8,11 @@ import { Eye, EyeOff } from 'lucide-react';
 
 import { registerUser, checkUser } from '../api/auth-api';
 import type { RegisterFormData, RegisterErrors } from '../types';
+import { useAuth } from '@/app/context/AuthContext';
 
 export function RegisterForm() {
   const router = useRouter();
+  const { login: authLogin } = useAuth();
 
   useEffect(() => {
     const prevBodyOverflow = document.body.style.overflow;
@@ -22,6 +24,36 @@ export function RegisterForm() {
       document.body.style.overflow = prevBodyOverflow;
       document.documentElement.style.overflow = prevHtmlOverflow;
     };
+  }, []);
+
+  // Nasłuchuj na wiadomości z Google OAuth popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Sprawdź origin dla bezpieczeństwa
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { token, userData } = event.data;
+        
+        console.log('✅ register-form: GOOGLE_AUTH_SUCCESS!', userData);
+        
+        // Użyj AuthContext.login() - to robi wszystko prawidłowo
+        authLogin(token, userData);
+        
+        console.log('✅ authLogin() wywołany! Przekierowuję...');
+        
+        // Krótkie opóźnienie dla pewności
+        setTimeout(() => {
+          window.location.href = '/dashboard';
+        }, 500);
+      } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
+        console.error('❌ Błąd logowania Google:', event.data.error);
+        setGeneralError('Błąd logowania przez Google. Spróbuj ponownie.');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   // ============================================================================

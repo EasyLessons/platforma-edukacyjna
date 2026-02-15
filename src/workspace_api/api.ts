@@ -643,19 +643,39 @@ export const createInvite = async (workspaceId: number, invitedUserId: number): 
 export const fetchPendingInvites = async (): Promise<PendingInvite[]> => {
   const token = getToken();
 
+  console.log('🔍 fetchPendingInvites: Token:', token ? `✅ ${token.substring(0, 30)}...` : '❌ BRAK');
+
   if (!token) {
+    console.error('❌ fetchPendingInvites: Brak tokenu!');
     throw new Error('Musisz być zalogowany');
   }
 
-  const response = await fetch(`${API_BASE_URL}/api/workspaces/invites/pending`, {
-    method: 'GET',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  const url = `${API_BASE_URL}/api/workspaces/invites/pending`;
+  console.log('🔍 fetchPendingInvites: URL:', url);
+  console.log('🔍 fetchPendingInvites: Authorization header:', `Bearer ${token.substring(0, 30)}...`);
 
-  return handleResponse(response);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log('📡 fetchPendingInvites: Response status:', response.status);
+    console.log('📡 fetchPendingInvites: Response ok:', response.ok);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ fetchPendingInvites: Response error:', errorText);
+    }
+
+    return handleResponse(response);
+  } catch (error) {
+    console.error('❌ fetchPendingInvites: Fetch error:', error);
+    throw error;
+  }
 };
 
 /**

@@ -14,6 +14,7 @@ import { useEffect } from 'react';
 import { ReactNode } from 'react';
 import { Button } from '@new/shared/ui/button';
 import { FcGoogle } from 'react-icons/fc';
+import { useAuth } from '@/app/context/AuthContext';
 
 interface AuthLayoutProps {
   title: string;
@@ -32,6 +33,8 @@ export function AuthLayout({
   showBackToLogin = false,
   showGoogle = true,
 }: AuthLayoutProps) {
+  const { login: authLogin } = useAuth();
+  
   // Blokada przewijania
   useEffect(() => {
     const prevBodyOverflow = document.body.style.overflow;
@@ -45,20 +48,76 @@ export function AuthLayout({
     };
   }, []);
 
+  // Nasłuchuj na wiadomości z Google OAuth popup
+  useEffect(() => {
+    console.log('👂 auth-layout: Nasluchuję na wiadomości postMessage...');
+    
+    const handleMessage = (event: MessageEvent) => {
+      console.log('📨 auth-layout: Otrzymano wiadomość!', {
+        origin: event.origin,
+        expectedOrigin: window.location.origin,
+        type: event.data?.type,
+        hasToken: !!event.data?.token,
+        hasUserData: !!event.data?.userData
+      });
+      
+      // Sprawdź origin dla bezpieczeństwa
+      if (event.origin !== window.location.origin) {
+        console.warn('⚠️ auth-layout: Zły origin, ignoruję wiadomość');
+        return;
+      }
+
+      if (event.data.type === 'GOOGLE_AUTH_SUCCESS') {
+        const { token, userData } = event.data;
+        
+        console.log('✅ auth-layout: GOOGLE_AUTH_SUCCESS!');
+        console.log('📝 Token otrzymany:', token?.substring(0, 20) + '...');
+        console.log('📝 UserData otrzymany:', userData);
+        
+        // Użyj AuthContext.login() - to robi wszystko prawidłowo!
+        authLogin(token, userData);
+        
+        console.log('✅ authLogin() wywołany! Przekierowuję na /dashboard...');
+        
+        // Przekieruj natychmiast
+        window.location.href = '/dashboard';
+      } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
+        console.error('❌ auth-layout: GOOGLE_AUTH_ERROR:', event.data.error);
+        alert('Błąd logowania przez Google. Spróbuj ponownie.');
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      console.log('🔇 auth-layout: Przestaję nasłuchiwać');
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
+
   // Handler logowania Google
   const handleGoogleLogin = () => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
     const authUrl = `${baseUrl}/api/auth/google`;
+    
+    console.log('🚀 Otwieram Google OAuth popup:', authUrl);
+    
     const width = 520;
     const height = 680;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
 
-    window.open(
+    const popup = window.open(
       authUrl,
       'google-oauth',
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
     );
+    
+    if (!popup) {
+      console.error('❌ Nie udało się otworzyć popup! (popup blocker?)');
+      alert('Nie udało się otworzyć okna logowania. Sprawdź blokowanie wyskakujących okien.');
+    } else {
+      console.log('✅ Popup otwarty pomyślnie');
+    }
   };
 
   return (

@@ -2,6 +2,7 @@
 AUTH ROUTES - Endpointy autentykacji
 """
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List
 
@@ -90,3 +91,35 @@ async def reset_password(reset_data: ResetPassword, db: Session = Depends(get_db
     """Resetuje hasło użytkownika"""
     service = AuthService(db)
     return await service.reset_password(reset_data)
+
+
+
+@router.get("/auth/google")
+async def google_login(db: Session = Depends(get_db)):
+    """
+    Przekierowuje użytkownika do Google OAuth
+    """
+    service = AuthService(db)
+    authorization_url = await service.get_google_auth_url()
+    return RedirectResponse(authorization_url)
+
+
+@router.get("/auth/google/callback")
+async def google_callback(code: str, db: Session = Depends(get_db)):
+    """
+    Callback od Google po autoryzacji
+    Loguje użytkownika lub tworzy nowe konto
+    """
+    import json
+    import base64
+    
+    service = AuthService(db)
+    result = await service.google_login(code)
+    
+    # Zakoduj dane użytkownika do base64 (default=str konwertuje datetime na string)
+    user_json = json.dumps(result['user'], default=str)
+    user_encoded = base64.b64encode(user_json.encode()).decode()
+    
+    # Przekieruj na frontend z tokenem i danymi użytkownika w URL
+    frontend_url = service.settings.frontend_url
+    return RedirectResponse(f"{frontend_url}/auth/callback?token={result['access_token']}&user={user_encoded}")

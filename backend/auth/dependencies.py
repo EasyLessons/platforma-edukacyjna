@@ -47,13 +47,14 @@ def get_current_user(
         
         print(f"✅ DEBUG: Token zdekodowany! Payload: {payload}")
         
+        # Odczytaj user_id z 'sub' i skonwertuj na int
         user_id_str = payload.get("sub")
+        if user_id_str is None:
+            print("❌ DEBUG: 'sub' jest None!")
+            raise credentials_exception
+            
         user_id = int(user_id_str)
         print(f"👤 DEBUG: User ID z tokena: {user_id}")
-        
-        if user_id is None:
-            print("❌ DEBUG: user_id jest None!")
-            raise credentials_exception
             
     except JWTError as e:
         print(f"❌ DEBUG: JWTError: {e}")

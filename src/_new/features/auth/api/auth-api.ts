@@ -48,7 +48,7 @@ const handleResponse = async (response: Response) => {
 // Zapisuje token do localStorage i cookies
 export const saveToken = (token: string) => {
   if (typeof window !== 'undefined') {
-    localStorage.setItem('authToken', token);
+    localStorage.setItem('access_token', token);
     document.cookie = `access_token=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Strict`;
   }
 };

@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from core.logging import get_logger
 from core.config import get_settings
 from typing import List
+import httpx
 
 from core.models import User, Workspace, WorkspaceMember
 from auth.schemas import (
@@ -419,3 +420,173 @@ class AuthService:
         logger.info(f"✅ Hasło zresetowane: {user.username}")
         
         return {"message": "Hasło zostało zmienione"}
+
+    """
+    GOOGLE OAUTH SERVICE - Dodatkowe metody do auth/service.py
+    Skopiuj te metody na koniec klasy AuthService w pliku service.py
+    """
+
+    # === Dodaj do importów na początku service.py ===
+    # import httpx
+
+
+    # === Dodaj te metody na końcu klasy AuthService ===
+
+    async def get_google_auth_url(self) -> str:
+        """
+        Generuje URL do autoryzacji Google OAuth
+        """
+        auth_url = (
+            f"https://accounts.google.com/o/oauth2/v2/auth?"
+            f"client_id={self.settings.google_client_id}&"
+            f"redirect_uri={self.settings.google_redirect_uri}&"
+            f"response_type=code&"
+            f"scope=openid%20email%20profile&"
+            f"access_type=offline"
+        )
+        logger.info("🔗 Wygenerowano URL autoryzacji Google")
+        return auth_url
+
+    async def google_login(self, code: str) -> dict:
+        """
+        Logowanie przez Google OAuth
+        1. Wymienia code na access_token w Google
+        2. Pobiera dane użytkownika z Google
+        3. Tworzy użytkownika lub loguje istniejącego
+        """
+        logger.info("🔐 Rozpoczęto logowanie przez Google")
+        
+        # 1. Wymień code na token
+        token_url = "https://oauth2.googleapis.com/token"
+        token_data = {
+            "code": code,
+            "client_id": self.settings.google_client_id,
+            "client_secret": self.settings.google_client_secret,
+            "redirect_uri": self.settings.google_redirect_uri,
+            "grant_type": "authorization_code"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            token_response = await client.post(token_url, data=token_data)
+            
+            if token_response.status_code != 200:
+                logger.error(f"❌ Błąd wymiany kodu: {token_response.text}")
+                raise HTTPException(status_code=400, detail="Błąd autoryzacji Google")
+            
+            tokens = token_response.json()
+            access_token = tokens.get("access_token")
+            
+            # 2. Pobierz dane użytkownika
+            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
+            headers = {"Authorization": f"Bearer {access_token}"}
+            userinfo_response = await client.get(userinfo_url, headers=headers)
+            
+            if userinfo_response.status_code != 200:
+                logger.error(f"❌ Błąd pobierania danych: {userinfo_response.text}")
+                raise HTTPException(status_code=400, detail="Błąd pobierania danych użytkownika")
+            
+            user_info = userinfo_response.json()
+        
+        google_id = user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name", "")
+        picture = user_info.get("picture")
+        
+        logger.info(f"📧 Dane Google: {email}")
+        
+        # 3. Sprawdź czy użytkownik istnieje (po google_id lub email)
+        user = self.db.query(User).filter(
+            (User.google_id == google_id) | (User.email == email)
+        ).first()
+        
+        if user:
+            # Użytkownik istnieje - zaktualizuj dane Google jeśli nie ma
+            if not user.google_id:
+                user.google_id = google_id
+                user.auth_provider = "google"
+                user.profile_picture = picture
+                user.is_active = True  # Google weryfikuje email
+                self.db.commit()
+                logger.info(f"🔄 Zaktualizowano użytkownika: {user.username}")
+            
+            logger.info(f"✅ Logowanie istniejącego użytkownika: {user.username}")
+        else:
+            # Utwórz nowego użytkownika
+            username = email.split("@")[0]  # Tymczasowy username z email
+            
+            # Sprawdź czy username jest zajęty
+            counter = 1
+            original_username = username
+            while self.db.query(User).filter(User.username == username).first():
+                username = f"{original_username}{counter}"
+                counter += 1
+            
+            user = User(
+                username=username,
+                email=email,
+                full_name=name,
+                google_id=google_id,
+                auth_provider="google",
+                profile_picture=picture,
+                is_active=True,  # Google weryfikuje email
+                hashed_password=None  # Brak hasła dla Google
+            )
+            
+            try:
+                self.db.add(user)
+                self.db.flush()
+                logger.info(f"✅ Nowy użytkownik Google: {user.username} (ID: {user.id})")
+                
+                # Utwórz starter workspace
+                starter_workspace = Workspace(
+                    name="Moja Przestrzeń",
+                    icon="Home",
+                    bg_color="bg-green-500",
+                    created_by=user.id,
+                    created_at=datetime.utcnow()
+                )
+                self.db.add(starter_workspace)
+                self.db.flush()
+                
+                # Dodaj membership
+                membership = WorkspaceMember(
+                    workspace_id=starter_workspace.id,
+                    user_id=user.id,
+                    role="owner",
+                    is_favourite=True,
+                    joined_at=datetime.utcnow()
+                )
+                self.db.add(membership)
+                
+                # Ustaw jako aktywny workspace
+                user.active_workspace_id = starter_workspace.id
+                
+                self.db.commit()
+                logger.info(f"🏢 Workspace utworzony dla {user.username}")
+            
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"❌ Błąd tworzenia użytkownika Google: {str(e)}")
+                raise HTTPException(status_code=500, detail="Błąd tworzenia konta")
+        
+        # Generuj JWT token (taki sam format jak normalne logowanie)
+        jwt_token = create_access_token(
+            data={"sub": str(user.id)},
+            secret_key=self.settings.secret_key,
+            algorithm=self.settings.algorithm
+        )
+        
+        logger.info(f"🎟️ Token wygenerowany dla {user.username}")
+        
+        return {
+            "access_token": jwt_token,
+            "token_type": "bearer",
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "full_name": user.full_name,
+                "is_active": user.is_active,
+                "created_at": user.created_at
+            }
+        }
