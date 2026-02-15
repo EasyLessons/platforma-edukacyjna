@@ -459,7 +459,8 @@ export function SelectTool({
               el.type === 'text' ||
               el.type === 'image' ||
               el.type === 'markdown' ||
-              el.type === 'table'
+              el.type === 'table' ||
+              el.type === 'pdf'
             ) {
               const x = el.x + dx;
               const y = el.y + dy;
@@ -511,6 +512,11 @@ export function SelectTool({
                 y: originalEl.y + dy + snapDy,
               });
             } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
+              updates.set(id, {
+                x: originalEl.x + dx + snapDx,
+                y: originalEl.y + dy + snapDy,
+              });
+            } else if (originalEl.type === 'pdf') {
               updates.set(id, {
                 x: originalEl.x + dx + snapDx,
                 y: originalEl.y + dy + snapDy,
@@ -683,6 +689,18 @@ export function SelectTool({
               x: newCenter.x - originalEl.width / 2,
               y: newCenter.y - originalEl.height / 2,
             });
+          } else if (originalEl.type === 'pdf') {
+            // 🆕 Dla PDF: obróć środek wokół pivota
+            const centerX = originalEl.x + originalEl.width / 2;
+            const centerY = originalEl.y + originalEl.height / 2;
+
+            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
+
+            updates.set(id, {
+              x: newCenter.x - originalEl.width / 2,
+              y: newCenter.y - originalEl.height / 2,
+              rotation: (originalEl.rotation || 0) + rotationAngle,
+            });
           }
         });
 
@@ -778,17 +796,12 @@ export function SelectTool({
     isRotating,
     resizeHandle,
     resizeOriginalBox,
-    resizeOriginalElements,
-    dragStart,
-    draggedElementsOriginal,
-    rotationStartAngle,
-    rotationPivot,
-    rotationOriginalElements,
     canvasWidth,
     canvasHeight,
     onElementsUpdate,
     onOperationFinish,
     elements,
+    selectedIds,
     onActiveGuidesChange,
   ]);
 
@@ -1236,6 +1249,7 @@ export function SelectTool({
     const clickedElement = elements.find((el) => isPointInElement(worldPoint, el));
 
     if (clickedElement) {
+      // 🆕 Auto-drag: zaznacz element i od razu zacznij go przeciągać
       if (e.shiftKey) {
         const newSelection = new Set(selectedIds);
         if (newSelection.has(clickedElement.id)) {
@@ -1244,8 +1258,40 @@ export function SelectTool({
           newSelection.add(clickedElement.id);
         }
         onSelectionChange(newSelection);
+        
+        // 🆕 Pobierz elementy z nową selekcją natychmiast
+        setIsDragging(true);
+        setDragStart(worldPoint);
+        const originalElements = new Map<string, DrawingElement>();
+        elements.forEach((el) => {
+          if (newSelection.has(el.id)) {
+            originalElements.set(el.id, { ...el });
+          }
+        });
+        setDraggedElementsOriginal(originalElements);
       } else {
-        onSelectionChange(new Set([clickedElement.id]));
+        // 🆕 Zwykłe kliknięcie - jeśli element już zaznaczony, drag WSZYSTKIE zaznaczone
+        // Jeśli nowy element - zaznacz go i rozpocznij drag
+        let newSelection: Set<string>;
+        if (selectedIds.has(clickedElement.id)) {
+          // Element już zaznaczony - drag wszystkie zaznaczone
+          newSelection = new Set(selectedIds);
+        } else {
+          // Nowy element - zaznacz tylko jego
+          newSelection = new Set([clickedElement.id]);
+        }
+        
+        onSelectionChange(newSelection);
+        
+        setIsDragging(true);
+        setDragStart(worldPoint);
+        const originalElements = new Map<string, DrawingElement>();
+        elements.forEach((el) => {
+          if (newSelection.has(el.id)) {
+            originalElements.set(el.id, { ...el });
+          }
+        });
+        setDraggedElementsOriginal(originalElements);
       }
     } else {
       setIsSelecting(true);
@@ -1781,7 +1827,7 @@ export function SelectTool({
 
     return (
       <div
-        className="absolute border-2 z-36 border-blue-500 pointer-events-none"
+        className="absolute border z-36 border-blue-500 pointer-events-none"
         style={{
           left: topLeft.x,
           top: topLeft.y,
@@ -1942,7 +1988,7 @@ export function SelectTool({
           return (
             <div
               key={`preview-${id}`}
-              className="absolute border-2 z-35 border-blue-400 bg-blue-50/10 pointer-events-none"
+              className="absolute border z-35 border-blue-400 bg-blue-50/10 pointer-events-none"
               style={{
                 left: topLeft.x,
                 top: topLeft.y,

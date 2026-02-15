@@ -27,12 +27,12 @@ import { Point, ViewportTransform, DrawingElement } from './types';
 import { evaluate } from 'mathjs';
 
 /**
- * Clamp lineWidth: min 0.5px, max 20px
+ * Clamp lineWidth: min 0.5px, max 100px (zwiększone dla highlightera)
  * Linie skalują się z viewport, ale z limitami
  */
 export function clampLineWidth(width: number, scale: number): number {
   const scaled = width * scale;
-  return Math.max(0.5, Math.min(20, scaled));
+  return Math.max(0.5, Math.min(100, scaled));
 }
 
 /**

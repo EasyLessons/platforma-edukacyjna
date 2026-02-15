@@ -17,6 +17,23 @@ import { Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
+// Komponent pomocniczy dla wiersza porównania
+function ComparisonRow({ feature, free, premium }: { feature: string; free: string; premium: string }) {
+  return (
+    <tr>
+      <td style={{ padding: '8px 12px', fontSize: '13px', color: '#374151' }}>
+        {feature}
+      </td>
+      <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', color: '#6b7280' }}>
+        {free}
+      </td>
+      <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#059669' }}>
+        {premium}
+      </td>
+    </tr>
+  );
+}
+
 interface BoardHeaderProps {
   boardName: string;
   boardId: string;
@@ -433,61 +450,5 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
         </div>
       )}
     </>
-  );
-}
-
-// Komponent pomocniczy dla wiersza porównania
-function ComparisonRow({
-  feature,
-  free,
-  premium,
-}: {
-  feature: string;
-  free: string;
-  premium: string;
-}) {
-  return (
-    <tr
-      style={{
-        backgroundColor: '#f9fafb',
-        borderRadius: '8px',
-      }}
-    >
-      <td
-        style={{
-          padding: '10px 12px',
-          fontSize: '13px',
-          color: '#374151',
-          fontWeight: '500',
-          borderTopLeftRadius: '8px',
-          borderBottomLeftRadius: '8px',
-        }}
-      >
-        {feature}
-      </td>
-      <td
-        style={{
-          padding: '10px 12px',
-          fontSize: '13px',
-          color: '#6b7280',
-          textAlign: 'center',
-        }}
-      >
-        {free}
-      </td>
-      <td
-        style={{
-          padding: '10px 12px',
-          fontSize: '13px',
-          color: '#059669',
-          fontWeight: '600',
-          textAlign: 'center',
-          borderTopRightRadius: '8px',
-          borderBottomRightRadius: '8px',
-        }}
-      >
-        {premium}
-      </td>
-    </tr>
   );
 }

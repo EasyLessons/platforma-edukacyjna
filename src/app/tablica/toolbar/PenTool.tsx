@@ -66,6 +66,8 @@ export function PenTool({
   const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<Point[]>([]);
+  const widthsRef = useRef<number[]>([]); // 🆕 Grubości dla każdego punktu
+  const lastTimestampRef = useRef<number>(0); // 🆕 Timestamp ostatniego punktu
   const [, forceUpdate] = useState({});
 
   // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
@@ -153,6 +155,15 @@ export function PenTool({
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     pointsRef.current = [worldPoint];
+    
+    // 🆕 Variable width tylko dla pędzla, nie dla highlightera
+    const isHighlighter = lineWidth >= 20;
+    if (!isHighlighter) {
+      widthsRef.current = [lineWidth]; // 🆕 Pierwsza szerokość to bazowa szerokość
+      lastTimestampRef.current = performance.now(); // 🆕 Timestamp rozpoczęcia
+    } else {
+      widthsRef.current = []; // Highlighter nie używa variable width
+    }
 
     const newPath: DrawingPath = {
       id: Date.now().toString(),
@@ -160,6 +171,7 @@ export function PenTool({
       points: pointsRef.current,
       color,
       width: lineWidth,
+      opacity: isHighlighter ? 0.2 : undefined,
     };
 
     currentPathRef.current = newPath;
@@ -189,6 +201,46 @@ export function PenTool({
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
+    // Wygładzanie - dodaj punkt tylko jeśli jest wystarczająco daleko od poprzedniego
+    const lastPoint = pointsRef.current[pointsRef.current.length - 1];
+    if (lastPoint) {
+      const dx = worldPoint.x - lastPoint.x;
+      const dy = worldPoint.y - lastPoint.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      
+      // Minimalna odległość między punktami (w jednostkach świata)
+      // Im większa wartość, tym bardziej wygładzona linia
+      const minDistance = 0;
+      
+      if (distance < minDistance) {
+        return; // Pomiń ten punkt - zbyt blisko poprzedniego
+      }
+
+      // 🆕 Oblicz szybkość rysowania dla pressure-sensitive width
+      // Tylko dla cienkich linii (pędzel), highlighter ma stałą grubość
+      const isHighlighter = lineWidth >= 20;
+      
+      if (!isHighlighter) {
+        const currentTime = performance.now();
+        const deltaTime = currentTime - lastTimestampRef.current;
+        lastTimestampRef.current = currentTime;
+
+        // Szybkość = odległość / czas (w jednostkach świata na milisekundę)
+        const speed = deltaTime > 0 ? distance / deltaTime : 0;
+
+        // Mapowanie szybkości na grubość:
+        // - Wolne rysowanie (speed < 0.5) → 100% bazowej grubości
+        // - Szybkie rysowanie (speed > 2) → 50% bazowej grubości
+        // Używamy funkcji wykładniczej dla płynnego przejścia
+        const speedFactor = Math.exp(-speed * 0.5); // Wykładnicze zanikanie
+        const minWidthRatio = 0.5; // Minimalna grubość to 50% bazowej
+        const widthMultiplier = minWidthRatio + (1 - minWidthRatio) * speedFactor;
+        
+        const newWidth = lineWidth * widthMultiplier;
+        widthsRef.current.push(newWidth);
+      }
+    }
+
     // Dodaj punkt bezpośrednio do ref (bez kopiowania całej tablicy)
     pointsRef.current.push(worldPoint);
 
@@ -211,6 +263,7 @@ export function PenTool({
       const finalPath: DrawingPath = {
         ...currentPathRef.current,
         points: [...pointsRef.current],
+        widths: widthsRef.current.length > 0 ? [...widthsRef.current] : undefined, // 🆕 Dodaj widths jeśli są
       };
       onPathCreate(finalPath);
     }
@@ -218,6 +271,7 @@ export function PenTool({
     isDrawingRef.current = false;
     currentPathRef.current = null;
     pointsRef.current = [];
+    widthsRef.current = []; // 🆕 Wyczyść widths
 
     // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
     setTimeout(() => {
@@ -240,6 +294,7 @@ export function PenTool({
     isDrawingRef.current = false;
     currentPathRef.current = null;
     pointsRef.current = [];
+    widthsRef.current = []; // 🆕 Wyczyść widths
   };
 
   // Render preview path (rysowanie w trakcie)
@@ -268,6 +323,7 @@ export function PenTool({
           strokeLinecap="round"
           strokeLinejoin="round"
           fill="none"
+          opacity={currentPathRef.current.opacity ?? 1}
         />
       </svg>
     );

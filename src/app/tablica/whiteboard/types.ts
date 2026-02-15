@@ -48,6 +48,8 @@ export interface DrawingPath {
   points: Point[];
   color: string;
   width: number;
+  widths?: number[]; // Opcjonalna tablica grubości dla każdego punktu (pressure-sensitive)
+  opacity?: number; // Opcjonalna przezroczystość (0-1), domyślnie 1
 }
 
 export interface Shape {
@@ -90,6 +92,7 @@ export interface FunctionPlot {
   strokeWidth: number;
   xRange: number;
   yRange: number;
+  strokeDasharray?: string; // np. '5 5' dla linii przerywanej
 }
 
 // 🆕 Nowy typ dla obrazków (przyszłość)

@@ -48,6 +48,8 @@ import { clampLineWidth, clampFontSize, evaluateExpression } from './utils';
  * Rysuje ścieżkę (path) - linie rysowane piórem
  * WAŻNE: Używa clamp dla lineWidth!
  * Obsługuje też pojedyncze punkty (kropki)
+ * 🆕 Obsługuje zmienną grubość (pressure-sensitive) jeśli path.widths jest zdefiniowane
+ * 🆕 Obsługuje opacity dla highlightera
  */
 export function drawPath(
   ctx: CanvasRenderingContext2D,
@@ -60,20 +62,53 @@ export function drawPath(
 
   const lineWidth = clampLineWidth(path.width, viewport.scale);
 
+  // 🆕 Ustaw opacity jeśli zdefiniowane
+  const originalAlpha = ctx.globalAlpha;
+  if (path.opacity !== undefined) {
+    ctx.globalAlpha = path.opacity;
+  }
+
   // Pojedynczy punkt - rysuj jako kółko (kropka)
   if (path.points.length === 1) {
     const point = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
     ctx.fillStyle = path.color;
     ctx.beginPath();
-    ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
+    const radius = path.widths && path.widths[0] 
+      ? clampLineWidth(path.widths[0], viewport.scale) / 2 
+      : lineWidth / 2;
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
     return;
   }
 
   ctx.strokeStyle = path.color;
-  ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+
+  // 🆕 Jeśli mamy zmienną grubość - rysuj każdy segment osobno
+  if (path.widths && path.widths.length > 0) {
+    for (let i = 0; i < path.points.length - 1; i++) {
+      const p1 = transformPoint(path.points[i], viewport, canvasWidth, canvasHeight);
+      const p2 = transformPoint(path.points[i + 1], viewport, canvasWidth, canvasHeight);
+      
+      // Użyj średniej grubości z dwóch sąsiednich punktów
+      const w1 = path.widths[i] || path.width;
+      const w2 = path.widths[i + 1] || path.width;
+      const avgWidth = (w1 + w2) / 2;
+      
+      ctx.lineWidth = clampLineWidth(avgWidth, viewport.scale);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
+    return;
+  }
+
+  // Stała grubość - rysuj normalnie
+  ctx.lineWidth = lineWidth;
   ctx.beginPath();
 
   const startPoint = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
@@ -85,6 +120,7 @@ export function drawPath(
   }
 
   ctx.stroke();
+  ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
 }
 
 /**
@@ -504,6 +540,15 @@ export function drawFunction(
   ctx.lineWidth = clampLineWidth(func.strokeWidth, viewport.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  
+  // Obsługa linii przerywanej
+  if (func.strokeDasharray) {
+    const dashArray = func.strokeDasharray.split(' ').map(Number);
+    ctx.setLineDash(dashArray);
+  } else {
+    ctx.setLineDash([]);
+  }
+  
   ctx.beginPath();
 
   let started = false;
@@ -537,6 +582,9 @@ export function drawFunction(
   if (started) {
     ctx.stroke();
   }
+  
+  // Resetuj lineDash po narysowaniu
+  ctx.setLineDash([]);
 }
 
 /**

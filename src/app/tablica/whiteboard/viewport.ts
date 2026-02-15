@@ -202,7 +202,7 @@ export function zoomViewport(
   const scaleChange = 1 + (delta > 0 ? zoomIntensity : -zoomIntensity);
 
   const oldScale = viewport.scale;
-  const newScale = Math.min(Math.max(oldScale * scaleChange, 0.2), 5.0);
+  const newScale = Math.min(Math.max(oldScale * scaleChange, 0.1), 5.0);
 
   const centerX = canvasWidth / 2;
   const centerY = canvasHeight / 2;

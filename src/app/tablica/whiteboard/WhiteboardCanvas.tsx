@@ -234,8 +234,8 @@ export default function WhiteboardCanvas({
   const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
   const [polygonSides, setPolygonSides] = useState(5); // Liczba boków dla wielokąta
   const [color, setColor] = useState('#000000');
-  const [lineWidth, setLineWidth] = useState(3);
-  const [fontSize, setFontSize] = useState(24);
+  const [lineWidth, setLineWidth] = useState(4);
+  const [fontSize, setFontSize] = useState(70);
   const [fillShape, setFillShape] = useState(false);
 
   // 🆕 LOADING STATE - wyświetlanie overlay podczas ładowania
@@ -448,6 +448,11 @@ Zadaj pytanie! 🤔`,
           console.error(`❌ Błąd ładowania zdalnego obrazu ${element.id}`);
         };
       }
+
+      // 🆕 Jeśli to PDF - po prostu go otrzymujemy, nie ma przygotowania
+      if (element.type === 'pdf') {
+        console.log(`📄 Otrzymano zdalny PDF ${element.id}`);
+      }
     });
 
     // Handler: Aktualizacja elementu od innego użytkownika
@@ -511,7 +516,7 @@ Zadaj pytanie! 🤔`,
 
   // 🆕 BROADCAST VIEWPORT CHANGE - gdy mój viewport się zmienia, wyślij do innych
   const lastViewportBroadcastRef = useRef<number>(0);
-  const VIEWPORT_BROADCAST_INTERVAL = 50; // 50ms = 20 FPS
+  const VIEWPORT_BROADCAST_INTERVAL = 16; // 50ms = 20 FPS
 
   useEffect(() => {
     // Throttle broadcast żeby nie zalewać sieci
@@ -924,6 +929,9 @@ Zadaj pytanie! 🤔`,
     if (boardIdStateRef.current) {
       debouncedSave(boardIdStateRef.current);
     }
+
+    // 🆕 Zmień narzędzie na zaznacz po wklejeniu
+    setTool('select');
 
     console.log('📌 Wklejono elementów:', newElements.length);
   }, [copiedElements, broadcastElementCreated, debouncedSave]);
@@ -1451,6 +1459,7 @@ Zadaj pytanie! 🤔`,
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
 
+      // Rysuj siatkę układu współrzędnych
       drawGrid(ctx, currentViewport, width, height);
 
       // 🆕 VIEWPORT CULLING - renderuj tylko widoczne elementy
@@ -2186,6 +2195,9 @@ Zadaj pytanie! 🤔`,
           console.error('Failed to load image:', image.id);
         };
       }
+
+      // 🆕 Zmień narzędzie na zaznacz po dodaniu zdjęcia
+      setTool('select');
     },
     [
       userRole,
@@ -2530,19 +2542,75 @@ Zadaj pytanie! 🤔`,
     [userRole, saveToHistory, broadcastElementUpdated, boardIdState, debouncedSave]
   );
 
+  // 🆕 Helper ref để śledzić zaznaczone elementy z ostatniego updateu
+  const lastBroadcastedElementsRef = useRef<Map<string, DrawingElement>>(new Map());
+  const batchBroadcastTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingBroadcastRef = useRef<Map<string, DrawingElement>>(new Map());
+
+  // Helper: Batch broadcast - wysyłaj wszystkie na raz zamiast pojedynczo
+  const scheduleBatchBroadcast = useCallback(() => {
+    if (batchBroadcastTimerRef.current) {
+      clearTimeout(batchBroadcastTimerRef.current);
+    }
+
+    batchBroadcastTimerRef.current = setTimeout(() => {
+      if (pendingBroadcastRef.current.size > 0) {
+        const elementsToSend = Array.from(pendingBroadcastRef.current.values());
+        broadcastElementsBatch(elementsToSend);
+        pendingBroadcastRef.current.clear();
+        batchBroadcastTimerRef.current = null;
+      }
+    }, 30); // 🆕 Czekaj 30ms żeby zebrać wszystkie updates, potem wyślij batch
+  }, [broadcastElementsBatch]);
+
   const handleElementsUpdate = useCallback(
     (updates: Map<string, Partial<DrawingElement>>) => {
       if (userRole === 'viewer') return; // 🔒 Blokada dla viewerów
 
-      setElements((prev) =>
-        prev.map((el) => {
+      setElements((prev) => {
+        // Zsynchronizuj z aktualnym stanem
+        elementsRef.current = prev;
+
+        // Oblicz nowe elementy
+        const newElements = prev.map((el) => {
           const update = updates.get(el.id);
           return update ? ({ ...el, ...update } as DrawingElement) : el;
-        })
-      );
+        });
+
+        // 🆕 BATCH BROADCAST - dodaj do pending, wyślij później
+        newElements.forEach((newEl) => {
+          if (updates.has(newEl.id)) {
+            pendingBroadcastRef.current.set(newEl.id, newEl);
+            setUnsavedElements((prev) => new Set(prev).add(newEl.id));
+          }
+        });
+
+        // Zaplanuj batch broadcast
+        scheduleBatchBroadcast();
+
+        // Zapisz do bazy (z throttle - debouncen są już)
+        if (boardIdState) debouncedSave(boardIdState);
+
+        return newElements;
+      });
     },
-    [userRole]
+    [userRole, boardIdState, debouncedSave, scheduleBatchBroadcast]
   );
+
+  // 🆕 Cleanup: Flush pending broadcasts na unmount
+  useEffect(() => {
+    return () => {
+      if (batchBroadcastTimerRef.current) {
+        clearTimeout(batchBroadcastTimerRef.current);
+      }
+      // Wyślij wszystkie pending updates ostatni raz
+      if (pendingBroadcastRef.current.size > 0) {
+        const elementsToSend = Array.from(pendingBroadcastRef.current.values());
+        broadcastElementsBatch(elementsToSend);
+        pendingBroadcastRef.current.clear();
+      }
+    };
+  }, [broadcastElementsBatch]);
 
   const handleSelectionFinish = useCallback(() => {
     // Używamy ref żeby mieć aktualny stan
@@ -2628,7 +2696,7 @@ Zadaj pytanie! 🤔`,
 
   const zoomOutRef = useRef(() => {
     setViewport((prev) => {
-      const newScale = Math.max(prev.scale / 1.2, 0.2);
+      const newScale = Math.max(prev.scale / 1.2, 0.1);
       return constrainViewport({ ...prev, scale: newScale });
     });
   });
@@ -3606,6 +3674,7 @@ Zadaj pytanie! 🤔`,
           onImport={handleImport}
           onImagePaste={handleImageToolPaste}
           onImageUpload={handleImageToolUpload}
+          onPDFUpload={handleImageToolUpload}
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen(!isCalculatorOpen)}
           isReadOnly={userRole === 'viewer'}
@@ -4005,7 +4074,7 @@ Zadaj pytanie! 🤔`,
               pointerEvents: 'none',
               width: '100%',
               height: '100%',
-              strokeWidth: '10',
+              strokeWidth: '1',
               opacity: '1',
             }}
           >
