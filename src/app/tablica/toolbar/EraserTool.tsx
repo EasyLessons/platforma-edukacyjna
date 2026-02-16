@@ -123,6 +123,30 @@ export function EraserTool({
     } else if (element.type === 'text') {
       const width = element.width || 3;
       const height = element.height || 1;
+      
+      // 🆕 Obsługa rotacji dla text
+      if (element.rotation && element.rotation !== 0) {
+        // Środek elementu
+        const centerX = element.x + width / 2;
+        const centerY = element.y + height / 2;
+        
+        // Odwróć punkt o -rotation wokół środka
+        const cos = Math.cos(-element.rotation);
+        const sin = Math.sin(-element.rotation);
+        const dx = worldPoint.x - centerX;
+        const dy = worldPoint.y - centerY;
+        const rotatedX = centerX + dx * cos - dy * sin;
+        const rotatedY = centerY + dx * sin + dy * cos;
+        
+        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
+        return (
+          rotatedX >= element.x &&
+          rotatedX <= element.x + width &&
+          rotatedY >= element.y &&
+          rotatedY <= element.y + height
+        );
+      }
+      
       return (
         worldPoint.x >= element.x &&
         worldPoint.x <= element.x + width &&
@@ -130,6 +154,29 @@ export function EraserTool({
         worldPoint.y <= element.y + height
       );
     } else if (element.type === 'image') {
+      // 🆕 Obsługa rotacji dla image
+      if (element.rotation && element.rotation !== 0) {
+        // Środek elementu
+        const centerX = element.x + element.width / 2;
+        const centerY = element.y + element.height / 2;
+        
+        // Odwróć punkt o -rotation wokół środka
+        const cos = Math.cos(-element.rotation);
+        const sin = Math.sin(-element.rotation);
+        const dx = worldPoint.x - centerX;
+        const dy = worldPoint.y - centerY;
+        const rotatedX = centerX + dx * cos - dy * sin;
+        const rotatedY = centerY + dx * sin + dy * cos;
+        
+        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
+        return (
+          rotatedX >= element.x &&
+          rotatedX <= element.x + element.width &&
+          rotatedY >= element.y &&
+          rotatedY <= element.y + element.height
+        );
+      }
+      
       return (
         worldPoint.x >= element.x &&
         worldPoint.x <= element.x + element.width &&

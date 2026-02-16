@@ -26,11 +26,11 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   MousePointer2,
   Hand,
-  PenTool,
+  Pencil,
   Type,
   Square,
   Circle,
@@ -57,6 +57,7 @@ import {
   MessageCircle,
   FileText,
   MoreVertical,
+  Highlighter,
 } from 'lucide-react';
 import { Tool, ShapeType } from './Toolbar';
 
@@ -116,12 +117,16 @@ const ToolButton = ({
   onClick,
   title,
   disabled = false,
+  filled = false,
+  fillOpacity,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; fill?: string; fillOpacity?: number }>;
   active: boolean;
   onClick: () => void;
   title: string;
   disabled?: boolean;
+  filled?: boolean;
+  fillOpacity?: number;
 }) => (
   <button
     onClick={onClick}
@@ -129,11 +134,28 @@ const ToolButton = ({
     title={title}
     className={`
       relative p-1.5 rounded-md transition-colors group
-      ${active ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'}
+      ${active 
+        ? 'bg-blue-500/20 text-blue-600' 
+        : 'text-gray-700 hover:bg-gray-100'
+      }
       ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
     `}
   >
-    <Icon className="w-4 h-4" />
+    <Icon 
+      className="w-5 h-5" 
+      {...(() => {
+        if (filled) {
+          return { fill: 'currentColor', fillOpacity };
+        }
+        if (active) {
+          return { 
+            fill: 'rgb(37 99 235 / 0.1)',
+            stroke: 'currentColor' 
+          };
+        }
+        return {};
+      })()} 
+    />
     <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
       {title}
     </span>
@@ -176,6 +198,23 @@ export function ToolbarUI({
   // 🆕 Wykrywanie wysokości ekranu
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+  
+  // 🆕 Tryb pędzla: 'pen' | 'highlighter'
+  const [penMode, setPenMode] = useState<'pen' | 'highlighter'>('pen');
+  const [penColors, setPenColors] = useState([
+  '#1c222b',  // Ciemnoszary - główne pisanie
+  '#e12f2f',  // Czerwony - ważne/błędy
+  '#04ba80'   // Ciemnozielony (green-600) - pomocnicze notatki
+]);
+  const [highlighterColors, setHighlighterColors] = useState(['#EF4444', '#22C55E', '#FFFF00']);
+  
+  // 🆕 Refs dla color picker inputs
+  const penBlackInputRef = useRef<HTMLInputElement>(null);
+  const penCreamInputRef = useRef<HTMLInputElement>(null);
+  const penPinkInputRef = useRef<HTMLInputElement>(null);
+  const highlighterRedInputRef = useRef<HTMLInputElement>(null);
+  const highlighterGreenInputRef = useRef<HTMLInputElement>(null);
+  const highlighterYellowInputRef = useRef<HTMLInputElement>(null);
 
   // Debug isReadOnly
   useEffect(() => {
@@ -218,7 +257,7 @@ export function ToolbarUI({
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
   // - eraser: brak właściwości do edycji
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image' || tool === 'pdf';
+  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
 
   return (
     <>
@@ -232,6 +271,8 @@ export function ToolbarUI({
               active={tool === 'select'}
               onClick={() => onToolChange('select')}
               title="Zaznacz (V)"
+              filled={true}
+              fillOpacity={1}
             />
           )}
           <ToolButton
@@ -241,11 +282,13 @@ export function ToolbarUI({
             title="Przesuwaj (H)"
           />
           <ToolButton
-            icon={PenTool}
+            icon={Pencil}
             active={tool === 'pen'}
             onClick={() => onToolChange('pen')}
             title="Rysuj (P)"
             disabled={isReadOnly}
+            filled={true}
+            fillOpacity={0.3}
           />
           <ToolButton
             icon={Type}
@@ -460,36 +503,282 @@ export function ToolbarUI({
 
       {/* PROPERTIES PANEL - tylko desktop i tylko gdy hasProperties - osobny blok obok toolbara */}
       {hasProperties && (
-        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-3 pointer-events-auto">
-          <div className="flex flex-col gap-2 min-w-[80px]">
+        <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-2 pointer-events-auto">
+          <div className="flex flex-col items-center gap-2">
             {/* PEN */}
             {tool === 'pen' && (
               <>
+                {/* Wybór trybu: Pen / Highlighter */}
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Kolor
-                  </label>
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    className="w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
-                  />
+                  <button
+                    onClick={() => {
+                      setPenMode('pen');
+                      onLineWidthChange(4);
+                      onColorChange(penColors[0]);
+                    }}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      penMode === 'pen'
+                        ? 'bg-blue-500/20 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Pędzel"
+                  >
+                    <Pencil className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPenMode('highlighter');
+                      onLineWidthChange(70);
+                      onColorChange(highlighterColors[2]);
+                    }}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      penMode === 'highlighter'
+                        ? 'bg-blue-500/20 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Zakreślacz"
+                  >
+                    <Highlighter className="w-5 h-5" />
+                  </button>
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Grubość
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={lineWidth}
-                    onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                  />
-                  <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
+                {/* Separator */}
+                <div className="w-6 h-px bg-gray-200 my-1" />
+
+                {/* Paleta kolorów */}
+                <div className="flex flex-col gap-1.5">
+                  {penMode === 'pen' ? (
+                    // Kolory dla pędzla: czarny, kremowy, czerwony pastelowy
+                    <>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === penColors[0].toUpperCase()) {
+                              penBlackInputRef.current?.click();
+                            } else {
+                              onColorChange(penColors[0]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === penColors[0].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: penColors[0] }}
+                          title="Czarny"
+                        />
+                        <input
+                          ref={penBlackInputRef}
+                          type="color"
+                          value={penColors[0]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setPenColors([next, penColors[1], penColors[2]]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === penColors[1].toUpperCase()) {
+                              penCreamInputRef.current?.click();
+                            } else {
+                              onColorChange(penColors[1]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === penColors[1].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: penColors[1] }}
+                          title="Kremowy"
+                        />
+                        <input
+                          ref={penCreamInputRef}
+                          type="color"
+                          value={penColors[1]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setPenColors([penColors[0], next, penColors[2]]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === penColors[2].toUpperCase()) {
+                              penPinkInputRef.current?.click();
+                            } else {
+                              onColorChange(penColors[2]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === penColors[2].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: penColors[2] }}
+                          title="Czerwony pastelowy"
+                        />
+                        <input
+                          ref={penPinkInputRef}
+                          type="color"
+                          value={penColors[2]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setPenColors([penColors[0], penColors[1], next]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    // Kolory dla zakreślacza: czerwony, zielony, żółty
+                    <>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === highlighterColors[0].toUpperCase()) {
+                              highlighterRedInputRef.current?.click();
+                            } else {
+                              onColorChange(highlighterColors[0]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === highlighterColors[0].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: highlighterColors[0], opacity: 0.4 }}
+                          title="Czerwony zakreślacz"
+                        />
+                        <input
+                          ref={highlighterRedInputRef}
+                          type="color"
+                          value={highlighterColors[0]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setHighlighterColors([next, highlighterColors[1], highlighterColors[2]]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === highlighterColors[1].toUpperCase()) {
+                              highlighterGreenInputRef.current?.click();
+                            } else {
+                              onColorChange(highlighterColors[1]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === highlighterColors[1].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: highlighterColors[1], opacity: 0.4 }}
+                          title="Zielony zakreślacz"
+                        />
+                        <input
+                          ref={highlighterGreenInputRef}
+                          type="color"
+                          value={highlighterColors[1]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setHighlighterColors([highlighterColors[0], next, highlighterColors[2]]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                      <div className="relative">
+                        <div
+                          onClick={() => {
+                            if (color.toUpperCase() === highlighterColors[2].toUpperCase()) {
+                              highlighterYellowInputRef.current?.click();
+                            } else {
+                              onColorChange(highlighterColors[2]);
+                            }
+                          }}
+                          className={`w-8 h-8 rounded-full border-2 transition-all cursor-pointer ${
+                            color.toUpperCase() === highlighterColors[2].toUpperCase()
+                              ? 'border-blue-500 ring-1 ring-blue-500'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                          style={{ backgroundColor: highlighterColors[2], opacity: 0.4 }}
+                          title="Żółty zakreślacz"
+                        />
+                        <input
+                          ref={highlighterYellowInputRef}
+                          type="color"
+                          value={highlighterColors[2]}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setHighlighterColors([highlighterColors[0], highlighterColors[1], next]);
+                            onColorChange(next);
+                          }}
+                          className="absolute opacity-0 pointer-events-none"
+                        />
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Separator */}
+                <div className="w-6 h-px bg-blue-200 my-1" />
+
+                {/* Pionowy slider grubości */}
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <div className="relative h-32 w-8 flex items-center justify-center">
+                    {/* Tło slider */}
+                    <div className="absolute w-2 h-full bg-blue-100 rounded-full" />
+    
+                      {/* Slider input */}
+                      <input
+                        type="range"
+                        min={penMode === 'pen' ? 1 : 20}
+                        max={penMode === 'pen' ? 21 : 200}
+                        value={lineWidth}
+                        onChange={(e) => onLineWidthChange(Number(e.target.value))}
+                        className="hover:cursor-pointer
+                                  absolute h-32 w-2 appearance-none bg-transparent cursor-default accent-blue-500
+                                  [&::-webkit-slider-thumb]:opacity-100
+                                  [&::-webkit-slider-thumb:active]:opacity-100
+                                  [&::-moz-range-thumb]:opacity-100
+                                  [&::-moz-range-thumb:active]:opacity-100
+                                  hover:opacity-100"
+                        style={{
+                          writingMode: 'bt-lr' as any,
+                          WebkitAppearance: 'slider-vertical',
+                        }}
+                      />
+                    </div>
+
+                  {/* Preview aktualnej grubości */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center">
+                      <div
+                        className="rounded-full"
+                        style={{
+                          width: `${Math.min(lineWidth / (penMode === 'highlighter' ? 7 : 1), 28)}px`,
+                          height: `${Math.min(lineWidth / (penMode === 'highlighter' ? 7 : 1), 28)}px`,
+                          backgroundColor: color,
+                          opacity: penMode === 'highlighter' ? 0.4 : 1,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-600 font-semibold">
+                      {lineWidth}px
+                    </span>
+                  </div>
                 </div>
               </>
             )}
@@ -498,136 +787,178 @@ export function ToolbarUI({
             {tool === 'shape' && (
               <>
                 {/* Wybór kształtu - pionowo */}
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Kształt
-                  </label>
-                  <div className="flex flex-col gap-1 bg-gray-100 rounded-lg p-1">
-                    <button
-                      onClick={() => onShapeChange('rectangle')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'rectangle'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title="Prostokąt"
-                    >
-                      <Square className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('circle')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'circle'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title="Koło"
-                    >
-                      <Circle className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('triangle')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'triangle'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title="Trójkąt"
-                    >
-                      <Triangle className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('polygon')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'polygon'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title={`Wielokąt (${polygonSides} boków)`}
-                    >
-                      <Hexagon className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('line')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'line'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title="Linia"
-                    >
-                      <Minus className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onShapeChange('arrow')}
-                      className={`p-1.5 rounded-md transition-all ${
-                        selectedShape === 'arrow'
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-700 hover:bg-gray-200'
-                      }`}
-                      title="Strzałka"
-                    >
-                      <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </div>
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => onShapeChange('rectangle')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'rectangle'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Prostokąt"
+                  >
+                    <Square className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onShapeChange('circle')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'circle'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Koło"
+                  >
+                    <Circle className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onShapeChange('triangle')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'triangle'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Trójkąt"
+                  >
+                    <Triangle className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onShapeChange('polygon')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'polygon'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title={`Wielokąt (${polygonSides} boków)`}
+                  >
+                    <Hexagon className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onShapeChange('line')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'line'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Linia"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => onShapeChange('arrow')}
+                    className={`p-1.5 rounded-md transition-all cursor-pointer ${
+                      selectedShape === 'arrow'
+                        ? 'bg-blue-500 text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                    title="Strzałka"
+                  >
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
                 </div>
+
+                {/* Separator */}
+                <div className="w-6 h-px bg-gray-200 my-1" />
 
                 {/* Input na liczbę boków wielokąta */}
                 {selectedShape === 'polygon' && (
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                      Boki
-                    </label>
-                    <input
-                      type="number"
-                      min="3"
-                      max="20"
-                      value={polygonSides}
-                      onChange={(e) =>
-                        onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))
-                      }
-                      className="w-14 px-2 py-1 text-sm text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  </div>
+                  <>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                        Boki
+                      </label>
+                      <input
+                        type="number"
+                        min="3"
+                        max="20"
+                        value={polygonSides}
+                        onChange={(e) =>
+                          onPolygonSidesChange(Math.max(3, Math.min(20, Number(e.target.value))))
+                        }
+                        className="w-14 px-2 py-1 text-sm text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                    {/* Separator */}
+                    <div className="w-6 h-px bg-gray-200 my-1" />
+                  </>
                 )}
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Kolor
-                  </label>
-                  <input
-                    type="color"
-                    value={color}
-                    onChange={(e) => onColorChange(e.target.value)}
-                    className="w-8 h-8 rounded-md border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
+                {/* Color picker */}
+                <div className="relative">
+                  <div
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'color';
+                      input.value = color;
+                      input.onchange = (e) => onColorChange((e.target as HTMLInputElement).value);
+                      input.click();
+                    }}
+                    className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-all cursor-pointer"
+                    style={{ backgroundColor: color }}
+                    title="Kolor"
                   />
                 </div>
 
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-                    Grubość
-                  </label>
-                  <input
-                    type="range"
-                    min="1"
-                    max="20"
-                    value={lineWidth}
-                    onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                    className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                  />
-                  <span className="text-xs text-gray-700 font-semibold">{lineWidth}px</span>
+                {/* Separator */}
+                <div className="w-6 h-px bg-blue-200 my-1" />
+
+                {/* Pionowy slider grubości */}
+                <div className="flex flex-col items-center gap-2 py-2">
+                  <div className="relative h-32 w-8 flex items-center justify-center">
+                    {/* Tło slider */}
+                    <div className="absolute w-2 h-full bg-blue-100 rounded-full" />
+    
+                    {/* Slider input */}
+                    <input
+                      type="range"
+                      min="1"
+                      max="20"
+                      value={lineWidth}
+                      onChange={(e) => onLineWidthChange(Number(e.target.value))}
+                      className="hover:cursor-pointer
+                                absolute h-32 w-2 appearance-none bg-transparent cursor-default accent-blue-500
+                                [&::-webkit-slider-thumb]:opacity-100
+                                [&::-webkit-slider-thumb:active]:opacity-100
+                                [&::-moz-range-thumb]:opacity-100
+                                [&::-moz-range-thumb:active]:opacity-100
+                                hover:opacity-100"
+                      style={{
+                        writingMode: 'bt-lr' as any,
+                        WebkitAppearance: 'slider-vertical',
+                      }}
+                    />
+                  </div>
+
+                  {/* Preview aktualnej grubości */}
+                  <div className="flex flex-col items-center gap-1">
+                    <div className="w-8 h-8 border border-gray-300 rounded-full flex items-center justify-center">
+                      <div
+                        className="rounded-full"
+                        style={{
+                          width: `${Math.min(lineWidth, 28)}px`,
+                          height: `${Math.min(lineWidth, 28)}px`,
+                          backgroundColor: color,
+                        }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-gray-600 font-semibold">
+                      {lineWidth}px
+                    </span>
+                  </div>
                 </div>
+
+                {/* Separator */}
+                <div className="w-6 h-px bg-gray-200 my-1" />
 
                 {selectedShape !== 'line' && selectedShape !== 'arrow' && (
                   <button
                     onClick={() => onFillShapeChange(!fillShape)}
-                    className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all ${
+                    className={`px-2 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${
                       fillShape
                         ? 'bg-blue-500 text-white hover:bg-blue-600'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'
                     }`}
                   >
-                    {fillShape ? '◼ Wypełniony' : '◻ Kontur'}
+                    {fillShape ? '◼' : '◻'}
                   </button>
                 )}
               </>
@@ -640,43 +971,43 @@ export function ToolbarUI({
 
             {/* 🖼️ IMAGE */}
             {tool === 'image' && (
-              <div className="flex flex-col gap-1.5">
+              <>
+                {/* Wklej obraz ze schowka */}
                 <button
                   onClick={onImagePaste}
-                  className="flex items-center gap-1.5 px-2 py-1.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors text-xs"
+                  className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-gray-100"
                   title="Wklej obraz ze schowka (Ctrl+V)"
                 >
-                  <ClipboardIcon className="w-3.5 h-3.5" />
-                  <span className="font-medium">Wklej</span>
+                  <ClipboardIcon className="w-5 h-5" />
                 </button>
 
+                {/* Separator */}
+                <div className="w-6 h-px bg-gray-200 my-1" />
+
+                {/* Upload obraz */}
                 <button
                   onClick={onImageUpload}
-                  className="flex items-center gap-1.5 px-2 py-1.5 bg-green-500 text-white rounded-md hover:bg-green-600 transition-colors text-xs"
-                  title="Wybierz plik z dysku"
+                  className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-gray-100"
+                  title="Wybierz plik obrazu z dysku"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span className="font-medium">Upload</span>
+                  <Upload className="w-5 h-5" />
                 </button>
-              </div>
-            )}
 
-            {/* 📄 PDF */}
-            {tool === 'pdf' && (
-              <div className="flex flex-col gap-1.5">
+                {/* Separator */}
+                <div className="w-6 h-px bg-gray-200 my-1" />
+
+                {/* Upload PDF */}
                 <button
                   onClick={onPDFUpload}
-                  className="flex items-center gap-1.5 px-2 py-1.5 bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors text-xs"
+                  className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-gray-100"
                   title="Wybierz plik PDF z dysku"
                 >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span className="font-medium">Wczytaj PDF</span>
+                  <FileText className="w-5 h-5" />
                 </button>
-                <div className="text-[10px] text-gray-500 text-center px-2">
-                  Drag & Drop również działa
-                </div>
-              </div>
+              </>
             )}
+
+            {/* 📄 PDF - usunięte, przyciski przeniesione do Image tool */}
           </div>
         </div>
       )}

@@ -573,7 +573,8 @@ class AuthService:
         jwt_token = create_access_token(
             data={"sub": str(user.id)},
             secret_key=self.settings.secret_key,
-            algorithm=self.settings.algorithm
+            algorithm=self.settings.algorithm,
+            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
         )
         
         logger.info(f"🎟️ Token wygenerowany dla {user.username}")

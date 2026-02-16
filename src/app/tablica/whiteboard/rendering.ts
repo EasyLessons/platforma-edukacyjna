@@ -48,6 +48,8 @@ import { clampLineWidth, clampFontSize, evaluateExpression } from './utils';
  * Rysuje ścieżkę (path) - linie rysowane piórem
  * WAŻNE: Używa clamp dla lineWidth!
  * Obsługuje też pojedyncze punkty (kropki)
+ * 🆕 Obsługuje zmienną grubość (pressure-sensitive) jeśli path.widths jest zdefiniowane
+ * 🆕 Obsługuje opacity dla highlightera
  */
 export function drawPath(
   ctx: CanvasRenderingContext2D,
@@ -60,20 +62,53 @@ export function drawPath(
 
   const lineWidth = clampLineWidth(path.width, viewport.scale);
 
+  // 🆕 Ustaw opacity jeśli zdefiniowane
+  const originalAlpha = ctx.globalAlpha;
+  if (path.opacity !== undefined) {
+    ctx.globalAlpha = path.opacity;
+  }
+
   // Pojedynczy punkt - rysuj jako kółko (kropka)
   if (path.points.length === 1) {
     const point = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
     ctx.fillStyle = path.color;
     ctx.beginPath();
-    ctx.arc(point.x, point.y, lineWidth / 2, 0, Math.PI * 2);
+    const radius = path.widths && path.widths[0] 
+      ? clampLineWidth(path.widths[0], viewport.scale) / 2 
+      : lineWidth / 2;
+    ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
     ctx.fill();
+    ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
     return;
   }
 
   ctx.strokeStyle = path.color;
-  ctx.lineWidth = lineWidth;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+
+  // 🆕 Jeśli mamy zmienną grubość - rysuj każdy segment osobno
+  if (path.widths && path.widths.length > 0) {
+    for (let i = 0; i < path.points.length - 1; i++) {
+      const p1 = transformPoint(path.points[i], viewport, canvasWidth, canvasHeight);
+      const p2 = transformPoint(path.points[i + 1], viewport, canvasWidth, canvasHeight);
+      
+      // Użyj średniej grubości z dwóch sąsiednich punktów
+      const w1 = path.widths[i] || path.width;
+      const w2 = path.widths[i + 1] || path.width;
+      const avgWidth = (w1 + w2) / 2;
+      
+      ctx.lineWidth = clampLineWidth(avgWidth, viewport.scale);
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
+    return;
+  }
+
+  // Stała grubość - rysuj normalnie
+  ctx.lineWidth = lineWidth;
   ctx.beginPath();
 
   const startPoint = transformPoint(path.points[0], viewport, canvasWidth, canvasHeight);
@@ -85,6 +120,7 @@ export function drawPath(
   }
 
   ctx.stroke();
+  ctx.globalAlpha = originalAlpha; // 🆕 Przywróć opacity
 }
 
 /**
@@ -105,6 +141,8 @@ export function drawShape(
     canvasHeight
   );
   const end = transformPoint({ x: shape.endX, y: shape.endY }, viewport, canvasWidth, canvasHeight);
+
+  // 🚫 Usunięta obsługa rotacji dla shape - tylko dla image/text
 
   ctx.strokeStyle = shape.color;
   ctx.fillStyle = shape.color;
@@ -208,6 +246,11 @@ export function drawShape(
       }
       break;
   }
+
+  // 🆕 Restore context jeśli była rotacja
+  if (shape.rotation && shape.rotation !== 0) {
+    ctx.restore();
+  }
 }
 
 /**
@@ -290,6 +333,21 @@ export function drawText(
   debug: boolean = false
 ): { requiredHeight?: number } {
   const pos = transformPoint({ x: textEl.x, y: textEl.y }, viewport, canvasWidth, canvasHeight);
+
+  // 🆕 Obsługa rotacji
+  if (textEl.rotation && textEl.rotation !== 0) {
+    ctx.save();
+    
+    // Środek tekstu w screen space
+    const width = (textEl.width || 3) * viewport.scale * 100;
+    const height = (textEl.height || 1) * viewport.scale * 100;
+    const centerX = pos.x + width / 2;
+    const centerY = pos.y + height / 2;
+    
+    ctx.translate(centerX, centerY);
+    ctx.rotate(textEl.rotation);
+    ctx.translate(-centerX, -centerY);
+  }
 
   // 🆕 Font styling
   const fontWeight = textEl.fontWeight || 'normal';
@@ -453,8 +511,15 @@ export function drawText(
 
     // Return required height for auto-expand
     if (needsExpand) {
+      if (textEl.rotation && textEl.rotation !== 0) {
+        ctx.restore();
+      }
       return { requiredHeight: requiredHeightPx / (viewport.scale * 100) };
     }
+  }
+
+  if (textEl.rotation && textEl.rotation !== 0) {
+    ctx.restore();
   }
 
   return {};
@@ -475,6 +540,15 @@ export function drawFunction(
   ctx.lineWidth = clampLineWidth(func.strokeWidth, viewport.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
+  
+  // Obsługa linii przerywanej
+  if (func.strokeDasharray) {
+    const dashArray = func.strokeDasharray.split(' ').map(Number);
+    ctx.setLineDash(dashArray);
+  } else {
+    ctx.setLineDash([]);
+  }
+  
   ctx.beginPath();
 
   let started = false;
@@ -508,6 +582,9 @@ export function drawFunction(
   if (started) {
     ctx.stroke();
   }
+  
+  // Resetuj lineDash po narysowaniu
+  ctx.setLineDash([]);
 }
 
 /**
@@ -533,6 +610,21 @@ export function drawImage(
   const screenHeight = bottomRight.y - topLeft.y;
 
   const htmlImg = loadedImages.get(img.id);
+
+  // 🆕 Obsługa rotacji
+  if (img.rotation && img.rotation !== 0) {
+    ctx.save();
+    
+    // Środek obrazu w screen space
+    const centerX = topLeft.x + screenWidth / 2;
+    const centerY = topLeft.y + screenHeight / 2;
+    
+    // Przesuń do środka, obróć, przesuń z powrotem
+    ctx.translate(centerX, centerY);
+    ctx.rotate(img.rotation);
+    ctx.translate(-centerX, -centerY);
+  }
+
   if (htmlImg && htmlImg.complete) {
     ctx.drawImage(htmlImg, topLeft.x, topLeft.y, screenWidth, screenHeight);
   } else {
@@ -542,6 +634,10 @@ export function drawImage(
     ctx.strokeStyle = '#ccc';
     ctx.lineWidth = 2;
     ctx.strokeRect(topLeft.x, topLeft.y, screenWidth, screenHeight);
+  }
+
+  if (img.rotation && img.rotation !== 0) {
+    ctx.restore();
   }
 }
 
@@ -557,7 +653,8 @@ export function drawElement(
   canvasHeight: number,
   loadedImages?: Map<string, HTMLImageElement>,
   debug?: boolean,
-  onAutoExpand?: (elementId: string, newHeight: number) => void
+  onAutoExpand?: (elementId: string, newHeight: number) => void,
+  elements?: DrawingElement[]
 ): void {
   if (element.type === 'path') {
     drawPath(ctx, element, viewport, canvasWidth, canvasHeight);

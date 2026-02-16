@@ -48,6 +48,8 @@ export interface DrawingPath {
   points: Point[];
   color: string;
   width: number;
+  widths?: number[]; // Opcjonalna tablica grubości dla każdego punktu (pressure-sensitive)
+  opacity?: number; // Opcjonalna przezroczystość (0-1), domyślnie 1
 }
 
 export interface Shape {
@@ -62,6 +64,7 @@ export interface Shape {
   strokeWidth: number;
   fill: boolean;
   sides?: number; // Liczba boków dla polygon (3+)
+  rotation?: number; // Kąt obrotu w radianach
 }
 
 export interface TextElement {
@@ -78,6 +81,7 @@ export interface TextElement {
   fontWeight?: 'normal' | 'bold'; // 🆕 Pogrubienie
   fontStyle?: 'normal' | 'italic'; // 🆕 Kursywa
   textAlign?: 'left' | 'center' | 'right'; // 🆕 Wyrównanie
+  rotation?: number; // Kąt obrotu w radianach
 }
 
 export interface FunctionPlot {
@@ -88,6 +92,7 @@ export interface FunctionPlot {
   strokeWidth: number;
   xRange: number;
   yRange: number;
+  strokeDasharray?: string; // np. '5 5' dla linii przerywanej
 }
 
 // 🆕 Nowy typ dla obrazków (przyszłość)
@@ -100,6 +105,7 @@ export interface ImageElement {
   height: number;
   src: string; // URL lub base64
   alt?: string;
+  rotation?: number; // Kąt obrotu w radianach
 }
 
 // 🆕 PDF Document - dla dokumentów PDF
@@ -114,6 +120,7 @@ export interface PDFElement {
   fileName?: string;
   currentPage?: number; // Aktualnie wyświetlana strona
   totalPages?: number; // Łączna liczba stron
+  rotation?: number; // Kąt obrotu w radianach
 }
 
 // 🆕 Notatka Markdown - dla chatbota i notatek użytkownika
@@ -148,6 +155,35 @@ export interface TableElement {
   headerBgColor?: string;
 }
 
+// 🆕 Strzałka - połączenie między elementami
+export interface ArrowElement {
+  id: string;
+  type: 'arrow';
+  // Pozycja początkowa
+  startX: number;
+  startY: number;
+  // Pozycja końcowa
+  endX: number;
+  endY: number;
+  // Attachmenty - przypiecie do innych elementów
+  startAttachment?: {
+    elementId: string;
+    side: 'top' | 'right' | 'bottom' | 'left' | 'center';
+  };
+  endAttachment?: {
+    elementId: string;
+    side: 'top' | 'right' | 'bottom' | 'left' | 'center';
+  };
+  // Styl
+  color: string;
+  strokeWidth: number;
+  arrowType: 'smooth' | 'rectangular'; // Gładka (Bezier) lub prostokątna
+  // Punkty kontrolne dla smooth lub punkty załamania dla rectangular
+  controlPoints?: Point[];
+  // Opcje grotu strzałki
+  arrowHead?: 'none' | 'end' | 'both'; // Gdzie pokazać grot
+}
+
 export type DrawingElement =
   | DrawingPath
   | Shape
@@ -156,7 +192,8 @@ export type DrawingElement =
   | ImageElement
   | PDFElement
   | MarkdownNote
-  | TableElement;
+  | TableElement
+  | ArrowElement;
 
 export interface MomentumState {
   velocityX: number;

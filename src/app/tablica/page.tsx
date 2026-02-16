@@ -225,8 +225,11 @@ export function TablicaContent() {
       {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
       <HomeButton />
 
-      {/* Nagłówek z logo, nazwą tablicy i przyciskiem premium */}
-      <BoardHeader boardName={boardName} boardId={boardId} />
+      {/* Nagłówek z logo, nazwą tablicy i przyciskiem Premium */}
+      <BoardHeader 
+        boardName={boardName} 
+        boardId={boardId}
+      />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
       <BoardRealtimeProvider boardId={boardId}>
