@@ -56,24 +56,13 @@ export const validatePasswordsMatch = (
   return { valid: true };
 };
 
-// Walidacja nazwy użytkownika
-export const validateUsername = (username: string): { valid: boolean; error?: string } => {
-  if (!username) {
-    return { valid: false, error: 'Nazwa użytkownika jest wymagana' };
+// Walidacja loginu
+export const validateLogin = (login: string): { valid: boolean; error?: string } => {
+  if (!login) {
+    return { valid: false, error: 'Login jest wymagany' };
   }
-  if (username.trim().length < 3) {
-    return { valid: false, error: 'Nazwa użytkownika musi mieć co najmniej 3 znaki' };
-  }
-  return { valid: true };
-};
-
-// Walidacja kodu resetującego hasło
-export const validateVerificationCode = (code: string): { valid: boolean; error?: string } => {
-  if (!code || code.length !== 6) {
-    return { valid: false, error: 'Kod musi mieć dokładnie 6 znaków' };
-  }
-  if (!/^\d{6}$/.test(code)) {
-    return { valid: false, error: 'Kod może zawierać tylko cyfry' };
+  if (login.trim().length < 3) {
+    return { valid: false, error: 'Login musi mieć co najmniej 3 znaki' };
   }
   return { valid: true };
 };
