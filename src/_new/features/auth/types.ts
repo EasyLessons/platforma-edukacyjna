@@ -1,21 +1,13 @@
 /**
  * AUTH TYPES
  * 
- * Globalne typy i interfejsy związane z autoryzacją użytkowników.
- * Ułatwiają zarządzanie danymi użytkowników, formularzami oraz komunikacją z API.
+ * Typy i interfejsy związane z autoryzacją użytkowników.
+ * Ułatwiają zarządzanie formularzami oraz komunikacją z API.
  *  
  * IDEA: typy zawarte w pliku są wspódzielone przez różne komponenty.
 */
 
-// USER TYPES
-export interface User {
-  id: number;
-  username: string;
-  email: string;
-  full_name?: string;
-  is_active: boolean;
-  created_at: string;
-}
+import { User } from "@/_new/shared/types/user";
 
 // FORM DATA TYPES
 export interface LoginFormData {
@@ -120,3 +112,5 @@ export interface AuthContextType {
   logout: () => void;
   updateUser: (user: User) => void;
 }
+
+export type { User } from '@/_new/shared/types/user';
