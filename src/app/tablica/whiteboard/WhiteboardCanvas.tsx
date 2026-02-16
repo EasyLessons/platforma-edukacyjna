@@ -770,6 +770,127 @@ Zadaj pytanie! 🤔`,
     console.log('📋 Skopiowano elementów:', elementsToCopy.length);
   }, []);
 
+  // 🆕 DUPLICATE - duplikacja zaznaczonych elementów (Ctrl+D)
+  const handleDuplicate = useCallback(() => {
+    const currentSelectedIds = selectedElementIdsRef.current;
+    if (currentSelectedIds.size === 0) return;
+
+    // Pobierz zaznaczone elementy
+    const elementsToDuplicate = elementsRef.current.filter((el) =>
+      currentSelectedIds.has(el.id)
+    );
+
+    if (elementsToDuplicate.length === 0) return;
+
+    // Offset dla duplikacji (lekkie przesunięcie w prawo i dół)
+    const offsetX = 0.3;
+    const offsetY = 0.3;
+
+    // Twórz zduplikowane elementy z nowymi ID
+    const newElements: DrawingElement[] = [];
+    const newIds: string[] = [];
+
+    elementsToDuplicate.forEach((el) => {
+      const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
+      newIds.push(newId);
+
+      if (el.type === 'path') {
+        const newPath: DrawingPath = {
+          ...el,
+          id: newId,
+          points: el.points.map((p) => ({ x: p.x + offsetX, y: p.y + offsetY })),
+        };
+        newElements.push(newPath);
+      } else if (el.type === 'shape') {
+        const newShape: Shape = {
+          ...el,
+          id: newId,
+          startX: el.startX + offsetX,
+          startY: el.startY + offsetY,
+          endX: el.endX + offsetX,
+          endY: el.endY + offsetY,
+        };
+        newElements.push(newShape);
+      } else if (el.type === 'text') {
+        const newText: TextElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+        };
+        newElements.push(newText);
+      } else if (el.type === 'image') {
+        const newImage: ImageElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+        };
+        newElements.push(newImage);
+
+        // Załaduj obraz do pamięci
+        if (el.src) {
+          const img = new Image();
+          img.src = el.src;
+          img.onload = () => {
+            setLoadedImages((prev) => new Map(prev).set(newId, img));
+          };
+        }
+      } else if (el.type === 'markdown') {
+        const newMarkdown: MarkdownNote = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+        };
+        newElements.push(newMarkdown);
+      } else if (el.type === 'table') {
+        const newTable: TableElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+          cells: el.cells.map((row) => [...row]), // Deep copy komórek
+        };
+        newElements.push(newTable);
+      } else if (el.type === 'function') {
+        const newFunction: FunctionPlot = {
+          ...el,
+          id: newId,
+        };
+        newElements.push(newFunction);
+      } else if (el.type === 'pdf') {
+        const newPDF: PDFElement = {
+          ...el,
+          id: newId,
+          x: el.x + offsetX,
+          y: el.y + offsetY,
+        };
+        newElements.push(newPDF);
+      }
+    });
+
+    // Dodaj nowe elementy
+    const allElements = [...elementsRef.current, ...newElements];
+    setElements(allElements);
+    saveToHistoryRef.current(allElements);
+
+    // Zaznacz zduplikowane elementy
+    setSelectedElementIds(new Set(newIds));
+
+    // Broadcast i zapisz każdy nowy element
+    newElements.forEach((el) => {
+      broadcastElementCreated(el);
+      setUnsavedElements((prev) => new Set(prev).add(el.id));
+    });
+
+    if (boardIdStateRef.current) {
+      debouncedSave(boardIdStateRef.current);
+    }
+
+    console.log('📋 Zduplikowano elementów:', newElements.length);
+  }, [broadcastElementCreated, debouncedSave]);
+
   // 🆕 PASTE - wklejanie skopiowanych elementów (Ctrl+V)
   const handlePaste = useCallback(() => {
     if (copiedElements.length === 0) return;
@@ -1142,121 +1263,7 @@ Zadaj pytanie! 🤔`,
         const currentSelectedIds = selectedElementIdsRef.current;
         if (currentSelectedIds.size > 0) {
           e.preventDefault();
-
-          // Pobierz zaznaczone elementy
-          const elementsToDuplicate = elementsRef.current.filter((el) =>
-            currentSelectedIds.has(el.id)
-          );
-
-          if (elementsToDuplicate.length === 0) return;
-
-          // Offset dla duplikacji (lekkie przesunięcie w prawo i dół)
-          const offsetX = 0.3;
-          const offsetY = 0.3;
-
-          // Twórz zduplikowane elementy z nowymi ID
-          const newElements: DrawingElement[] = [];
-          const newIds: string[] = [];
-
-          elementsToDuplicate.forEach((el) => {
-            const newId = Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9);
-            newIds.push(newId);
-
-            if (el.type === 'path') {
-              const newPath: DrawingPath = {
-                ...el,
-                id: newId,
-                points: el.points.map((p) => ({ x: p.x + offsetX, y: p.y + offsetY })),
-              };
-              newElements.push(newPath);
-            } else if (el.type === 'shape') {
-              const newShape: Shape = {
-                ...el,
-                id: newId,
-                startX: el.startX + offsetX,
-                startY: el.startY + offsetY,
-                endX: el.endX + offsetX,
-                endY: el.endY + offsetY,
-              };
-              newElements.push(newShape);
-            } else if (el.type === 'text') {
-              const newText: TextElement = {
-                ...el,
-                id: newId,
-                x: el.x + offsetX,
-                y: el.y + offsetY,
-              };
-              newElements.push(newText);
-            } else if (el.type === 'image') {
-              const newImage: ImageElement = {
-                ...el,
-                id: newId,
-                x: el.x + offsetX,
-                y: el.y + offsetY,
-              };
-              newElements.push(newImage);
-
-              // Załaduj obraz do pamięci
-              if (el.src) {
-                const img = new Image();
-                img.src = el.src;
-                img.onload = () => {
-                  setLoadedImages((prev) => new Map(prev).set(newId, img));
-                };
-              }
-            } else if (el.type === 'markdown') {
-              const newMarkdown: MarkdownNote = {
-                ...el,
-                id: newId,
-                x: el.x + offsetX,
-                y: el.y + offsetY,
-              };
-              newElements.push(newMarkdown);
-            } else if (el.type === 'table') {
-              const newTable: TableElement = {
-                ...el,
-                id: newId,
-                x: el.x + offsetX,
-                y: el.y + offsetY,
-                cells: el.cells.map((row) => [...row]), // Deep copy komórek
-              };
-              newElements.push(newTable);
-            } else if (el.type === 'function') {
-              const newFunction: FunctionPlot = {
-                ...el,
-                id: newId,
-              };
-              newElements.push(newFunction);
-            } else if (el.type === 'pdf') {
-              const newPDF: PDFElement = {
-                ...el,
-                id: newId,
-                x: el.x + offsetX,
-                y: el.y + offsetY,
-              };
-              newElements.push(newPDF);
-            }
-          });
-
-          // Dodaj nowe elementy
-          const allElements = [...elementsRef.current, ...newElements];
-          setElements(allElements);
-          saveToHistoryRef.current(allElements);
-
-          // Zaznacz zduplikowane elementy
-          setSelectedElementIds(new Set(newIds));
-
-          // Broadcast i zapisz każdy nowy element
-          newElements.forEach((el) => {
-            broadcastElementCreated(el);
-            setUnsavedElements((prev) => new Set(prev).add(el.id));
-          });
-
-          if (boardIdStateRef.current) {
-            debouncedSave(boardIdStateRef.current);
-          }
-
-          console.log('📋 Zduplikowano elementów:', newElements.length);
+          handleDuplicate();
           return;
         }
       }
@@ -1277,6 +1284,7 @@ Zadaj pytanie! 🤔`,
     selectedElementIds,
     broadcastElementDeleted,
     handleCopy,
+    handleDuplicate,
     handlePaste,
     copiedElements,
     lastCopyWasInternal,
@@ -3763,6 +3771,9 @@ Zadaj pytanie! 🤔`,
             onMarkdownEdit={(id) => setEditingMarkdownId(id)}
             onViewportChange={handleViewportChange}
             onActiveGuidesChange={setActiveGuides}
+            onDeleteSelected={deleteSelectedElements}
+            onCopySelected={handleCopy}
+            onDuplicateSelected={handleDuplicate}
           />
         )}
 

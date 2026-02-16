@@ -210,7 +210,7 @@ export function PenTool({
       
       // Minimalna odległość między punktami (w jednostkach świata)
       // Im większa wartość, tym bardziej wygładzona linia
-      const minDistance = 0;
+      const minDistance = 0.001 * (viewport.scale || 1); // Skaluj minimalną odległość wraz z zoomem
       
       if (distance < minDistance) {
         return; // Pomiń ten punkt - zbyt blisko poprzedniego

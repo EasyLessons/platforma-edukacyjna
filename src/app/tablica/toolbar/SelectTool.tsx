@@ -42,6 +42,9 @@ interface SelectToolProps {
   onMarkdownEdit?: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
   onActiveGuidesChange?: (guides: GuideLine[]) => void;
+  onDeleteSelected?: () => void;
+  onCopySelected?: () => void;
+  onDuplicateSelected?: () => void;
 }
 
 type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | null;
@@ -68,6 +71,9 @@ export function SelectTool({
   onMarkdownEdit,
   onViewportChange,
   onActiveGuidesChange,
+  onDeleteSelected,
+  onCopySelected,
+  onDuplicateSelected,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -2165,11 +2171,13 @@ export function SelectTool({
     );
     // Czy są zaznaczone notatki markdown?
     const hasMarkdownElements = selectedElements.some((el) => el.type === 'markdown');
+    // 🆕 Czy są zaznaczone obrazki?
+    const hasImageElements = selectedElements.some((el) => el.type === 'image');
 
-    // Jeśli nie ma ani edytowalnych kształtów ani markdown, nie pokazuj
-    if (!hasEditableElements && !hasMarkdownElements) return null;
+    // Jeśli nie ma ani edytowalnych kształtów ani markdown ani obrazków, nie pokazuj
+    if (!hasEditableElements && !hasMarkdownElements && !hasImageElements) return null;
 
-    // Nie pokazuj jeśli zaznaczony jest tylko tekst (bez shape/path/markdown)
+    // Nie pokazuj jeśli zaznaczony jest tylko tekst (bez shape/path/markdown/image)
     const onlyText = selectedElements.every((el) => el.type === 'text');
     if (onlyText) return null;
 
@@ -2190,6 +2198,9 @@ export function SelectTool({
         selectedIds={selectedIds}
         position={topCenter}
         onElementUpdate={onElementUpdateWithHistory}
+        onDeleteSelected={onDeleteSelected}
+        onCopySelected={onCopySelected}
+        onDuplicateSelected={onDuplicateSelected}
       />
     );
   };
