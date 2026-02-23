@@ -26,13 +26,13 @@ interface WorkspaceFormModalProps {
   workspace: Workspace | null;
 }
 
-export function WorkspaceSettingsModal({
+export function WorkspaceFormModal({
   isOpen,
   onClose,
   mode,
   workspace,
 }: WorkspaceFormModalProps) {
-  // STATE & DATA &
+  // STATE & DATA
   // ================================
 
   const { createWorkspace, updateWorkspace } = useWorkspaces();
