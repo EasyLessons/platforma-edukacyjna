@@ -32,6 +32,7 @@ export function WorkspaceList({
   activeWorkspaceId,
   showSearch = true,
 }: WorkspaceListProps) {
+  
   // STATE & DATA
   // ================================
 

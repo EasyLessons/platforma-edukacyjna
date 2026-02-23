@@ -25,7 +25,7 @@ interface UseWorkspaceFormOptions {
   initialData?: Workspace | null;
 }
 
-export function useCreateWorkspace(options: UseWorkspaceFormOptions = {}) {
+export function useWorkspaceForm(options: UseWorkspaceFormOptions = {}) {
   const { initialData } = options;
 
   // STATE
