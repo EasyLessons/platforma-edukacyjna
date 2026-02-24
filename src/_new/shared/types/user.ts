@@ -18,3 +18,8 @@ export interface UserBasic {
   username: string;
   email: string;
 }
+
+export interface OnlineUser {
+  user_id: number;
+  username: string;
+}

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/WorkspaceSidebar';
 import WelcomeSection from './Components/WelcomeSection';
@@ -7,6 +8,8 @@ import TemplatesSection from './Components/TemplateSection';
 import LastBoards from './Components/LastBoards';
 
 export default function Dashboard() {
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* HEADER - Na samej górze */}

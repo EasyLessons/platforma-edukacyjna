@@ -17,7 +17,11 @@ import { WorkspaceList } from '@/_new/features/workspace/components/workspace-li
 import { WorkspaceFormModal } from '@/_new/features/workspace/components/workspace-form-modal';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
 
-export default function WorkspaceSidebar() {
+interface WorkspaceSidebarProps {
+  onWorkspaceSelect: (workspaceId: number) => void;
+}
+
+export default function WorkspaceSidebar({ onWorkspaceSelect }: WorkspaceSidebarProps) {
   // STATE
   // ================================
 
@@ -31,8 +35,7 @@ export default function WorkspaceSidebar() {
   // ================================
 
   const handleWorkspaceSelect = (workspaceId: number) => {
-    console.log('Selected workspace:', workspaceId);
-    // TODO: Navigate to workspace boards lub set active workspace
+    onWorkspaceSelect(workspaceId);
   };
 
   // RENDER
