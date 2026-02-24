@@ -51,7 +51,9 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   label?: string;
   error?: string;
   helperText?: string;
+  leftIcon?: React.ReactNode;
   rightIcon?: React.ReactNode;
+  onLeftIconClick?: () => void;
   onRightIconClick?: () => void;
   wrapperClassName?: string;
   state?: 'default' | 'error' | 'success';
@@ -66,7 +68,9 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       label,
       error,
       helperText,
+      leftIcon,
       rightIcon,
+      onLeftIconClick,
       onRightIconClick,
       wrapperClassName,
       disabled,
@@ -83,6 +87,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
         {/* Input wrapper */}
         <div className="relative">
+          {/* Left Icon */}
+          {leftIcon && (
+            <div
+              className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 ${
+                onLeftIconClick ? 'cursor-pointer hover:text-gray-600' : 'pointer-events-none'
+              }`}
+              onClick={onLeftIconClick}
+            >
+              {leftIcon}
+            </div>
+          )}
+
           {/* Input */}
           <input
             ref={ref}
