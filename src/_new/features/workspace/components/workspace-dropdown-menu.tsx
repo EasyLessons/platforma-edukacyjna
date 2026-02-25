@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MoreVertical, Settings, Users, Trash2, LogOut } from 'lucide-react';
+import { MoreVertical, Settings, Users, Trash2 } from 'lucide-react';
 import type { Workspace } from '../types';
 import { Button } from '@/_new/shared/ui/button';
 
@@ -81,13 +81,10 @@ export function WorkspaceDropdownMenu({
       {/* Trigger Button */}
       <Button
         variant="secondary"
-        size="icon"
+        size="iconSm"
         onClick={handleToggle}
-        title="Więcej opcji"
-        aria-label="Więcej opcji"
-        aria-haspopup="true"
-        aria-expanded={isOpen}
-        className="shadow-md"
+        title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+        aria-label={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
       >
         <MoreVertical className="w-4 h-4 text-gray-600" />
       </Button>
@@ -102,18 +99,18 @@ export function WorkspaceDropdownMenu({
           {workspace.is_owner ? (
             // Owner menu
             <>
-              <Button
+              <button
                 onClick={handleAction(onEdit)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
                 role="menuitem"
               >
                 <Settings size={14} />
                 <span>Ustawienia</span>
-              </Button>
+              </button>
 
               <button
                 onClick={handleAction(onMembers)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
                 role="menuitem"
               >
                 <Users size={14} />
@@ -124,22 +121,22 @@ export function WorkspaceDropdownMenu({
 
               <button
                 onClick={handleAction(onDelete)}
-                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100 flex items-center gap-2 transition-colors cursor-pointer"
                 role="menuitem"
               >
                 <Trash2 size={14} />
-                <span>Usuń przestrzeń</span>
+                <span>Usuń</span>
               </button>
             </>
           ) : (
             // Member menu
             <button
               onClick={handleAction(onLeave)}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
               role="menuitem"
             >
-              <LogOut size={14} />
-              <span>Opuść przestrzeń</span>
+              <Trash2 size={14} />
+              <span>Opuść</span>
             </button>
           )}
         </div>

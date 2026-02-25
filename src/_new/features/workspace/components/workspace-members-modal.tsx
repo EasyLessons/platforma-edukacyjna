@@ -156,17 +156,12 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
               {members.map((member) => (
                 <div
                   key={member.user_id}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  className={`flex items-center justify-between p-4 ${member.is_owner ? 'bg-yellow-50' : 'bg-gray-50 hover:bg-gray-100'} bg-gray-50 rounded-lg transition-colors`}
                 >
                   {/* Member Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-medium text-gray-900 truncate">{member.username}</h3>
-                      {member.is_owner && (
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-medium rounded">
-                          Właściciel
-                        </span>
-                      )}
                     </div>
                     <p className="text-sm text-gray-500 truncate">{member.email}</p>
                     {member.full_name && (
@@ -190,7 +185,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
                         }
                         disabled={changingRoleMemberId === member.user_id}
                         className={`
-                          px-3 py-1.5 rounded-lg text-sm font-medium
+                          px-3 py-1.5 rounded-lg text-sm text-black font-medium
                           border border-gray-300 bg-white
                           focus:outline-none focus:ring-2 focus:ring-green-500
                           disabled:opacity-50 disabled:cursor-not-allowed
@@ -212,11 +207,11 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
                     {/* Remove Button (tylko dla owner, nie można usunąć siebie) */}
                     {workspace.is_owner && !member.is_owner && (
                       <Button
-                        variant="destructive"
+                        variant="secondary"
                         size="icon"
                         onClick={() => handleRemoveMember(member.user_id, member.username)}
                         disabled={removingMemberId === member.user_id}
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        className="text-red-600 hover:bg-red-200"
                         aria-label="Usuń członka"
                       >
                         {removingMemberId === member.user_id ? (
@@ -249,8 +244,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             <span>
               Łącznie:{' '}
               <span className="font-medium text-gray-900">
-                {members.length}{' '}
-                {members.length === 1 ? 'uczestnik' : 'uczestników'}
+                {members.length} {members.length === 1 ? 'uczestnik' : 'uczestników'}
               </span>
             </span>
           </div>

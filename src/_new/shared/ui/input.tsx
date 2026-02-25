@@ -89,21 +89,22 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         <div className="relative">
           {/* Left Icon */}
           {leftIcon && (
-            <div
-              className={`absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 ${
-                onLeftIconClick ? 'cursor-pointer hover:text-gray-600' : 'pointer-events-none'
-              }`}
+            <button
+              type="button"
               onClick={onLeftIconClick}
+              disabled={disabled}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              tabIndex={-1}
             >
               {leftIcon}
-            </div>
+            </button>
           )}
 
           {/* Input */}
           <input
             ref={ref}
             disabled={disabled}
-            className={cn(inputVariants({ state }), rightIcon && 'pr-12', className)}
+            className={cn(inputVariants({ state }), leftIcon && 'pl-10', rightIcon && 'pr-12', className)}
             {...props}
           />
 

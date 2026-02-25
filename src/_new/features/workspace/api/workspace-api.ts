@@ -176,7 +176,7 @@ export const leaveWorkspace = async (
 
 // toggleWorkspaceFavourite - Dodaje/usuwa workspace z ulubionych
 export const toggleWorkspaceFavourite = async (
-  id: number,
+  workspaceId: number,
   isFavourite: boolean
 ): Promise<void> => {
   const token = getToken();
@@ -186,9 +186,9 @@ export const toggleWorkspaceFavourite = async (
   }
 
   const response = await fetch(
-    `${API_BASE_URL}/api/workspaces/${id}/toggle-favourite`,
+    `${API_BASE_URL}/api/workspaces/${workspaceId}/favourite`,
     {
-      method: 'POST',
+      method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',

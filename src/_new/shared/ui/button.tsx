@@ -26,7 +26,7 @@ const buttonVariants = cva(
     'rounded-lg',
     'transition-all duration-200',
     'cursor-pointer',
-    'focus:outline-none focus:ring-2 focus:ring-offset-2',
+    'focus:outline-none',
     'disabled:opacity-50 disabled:cursor-not-allowed',
   ],
   {
@@ -50,7 +50,7 @@ const buttonVariants = cva(
         secondary: [
           'bg-transparent text-gray-700',
           'hover:bg-gray-200',
-          'focus-visible:ring-gray-500',
+          'focus-visible:ring-gray-100',
         ],
         // Outline (dla Google button)
         outline: [
@@ -62,9 +62,9 @@ const buttonVariants = cva(
         ],
         // czerwony przycisk (usuwanie)
         destructive: [
-          'bg-red-600 text-white',
-          'hover:bg-red-700',
-          'focus:ring-red-400',
+          'bg-red-500 text-gray-200',
+          'hover:bg-red-600',
+          'focus:ring-red-50',
         ],
         // sam tekst bez tła (linki, akcje w tekście)
         link: [

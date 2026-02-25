@@ -1,8 +1,7 @@
 /**
- * USE CREATE WORKSPACE HOOK
+ * USE EDIT WORKSPACE FORM HOOK
  *
- * Hook który zarządza formularzem workspace'a.
- * Działa zarówna dla tworzenia nowego jak i edycji istniejącego.
+ * Hook który zarządza formularzem edycji workspace'a.
  *
  * Odpowiada za:
  * - Stan formularza (nazwa, ikona, kolor)
@@ -10,48 +9,43 @@
  * - Obsługa błędów
  * - Reset formularza
  *
- * Jeden hook, dwa przypadki użycia:
- * - Bez initialData = CREATE
- * - Z initial Data = UPDATE
- *
  */
 
 import { useState, useEffect } from 'react';
 import { validateWorkspaceName, validateWorkspaceIcon } from '../utils/validation';
-import { DEFAULT_WORKSPACE_ICON, DEFAULT_WORKSPACE_COLOR } from '../utils/constants';
-import type { WorkspaceFormData, WorkspaceErrors, Workspace } from '../types';
+import type {
+  WorkspaceFormData,
+  WorkspaceErrors,
+  Workspace,
+  WorkspaceUpdateRequest,
+} from '../types';
 
-interface UseWorkspaceFormOptions {
-  initialData?: Workspace | null;
+interface UseEditWorkspaceFormOptions {
+  workspace: Workspace;
+  onSubmit: (data: WorkspaceUpdateRequest) => Promise<void>;
+  onClose: () => void;
 }
 
-export function useWorkspaceForm(options: UseWorkspaceFormOptions = {}) {
-  const { initialData } = options;
-
+export function useEditWorkspaceForm({ workspace, onSubmit, onClose }: UseEditWorkspaceFormOptions) {
   // STATE
   // ================================
   const [formData, setFormData] = useState<WorkspaceFormData>({
-    name: initialData?.name || '',
-    icon: initialData?.icon || DEFAULT_WORKSPACE_ICON,
-    bg_color: initialData?.bg_color || DEFAULT_WORKSPACE_COLOR,
+    name: workspace.name,
+    icon: workspace.icon,
+    bg_color: workspace.bg_color,
   });
   const [errors, setErrors] = useState<WorkspaceErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // EFFECTS
-  // ================================
-
-  // Gdy initialData się zmieni, zaktualizuj formData
+  // Gdy workspace id się zmieni, zsynchronizuj formularz
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        name: initialData.name,
-        icon: initialData.icon,
-        bg_color: initialData.bg_color,
-      });
-      setErrors({});
-    }
-  }, [initialData]);
+    setFormData({
+      name: workspace.name,
+      icon: workspace.icon,
+      bg_color: workspace.bg_color,
+    });
+    setErrors({});
+  }, [workspace.id]);
 
   // VALIDATION
   // ================================
@@ -73,7 +67,6 @@ export function useWorkspaceForm(options: UseWorkspaceFormOptions = {}) {
     }
 
     setErrors(newErrors);
-
     return Object.keys(newErrors).length === 0;
   };
 
@@ -92,32 +85,47 @@ export function useWorkspaceForm(options: UseWorkspaceFormOptions = {}) {
 
   // resetForm - Resetuje formularz do stanu początkowego
   const resetForm = () => {
-    if (initialData) {
-      // UPDATE mode - wróć do initialData
-      setFormData({
-        name: initialData.name,
-        icon: initialData.icon,
-        bg_color: initialData.bg_color,
-      });
-    } else {
-      // CREATE mode - wyczyść formularz
-      setFormData({
-        name: '',
-        icon: DEFAULT_WORKSPACE_ICON,
-        bg_color: DEFAULT_WORKSPACE_COLOR,
-      });
-    }
-
+    setFormData({
+      name: workspace.name,
+      icon: workspace.icon,
+      bg_color: workspace.bg_color,
+    });
     setErrors({});
     setIsSubmitting(false);
   };
 
+  // handleClose - obsługa zamknięcia formularza X
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  // handleSubmit - ubsługa submit, zatwierdzenia formularza
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    setIsSubmitting(true);
+    try {
+      await onSubmit({
+        name: formData.name.trim(),
+        icon: formData.icon,
+        bg_color: formData.bg_color,
+      });
+      handleClose();
+    } catch (err) {
+      console.error('Error updating workspace:', err);
+      alert('Nie udało się zaktualizować przestrzeni. Spróbuj ponownie.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   // isDirty - Czy formularz został zmieniony
-  const isDirty = initialData
-    ? formData.name !== initialData.name ||
-      formData.icon !== initialData.icon ||
-      formData.bg_color !== initialData.bg_color
-    : formData.name.trim() !== '';
+  const isDirty =
+    formData.name !== workspace.name ||
+    formData.icon !== workspace.icon ||
+    formData.bg_color !== workspace.bg_color;
 
   return {
     // State
@@ -125,13 +133,9 @@ export function useWorkspaceForm(options: UseWorkspaceFormOptions = {}) {
     errors,
     isSubmitting,
     isDirty,
-    // Actions
-    setIsSubmitting,
-    validateForm,
+    // Handlers
     handleChange,
-    resetForm,
-    // Meta
-    isCreateMode: !initialData,
-    isUpdateMode: !!initialData,
+    handleClose,
+    handleSubmit,
   };
 }
