@@ -56,7 +56,7 @@ tablica/
 
 ---
 
-## STRUKTURA DOCELOWA (src/_new/features/whiteboard/) — ZAKTUALIZOWANA
+## STRUKTURA DOCELOWA (src/\_new/features/whiteboard/) — ZAKTUALIZOWANA
 
 > Foldery nazwane tak żeby sama nazwa mówiła co tam jest.
 > Kolega stworzył szkielet w hooks/ components/ — przenosimy do tej struktury.
@@ -157,12 +157,14 @@ _new/features/whiteboard/
 ## KLUCZOWE ZALEŻNOŚCI DO ZROZUMIENIA
 
 ### Supabase Realtime (najtrudniejsza część)
+
 - `BoardRealtimeContext` (src/app/context/) — trzyma channel Supabase, presence, broadcast
 - `WhiteboardCanvas.tsx` używa `useBoardRealtime()` hook z tego kontekstu
 - `OnlineUsers.tsx` i `RemoteCursors.tsx` też używają `useBoardRealtime()`
 - Plan: logika realtime w `use-realtime.ts`, komponenty w osobnych plikach
 
 ### Przepływ danych
+
 ```
 page.tsx
   └── BoardRealtimeProvider (kontekst)
@@ -176,6 +178,7 @@ page.tsx
 ```
 
 ### Co WhiteboardCanvas.tsx ROBI sam (do wyciągnięcia do hooków):
+
 1. **Stan elementów** — elements[], historia undo/redo
 2. **Viewport** — pan, zoom, momentum (pinch)
 3. **Realtime** — broadcast, receive, merge remotely
@@ -189,7 +192,9 @@ page.tsx
 ## PLAN ETAPÓW (od najbezpieczniejszego)
 
 ### ETAP 1 — Typy (ZEROWE RYZYKO)
+
 > Nie zmienia żadnej logiki, tylko przenosi typy.
+
 - [ ] `types/elements.ts` ← z `whiteboard/types.ts`
 - [ ] `types/tools.ts` ← z `toolbar/Toolbar.tsx` (enum Tool, ShapeType)
 - [ ] `types/canvas.ts` ← ViewportTransform, MomentumState
@@ -197,19 +202,25 @@ page.tsx
 - Stare pliki exportują z nowych (re-export) → zero breaking changes
 
 ### ETAP 2 — Utils/helpers (MINIMALNE RYZYKO)
+
 > Czyste funkcje, łatwe do testowania, zero side effects.
+
 - [ ] `utils/geometry.ts` ← funkcje geometryczne rozsiane po rendering.ts, utils.ts
 - [ ] `utils/snap-utils.ts` ← z `utils/snapUtils.ts`
 - [ ] `utils/canvas-helper.ts` ← `rendering.ts` + `Grid.tsx` (tylko funkcje, nie komponenty)
 - [ ] `utils/export.ts` ← logika eksportu z BoardHeader/ToolbarUI
 
 ### ETAP 3 — API layer (NISKIE RYZYKO)
+
 > Przeniesienie wywołań API do jednego miejsca.
+
 - [ ] `api/elements-api.ts` ← saveBoardElementsBatch, loadBoardElements, deleteBoardElement (z boards_api)
 - [ ] `api/realtime-api.ts` ← setup Supabase channel (z BoardRealtimeContext)
 
 ### ETAP 4 — Hooki (ŚREDNIE RYZYKO)
+
 > Tu dzieje się porządkowanie logiki WhiteboardCanvas.
+
 - [ ] `hooks/use-history.ts` ← undo/redo stack
 - [ ] `hooks/use-clipboard.ts` ← copy/paste
 - [ ] `hooks/use-viewport.ts` ← pan/zoom/momentum (z viewport.ts + hooks z WhiteboardCanvas)
@@ -218,7 +229,9 @@ page.tsx
 - [ ] `hooks/use-canvas.ts` ← główny orchestrator (łączy pozostałe hooki)
 
 ### ETAP 5 — Komponenty (NAJWIĘKSZA ZMIANA)
+
 > Rozbicie WhiteboardCanvas na małe komponenty.
+
 - [ ] `components/canvas/whiteboard-canvas.tsx` ← NOWY, ~300 linii, używa hooków z etapu 4
 - [ ] `components/canvas/grid.tsx` ← Grid.tsx (bez logiki, tylko render)
 - [ ] `components/canvas/snap-guides.tsx` ← render linii snap
@@ -228,6 +241,7 @@ page.tsx
 - [ ] `components/panels/*` ← Calculator, Chat, PDF, ActivityHistory
 
 ### ETAP 6 — Integracja (FINALNE SPINANIE)
+
 - [ ] Nowy `page.tsx` używa nowych komponentów z `_new/features/whiteboard/`
 - [ ] Stary folder `tablica/` działa nadal (przez re-export) do momentu pełnego przejścia
 - [ ] Po weryfikacji - usunięcie starych plików
@@ -246,14 +260,14 @@ page.tsx
 
 ## STATUS
 
-| Etap | Status | Notatki |
-|------|--------|---------|
-| 1. Typy | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami |
-| 2. Utils | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami |
-| 3. API layer | ⬜ TODO | |
-| 4. Hooki | ⬜ TODO | Najtrudniejszy |
-| 5. Komponenty | ⬜ TODO | |
-| 6. Integracja | ⬜ TODO | |
+| Etap          | Status  | Notatki                                                                         |
+| ------------- | ------- | ------------------------------------------------------------------------------- |
+| 1. Typy       | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami   |
+| 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami |
+| 3. API layer  | ✅ DONE | elements-api.ts / realtime-api.ts (BoardEvent type + createBoardChannel factory) |
+| 4. Hooki      | ⬜ TODO | Najtrudniejszy                                                                  |
+| 5. Komponenty | ⬜ TODO |                                                                                 |
+| 6. Integracja | ⬜ TODO |                                                                                 |
 
 ---
 
