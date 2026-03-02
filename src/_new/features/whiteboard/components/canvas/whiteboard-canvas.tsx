@@ -66,6 +66,9 @@ import { SnapGuides } from './snap-guides';
 import { SmartSearchBar, CardViewer } from '@/app/tablica/smartsearch';
 import type { FormulaResource, CardResource } from '@/app/tablica/smartsearch';
 
+// ─── MathChatbot ─────────────────────────────────────────────────────────────
+import { MathChatbot } from '@/app/tablica/toolbar/MathChatbot';
+
 // ─── Renderowanie canvas ──────────────────────────────────────────────────────
 import { drawElement } from '../../elements/rendering';
 import { drawGrid } from './grid';
@@ -149,6 +152,18 @@ export default function WhiteboardCanvasNew({
   const [isCardViewerActive, setIsCardViewerActive] = useState(false);
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
+
+  // ─── Stan MathChatbot ───────────────────────────────────────────────────────
+  const [chatMessages, setChatMessages] = useState<
+    Array<{ id: string; role: 'user' | 'assistant'; content: string; timestamp: Date }>
+  >([
+    {
+      id: 'welcome',
+      role: 'assistant',
+      content: `Cześć! 👋 Jestem **Math Tutor**!\n\nMogę Ci pomóc z:\n• 📐 Rozwiązywaniem zadań\n• 💡 Podpowiedziami  \n• ✅ Sprawdzaniem rozwiązań\n• 📚 Wyjaśnianiem wzorów\n\nZadaj pytanie! 🤔`,
+      timestamp: new Date(),
+    },
+  ]);
 
   /** Aktywne linie snap — aktualizuje SelectTool podczas przeciągania */
   const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
@@ -690,6 +705,32 @@ export default function WhiteboardCanvasNew({
   const handleCardSelect = useCallback((card: CardResource) => {
     setActiveCard(card);
   }, []);
+
+  const handleChatbotAddToBoard = useCallback((content: string) => {
+    const centerWorld = inverseTransformPoint(
+      { x: canvasWidth / 2, y: canvasHeight / 2 },
+      vp.viewportRef.current,
+      canvasWidth,
+      canvasHeight
+    );
+    const noteWidth = 5;
+    const noteHeight = 4;
+    const newNote: MarkdownNote = {
+      id: `chatbot-note-${Date.now()}`,
+      type: 'markdown',
+      x: centerWorld.x - noteWidth / 2,
+      y: centerWorld.y - noteHeight / 2,
+      width: noteWidth,
+      height: noteHeight,
+      content,
+      backgroundColor: '#ffffff',
+      borderColor: '#e5e7eb',
+    };
+    el.addElements([newNote]);
+    el.markUnsaved([newNote.id]);
+    rt.broadcastElementCreated(newNote);
+    hist.pushUserAction({ type: 'create', element: newNote });
+  }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
 
   const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
     const COLS = 2, WORLD_WIDTH = 3.5, WORLD_PADDING = 0.5;
@@ -1574,6 +1615,17 @@ export default function WhiteboardCanvasNew({
           isSaving={el.isSaving}
           unsavedCount={el.unsavedElements.size}
           isConnected={rt.isConnected}
+        />
+
+        {/* ── MATH CHATBOT ──────────────────────────────────────────────── */}
+        <MathChatbot
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+          onAddToBoard={handleChatbotAddToBoard}
+          messages={chatMessages}
+          setMessages={setChatMessages}
+          onActiveChange={setIsCardViewerActive}
+          userRole={userRole}
         />
 
       </div>
