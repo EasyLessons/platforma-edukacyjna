@@ -38,31 +38,31 @@ import { useClipboard } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 
-// ─── Stare narzędzia (re-import as-is, podłączamy do nowych hooków) ───────────
-import Toolbar from '@/app/tablica/toolbar/Toolbar';
-import { ZoomControls } from '@/app/tablica/toolbar/ZoomControls';
-import { TextTool } from '@/app/tablica/toolbar/TextTool';
-import { SelectTool } from '@/app/tablica/toolbar/SelectTool';
-import { PenTool } from '@/app/tablica/toolbar/PenTool';
-import { ShapeTool } from '@/app/tablica/toolbar/ShapeTool';
-import { PanTool } from '@/app/tablica/toolbar/PanTool';
-import { FunctionTool } from '@/app/tablica/toolbar/FunctionTool';
-import { ImageTool, ImageToolRef } from '@/app/tablica/toolbar/ImageTool';
-import { EraserTool } from '@/app/tablica/toolbar/EraserTool';
-import { MarkdownNoteTool, MarkdownNoteView } from '@/app/tablica/toolbar/MarkdownNoteTool';
-import { TableTool, TableView } from '@/app/tablica/toolbar/TableTool';
-import ArrowTool from '@/app/tablica/toolbar/ArrowTool';
-import { OnlineUsers } from '@/app/tablica/whiteboard/OnlineUsers';
-import { RemoteCursorsContainer } from '@/app/tablica/whiteboard/RemoteCursors';
+// ─── Komponenty narzędzi (przez re-exportery _new/) ──────────────────────────
+import Toolbar from '../toolbar/toolbar';
+import { ZoomControls } from '../toolbar/zoom-controls';
+import { TextTool } from '../toolbar/text-tool';
+import { SelectTool } from '../toolbar/select-tool';
+import { PenTool } from '../toolbar/pen-tool';
+import { ShapeTool } from '../toolbar/shape-tool';
+import { PanTool } from '../toolbar/pan-tool';
+import { FunctionTool } from '../toolbar/function-tool';
+import { ImageTool, ImageToolRef } from '../toolbar/image-tool';
+import { EraserTool } from '../toolbar/eraser-tool';
+import { MarkdownNoteTool, MarkdownNoteView } from '../toolbar/markdown-note-tool';
+import { TableTool, TableView } from '../toolbar/table-tool';
+import { ArrowTool } from '../toolbar/arrow-tool';
+import { OnlineUsers } from './online-users';
+import { RemoteCursorsContainer } from './remote-cursors';
 
 // ─── Nowe komponenty UI ───────────────────────────────────────────────────────
 import { LoadingOverlay } from './loading-overlay';
 import { StatusIndicators } from './status-indicators';
 import { SnapGuides } from './snap-guides';
 
-// ─── Renderowanie canvas (sprawdzona funkcja ze starego kodu) ─────────────────
-import { drawElement } from '@/app/tablica/whiteboard/rendering';
-import { drawGrid } from '@/app/tablica/whiteboard/Grid';
+// ─── Renderowanie canvas ──────────────────────────────────────────────────────
+import { drawElement } from '../../elements/rendering';
+import { drawGrid } from './grid';
 
 // ─── Matematyka viewportu ─────────────────────────────────────────────────────
 import {
@@ -70,9 +70,8 @@ import {
   zoomViewport,
   panViewportWithWheel,
   panViewportWithMouse,
+  transformPoint,
 } from '../../navigation/viewport-math';
-// transformPoint ze starego kodu (potrzebny do pozycjonowania overlayów MD/table)
-import { transformPoint } from '@/app/tablica/whiteboard/viewport';
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
 import type {
