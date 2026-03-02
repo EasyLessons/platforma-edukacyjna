@@ -6,7 +6,6 @@
  * CardViewer - modal do przeglądania karty wzorów z bocznym spisem treści
  * Użytkownik może zaznaczyć sekcje do dodania na tablicę
  *
- * ✅ NAPRAWIONY SCROLL MYSZKĄ
  * ============================================================================
  */
 
