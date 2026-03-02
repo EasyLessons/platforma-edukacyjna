@@ -52,6 +52,8 @@ import { EraserTool } from '../toolbar/eraser-tool';
 import { MarkdownNoteTool, MarkdownNoteView } from '../toolbar/markdown-note-tool';
 import { TableTool, TableView } from '../toolbar/table-tool';
 import { ArrowTool } from '../toolbar/arrow-tool';
+import { CalculatorTool } from '../toolbar/calculator-tool';
+import { ActivityHistory } from '../toolbar/activity-history';
 import { OnlineUsers } from './online-users';
 import { RemoteCursorsContainer } from './remote-cursors';
 
@@ -71,6 +73,7 @@ import {
   panViewportWithWheel,
   panViewportWithMouse,
   transformPoint,
+  inverseTransformPoint,
 } from '../../navigation/viewport-math';
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
@@ -116,8 +119,10 @@ export default function WhiteboardCanvasNew({
   const boardIdRef = useRef<string>(boardId);
   /** Ref do ImageTool (forwardRef — potrzebny do triggerFileUpload / handlePasteFromClipboard) */
   const imageToolRef = useRef<ImageToolRef>(null);
-  /** Ref do kontenera overlayów zaznaczenia (SelectTool, SnapGuides) — ukrywany podczas pan by uniknąć lag zaznaczenia */
-  const selectOverlayRef = useRef<HTMLDivElement>(null);
+  /** Ref do wrappera wszystkich HTML overlaysów (SelectTool, Markdown, Table) — ukrywany podczas pan by uniknąć lag pozycjonowania */
+  const htmlOverlaysRef = useRef<HTMLDivElement>(null);
+  /** Ref do wrappera Markdown + Table overlayów — ukrywany podczas pan razem z htmlOverlaysRef */
+  const mdTableOverlaysRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     boardIdRef.current = boardId;
@@ -346,9 +351,10 @@ export default function WhiteboardCanvasNew({
 
   const wheelSetViewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Po każdej aktualizacji React-stanu viewportu (po re-renderze z poprawnymi pozycjami) — przywróć widoczność overlay zaznaczenia
+  // Po każdej aktualizacji React-stanu viewportu (po re-renderze z poprawnymi pozycjami) — przywróć widoczność wszystkich HTML overlaysów
   useEffect(() => {
-    if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = '';
+    if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
   }, [vp.viewport]);
 
   useEffect(() => {
@@ -358,8 +364,9 @@ export default function WhiteboardCanvasNew({
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       vp.handleStopFollowing();
-      // Ukryj overlay zaznaczenia — pojawi się z powrotem po zsynchronizowaniu React-stanu viewport (useEffect wyżej)
-      if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = 'hidden';
+      // Ukryj HTML overlaye — pojawią się z powrotem po zsynchronizowaniu React-stanu viewport (useEffect wyżej)
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
+      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -389,6 +396,27 @@ export default function WhiteboardCanvasNew({
     return () => container.removeEventListener('wheel', handleWheel);
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
 
+  // ─── BROADCAST CURSOR (pointermove → world coords → WebSocket) ──────────
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      const rect = container.getBoundingClientRect();
+      const worldPos = inverseTransformPoint(
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        vp.viewportRef.current,
+        rect.width,
+        rect.height
+      );
+      rt.broadcastCursorMove(worldPos.x, worldPos.y);
+    };
+
+    container.addEventListener('pointermove', handlePointerMove, { passive: true });
+    return () => container.removeEventListener('pointermove', handlePointerMove);
+  }, [rt.broadcastCursorMove, vp.viewportRef]);
+
   // ─── PAN środkowym przyciskiem myszy (wciśnięcie kółka + przeciągnięcie) ──
 
   useEffect(() => {
@@ -407,8 +435,9 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
       vp.handleStopFollowing();
-      // Ukryj overlay zaznaczenia — pojawi się z powrotem po setViewport (mouseup)
-      if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = 'hidden';
+      // Ukryj HTML overlaye — pojawią się z powrotem po setViewport (mouseup)
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
+      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -534,6 +563,24 @@ export default function WhiteboardCanvasNew({
     vp.viewportRef.current = constrained;
     vp.setViewport(constrained);
   }, [vp.setViewport, vp.viewportRef]);
+
+  /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
+  const handleCenterViewAndSelectElements = useCallback((
+    x: number,
+    y: number,
+    scale?: number,
+    _bounds?: { minX: number; minY: number; maxX: number; maxY: number }
+  ) => {
+    const constrained = constrainViewport({ x, y, scale: scale ?? vp.viewport.scale });
+    vp.viewportRef.current = constrained;
+    vp.setViewport(constrained);
+  }, [vp.setViewport, vp.viewportRef, vp.viewport.scale]);
+
+  /** Używane przez ActivityHistory — zaznacza elementy i przełącza na select */
+  const handleSelectElementsFromHistory = useCallback((elementIds: string[]) => {
+    sel.selectElements(elementIds);
+    setTool('select');
+  }, [sel.selectElements]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY TWORZENIA ELEMENTÓW
@@ -995,7 +1042,7 @@ export default function WhiteboardCanvasNew({
         )}
 
         {tool === 'select' && canvasWidth > 0 && (
-          <div ref={selectOverlayRef} style={{ position: 'absolute', inset: 0 }}>
+          <div ref={htmlOverlaysRef} style={{ position: 'absolute', inset: 0 }}>
             <SelectTool
               viewport={vp.viewport}
               canvasWidth={canvasWidth}
@@ -1125,120 +1172,133 @@ export default function WhiteboardCanvasNew({
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            MARKDOWN HTML OVERLAYS
-            Pozycjonowanie: transformPoint → stały baseWidth/baseHeight
-            + CSS scale(viewport.scale) od top-left
+            HTML OVERLAYS (Markdown + Table) — ukrywane podczas pan
+            Render wszystkich HTML-pozycjonowanych elementów świata
             ═══════════════════════════════════════════════════════════════ */}
-        {canvasWidth > 0 &&
-          el.elements
-            .filter((e) => e.type === 'markdown')
-            .map((e) => {
-              const note = e as MarkdownNote;
-              const topLeft = transformPoint(
-                { x: note.x, y: note.y },
-                vp.viewport,
-                canvasWidth,
-                canvasHeight
-              );
-              const baseWidth = note.width * 100; // 100px = 1 world unit
-              const baseHeight = note.height * 100;
-              const scaledW = baseWidth * vp.viewport.scale;
-              const scaledH = baseHeight * vp.viewport.scale;
+        <div
+          ref={mdTableOverlaysRef}
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
+        >
+          {/* MARKDOWN */}
+          {canvasWidth > 0 &&
+            el.elements
+              .filter((e) => e.type === 'markdown')
+              .map((e) => {
+                const note = e as MarkdownNote;
+                const topLeft = transformPoint(
+                  { x: note.x, y: note.y },
+                  vp.viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                const baseWidth = note.width * 100; // 100px = 1 world unit
+                const baseHeight = note.height * 100;
+                const scaledW = baseWidth * vp.viewport.scale;
+                const scaledH = baseHeight * vp.viewport.scale;
 
-              // Culling — nie renderuj jeśli poza ekranem lub za małe
-              if (scaledW < 30 || scaledH < 30) return null;
-              if (topLeft.x + scaledW < 0 || topLeft.x > canvasWidth) return null;
-              if (topLeft.y + scaledH < 0 || topLeft.y > canvasHeight) return null;
+                // Culling — nie renderuj jeśli poza ekranem lub za małe
+                if (scaledW < 30 || scaledH < 30) return null;
+                if (topLeft.x + scaledW < 0 || topLeft.x > canvasWidth) return null;
+                if (topLeft.y + scaledH < 0 || topLeft.y > canvasHeight) return null;
 
-              const isBeingEdited = sel.editingMarkdownId === note.id;
+                const isBeingEdited = sel.editingMarkdownId === note.id;
+                // contentScale kontroluje rozmiar tekstu (1 = domyślny, 2 = 2x większy)
+                const contentScale = note.contentScale ?? 1;
 
-              return (
-                <div
-                  key={note.id}
-                  className="absolute rounded-lg shadow-md border overflow-hidden"
-                  style={{
-                    left: topLeft.x,
-                    top: topLeft.y,
-                    width: baseWidth,
-                    height: baseHeight,
-                    transform: `scale(${vp.viewport.scale})`,
-                    transformOrigin: 'top left',
-                    willChange: 'transform',
-                    backgroundColor: note.backgroundColor || '#fffde7',
-                    borderColor: note.borderColor || '#fbc02d',
-                    pointerEvents: isBeingEdited ? 'auto' : 'none',
-                    zIndex: isBeingEdited ? 50 : 10,
-                  }}
-                >
-                  <MarkdownNoteView
-                    note={note}
-                    noteId={note.id}
-                    isEditing={isBeingEdited}
-                    onContentChange={handleMarkdownContentChange}
-                    onEditStart={handleMarkdownEditStart}
-                    onEditEnd={handleMarkdownEditEnd}
-                    remoteTypingUser={
-                      rt.typingUsers.find((t) => t.elementId === note.id)?.username
-                    }
-                  />
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={note.id}
+                    className="absolute rounded-lg shadow-md border overflow-hidden"
+                    style={{
+                      left: topLeft.x,
+                      top: topLeft.y,
+                      width: baseWidth,
+                      height: baseHeight,
+                      transform: `scale(${vp.viewport.scale})`,
+                      transformOrigin: 'top left',
+                      willChange: 'transform',
+                      backgroundColor: note.backgroundColor || '#fffde7',
+                      borderColor: note.borderColor || '#fbc02d',
+                      pointerEvents: isBeingEdited ? 'auto' : 'none',
+                      zIndex: isBeingEdited ? 50 : 10,
+                    }}
+                  >
+                    {/* Inner wrapper dla contentScale (rozmiar tekstu) */}
+                    <div
+                      style={{
+                        width: `${100 / contentScale}%`,
+                        height: `${100 / contentScale}%`,
+                        transform: `scale(${contentScale})`,
+                        transformOrigin: 'top left',
+                      }}
+                    >
+                      <MarkdownNoteView
+                        note={note}
+                        noteId={note.id}
+                        isEditing={isBeingEdited}
+                        onContentChange={handleMarkdownContentChange}
+                        onEditStart={handleMarkdownEditStart}
+                        onEditEnd={handleMarkdownEditEnd}
+                        remoteTypingUser={
+                          rt.typingUsers.find((t) => t.elementId === note.id)?.username
+                        }
+                      />
+                    </div>
+                  </div>
+                );
+              })}
 
-        {/* ═══════════════════════════════════════════════════════════════
-            TABLE HTML OVERLAYS
-            Pozycjonowanie: transformPoint dla obu narożników → screenWidth/Height
-            pointerEvents: auto tylko gdy tabela jest zaznaczona
-            ═══════════════════════════════════════════════════════════════ */}
-        {canvasWidth > 0 &&
-          el.elements
-            .filter((e) => e.type === 'table')
-            .map((e) => {
-              const table = e as TableElement;
-              const topLeft = transformPoint(
-                { x: table.x, y: table.y },
-                vp.viewport,
-                canvasWidth,
-                canvasHeight
-              );
-              const bottomRight = transformPoint(
-                { x: table.x + table.width, y: table.y + table.height },
-                vp.viewport,
-                canvasWidth,
-                canvasHeight
-              );
-              const screenW = bottomRight.x - topLeft.x;
-              const screenH = bottomRight.y - topLeft.y;
+          {/* TABLE */}
+          {canvasWidth > 0 &&
+            el.elements
+              .filter((e) => e.type === 'table')
+              .map((e) => {
+                const table = e as TableElement;
+                const topLeft = transformPoint(
+                  { x: table.x, y: table.y },
+                  vp.viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                const bottomRight = transformPoint(
+                  { x: table.x + table.width, y: table.y + table.height },
+                  vp.viewport,
+                  canvasWidth,
+                  canvasHeight
+                );
+                const screenW = bottomRight.x - topLeft.x;
+                const screenH = bottomRight.y - topLeft.y;
 
-              if (screenW < 20 || screenH < 20) return null;
-              if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
-              if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
+                if (screenW < 20 || screenH < 20) return null;
+                if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
+                if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
 
-              const isSelected = sel.selectedElementIds.has(table.id);
+                const isSelected = sel.selectedElementIds.has(table.id);
 
-              return (
-                <div
-                  key={table.id}
-                  className="absolute"
-                  style={{
-                    left: topLeft.x,
-                    top: topLeft.y,
-                    width: screenW,
-                    minHeight: screenH,
-                    pointerEvents: isSelected ? 'auto' : 'none',
-                    zIndex: isSelected ? 35 : 10,
-                    overflow: 'visible',
-                  }}
-                >
-                  <TableView
-                    table={table}
-                    onCellChange={(row, col, value) =>
-                      handleTableCellChange(table.id, row, col, value)
-                    }
-                  />
-                </div>
-              );
-            })}
+                return (
+                  <div
+                    key={table.id}
+                    className="absolute"
+                    style={{
+                      left: topLeft.x,
+                      top: topLeft.y,
+                      width: screenW,
+                      minHeight: screenH,
+                      pointerEvents: isSelected ? 'auto' : 'none',
+                      zIndex: isSelected ? 35 : 10,
+                      overflow: 'visible',
+                    }}
+                  >
+                    <TableView
+                      table={table}
+                      onCellChange={(row, col, value) =>
+                        handleTableCellChange(table.id, row, col, value)
+                      }
+                    />
+                  </div>
+                );
+              })}
+        </div>
 
         {/* ═══════════════════════════════════════════════════════════════
             CANVAS — pointer-events: none
@@ -1265,6 +1325,25 @@ export default function WhiteboardCanvasNew({
             canvasHeight={canvasHeight}
           />
         )}
+
+        {/* ── KALKULATOR ────────────────────────────────────────────────── */}
+        {isCalculatorOpen && canvasWidth > 0 && (
+          <CalculatorTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onViewportChange={handleViewportChange}
+            onClose={() => setIsCalculatorOpen(false)}
+          />
+        )}
+
+        {/* ── HISTORIA AKTYWNOŚCI ───────────────────────────────────────── */}
+        <ActivityHistory
+          elements={el.elementsWithAuthor}
+          viewport={vp.viewport}
+          onCenterView={handleCenterViewAndSelectElements}
+          onSelectElements={handleSelectElementsFromHistory}
+        />
 
         {/* ── SNAP GUIDES ───────────────────────────────────────────────── */}
         <SnapGuides
