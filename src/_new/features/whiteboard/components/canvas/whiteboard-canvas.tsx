@@ -250,13 +250,15 @@ export default function WhiteboardCanvasNew({
   // ─── Broadcast viewport throttled ──────────────────────────────────────────
   const lastVpBroadcastRef = useRef(0);
   useEffect(() => {
+    // Nie broadcastuj gdy kanał WebSocket nie jest gotowy
+    if (!rt.isConnected) return;
     // Nie broadcastuj gdy jesteśmy w follow mode
     if (vp.followingUserId) return;
     const now = Date.now();
     if (now - lastVpBroadcastRef.current < 50) return; // 20 FPS max
     lastVpBroadcastRef.current = now;
     rt.broadcastViewportChange(vp.viewport.x, vp.viewport.y, vp.viewport.scale);
-  }, [vp.viewport, vp.followingUserId, rt.broadcastViewportChange]);
+  }, [vp.viewport, vp.followingUserId, rt.broadcastViewportChange, rt.isConnected]);
 
   // ─── RENDEROWANIE CANVAS ────────────────────────────────────────────────────
 
