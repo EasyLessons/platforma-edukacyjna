@@ -123,6 +123,8 @@ export default function WhiteboardCanvasNew({
   const htmlOverlaysRef = useRef<HTMLDivElement>(null);
   /** Ref do wrappera Markdown + Table overlayów — ukrywany podczas pan razem z htmlOverlaysRef */
   const mdTableOverlaysRef = useRef<HTMLDivElement>(null);
+  /** Ref do wrappera RemoteCursors — ukrywany podczas pan (viewport stale → złe pozycje ekranowe) */
+  const remoteCursorsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     boardIdRef.current = boardId;
@@ -355,6 +357,7 @@ export default function WhiteboardCanvasNew({
   useEffect(() => {
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
+    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
   }, [vp.viewport]);
 
   useEffect(() => {
@@ -367,6 +370,7 @@ export default function WhiteboardCanvasNew({
       // Ukryj HTML overlaye — pojawią się z powrotem po zsynchronizowaniu React-stanu viewport (useEffect wyżej)
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
+      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -438,6 +442,7 @@ export default function WhiteboardCanvasNew({
       // Ukryj HTML overlaye — pojawią się z powrotem po setViewport (mouseup)
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
+      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -1386,11 +1391,13 @@ export default function WhiteboardCanvasNew({
 
         {/* ── KURSORY INNYCH UŻYTKOWNIKÓW ───────────────────────────────── */}
         {canvasWidth > 0 && (
-          <RemoteCursorsContainer
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-          />
+          <div ref={remoteCursorsRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
+            <RemoteCursorsContainer
+              viewport={vp.viewport}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+            />
+          </div>
         )}
 
         {/* ── KALKULATOR ────────────────────────────────────────────────── */}
