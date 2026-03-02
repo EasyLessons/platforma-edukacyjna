@@ -62,6 +62,7 @@ import { SnapGuides } from './snap-guides';
 
 // ─── Renderowanie canvas (sprawdzona funkcja ze starego kodu) ─────────────────
 import { drawElement } from '@/app/tablica/whiteboard/rendering';
+import { drawGrid } from '@/app/tablica/whiteboard/Grid';
 
 // ─── Matematyka viewportu ─────────────────────────────────────────────────────
 import {
@@ -248,6 +249,9 @@ export default function WhiteboardCanvasNew({
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
+
+    // Siatka kartezjańska (układ współrzędnych)
+    drawGrid(ctx, viewport, width, height);
 
     // Markdown + Table renderowane jako HTML overlay — canvas je pomija
     for (const element of el.elementsRef.current) {

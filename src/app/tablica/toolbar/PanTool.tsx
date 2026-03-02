@@ -73,14 +73,16 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange 
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
-  // 🆕 Handler dla wheel event - obsługuje zoom i pan
-  const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+  // 🆕 Native wheel listener — musi być non-passive żeby preventDefault działał
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
+
+    const handleNativeWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
       if (e.ctrlKey) {
-        // Zoom
         const newViewport = zoomViewport(
           viewport,
           e.deltaY,
@@ -91,13 +93,14 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange 
         );
         onViewportChange(constrainViewport(newViewport));
       } else {
-        // Pan
         const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
-    },
-    [viewport, canvasWidth, canvasHeight, onViewportChange]
-  );
+    };
+
+    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleNativeWheel);
+  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
   // Pointer down - rozpocznij panning
   const handlePointerDown = useCallback(
@@ -162,7 +165,6 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange 
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onWheel={handleWheel}
       />
     </div>
   );
