@@ -41,6 +41,7 @@ export type Tool =
   | 'eraser'
   | 'markdown'
   | 'table'
+  | 'arrow'
   | 'calculator';
 
 /**

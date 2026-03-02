@@ -241,6 +241,7 @@ page.tsx
 - [ ] `components/panels/*` ← TODO: Etap 6 (Calculator, Chat, PDF, ActivityHistory)
 
 **Co zawiera whiteboard-canvas.tsx:**
+
 - Resize canvas + pętla renderowania (requestAnimationFrame + drawElement z rendering.ts)
 - Wheel: zoom (Ctrl+scroll) + pan (scroll)
 - Keyboard: Ctrl+Z/Y, Ctrl+C/V/D, Delete, Escape, skróty liter narzędzi
@@ -248,6 +249,7 @@ page.tsx
 - TODO [Etap 6]: `onPointerDown/Move/Up` → podłączyć SelectTool, PenTool itp.
 
 **Naprawa use-history.ts (bug z Etap 4):**
+
 - Dodano `onRemoveElement` + `onAddElement` — bez nich undo/redo nie aktualizował ekranu
 
 ### ETAP 6 — Integracja (FINALNE SPINANIE)
@@ -270,14 +272,14 @@ page.tsx
 
 ## STATUS
 
-| Etap          | Status  | Notatki                                                                          |
-| ------------- | ------- | -------------------------------------------------------------------------------- |
-| 1. Typy       | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami    |
-| 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami  |
-| 3. API layer  | ✅ DONE | elements-api.ts / realtime-api.ts (BoardEvent type + createBoardChannel factory) |
+| Etap          | Status  | Notatki                                                                                         |
+| ------------- | ------- | ----------------------------------------------------------------------------------------------- |
+| 1. Typy       | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami                   |
+| 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami                 |
+| 3. API layer  | ✅ DONE | elements-api.ts / realtime-api.ts (BoardEvent type + createBoardChannel factory)                |
 | 4. Hooki      | ✅ DONE | use-history / use-viewport / use-elements (nowy) / use-clipboard / use-selection / use-realtime |
-| 5. Komponenty | ✅ DONE | whiteboard-canvas (orkiestrator 6 hooków) + loading-overlay + status-indicators + snap-guides |
-| 6. Integracja | ⬜ TODO |                                                                                  |
+| 5. Komponenty | ✅ DONE | whiteboard-canvas (orkiestrator 6 hooków) + loading-overlay + status-indicators + snap-guides   |
+| 6. Integracja | ⬜ TODO |                                                                                                 |
 
 ---
 

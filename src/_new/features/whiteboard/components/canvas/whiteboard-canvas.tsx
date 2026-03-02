@@ -1,22 +1,29 @@
 /**
  * whiteboard-canvas.tsx
  *
- * GŁÓWNY ORKIESTRATOR tablicy. Etap 5 refaktoryzacji.
+ * GŁÓWNY ORKIESTRATOR tablicy. Etap 6 — FINALNE SPINANIE.
  *
  * ODPOWIEDZIALNOŚĆ:
  *  - Spina razem 6 hooków: useViewport, useElements, useHistory,
  *    useClipboard, useSelection, useRealtime
+ *  - Importuje i renderuje WSZYSTKIE stare narzędzia (SelectTool, PenTool,
+ *    ShapeTool, TextTool, PanTool, EraserTool, FunctionTool, ImageTool,
+ *    MarkdownNoteTool, TableTool, ArrowTool) — re-use as-is, podłączone do hooków
+ *  - Renderuje HTML overlays dla markdown (MarkdownNoteView) i tabel (TableView)
+ *  - Renderuje Toolbar, ZoomControls, OnlineUsers, RemoteCursors
  *  - Obsługuje resize canvas + pętlę renderowania (requestAnimationFrame)
  *  - Obsługuje kółko myszy (zoom + pan)
- *  - Obsługuje skróty klawiszowe (Ctrl+Z/Y, Ctrl+C/V/D, Delete, Escape, litery narzędzi)
- *  - Renderuje overlay UI: LoadingOverlay, StatusIndicators, SnapGuides
+ *  - Obsługuje skróty klawiszowe (Ctrl+Z/Y, Ctrl+C/V/D, Delete, Escape, litery)
  *
- * NIE robi:
- *  - Nie zawiera logiki narzędzi (SelectTool, PenTool itp.) — TODO: Etap 6
- *  - Nie zawiera czatu ani SmartSearch — TODO: Etap 6
- *  - Nie zarządza rolami użytkownika złożono (tylko wymuszenie 'pan' dla viewera)
+ * ZMIANY vs Etap 5:
+ *  - Dodano canvasWidth/canvasHeight state (potrzebne przez komponenty narzędzi)
+ *  - Dodano wszystkie handler callbacks dla narzędzi
+ *  - Dodano renderowanie narzędzi, overlayów MD/table, Toolbar, ZoomControls
+ *  - Dodano imageToolRef (ImageTool to forwardRef)
+ *  - Dodano handleFollowUser/handleStopFollowing (OnlineUsers)
+ *  - Dodano clearCanvas, deleteSelectedElements, zoomIn, zoomOut
  *
- * STATUS: Etap 5 — gotowy do podłączenia w Etap 6 (tu: budujemy architekturę)
+ * STATUS: Etap 6 — gotowy do podmiany w page.tsx
  */
 
 'use client';
@@ -31,12 +38,29 @@ import { useClipboard } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 
+// ─── Stare narzędzia (re-import as-is, podłączamy do nowych hooków) ───────────
+import Toolbar from '@/app/tablica/toolbar/Toolbar';
+import { ZoomControls } from '@/app/tablica/toolbar/ZoomControls';
+import { TextTool } from '@/app/tablica/toolbar/TextTool';
+import { SelectTool } from '@/app/tablica/toolbar/SelectTool';
+import { PenTool } from '@/app/tablica/toolbar/PenTool';
+import { ShapeTool } from '@/app/tablica/toolbar/ShapeTool';
+import { PanTool } from '@/app/tablica/toolbar/PanTool';
+import { FunctionTool } from '@/app/tablica/toolbar/FunctionTool';
+import { ImageTool, ImageToolRef } from '@/app/tablica/toolbar/ImageTool';
+import { EraserTool } from '@/app/tablica/toolbar/EraserTool';
+import { MarkdownNoteTool, MarkdownNoteView } from '@/app/tablica/toolbar/MarkdownNoteTool';
+import { TableTool, TableView } from '@/app/tablica/toolbar/TableTool';
+import ArrowTool from '@/app/tablica/toolbar/ArrowTool';
+import { OnlineUsers } from '@/app/tablica/whiteboard/OnlineUsers';
+import { RemoteCursorsContainer } from '@/app/tablica/whiteboard/RemoteCursors';
+
 // ─── Nowe komponenty UI ───────────────────────────────────────────────────────
 import { LoadingOverlay } from './loading-overlay';
 import { StatusIndicators } from './status-indicators';
 import { SnapGuides } from './snap-guides';
 
-// ─── Renderowanie (stara, sprawdzona funkcja — nie ruszamy w Etap 5) ──────────
+// ─── Renderowanie canvas (sprawdzona funkcja ze starego kodu) ─────────────────
 import { drawElement } from '@/app/tablica/whiteboard/rendering';
 
 // ─── Matematyka viewportu ─────────────────────────────────────────────────────
@@ -45,9 +69,22 @@ import {
   zoomViewport,
   panViewportWithWheel,
 } from '../../navigation/viewport-math';
+// transformPoint ze starego kodu (potrzebny do pozycjonowania overlayów MD/table)
+import { transformPoint } from '@/app/tablica/whiteboard/viewport';
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
-import type { DrawingElement } from '../../types';
+import type {
+  DrawingElement,
+  DrawingPath,
+  Shape,
+  TextElement,
+  FunctionPlot,
+  ImageElement,
+  MarkdownNote,
+  TableElement,
+  ArrowElement,
+  ViewportTransform,
+} from '../../types';
 import type { Tool, ShapeType } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 
@@ -58,31 +95,27 @@ export interface WhiteboardCanvasNewProps {
   boardId: string;
   /** Ścieżka do folderu z arkuszem PDF do wczytania jako tło — opcjonalne */
   arkuszPath?: string | null;
-  /** Rola użytkownika — viewer dostaje tylko narzędzie 'pan' */
+  /** Rola użytkownika — viewer dostaje tylko 'pan' */
   userRole?: 'owner' | 'editor' | 'viewer';
   className?: string;
 }
 
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
-/**
- * WhiteboardCanvasNew — etapowa wersja orkiestratora tablicy.
- *
- * Eksportowana jako `default` żeby móc podmienić import w page.tsx w Etap 6.
- * Podczas Etap 5 NIE jest podłączona do produkcyjnego routingu —
- * testowanie odbywa się przez bezpośredni import na potrzeby weryfikacji.
- */
 export default function WhiteboardCanvasNew({
   boardId,
-  arkuszPath,
+  arkuszPath: _arkuszPath,
   userRole = 'editor',
   className = '',
 }: WhiteboardCanvasNewProps) {
   // ─── Refs do DOM ────────────────────────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  /** Stabilna referencja do boardId — bezpieczna w event handlerach bez closures */
+  /** Stabilna referencja do boardId — bezpieczna w event handlerach */
   const boardIdRef = useRef<string>(boardId);
+  /** Ref do ImageTool (forwardRef — potrzebny do triggerFileUpload / handlePasteFromClipboard) */
+  const imageToolRef = useRef<ImageToolRef>(null);
+
   useEffect(() => {
     boardIdRef.current = boardId;
   }, [boardId]);
@@ -95,9 +128,18 @@ export default function WhiteboardCanvasNew({
   const [lineWidth, setLineWidth] = useState(4);
   const [fontSize, setFontSize] = useState(70);
   const [fillShape, setFillShape] = useState(false);
+  const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
-  /** Aktywne linie prowadzące snap — ustawiane przez SelectTool podczas przeciągania */
+  /** Aktywne linie snap — aktualizuje SelectTool podczas przeciągania */
   const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
+
+  /**
+   * Wymiary canvasa w CSS-px — potrzebne przez wszystkie komponenty narzędzi.
+   * Inicjalizowane na 0, aktualizowane przez ResizeObserver w effekcie resize.
+   * Narzędzia renderują się dopiero gdy > 0 (guard: `canvasWidth > 0`).
+   */
+  const [canvasWidth, setCanvasWidth] = useState(0);
+  const [canvasHeight, setCanvasHeight] = useState(0);
 
   // Viewer = tylko pan (nie może rysować)
   useEffect(() => {
@@ -207,8 +249,9 @@ export default function WhiteboardCanvasNew({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    // Rysuj elementy (markdown + table są renderowane jako HTML overlay, nie canvas)
+    // Markdown + Table renderowane jako HTML overlay — canvas je pomija
     for (const element of el.elementsRef.current) {
+      if (element.type === 'markdown' || element.type === 'table') continue;
       drawElement(
         ctx,
         element,
@@ -216,8 +259,8 @@ export default function WhiteboardCanvasNew({
         width,
         height,
         el.loadedImages,
-        false,  // debug
-        undefined, // onAutoExpand — TODO: Etap 6 (podłączyć autoExpand)
+        false,
+        undefined,
         el.elementsRef.current
       );
     }
@@ -260,6 +303,9 @@ export default function WhiteboardCanvasNew({
       canvas.height = h * dpr;
       canvas.style.width = `${w}px`;
       canvas.style.height = `${h}px`;
+      // Zaktualizuj stan — narzędzia czekają na canvasWidth > 0
+      setCanvasWidth(w);
+      setCanvasHeight(h);
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.scale(dpr, dpr);
@@ -359,15 +405,7 @@ export default function WhiteboardCanvasNew({
       if (e.key === 'Delete') {
         if (sel.selectedElementIds.size > 0) {
           e.preventDefault();
-          const boardIdNum = parseInt(boardIdRef.current);
-          sel.selectedElementIds.forEach((id) => {
-            el.removeElement(id);
-            rt.broadcastElementDeleted(id);
-            if (!isNaN(boardIdNum)) {
-              el.deleteElementDirectly(boardIdNum, id).catch(console.error);
-            }
-          });
-          sel.clearSelection();
+          deleteSelectedElementsRef.current();
         }
         return;
       }
@@ -401,99 +439,764 @@ export default function WhiteboardCanvasNew({
     hist.undo, hist.redo,
     sel.selectedElementIds, sel.clearSelection,
     clip.handleCopy, clip.handlePaste, clip.handleDuplicate,
-    el.removeElement, el.deleteElementDirectly,
-    rt.broadcastElementDeleted,
     userRole,
   ]);
 
-  // ─── RENDER ─────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER VIEWPORT (wywołują narzędzia podczas pan/zoom przez touch/drag)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleViewportChange = useCallback((newVp: ViewportTransform) => {
+    const constrained = constrainViewport(newVp);
+    vp.viewportRef.current = constrained;
+    vp.setViewport(constrained);
+  }, [vp.setViewport, vp.viewportRef]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERY TWORZENIA ELEMENTÓW
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  /** Wspólna logika: dodaj element + broadcast + history */
+  const createElement = useCallback((element: DrawingElement) => {
+    if (userRole === 'viewer') return;
+    el.addElements([element]);
+    el.markUnsaved([element.id]);
+    rt.broadcastElementCreated(element);
+    hist.pushUserAction({ type: 'create', element });
+  }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction]);
+
+  const handlePathCreate = useCallback(
+    (path: DrawingPath) => createElement(path),
+    [createElement]
+  );
+
+  const handleShapeCreate = useCallback(
+    (shape: Shape) => createElement(shape),
+    [createElement]
+  );
+
+  const handleFunctionCreate = useCallback(
+    (func: FunctionPlot) => createElement(func),
+    [createElement]
+  );
+
+  const handleArrowCreate = useCallback(
+    (arrow: ArrowElement) => createElement(arrow as DrawingElement),
+    [createElement]
+  );
+
+  const handleImageCreate = useCallback((image: ImageElement) => {
+    if (userRole === 'viewer') return;
+    el.addElements([image]);
+    el.markUnsaved([image.id]);
+    rt.broadcastElementCreated(image);
+    hist.pushUserAction({ type: 'create', element: image });
+    if (image.src) el.loadImage(image.id, image.src);
+    setTool('select');
+  }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction, el.loadImage]);
+
+  const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
+    if (userRole === 'viewer') return;
+    el.addElements([note]);
+    el.markUnsaved([note.id]);
+    rt.broadcastElementCreated(note);
+    hist.pushUserAction({ type: 'create', element: note });
+    setTool('select');
+    sel.setSelectedElementIds(new Set([note.id]));
+    sel.setEditingMarkdownId(note.id);
+  }, [
+    userRole,
+    el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction,
+    sel.setSelectedElementIds, sel.setEditingMarkdownId,
+  ]);
+
+  const handleTableCreate = useCallback((table: TableElement) => {
+    if (userRole === 'viewer') return;
+    el.addElements([table]);
+    el.markUnsaved([table.id]);
+    rt.broadcastElementCreated(table);
+    hist.pushUserAction({ type: 'create', element: table });
+    setTool('select');
+    sel.setSelectedElementIds(new Set([table.id]));
+  }, [
+    userRole,
+    el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction,
+    sel.setSelectedElementIds,
+  ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERY TextTool
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleTextCreate = useCallback(
+    (text: TextElement) => createElement(text),
+    [createElement]
+  );
+
+  const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
+    if (userRole === 'viewer') return;
+    const current = el.elementsRef.current.find((e) => e.id === id);
+    if (!current) return;
+    const updated = { ...current, ...updates } as DrawingElement;
+    el.updateElement(updated);
+    el.markUnsaved([id]);
+    rt.broadcastElementUpdated(updated);
+  }, [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]);
+
+  const handleTextDelete = useCallback((id: string) => {
+    if (userRole === 'viewer') return;
+    const current = el.elementsRef.current.find((e) => e.id === id);
+    el.removeElement(id);
+    rt.broadcastElementDeleted(id);
+    const boardIdNum = parseInt(boardIdRef.current);
+    if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
+    if (current) hist.pushUserAction({ type: 'delete', element: current });
+  }, [
+    userRole,
+    el.elementsRef, el.removeElement, el.deleteElementDirectly,
+    rt.broadcastElementDeleted, hist.pushUserAction,
+  ]);
+
+  const handleEditingComplete = useCallback(() => {
+    sel.setEditingTextId(null);
+    if (userRole !== 'viewer') setTool('select');
+  }, [sel.setEditingTextId, userRole]);
+
+  const handleTextEdit = useCallback((id: string) => {
+    sel.setEditingTextId(id);
+    setTool('text');
+  }, [sel.setEditingTextId]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERY SelectTool
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleSelectionChange = useCallback((ids: Set<string>) => {
+    sel.setSelectedElementIds(ids);
+  }, [sel.setSelectedElementIds]);
+
+  /** Szybki update bez historii (podczas przeciągania) */
+  const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
+    if (userRole === 'viewer') return;
+    const current = el.elementsRef.current.find((e) => e.id === id);
+    if (!current) return;
+    el.updateElement({ ...current, ...updates } as DrawingElement);
+  }, [userRole, el.elementsRef, el.updateElement]);
+
+  /** Update z historią (po zakończeniu przeciągania / zmianie rozmiaru) */
+  const handleElementUpdateWithHistory = useCallback(
+    (id: string, updates: Partial<DrawingElement>) => {
+      if (userRole === 'viewer') return;
+      const current = el.elementsRef.current.find((e) => e.id === id);
+      if (!current) return;
+      const updated = { ...current, ...updates } as DrawingElement;
+      el.updateElement(updated);
+      el.markUnsaved([id]);
+      rt.broadcastElementUpdated(updated);
+      hist.saveToHistory(
+        el.elementsRef.current.map((e) => (e.id === id ? updated : e))
+      );
+    },
+    [
+      userRole,
+      el.elementsRef, el.updateElement, el.markUnsaved,
+      rt.broadcastElementUpdated, hist.saveToHistory,
+    ]
+  );
+
+  /** Batch update (SelectTool przesuwa wiele elementów naraz) */
+  const handleElementsUpdate = useCallback(
+    (updates: Map<string, Partial<DrawingElement>>) => {
+      if (userRole === 'viewer') return;
+      const ids = Array.from(updates.keys());
+      ids.forEach((id) => {
+        const current = el.elementsRef.current.find((e) => e.id === id);
+        if (!current) return;
+        const updated = { ...current, ...updates.get(id) } as DrawingElement;
+        el.updateElement(updated);
+        rt.broadcastElementUpdated(updated);
+      });
+      el.markUnsaved(ids);
+    },
+    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+  );
+
+  /** Wywoływane przez SelectTool po zakończeniu operacji (mouseup) */
+  const handleSelectionFinish = useCallback(() => {
+    if (userRole === 'viewer') return;
+    const currentElements = el.elementsRef.current;
+    const selectedIds = Array.from(sel.selectedElementIdsRef.current);
+    hist.saveToHistory(currentElements);
+    selectedIds.forEach((id) => {
+      const found = currentElements.find((e) => e.id === id);
+      if (found) rt.broadcastElementUpdated(found);
+    });
+    el.markUnsaved(selectedIds);
+  }, [
+    userRole,
+    el.elementsRef, el.markUnsaved,
+    sel.selectedElementIdsRef,
+    hist.saveToHistory,
+    rt.broadcastElementUpdated,
+  ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLER EraserTool
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleElementDelete = useCallback((id: string) => {
+    if (userRole === 'viewer') return;
+    const current = el.elementsRef.current.find((e) => e.id === id);
+    el.removeElement(id);
+    rt.broadcastElementDeleted(id);
+    const boardIdNum = parseInt(boardIdRef.current);
+    if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
+    if (current) hist.pushUserAction({ type: 'delete', element: current });
+  }, [
+    userRole,
+    el.elementsRef, el.removeElement, el.deleteElementDirectly,
+    rt.broadcastElementDeleted, hist.pushUserAction,
+  ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // HANDLERY HTML OVERLAYS (Markdown + Table)
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleMarkdownContentChange = useCallback((noteId: string, content: string) => {
+    if (userRole === 'viewer') return;
+    const current = el.elementsRef.current.find((e) => e.id === noteId);
+    if (!current || current.type !== 'markdown') return;
+    const updated = { ...current, content } as DrawingElement;
+    el.updateElement(updated);
+    el.markUnsaved([noteId]);
+    rt.broadcastElementUpdated(updated);
+  }, [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]);
+
+  const handleMarkdownEditStart = useCallback((noteId: string) => {
+    sel.setEditingMarkdownId(noteId);
+    rt.broadcastTypingStarted(noteId);
+  }, [sel.setEditingMarkdownId, rt.broadcastTypingStarted]);
+
+  const handleMarkdownEditEnd = useCallback(() => {
+    const editingId = sel.editingMarkdownId;
+    if (editingId) rt.broadcastTypingStopped(editingId);
+    sel.setEditingMarkdownId(null);
+  }, [sel.editingMarkdownId, sel.setEditingMarkdownId, rt.broadcastTypingStopped]);
+
+  const handleTableCellChange = useCallback(
+    (tableId: string, row: number, col: number, value: string) => {
+      if (userRole === 'viewer') return;
+      const current = el.elementsRef.current.find((e) => e.id === tableId);
+      if (!current || current.type !== 'table') return;
+      const table = current as TableElement;
+      const newCells = table.cells.map((r, ri) =>
+        ri === row ? r.map((c, ci) => (ci === col ? value : c)) : [...r]
+      );
+      const updated = { ...table, cells: newCells } as DrawingElement;
+      el.updateElement(updated);
+      el.markUnsaved([tableId]);
+      rt.broadcastElementUpdated(updated);
+    },
+    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+  );
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // USUWANIE ZAZNACZONYCH
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const deleteSelectedElements = useCallback(() => {
+    if (userRole === 'viewer') return;
+    const ids = sel.selectedElementIdsRef.current;
+    if (ids.size === 0) return;
+    const boardIdNum = parseInt(boardIdRef.current);
+    ids.forEach((id) => {
+      const element = el.elementsRef.current.find((e) => e.id === id);
+      el.removeElement(id);
+      rt.broadcastElementDeleted(id);
+      if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
+      if (element) hist.pushUserAction({ type: 'delete', element });
+    });
+    sel.clearSelection();
+  }, [
+    userRole,
+    sel.selectedElementIdsRef, sel.clearSelection,
+    el.elementsRef, el.removeElement, el.deleteElementDirectly,
+    rt.broadcastElementDeleted,
+    hist.pushUserAction,
+  ]);
+
+  // Aktualizuj ref (używany w keyDown handler)
+  const deleteSelectedElementsRef = useRef<() => void>(deleteSelectedElements);
+  useEffect(() => {
+    deleteSelectedElementsRef.current = deleteSelectedElements;
+  }, [deleteSelectedElements]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // ZOOM CONTROLS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const resetView = useCallback(() => {
+    const neutral = constrainViewport({ x: 0, y: 0, scale: 1 });
+    vp.viewportRef.current = neutral;
+    vp.setViewport(neutral);
+  }, [vp.setViewport, vp.viewportRef]);
+
+  const zoomIn = useCallback(() => {
+    vp.setViewport((prev: ViewportTransform) =>
+      constrainViewport({ ...prev, scale: Math.min(prev.scale * 1.2, 5.0) })
+    );
+  }, [vp.setViewport]);
+
+  const zoomOut = useCallback(() => {
+    vp.setViewport((prev: ViewportTransform) =>
+      constrainViewport({ ...prev, scale: Math.max(prev.scale / 1.2, 0.1) })
+    );
+  }, [vp.setViewport]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CLEAR CANVAS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const clearCanvas = useCallback(async () => {
+    if (userRole === 'viewer') return;
+    const boardIdNum = parseInt(boardIdRef.current);
+    const snapshot = [...el.elementsRef.current];
+    snapshot.forEach((e) => {
+      el.removeElement(e.id);
+      rt.broadcastElementDeleted(e.id);
+      if (!isNaN(boardIdNum)) {
+        el.deleteElementDirectly(boardIdNum, e.id).catch(console.error);
+      }
+    });
+    sel.clearSelection();
+  }, [
+    userRole,
+    el.elementsRef, el.removeElement, el.deleteElementDirectly,
+    rt.broadcastElementDeleted,
+    sel.clearSelection,
+  ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // IMAGE TOOL WRAPPERS
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleImageToolPaste = useCallback(() => {
+    imageToolRef.current?.handlePasteFromClipboard();
+  }, []);
+
+  const handleImageToolUpload = useCallback(() => {
+    imageToolRef.current?.triggerFileUpload();
+  }, []);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FOLLOW MODE
+  // ═══════════════════════════════════════════════════════════════════════════
+
+  const handleFollowUser = useCallback(
+    (userId: number, x: number, y: number, scale: number) => {
+      vp.handleFollowUser(userId, x, y, scale);
+    },
+    [vp.handleFollowUser]
+  );
+
+  const handleStopFollowing = useCallback(() => {
+    vp.handleStopFollowing();
+  }, [vp.handleStopFollowing]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ═══════════════════════════════════════════════════════════════════════════
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full overflow-hidden ${className}`}
-      style={{ cursor: toolToCursor(tool) }}
-    >
-      {/* Canvas — renderowanie ścieżek, kształtów, tekstów, obrazów */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-        style={{ touchAction: 'none' }}
-        /**
-         * TODO: [Etap 6] Podłączyć handlery zdarzeń myszy/dotyku.
-         * Każde narzędzie ma własny komponent (SelectTool, PenTool, ShapeTool itp.)
-         * który obsługuje onPointerDown/Move/Up i wywołuje nowe hooki.
-         *
-         * Przykład dla PenTool:
-         *   onPointerDown={tool === 'pen' ? penTool.handlePointerDown : undefined}
-         *   onPointerMove={tool === 'pen' ? penTool.handlePointerMove : undefined}
-         *   onPointerUp={tool === 'pen' ? penTool.handlePointerUp : undefined}
-         */
-      />
+    <div className={`relative w-full h-full bg-[#FEF2F2] ${className}`}>
 
-      {/*
-       * TODO: [Etap 6] NAKŁADKI NARZĘDZI (renderowane jako SVG/HTML nad canvasem)
-       *
-       * ─── SelectTool ──────────────────────────────────────────────────────────
-       * <SelectTool
-       *   elements={el.elements}
-       *   elementsRef={el.elementsRef}
-       *   selectedElementIds={sel.selectedElementIds}
-       *   setSelectedElementIds={sel.setSelectedElementIds}
-       *   viewport={vp.viewport}
-       *   viewportRef={vp.viewportRef}
-       *   setViewport={vp.setViewport}
-       *   canvasRef={canvasRef}
-       *   tool={tool}
-       *   onElementsUpdate={(updated, ids) => {
-       *     updated.forEach(u => el.updateElement(u));
-       *     el.markUnsaved(ids);
-       *     updated.forEach(u => rt.broadcastElementUpdated(u));
-       *   }}
-       *   onActiveGuides={setActiveGuides}
-       *   boardId={boardId}
-       * />
-       *
-       * ─── PenTool ─────────────────────────────────────────────────────────────
-       * <PenTool
-       *   tool={tool}
-       *   color={color}
-       *   lineWidth={lineWidth}
-       *   viewport={vp.viewport}
-       *   viewportRef={vp.viewportRef}
-       *   canvasRef={canvasRef}
-       *   onPathCreated={(path) => {
-       *     el.addElements([path]);
-       *     el.markUnsaved([path.id]);
-       *     rt.broadcastElementCreated(path);
-       *     hist.pushUserAction({ type: 'create', element: path });
-       *   }}
-       * />
-       *
-       * i tak dalej dla ShapeTool, TextTool, FunctionTool, ImageTool, EraserTool, MarkdownTool...
-       * Każde narzędzie to ~4 linie konfiguracji dzięki nowej architekturze hooków.
-       */}
+      {/* Loading overlay — zakrywa canvas aż elementy się załadują */}
+      <LoadingOverlay isLoading={el.isLoading} progress={el.loadingProgress} />
 
-      {/* Linie snap (niebieskie prowadnice podczas przeciągania) */}
-      <SnapGuides
-        guides={activeGuides}
-        viewport={vp.viewport}
-        canvasWidth={canvasRef.current?.offsetWidth ?? 800}
-        canvasHeight={canvasRef.current?.offsetHeight ?? 600}
-      />
+      {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
+      <div
+        ref={containerRef}
+        className="absolute inset-0 overflow-hidden touch-none overscroll-none"
+        onContextMenu={(e) => e.preventDefault()}
+        style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
+      >
 
-      {/* Wskaźniki stanu (zapisywanie / niezapisane / brak połączenia) */}
-      <StatusIndicators
-        isSaving={el.isSaving}
-        unsavedCount={el.unsavedElements.size}
-        isConnected={rt.isConnected}
-      />
+        {/* ── ONLINE USERS ──────────────────────────────────────────────── */}
+        <OnlineUsers onFollowUser={handleFollowUser} userRole={userRole} />
 
-      {/* Overlay ładowania — zakrywa canvas do momentu gdy wszystko gotowe */}
-      <LoadingOverlay
-        isLoading={el.isLoading}
-        progress={el.loadingProgress}
-      />
+        {/* ── FOLLOW MODE BANNER ────────────────────────────────────────── */}
+        {vp.followingUserId && (
+          <div className="absolute top-20 right-4 z-50 bg-blue-500 text-white rounded-lg shadow-lg px-4 py-2 flex items-center gap-3 animate-pulse">
+            <span className="text-sm font-medium">👁️ Śledzisz użytkownika</span>
+            <button
+              onClick={handleStopFollowing}
+              className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm font-medium transition-colors"
+            >
+              Przestań śledzić
+            </button>
+          </div>
+        )}
+
+        {/* ── VIEWER BANNER ─────────────────────────────────────────────── */}
+        {userRole === 'viewer' && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[150] bg-yellow-100 border border-yellow-300 text-yellow-800 px-4 py-2 rounded-lg shadow-md flex items-center gap-2">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              />
+            </svg>
+            <span className="font-medium">Tryb tylko do odczytu</span>
+          </div>
+        )}
+
+        {/* ── TOOLBAR ───────────────────────────────────────────────────── */}
+        <Toolbar
+          tool={tool}
+          setTool={setTool}
+          selectedShape={selectedShape}
+          setSelectedShape={setSelectedShape}
+          polygonSides={polygonSides}
+          setPolygonSides={setPolygonSides}
+          color={color}
+          setColor={setColor}
+          lineWidth={lineWidth}
+          setLineWidth={setLineWidth}
+          fontSize={fontSize}
+          setFontSize={setFontSize}
+          fillShape={fillShape}
+          setFillShape={setFillShape}
+          onUndo={hist.undo}
+          onRedo={hist.redo}
+          onClear={clearCanvas}
+          onResetView={resetView}
+          canUndo={hist.canUndo}
+          canRedo={hist.canRedo}
+          hasSelection={sel.selectedElementIds.size > 0}
+          onDeleteSelected={deleteSelectedElements}
+          onImagePaste={handleImageToolPaste}
+          onImageUpload={handleImageToolUpload}
+          onPDFUpload={handleImageToolUpload}
+          isCalculatorOpen={isCalculatorOpen}
+          onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
+          isReadOnly={userRole === 'viewer'}
+        />
+
+        {/* ── ZOOM CONTROLS ─────────────────────────────────────────────── */}
+        <ZoomControls
+          zoom={vp.viewport.scale}
+          onZoomIn={zoomIn}
+          onZoomOut={zoomOut}
+          onResetView={resetView}
+        />
+
+        {/* ═══════════════════════════════════════════════════════════════
+            NARZĘDZIA — każde zarządza własnymi overlayami pointer-events
+            ═══════════════════════════════════════════════════════════════ */}
+
+        {tool === 'text' && canvasWidth > 0 && (
+          <TextTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={el.elements.filter((e) => e.type === 'text') as TextElement[]}
+            editingTextId={sel.editingTextId}
+            onTextCreate={handleTextCreate}
+            onTextUpdate={handleTextUpdate}
+            onTextDelete={handleTextDelete}
+            onEditingComplete={handleEditingComplete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'select' && canvasWidth > 0 && (
+          <SelectTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={el.elements}
+            selectedIds={sel.selectedElementIds}
+            onSelectionChange={handleSelectionChange}
+            onElementUpdate={handleElementUpdate}
+            onElementUpdateWithHistory={handleElementUpdateWithHistory}
+            onElementsUpdate={handleElementsUpdate}
+            onOperationFinish={handleSelectionFinish}
+            onTextEdit={handleTextEdit}
+            onMarkdownEdit={sel.setEditingMarkdownId}
+            onViewportChange={handleViewportChange}
+            onActiveGuidesChange={setActiveGuides}
+            onDeleteSelected={deleteSelectedElements}
+            onCopySelected={clip.handleCopy}
+            onDuplicateSelected={clip.handleDuplicate}
+          />
+        )}
+
+        {tool === 'pen' && canvasWidth > 0 && (
+          <PenTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onPathCreate={handlePathCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'shape' && canvasWidth > 0 && (
+          <ShapeTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            selectedShape={selectedShape}
+            polygonSides={polygonSides}
+            color={color}
+            lineWidth={lineWidth}
+            fillShape={fillShape}
+            onShapeCreate={handleShapeCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'pan' && canvasWidth > 0 && (
+          <PanTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'function' && canvasWidth > 0 && (
+          <FunctionTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onFunctionCreate={handleFunctionCreate}
+            onColorChange={setColor}
+            onLineWidthChange={setLineWidth}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'image' && canvasWidth > 0 && (
+          <ImageTool
+            ref={imageToolRef}
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onImageCreate={handleImageCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'eraser' && canvasWidth > 0 && (
+          <EraserTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            elements={el.elements}
+            onElementDelete={handleElementDelete}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'markdown' && canvasWidth > 0 && (
+          <MarkdownNoteTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onNoteCreate={handleMarkdownNoteCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'table' && canvasWidth > 0 && (
+          <TableTool
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onTableCreate={handleTableCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {tool === 'arrow' && canvasWidth > 0 && (
+          <ArrowTool
+            elements={el.elements}
+            selectedIds={sel.selectedElementIds}
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            color={color}
+            lineWidth={lineWidth}
+            onArrowCreate={handleArrowCreate}
+            onViewportChange={handleViewportChange}
+          />
+        )}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            MARKDOWN HTML OVERLAYS
+            Pozycjonowanie: transformPoint → stały baseWidth/baseHeight
+            + CSS scale(viewport.scale) od top-left
+            ═══════════════════════════════════════════════════════════════ */}
+        {canvasWidth > 0 &&
+          el.elements
+            .filter((e) => e.type === 'markdown')
+            .map((e) => {
+              const note = e as MarkdownNote;
+              const topLeft = transformPoint(
+                { x: note.x, y: note.y },
+                vp.viewport,
+                canvasWidth,
+                canvasHeight
+              );
+              const baseWidth = note.width * 100; // 100px = 1 world unit
+              const baseHeight = note.height * 100;
+              const scaledW = baseWidth * vp.viewport.scale;
+              const scaledH = baseHeight * vp.viewport.scale;
+
+              // Culling — nie renderuj jeśli poza ekranem lub za małe
+              if (scaledW < 30 || scaledH < 30) return null;
+              if (topLeft.x + scaledW < 0 || topLeft.x > canvasWidth) return null;
+              if (topLeft.y + scaledH < 0 || topLeft.y > canvasHeight) return null;
+
+              const isBeingEdited = sel.editingMarkdownId === note.id;
+
+              return (
+                <div
+                  key={note.id}
+                  className="absolute rounded-lg shadow-md border overflow-hidden"
+                  style={{
+                    left: topLeft.x,
+                    top: topLeft.y,
+                    width: baseWidth,
+                    height: baseHeight,
+                    transform: `scale(${vp.viewport.scale})`,
+                    transformOrigin: 'top left',
+                    willChange: 'transform',
+                    backgroundColor: note.backgroundColor || '#fffde7',
+                    borderColor: note.borderColor || '#fbc02d',
+                    pointerEvents: isBeingEdited ? 'auto' : 'none',
+                    zIndex: isBeingEdited ? 50 : 10,
+                  }}
+                >
+                  <MarkdownNoteView
+                    note={note}
+                    noteId={note.id}
+                    isEditing={isBeingEdited}
+                    onContentChange={handleMarkdownContentChange}
+                    onEditStart={handleMarkdownEditStart}
+                    onEditEnd={handleMarkdownEditEnd}
+                    remoteTypingUser={
+                      rt.typingUsers.find((t) => t.elementId === note.id)?.username
+                    }
+                  />
+                </div>
+              );
+            })}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            TABLE HTML OVERLAYS
+            Pozycjonowanie: transformPoint dla obu narożników → screenWidth/Height
+            pointerEvents: auto tylko gdy tabela jest zaznaczona
+            ═══════════════════════════════════════════════════════════════ */}
+        {canvasWidth > 0 &&
+          el.elements
+            .filter((e) => e.type === 'table')
+            .map((e) => {
+              const table = e as TableElement;
+              const topLeft = transformPoint(
+                { x: table.x, y: table.y },
+                vp.viewport,
+                canvasWidth,
+                canvasHeight
+              );
+              const bottomRight = transformPoint(
+                { x: table.x + table.width, y: table.y + table.height },
+                vp.viewport,
+                canvasWidth,
+                canvasHeight
+              );
+              const screenW = bottomRight.x - topLeft.x;
+              const screenH = bottomRight.y - topLeft.y;
+
+              if (screenW < 20 || screenH < 20) return null;
+              if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
+              if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
+
+              const isSelected = sel.selectedElementIds.has(table.id);
+
+              return (
+                <div
+                  key={table.id}
+                  className="absolute"
+                  style={{
+                    left: topLeft.x,
+                    top: topLeft.y,
+                    width: screenW,
+                    minHeight: screenH,
+                    pointerEvents: isSelected ? 'auto' : 'none',
+                    zIndex: isSelected ? 35 : 10,
+                    overflow: 'visible',
+                  }}
+                >
+                  <TableView
+                    table={table}
+                    onCellChange={(row, col, value) =>
+                      handleTableCellChange(table.id, row, col, value)
+                    }
+                  />
+                </div>
+              );
+            })}
+
+        {/* ═══════════════════════════════════════════════════════════════
+            CANVAS — pointer-events: none
+            Narzędzia mają własne pełnoekranowe overlaye powyżej canvasa.
+            Canvas tylko RYSUJE — nie obsługuje eventów myszy/dotyku.
+            ═══════════════════════════════════════════════════════════════ */}
+        <canvas
+          ref={canvasRef}
+          onContextMenu={(e) => e.preventDefault()}
+          className="absolute inset-0 w-full h-full"
+          style={{
+            cursor: toolToCursor(tool),
+            willChange: 'auto',
+            imageRendering: 'crisp-edges',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* ── KURSORY INNYCH UŻYTKOWNIKÓW ───────────────────────────────── */}
+        {canvasWidth > 0 && (
+          <RemoteCursorsContainer
+            viewport={vp.viewport}
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+          />
+        )}
+
+        {/* ── SNAP GUIDES ───────────────────────────────────────────────── */}
+        <SnapGuides
+          guides={activeGuides}
+          viewport={vp.viewport}
+          canvasWidth={canvasWidth}
+          canvasHeight={canvasHeight}
+        />
+
+        {/* ── STATUS INDICATORS ─────────────────────────────────────────── */}
+        <StatusIndicators
+          isSaving={el.isSaving}
+          unsavedCount={el.unsavedElements.size}
+          isConnected={rt.isConnected}
+        />
+
+      </div>
     </div>
   );
 }
@@ -512,6 +1215,7 @@ function toolToCursor(tool: Tool): string {
     case 'function': return 'crosshair';
     case 'image':    return 'copy';
     case 'markdown': return 'crosshair';
-    default:         return 'default';
+    case 'table':    return 'crosshair';
+    case 'arrow':    return 'crosshair';    default:         return 'default';
   }
 }
