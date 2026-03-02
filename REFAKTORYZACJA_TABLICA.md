@@ -228,17 +228,27 @@ page.tsx
 - [ ] `hooks/use-realtime.ts` ← Supabase presence + broadcast
 - [ ] `hooks/use-canvas.ts` ← główny orchestrator (łączy pozostałe hooki)
 
-### ETAP 5 — Komponenty (NAJWIĘKSZA ZMIANA)
+### ETAP 5 — Komponenty ✅ DONE
 
-> Rozbicie WhiteboardCanvas na małe komponenty.
+> Rozbicie WhiteboardCanvas na małe komponenty — w zakresie Etap 5.
 
-- [ ] `components/canvas/whiteboard-canvas.tsx` ← NOWY, ~300 linii, używa hooków z etapu 4
-- [ ] `components/canvas/grid.tsx` ← Grid.tsx (bez logiki, tylko render)
-- [ ] `components/canvas/snap-guides.tsx` ← render linii snap
-- [ ] `components/toolbar/toolbar.tsx` ← refactor Toolbar.tsx
-- [ ] `components/toolbar/tool-button.tsx` ← reużywalny przycisk
-- [ ] `components/toolbar/properties-panel.tsx` ← SelectionPropertiesPanel
-- [ ] `components/panels/*` ← Calculator, Chat, PDF, ActivityHistory
+- [x] `components/canvas/whiteboard-canvas.tsx` ← ~330 linii orkiestrator, spina 6 hooków
+- [x] `components/canvas/loading-overlay.tsx` ← pasek postępu + logo podczas ładowania
+- [x] `components/canvas/status-indicators.tsx` ← badge: zapisywanie / niezapisane / offline
+- [x] `components/canvas/snap-guides.tsx` ← SVG prowadnice wyrównywania (snap)
+- [ ] `components/canvas/grid.tsx` ← TODO: Etap 6 (Grid.tsx jest prosty, NISKIE RYZYKO)
+- [ ] `components/toolbar/*` ← TODO: Etap 6 (ToolbarUI.tsx 1016 linii → rozbić)
+- [ ] `components/panels/*` ← TODO: Etap 6 (Calculator, Chat, PDF, ActivityHistory)
+
+**Co zawiera whiteboard-canvas.tsx:**
+- Resize canvas + pętla renderowania (requestAnimationFrame + drawElement z rendering.ts)
+- Wheel: zoom (Ctrl+scroll) + pan (scroll)
+- Keyboard: Ctrl+Z/Y, Ctrl+C/V/D, Delete, Escape, skróty liter narzędzi
+- Broadcast viewport throttled (20 FPS max)
+- TODO [Etap 6]: `onPointerDown/Move/Up` → podłączyć SelectTool, PenTool itp.
+
+**Naprawa use-history.ts (bug z Etap 4):**
+- Dodano `onRemoveElement` + `onAddElement` — bez nich undo/redo nie aktualizował ekranu
 
 ### ETAP 6 — Integracja (FINALNE SPINANIE)
 
@@ -266,7 +276,7 @@ page.tsx
 | 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami  |
 | 3. API layer  | ✅ DONE | elements-api.ts / realtime-api.ts (BoardEvent type + createBoardChannel factory) |
 | 4. Hooki      | ✅ DONE | use-history / use-viewport / use-elements (nowy) / use-clipboard / use-selection / use-realtime |
-| 5. Komponenty | ⬜ TODO |                                                                                  |
+| 5. Komponenty | ✅ DONE | whiteboard-canvas (orkiestrator 6 hooków) + loading-overlay + status-indicators + snap-guides |
 | 6. Integracja | ⬜ TODO |                                                                                  |
 
 ---
