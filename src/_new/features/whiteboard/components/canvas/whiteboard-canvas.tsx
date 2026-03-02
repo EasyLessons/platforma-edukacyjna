@@ -116,6 +116,8 @@ export default function WhiteboardCanvasNew({
   const boardIdRef = useRef<string>(boardId);
   /** Ref do ImageTool (forwardRef — potrzebny do triggerFileUpload / handlePasteFromClipboard) */
   const imageToolRef = useRef<ImageToolRef>(null);
+  /** Ref do kontenera overlayów zaznaczenia (SelectTool, SnapGuides) — ukrywany podczas pan by uniknąć lag zaznaczenia */
+  const selectOverlayRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     boardIdRef.current = boardId;
@@ -344,6 +346,11 @@ export default function WhiteboardCanvasNew({
 
   const wheelSetViewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Po każdej aktualizacji React-stanu viewportu (po re-renderze z poprawnymi pozycjami) — przywróć widoczność overlay zaznaczenia
+  useEffect(() => {
+    if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = '';
+  }, [vp.viewport]);
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -351,6 +358,8 @@ export default function WhiteboardCanvasNew({
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       vp.handleStopFollowing();
+      // Ukryj overlay zaznaczenia — pojawi się z powrotem po zsynchronizowaniu React-stanu viewport (useEffect wyżej)
+      if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = 'hidden';
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -398,6 +407,8 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
       vp.handleStopFollowing();
+      // Ukryj overlay zaznaczenia — pojawi się z powrotem po setViewport (mouseup)
+      if (selectOverlayRef.current) selectOverlayRef.current.style.visibility = 'hidden';
     };
 
     const handleMouseMove = (e: MouseEvent) => {
@@ -984,25 +995,27 @@ export default function WhiteboardCanvasNew({
         )}
 
         {tool === 'select' && canvasWidth > 0 && (
-          <SelectTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            elements={el.elements}
-            selectedIds={sel.selectedElementIds}
-            onSelectionChange={handleSelectionChange}
-            onElementUpdate={handleElementUpdate}
-            onElementUpdateWithHistory={handleElementUpdateWithHistory}
-            onElementsUpdate={handleElementsUpdate}
-            onOperationFinish={handleSelectionFinish}
-            onTextEdit={handleTextEdit}
-            onMarkdownEdit={sel.setEditingMarkdownId}
-            onViewportChange={handleViewportChange}
-            onActiveGuidesChange={setActiveGuides}
-            onDeleteSelected={deleteSelectedElements}
-            onCopySelected={clip.handleCopy}
-            onDuplicateSelected={clip.handleDuplicate}
-          />
+          <div ref={selectOverlayRef} style={{ position: 'absolute', inset: 0 }}>
+            <SelectTool
+              viewport={vp.viewport}
+              canvasWidth={canvasWidth}
+              canvasHeight={canvasHeight}
+              elements={el.elements}
+              selectedIds={sel.selectedElementIds}
+              onSelectionChange={handleSelectionChange}
+              onElementUpdate={handleElementUpdate}
+              onElementUpdateWithHistory={handleElementUpdateWithHistory}
+              onElementsUpdate={handleElementsUpdate}
+              onOperationFinish={handleSelectionFinish}
+              onTextEdit={handleTextEdit}
+              onMarkdownEdit={sel.setEditingMarkdownId}
+              onViewportChange={handleViewportChange}
+              onActiveGuidesChange={setActiveGuides}
+              onDeleteSelected={deleteSelectedElements}
+              onCopySelected={clip.handleCopy}
+              onDuplicateSelected={clip.handleDuplicate}
+            />
+          </div>
         )}
 
         {tool === 'pen' && canvasWidth > 0 && (
