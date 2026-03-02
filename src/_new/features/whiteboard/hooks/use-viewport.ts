@@ -43,7 +43,7 @@ export function useViewport(): UseViewportReturn {
   const [viewport, setViewport] = useState<ViewportTransform>({
     x: 0,
     y: 0,
-    scale: 100, // 100 px = 1 jednostka świata
+    scale: 1, // 1.0 = 100% — viewport-math mnoży scale*100 wewnętrznie
   });
 
   const [momentum, setMomentum] = useState<MomentumState>({
