@@ -35,20 +35,9 @@ import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
 
-export type Tool =
-  | 'select'
-  | 'pan'
-  | 'pen'
-  | 'text'
-  | 'shape'
-  | 'function'
-  | 'image'
-  | 'pdf'
-  | 'eraser'
-  | 'markdown'
-  | 'table'
-  | 'calculator';
-export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';
+// Typy przeniesione do _new/features/whiteboard/types/tools.ts
+// Re-eksportujemy żeby stare importy z './toolbar/Toolbar' nadal działały
+export type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
 
 interface ToolbarProps {
   tool: Tool;
