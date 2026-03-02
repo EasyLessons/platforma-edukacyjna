@@ -14,7 +14,7 @@
 
 'use client';
 
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import { RemoteCursor, useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 import { ViewportTransform } from './types';
 import { transformPoint } from './viewport';
@@ -46,6 +46,9 @@ const CURSOR_COLORS = [
   '#7C3AED', // Ciemnofioletowy
 ];
 
+/** Po ilu ms bezczynności kursor zanika */
+const CURSOR_HIDE_DELAY_MS = 4000;
+
 // Pojedynczy kursor - memo żeby nie re-renderować gdy inne kursory się zmieniają
 const SingleCursor = memo(function SingleCursor({
   cursor,
@@ -58,8 +61,27 @@ const SingleCursor = memo(function SingleCursor({
   screenY: number;
   color: string;
 }) {
+  const [visible, setVisible] = useState(true);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Przy każdym ruchu kursora (lastUpdate się zmienia) — pokaż i resetuj timer
+  useEffect(() => {
+    setVisible(true);
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => setVisible(false), CURSOR_HIDE_DELAY_MS);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [cursor.lastUpdate]);
+
   return (
-    <div>
+    <div
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 600ms ease-out',
+        pointerEvents: 'none',
+      }}
+    >
       {/* Kursor - SVG arrow */}
       <div
         className="absolute"
@@ -67,7 +89,7 @@ const SingleCursor = memo(function SingleCursor({
           left: 0,
           top: 0,
           transform: `translate(${screenX - 2}px, ${screenY - 2}px)`,
-          transition: 'transform 100ms ease-out', // CSS transition zamiast JS
+          transition: 'transform 100ms ease-out',
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
           willChange: 'transform',
         }}
@@ -99,7 +121,7 @@ const SingleCursor = memo(function SingleCursor({
           left: 0,
           top: 0,
           transform: `translate(${screenX + 26}px, ${screenY + 14}px)`,
-          transition: 'transform 150ms ease-out', // Nieco wolniejsza animacja labelki
+          transition: 'transform 150ms ease-out',
           willChange: 'transform',
         }}
       >
@@ -129,8 +151,8 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
 
   return (
     <div
-      className="absolute inset-0 pointer-events-none z-40 overflow-hidden"
-      style={{ width: canvasWidth, height: canvasHeight }}
+      className="absolute inset-0 pointer-events-none z-40"
+      style={{ width: canvasWidth, height: canvasHeight, overflow: 'visible' }}
     >
       {cursors.map((cursor) => {
         // Transform world coordinates to screen coordinates
@@ -141,12 +163,12 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
           canvasHeight
         );
 
-        // Ukryj kursory poza widocznym obszarem (z marginesem)
+        // Ukryj kursory daleko poza widocznym obszarem (duży margines na wypadek lagu viewport)
         if (
-          screenPos.x < -50 ||
-          screenPos.x > canvasWidth + 50 ||
-          screenPos.y < -50 ||
-          screenPos.y > canvasHeight + 50
+          screenPos.x < -300 ||
+          screenPos.x > canvasWidth + 300 ||
+          screenPos.y < -300 ||
+          screenPos.y > canvasHeight + 300
         ) {
           return null;
         }

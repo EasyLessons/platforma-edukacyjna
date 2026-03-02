@@ -499,10 +499,18 @@ export default function WhiteboardCanvasNew({
         }
         return;
       }
-      // Ctrl+V — wklej
+      // Ctrl+V — wklej (inteligentnie: najpierw sprawdź schowek systemowy pod kątem obrazu)
       if (e.ctrlKey && e.key === 'v') {
         e.preventDefault();
-        clip.handlePaste();
+        // Jeśli mamy skopiowane elementy wewnątrz aplikacji — wklej je bezpośrednio
+        if (clip.copiedElements.length > 0) {
+          clip.handlePaste();
+        } else {
+          // Brak wewnętrznej kopii — sprawdź schowek OS (screenshot itp.)
+          handleOsClipboardPasteRef.current().then((pasted) => {
+            if (!pasted) clip.handlePaste(); // fallback (no-op gdy copiedElements=[])
+          });
+        }
         return;
       }
       // Ctrl+D — duplikuj
@@ -624,6 +632,64 @@ export default function WhiteboardCanvasNew({
     if (image.src) el.loadImage(image.id, image.src);
     setTool('select');
   }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction, el.loadImage]);
+
+  /**
+   * Wklejanie obrazka ze schowka systemowego (screenshot, Ctrl+C z przeglądarki itp.).
+   * Czyta navigator.clipboard.read() i tworzy ImageElement w centrum widoku.
+   * Zwraca true jeśli obraz został wklejony, false gdy schowek nie zawiera obrazka.
+   */
+  const handleOsClipboardPaste = useCallback(async (): Promise<boolean> => {
+    if (userRole === 'viewer') return false;
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find((t) => t.startsWith('image/'));
+        if (!imageType) continue;
+        const blob = await item.getType(imageType);
+        // Blob → base64 data URL
+        const data: string = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        // Pobierz naturalne wymiary obrazka
+        const { width: imgW, height: imgH } = await new Promise<{ width: number; height: number }>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+          img.src = data;
+        });
+        const centerWorld = inverseTransformPoint(
+          { x: canvasWidth / 2, y: canvasHeight / 2 },
+          vp.viewportRef.current,
+          canvasWidth,
+          canvasHeight
+        );
+        const aspectRatio = imgH / Math.max(imgW, 1);
+        const worldWidth = 3;
+        const worldHeight = worldWidth * aspectRatio;
+        const newImage: ImageElement = {
+          id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+          type: 'image',
+          x: centerWorld.x - worldWidth / 2,
+          y: centerWorld.y - worldHeight / 2,
+          width: worldWidth,
+          height: worldHeight,
+          src: data,
+          alt: 'Pasted image',
+        };
+        handleImageCreate(newImage);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+
+  // Ref — umożliwia wywołanie w async then-chain wewnątrz useEffect (keydown handler)
+  const handleOsClipboardPasteRef = useRef(handleOsClipboardPaste);
+  useEffect(() => { handleOsClipboardPasteRef.current = handleOsClipboardPaste; }, [handleOsClipboardPaste]);
 
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
     if (userRole === 'viewer') return;
@@ -1248,57 +1314,58 @@ export default function WhiteboardCanvasNew({
                 );
               })}
 
-          {/* TABLE */}
-          {canvasWidth > 0 &&
-            el.elements
-              .filter((e) => e.type === 'table')
-              .map((e) => {
-                const table = e as TableElement;
-                const topLeft = transformPoint(
-                  { x: table.x, y: table.y },
-                  vp.viewport,
-                  canvasWidth,
-                  canvasHeight
-                );
-                const bottomRight = transformPoint(
-                  { x: table.x + table.width, y: table.y + table.height },
-                  vp.viewport,
-                  canvasWidth,
-                  canvasHeight
-                );
-                const screenW = bottomRight.x - topLeft.x;
-                const screenH = bottomRight.y - topLeft.y;
-
-                if (screenW < 20 || screenH < 20) return null;
-                if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
-                if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
-
-                const isSelected = sel.selectedElementIds.has(table.id);
-
-                return (
-                  <div
-                    key={table.id}
-                    className="absolute"
-                    style={{
-                      left: topLeft.x,
-                      top: topLeft.y,
-                      width: screenW,
-                      minHeight: screenH,
-                      pointerEvents: isSelected ? 'auto' : 'none',
-                      zIndex: isSelected ? 35 : 10,
-                      overflow: 'visible',
-                    }}
-                  >
-                    <TableView
-                      table={table}
-                      onCellChange={(row, col, value) =>
-                        handleTableCellChange(table.id, row, col, value)
-                      }
-                    />
-                  </div>
-                );
-              })}
         </div>
+
+        {/* TABLE — osobny wrapper, NIE ukrywany podczas pan */}
+        {canvasWidth > 0 &&
+          el.elements
+            .filter((e) => e.type === 'table')
+            .map((e) => {
+              const table = e as TableElement;
+              const topLeft = transformPoint(
+                { x: table.x, y: table.y },
+                vp.viewport,
+                canvasWidth,
+                canvasHeight
+              );
+              const bottomRight = transformPoint(
+                { x: table.x + table.width, y: table.y + table.height },
+                vp.viewport,
+                canvasWidth,
+                canvasHeight
+              );
+              const screenW = bottomRight.x - topLeft.x;
+              const screenH = bottomRight.y - topLeft.y;
+
+              if (screenW < 20 || screenH < 20) return null;
+              if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
+              if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
+
+              const isSelected = sel.selectedElementIds.has(table.id);
+
+              return (
+                <div
+                  key={table.id}
+                  className="absolute"
+                  style={{
+                    left: topLeft.x,
+                    top: topLeft.y,
+                    width: screenW,
+                    minHeight: screenH,
+                    pointerEvents: isSelected ? 'auto' : 'none',
+                    zIndex: isSelected ? 35 : 10,
+                    overflow: 'visible',
+                  }}
+                >
+                  <TableView
+                    table={table}
+                    onCellChange={(row, col, value) =>
+                      handleTableCellChange(table.id, row, col, value)
+                    }
+                  />
+                </div>
+              );
+            })}
 
         {/* ═══════════════════════════════════════════════════════════════
             CANVAS — pointer-events: none
