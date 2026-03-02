@@ -62,6 +62,10 @@ import { LoadingOverlay } from './loading-overlay';
 import { StatusIndicators } from './status-indicators';
 import { SnapGuides } from './snap-guides';
 
+// ─── SmartSearch ─────────────────────────────────────────────────────────────
+import { SmartSearchBar, CardViewer } from '@/app/tablica/smartsearch';
+import type { FormulaResource, CardResource } from '@/app/tablica/smartsearch';
+
 // ─── Renderowanie canvas ──────────────────────────────────────────────────────
 import { drawElement } from '../../elements/rendering';
 import { drawGrid } from './grid';
@@ -140,6 +144,12 @@ export default function WhiteboardCanvasNew({
   const [fillShape, setFillShape] = useState(false);
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
+  // ─── Stan SmartSearch ───────────────────────────────────────────────────────
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isCardViewerActive, setIsCardViewerActive] = useState(false);
+  const [activeCard, setActiveCard] = useState<CardResource | null>(null);
+  const [windowWidth, setWindowWidth] = useState(0);
+
   /** Aktywne linie snap — aktualizuje SelectTool podczas przeciągania */
   const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
 
@@ -155,6 +165,14 @@ export default function WhiteboardCanvasNew({
   useEffect(() => {
     if (userRole === 'viewer') setTool('pan');
   }, [userRole]);
+
+  // ─── windowWidth dla responsywnego pozycjonowania SmartSearch ──────────────
+  useEffect(() => {
+    setWindowWidth(window.innerWidth);
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ─── Broadcast refs — rozwiązanie problemu "kółkowej zależności" ────────────
   // hist potrzebuje rt.broadcastElementCreated, ale rt inicjalizujemy po hist.
@@ -638,6 +656,92 @@ export default function WhiteboardCanvasNew({
     setTool('select');
   }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction, el.loadImage]);
 
+  // ─── SmartSearch handlers ──────────────────────────────────────────────────
+
+  const handleFormulaSelect = useCallback((formula: FormulaResource) => {
+    const img = new Image();
+    img.src = formula.path;
+    img.onload = () => {
+      const aspectRatio = img.naturalHeight / img.naturalWidth;
+      const worldWidth = 3.5;
+      const worldHeight = worldWidth * aspectRatio;
+      const centerWorld = inverseTransformPoint(
+        { x: canvasWidth / 2, y: canvasHeight / 2 },
+        vp.viewportRef.current,
+        canvasWidth,
+        canvasHeight
+      );
+      const newImage: ImageElement = {
+        id: `formula-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        type: 'image',
+        x: centerWorld.x - worldWidth / 2,
+        y: centerWorld.y - worldHeight / 2,
+        width: worldWidth,
+        height: worldHeight,
+        src: formula.path,
+        alt: formula.title,
+      };
+      handleImageCreate(newImage);
+    };
+  }, [canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+
+  const handleCardSelect = useCallback((card: CardResource) => {
+    setActiveCard(card);
+  }, []);
+
+  const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
+    const COLS = 2, WORLD_WIDTH = 3.5, WORLD_PADDING = 0.5;
+    const centerWorld = inverseTransformPoint(
+      { x: canvasWidth / 2, y: canvasHeight / 2 },
+      vp.viewportRef.current,
+      canvasWidth,
+      canvasHeight
+    );
+    const imagePromises = formulas.map((formula, index) =>
+      new Promise<{ formula: FormulaResource; img: HTMLImageElement; index: number }>((resolve, reject) => {
+        const img = new Image();
+        img.src = formula.path;
+        img.onload = () => resolve({ formula, img, index });
+        img.onerror = () => reject(new Error(`Failed to load: ${formula.path}`));
+      })
+    );
+    Promise.all(imagePromises)
+      .then((loaded) => {
+        const newImages = loaded.map(({ formula, img, index }) => {
+          const aspectRatio = img.naturalHeight / img.naturalWidth;
+          const worldHeight = WORLD_WIDTH * aspectRatio;
+          const col = index % COLS;
+          const row = Math.floor(index / COLS);
+          const startX = centerWorld.x - ((COLS - 1) * (WORLD_WIDTH + WORLD_PADDING)) / 2;
+          const startY = centerWorld.y - 2;
+          const imageEl: ImageElement = {
+            id: `formula-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            type: 'image',
+            x: startX + col * (WORLD_WIDTH + WORLD_PADDING) - WORLD_WIDTH / 2,
+            y: startY + row * (worldHeight + WORLD_PADDING),
+            width: WORLD_WIDTH,
+            height: worldHeight,
+            src: formula.path,
+            alt: formula.title,
+          };
+          return { imageEl, img };
+        });
+        const elements = newImages.map(({ imageEl }) => imageEl);
+        el.addElements(elements);
+        el.markUnsaved(elements.map((e) => e.id));
+        elements.forEach((imageEl) => {
+          rt.broadcastElementCreated(imageEl);
+          hist.pushUserAction({ type: 'create', element: imageEl });
+          el.loadImage(imageEl.id, imageEl.src!);
+        });
+        setActiveCard(null);
+      })
+      .catch((err) => {
+        console.error('❌ Błąd ładowania wzorów z karty:', err);
+        setActiveCard(null);
+      });
+  }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
+
   /**
    * Wklejanie obrazka ze schowka systemowego (screenshot, Ctrl+C z przeglądarki itp.).
    * Czyta navigator.clipboard.read() i tworzy ImageElement w centrum widoku.
@@ -1036,6 +1140,42 @@ export default function WhiteboardCanvasNew({
               Przestań śledzić
             </button>
           </div>
+        )}
+
+        {/* ── SMARTSEARCH BAR ───────────────────────────────────────────── */}
+        {userRole !== 'viewer' && (
+          <div
+            className="absolute top-4 z-50 pointer-events-auto"
+            style={{
+              left: windowWidth <= 760 ? '90px' : windowWidth <= 1550 ? '90px' : '50%',
+              transform:
+                windowWidth <= 760 ? 'none' : windowWidth <= 1550 ? 'none' : 'translateX(-50%)',
+              right: windowWidth <= 760 ? '16px' : windowWidth <= 1550 ? '330px' : 'auto',
+              maxWidth:
+                windowWidth <= 760
+                  ? 'calc(100vw - 90px - 16px)'
+                  : windowWidth <= 1550
+                  ? 'calc(100vw - 90px - 330px)'
+                  : '900px',
+            }}
+          >
+            <SmartSearchBar
+              onFormulaSelect={handleFormulaSelect}
+              onCardSelect={handleCardSelect}
+              onActiveChange={setIsSearchActive}
+              userRole={userRole}
+            />
+          </div>
+        )}
+
+        {/* ── CARD VIEWER MODAL ─────────────────────────────────────────── */}
+        {activeCard && (
+          <CardViewer
+            card={activeCard}
+            onClose={() => setActiveCard(null)}
+            onAddFormulas={handleAddFormulasFromCard}
+            onActiveChange={setIsCardViewerActive}
+          />
         )}
 
         {/* ── VIEWER BANNER ─────────────────────────────────────────────── */}

@@ -95,29 +95,34 @@ export function ShapeTool({
   }, []);
 
   // 🆕 Handler dla wheel event - obsługuje zoom i pan
-  const handleWheel = (e: React.WheelEvent) => {
-    if (!onViewportChange) return;
+  // ⚠️ Używamy addEventListener({ passive: false }) bo React onWheel jest pasywny
+  const viewportRef = useRef(viewport);
+  useEffect(() => { viewportRef.current = viewport; }, [viewport]);
+  const onViewportChangeRef = useRef(onViewportChange);
+  useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
 
-    e.preventDefault();
-    e.stopPropagation();
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay) return;
 
-    if (e.ctrlKey) {
-      // Zoom
-      const newViewport = zoomViewport(
-        viewport,
-        e.deltaY,
-        e.clientX,
-        e.clientY,
-        canvasWidth,
-        canvasHeight
-      );
-      onViewportChange(constrainViewport(newViewport));
-    } else {
-      // Pan
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      onViewportChange(constrainViewport(newViewport));
-    }
-  };
+    const handleWheel = (e: WheelEvent) => {
+      if (!onViewportChangeRef.current) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      const vp = viewportRef.current;
+      if (e.ctrlKey) {
+        const newViewport = zoomViewport(vp, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        onViewportChangeRef.current(constrainViewport(newViewport));
+      } else {
+        const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
+        onViewportChangeRef.current(constrainViewport(newViewport));
+      }
+    };
+
+    overlay.addEventListener('wheel', handleWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', handleWheel);
+  }, [canvasWidth, canvasHeight]);
 
   // Pointer down - rozpocznij rysowanie kształtu
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -342,7 +347,6 @@ export function ShapeTool({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        onWheel={handleWheel}
       />
 
       {/* Preview shape */}
