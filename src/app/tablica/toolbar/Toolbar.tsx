@@ -34,8 +34,8 @@
 import React, { useState, memo } from 'react';
 import { ToolbarUI } from './ToolbarUI';
 import { ZoomControls } from './ZoomControls';
+import type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
 
-// Typy przeniesione do _new/features/whiteboard/types/tools.ts
 // Re-eksportujemy żeby stare importy z './toolbar/Toolbar' nadal działały
 export type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
 

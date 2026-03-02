@@ -3522,9 +3522,8 @@ Zadaj pytanie! 🤔`,
           const currentScale = viewportRef.current.scale;
           const scaleMultiplier = 1 / currentScale;
 
-          setMomentum((prev) =>
+          setMomentum(() =>
             startMomentum(
-              prev,
               -avgVx * 2 * multiplier * scaleMultiplier,
               -avgVy * 2 * multiplier * scaleMultiplier
             )
