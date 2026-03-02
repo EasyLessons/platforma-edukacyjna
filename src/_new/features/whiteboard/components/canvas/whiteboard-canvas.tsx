@@ -69,6 +69,7 @@ import {
   constrainViewport,
   zoomViewport,
   panViewportWithWheel,
+  panViewportWithMouse,
 } from '../../navigation/viewport-math';
 // transformPoint ze starego kodu (potrzebny do pozycjonowania overlayów MD/table)
 import { transformPoint } from '@/app/tablica/whiteboard/viewport';
@@ -362,6 +363,54 @@ export default function WhiteboardCanvasNew({
 
     container.addEventListener('wheel', handleWheel, { passive: false });
     return () => container.removeEventListener('wheel', handleWheel);
+  }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
+
+  // ─── PAN środkowym przyciskiem myszy (wciśnięcie kółka + przeciągnięcie) ──
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    let isPanning = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      e.preventDefault();
+      isPanning = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      document.body.style.cursor = 'grabbing';
+      vp.handleStopFollowing();
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isPanning) return;
+      const dx = e.clientX - lastX;
+      const dy = e.clientY - lastY;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      const next = panViewportWithMouse(vp.viewportRef.current, dx, dy);
+      const constrained = constrainViewport(next);
+      vp.viewportRef.current = constrained;
+      vp.setViewport(constrained);
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button !== 1) return;
+      isPanning = false;
+      document.body.style.cursor = '';
+    };
+
+    container.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
 
   // ─── SKRÓTY KLAWISZOWE ─────────────────────────────────────────────────────
