@@ -29,7 +29,7 @@ export interface UseClipboardOptions {
   elementsRef: React.RefObject<DrawingElement[]>;
   selectedElementIdsRef: React.RefObject<Set<string>>;
   viewportRef: React.RefObject<ViewportTransform>;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
   boardIdRef: React.RefObject<string>;
   onAddElements: (newElements: DrawingElement[]) => void;
   onBroadcastCreated: (element: DrawingElement) => Promise<void>;

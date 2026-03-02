@@ -28,6 +28,18 @@ export interface UseHistoryOptions {
   onBroadcastCreated: (element: DrawingElement) => Promise<void>;
   /** Broadcast "element deleted" do innych użytkowników */
   onBroadcastDeleted: (elementId: string) => Promise<void>;
+  /**
+   * Usuń element z lokalnego stanu React (setElements).
+   * BEZ tego undo 'create' tylko broadcastuje i usuwa z bazy,
+   * ale element zostaje widoczny na ekranie użytkownika.
+   */
+  onRemoveElement: (elementId: string) => void;
+  /**
+   * Dodaj element do lokalnego stanu React (setElements).
+   * BEZ tego undo 'delete' tylko broadcastuje i zapisuje do bazy,
+   * ale element nie pojawia się z powrotem na ekranie użytkownika.
+   */
+  onAddElement: (element: DrawingElement) => void;
   /** Funkcja do czyszczenia zaznaczenia po undo/redo */
   onClearSelection: () => void;
   /** Ref do aktualnych niezapisanych elementów (żeby wiedzieć czy element jest w bazie) */
@@ -62,6 +74,8 @@ export function useHistory({
   onSaveElement,
   onBroadcastCreated,
   onBroadcastDeleted,
+  onRemoveElement,
+  onAddElement,
   onClearSelection,
   unsavedElementsRef,
   boardIdRef,
@@ -133,12 +147,15 @@ export function useHistory({
 
     if (lastAction.type === 'create') {
       // Stworzył element → cofnij = USUŃ
+      // Kolejność: najpierw lokalny stan (natychmiastowe), potem API/broadcast (async)
+      onRemoveElement(lastAction.element.id);
       onBroadcastDeleted(lastAction.element.id);
       if (boardId && !unsavedElementsRef.current?.has(lastAction.element.id)) {
         onDeleteElement(boardId, lastAction.element.id).catch(console.error);
       }
     } else {
       // Usunął element → cofnij = PRZYWRÓĆ
+      onAddElement(lastAction.element);
       onBroadcastCreated(lastAction.element);
       if (boardId) {
         onSaveElement(boardId, lastAction.element).catch(console.error);
@@ -146,7 +163,7 @@ export function useHistory({
     }
 
     onClearSelection();
-  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onClearSelection, unsavedElementsRef]);
+  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onRemoveElement, onAddElement, onClearSelection, unsavedElementsRef]);
 
   // ─── Redo ───────────────────────────────────────────────────────────────
   const redo = useCallback(() => {
@@ -167,12 +184,14 @@ export function useHistory({
 
     if (lastAction.type === 'create') {
       // Cofnął create → redo = PRZYWRÓĆ
+      onAddElement(lastAction.element);
       onBroadcastCreated(lastAction.element);
       if (boardId) {
         onSaveElement(boardId, lastAction.element).catch(console.error);
       }
     } else {
       // Cofnął delete → redo = USUŃ ponownie
+      onRemoveElement(lastAction.element.id);
       onBroadcastDeleted(lastAction.element.id);
       if (boardId && !unsavedElementsRef.current?.has(lastAction.element.id)) {
         onDeleteElement(boardId, lastAction.element.id).catch(console.error);
@@ -180,7 +199,7 @@ export function useHistory({
     }
 
     onClearSelection();
-  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onClearSelection, unsavedElementsRef]);
+  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onRemoveElement, onAddElement, onClearSelection, unsavedElementsRef]);
 
   return {
     saveToHistory,
