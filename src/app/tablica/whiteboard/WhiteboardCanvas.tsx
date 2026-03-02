@@ -888,6 +888,13 @@ Zadaj pytanie! 🤔`,
       debouncedSave(boardIdStateRef.current);
     }
 
+    // 🆕 Zarejestruj w user undo stack — żeby Ctrl+Z mógł cofnąć duplikację
+    setUserUndoStack((prev) => [
+      ...prev,
+      ...newElements.map((el) => ({ type: 'create' as const, element: el })),
+    ]);
+    setUserRedoStack([]);
+
     console.log('📋 Zduplikowano elementów:', newElements.length);
   }, [broadcastElementCreated, debouncedSave]);
 
@@ -1050,6 +1057,13 @@ Zadaj pytanie! 🤔`,
     if (boardIdStateRef.current) {
       debouncedSave(boardIdStateRef.current);
     }
+
+    // 🆕 Zarejestruj w user undo stack — żeby Ctrl+Z mógł cofnąć wklejenie
+    setUserUndoStack((prev) => [
+      ...prev,
+      ...newElements.map((el) => ({ type: 'create' as const, element: el })),
+    ]);
+    setUserRedoStack([]);
 
     // 🆕 Zmień narzędzie na zaznacz po wklejeniu
     setTool('select');

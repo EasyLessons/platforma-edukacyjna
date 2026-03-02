@@ -174,6 +174,7 @@ export default function WhiteboardCanvasNew({
     onDebouncedSave: () => {},
     onSelectElements: sel.selectElements,
     onLoadImage: el.loadImage,
+    onPushUserAction: hist.pushUserAction,
   });
 
   // ─── Broadcast viewport throttled ──────────────────────────────────────────

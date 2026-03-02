@@ -22,6 +22,7 @@ import { useState, useCallback } from 'react';
 import { inverseTransformPoint } from '../navigation/viewport-math';
 import type { DrawingElement, DrawingPath, Shape, TextElement, ImageElement,
   MarkdownNote, TableElement, FunctionPlot, PDFElement, ViewportTransform } from '../types';
+import type { UserAction } from '../types';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,8 @@ export interface UseClipboardOptions {
   onDebouncedSave: (boardId: string) => void;
   onSelectElements: (ids: string[]) => void;
   onLoadImage?: (id: string, src: string) => void;
+  /** Rejestruje akcję w stosie undo — żeby Ctrl+Z mógł cofnąć wklejenie/duplikację */
+  onPushUserAction?: (action: UserAction) => void;
 }
 
 export interface UseClipboardReturn {
@@ -112,6 +115,7 @@ export function useClipboard({
   onDebouncedSave,
   onSelectElements,
   onLoadImage,
+  onPushUserAction,
 }: UseClipboardOptions): UseClipboardReturn {
 
   const [copiedElements, setCopiedElements] = useState<DrawingElement[]>([]);
@@ -143,9 +147,11 @@ export function useClipboard({
         onLoadImage(el.id, (el as ImageElement).src);
       }
     });
+    // Zarejestruj każdy nowy element w undo stack
+    newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage]);
+  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
 
   // ─── Paste ─────────────────────────────────────────────────────────────
   const handlePaste = useCallback(() => {
@@ -176,9 +182,11 @@ export function useClipboard({
         onLoadImage(el.id, (el as ImageElement).src);
       }
     });
+    // Zarejestruj każdy nowy element w undo stack
+    newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage]);
+  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
 
   return { copiedElements, handleCopy, handleDuplicate, handlePaste };
 }
