@@ -2,38 +2,16 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/utils.ts
  * ============================================================================
+ * ⚠️ TEN PLIK JEST RE-EXPORTEREM — nie edytuj tutaj logiki!
  *
- * IMPORTUJE Z:
- * - ./types (Point, ViewportTransform, DrawingElement)
+ * Funkcje przeniesione do:
+ *   src/_new/features/whiteboard/elements/math-eval.ts
  *
- * EKSPORTUJE:
- * - clampLineWidth (function) - ogranicza szerokość linii (0.5-20px)
- * - clampFontSize (function) - ogranicza rozmiar czcionki (10-200px)
- * - evaluateExpression (function) - evaluator wyrażeń matematycznych
- * - isOutsideViewport (function) - sprawdza czy element poza viewport (TODO)
- *
- * UŻYWANE PRZEZ:
- * - rendering.ts (clamp dla renderowania)
- *
- * PRZEZNACZENIE:
- * Funkcje pomocnicze dla tablicy:
- * - Clamp dla rozmiaru linii/czcionek ze skalowaniem viewport
- * - Parser wyrażeń matematycznych (sin, cos, tan, ^, pi, e itp.)
- * - Culling elementów poza viewport (placeholder)
+ * Ten plik istnieje żeby nie psuć istniejących importów.
  * ============================================================================
  */
 
-import { Point, ViewportTransform, DrawingElement } from './types';
-import { evaluate } from 'mathjs';
-
-/**
- * Clamp lineWidth: min 0.5px, max 100px (zwiększone dla highlightera)
- * Linie skalują się z viewport, ale z limitami
- */
-export function clampLineWidth(width: number, scale: number): number {
-  const scaled = width * scale;
-  return Math.max(0.5, Math.min(100, scaled));
-}
+export * from '@/_new/features/whiteboard/elements/math-eval';
 
 /**
  * Clamp fontSize: min 10px, max 200px

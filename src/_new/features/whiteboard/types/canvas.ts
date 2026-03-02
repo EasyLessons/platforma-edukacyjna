@@ -51,15 +51,5 @@ export interface MomentumState {
   lastTimestamp: number;
 }
 
-/**
- * Linia pomocnicza snap — pojawia się chwilowo gdy przeciągany element
- * wyrównuje się do krawędzi lub środka innego elementu.
- *
- * x lub y   → pozycja linii (tylko jedna z nich jest ustawiona)
- * type      → 'vertical' (pionowa) lub 'horizontal' (pozioma)
- */
-export interface GuideLine {
-  x?: number;
-  y?: number;
-  type: 'vertical' | 'horizontal';
-}
+// GuideLine znajduje się w selection/snap-utils.ts
+// (ma tam pełną strukturę z value, orientation, sourceId)

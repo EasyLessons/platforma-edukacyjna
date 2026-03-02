@@ -2,34 +2,19 @@
  * ============================================================================
  * PLIK: src/app/tablica/whiteboard/viewport.ts
  * ============================================================================
+ * ⚠️ TEN PLIK JEST RE-EXPORTEREM — nie edytuj tutaj logiki!
  *
- * IMPORTUJE Z:
- * - ./types (Point, ViewportTransform)
+ * Funkcje przeniesione do:
+ *   src/_new/features/whiteboard/navigation/viewport-math.ts
  *
- * EKSPORTUJE:
- * - transformPoint (function) - world coords → screen coords
- * - inverseTransformPoint (function) - screen coords → world coords
- * - panViewportWithMouse (function) - przesuwanie myszką
- * - panViewportWithWheel (function) - przesuwanie touchpadem (2 palce)
- * - zoomViewport (function) - zoom pinch (2 palce do/od siebie)
- * - constrainViewport (function) - ograniczenia viewport (obecnie brak)
- *
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (obsługa myszy/touchpada)
- * - rendering.ts (transformacje przy renderowaniu)
- * - Grid.tsx (transformacje siatki)
- *
- * PRZEZNACZENIE:
- * Moduł transformacji współrzędnych i viewport management:
- * - Konwersja między współrzędnymi świata i ekranu
- * - Pan (przesuwanie) myszką i touchpadem
- * - Zoom z zachowaniem punktu pod kursorem
- * - Skala: 100px = 1 jednostka matematyczna (2 kratki = 1 jednostka)
+ * Ten plik istnieje żeby nie psuć istniejących importów.
  * ============================================================================
  */
 
-import { Point, ViewportTransform, MomentumState } from './types';
+export * from '@/_new/features/whiteboard/navigation/viewport-math';
 
+// UWAGA: poniższy kod jest nieaktywny — zastąpiony przez re-export powyżej
+// Zostaje tymczasowo dla bezpieczeństwa, zostanie usunięty w Etapie 6
 const MOMENTUM_FRICTION = 0.9; // Tarcie - im wyższe, tym dłużej się ślizga
 const MOMENTUM_THRESHOLD = 0.001; // Prędkość poniżej której zatrzymujemy
 const MAX_MOMENTUM_VELOCITY = 1; // Maksymalna prędkość

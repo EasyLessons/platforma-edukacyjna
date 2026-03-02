@@ -2,19 +2,18 @@
  * ============================================================================
  * PLIK: src/app/tablica/utils/snapUtils.ts
  * ============================================================================
+ * ⚠️ TEN PLIK JEST RE-EXPORTEREM — nie edytuj tutaj logiki!
  *
- * SNAP TO GUIDES - System przyciągania do linii prowadzących
+ * Funkcje przeniesione do:
+ *   src/_new/features/whiteboard/selection/snap-utils.ts
  *
- * LOGIKA:
- * - Tylko OBRAZKI emitują guide lines (vertical/horizontal)
- * - Wszystkie inne obiekty przyciągają się do tych linii
- * - Snap threshold: 10 jednostek canvas (0.1 w jednostkach świata)
- *
+ * Ten plik istnieje żeby nie psuć istniejących importów.
  * ============================================================================
  */
 
-import { DrawingElement, ImageElement } from '../whiteboard/types';
+export * from '@/_new/features/whiteboard/selection/snap-utils';
 
+// UWAGA: poniższy kod nieaktywny — zastąpiony re-exportem powyżej
 export interface GuideLine {
   value: number; // pozycja w jednostkach canvas (world space)
   orientation: 'vertical' | 'horizontal'; // vertical = x, horizontal = y

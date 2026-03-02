@@ -249,7 +249,7 @@ page.tsx
 | Etap | Status | Notatki |
 |------|--------|---------|
 | 1. Typy | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami |
-| 2. Utils | ⬜ TODO | |
+| 2. Utils | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami |
 | 3. API layer | ⬜ TODO | |
 | 4. Hooki | ⬜ TODO | Najtrudniejszy |
 | 5. Komponenty | ⬜ TODO | |
