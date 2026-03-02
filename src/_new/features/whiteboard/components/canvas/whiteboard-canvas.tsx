@@ -335,6 +335,14 @@ export default function WhiteboardCanvasNew({
   }, []); // Celowo pusta — setup jednorazowy, korzystamy z redrawCanvasRef
 
   // ─── ZOOM + PAN (kółko myszy / touchpad) ───────────────────────────────────
+  //
+  // ⚡ PERF: Nie wołamy setViewport w hot-path każdego eventu!
+  //   - viewportRef.current aktualizowany natychmiast (canvas RAF reads this)
+  //   - redrawCanvasRef.current() wołane bezpośrednio przez RAF
+  //   - setViewport wywołany przez debounce (co 80ms) — synchronizuje React state
+  //     (ZoomControls, HTMLoverlays) bez jitter klatka-po-klatce
+
+  const wheelSetViewportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -342,8 +350,6 @@ export default function WhiteboardCanvasNew({
 
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
-
-      // Wyłącz follow mode gdy user sam nawiguje
       vp.handleStopFollowing();
 
       const rect = container.getBoundingClientRect();
@@ -356,8 +362,18 @@ export default function WhiteboardCanvasNew({
         : panViewportWithWheel(current, e.deltaX, e.deltaY);
 
       const constrained = constrainViewport(next);
+
+      // 1. Zaktualizuj ref natychmiast — canvas RAF odczyta nową wartość
       vp.viewportRef.current = constrained;
-      vp.setViewport(constrained);
+
+      // 2. Narysuj canvas bezpośrednio (bez czekania na React re-render)
+      requestAnimationFrame(() => redrawCanvasRef.current());
+
+      // 3. Zsynchronizuj React state z debounce — aktualizuje ZoomControls + HTML overlays
+      if (wheelSetViewportTimerRef.current) clearTimeout(wheelSetViewportTimerRef.current);
+      wheelSetViewportTimerRef.current = setTimeout(() => {
+        vp.setViewport(vp.viewportRef.current);
+      }, 80);
     };
 
     container.addEventListener('wheel', handleWheel, { passive: false });
@@ -392,14 +408,18 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       const next = panViewportWithMouse(vp.viewportRef.current, dx, dy);
       const constrained = constrainViewport(next);
+
+      // ⚡ PERF: tylko ref — bez React re-render w hot-path
       vp.viewportRef.current = constrained;
-      vp.setViewport(constrained);
+      requestAnimationFrame(() => redrawCanvasRef.current());
     };
 
     const handleMouseUp = (e: MouseEvent) => {
       if (e.button !== 1) return;
       isPanning = false;
       document.body.style.cursor = '';
+      // Zsynchronizuj React state raz na koniec gestu
+      vp.setViewport(vp.viewportRef.current);
     };
 
     container.addEventListener('mousedown', handleMouseDown);
