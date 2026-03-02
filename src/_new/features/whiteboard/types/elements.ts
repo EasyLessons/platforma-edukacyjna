@@ -22,6 +22,14 @@ export interface Point {
   y: number;
 }
 
+/**
+ * Akcja użytkownika zapisywana na stosie undo/redo.
+ * Tylko dwa typy: create i delete — update jest obsługiwany przez SelectTool.
+ */
+export type UserAction =
+  | { type: 'create'; element: DrawingElement }
+  | { type: 'delete'; element: DrawingElement };
+
 // ─── TYPY ELEMENTÓW ──────────────────────────────────────────────────────────
 
 /** Linia rysowana odręcznie (narzędzie: pióro) */

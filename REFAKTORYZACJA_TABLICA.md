@@ -260,14 +260,14 @@ page.tsx
 
 ## STATUS
 
-| Etap          | Status  | Notatki                                                                         |
-| ------------- | ------- | ------------------------------------------------------------------------------- |
-| 1. Typy       | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami   |
-| 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami |
+| Etap          | Status  | Notatki                                                                          |
+| ------------- | ------- | -------------------------------------------------------------------------------- |
+| 1. Typy       | ✅ DONE | elements.ts / tools.ts / canvas.ts / index.ts — stare pliki są re-exporterami    |
+| 2. Utils      | ✅ DONE | viewport-math.ts / math-eval.ts / snap-utils.ts — stare pliki są re-exporterami  |
 | 3. API layer  | ✅ DONE | elements-api.ts / realtime-api.ts (BoardEvent type + createBoardChannel factory) |
-| 4. Hooki      | ⬜ TODO | Najtrudniejszy                                                                  |
-| 5. Komponenty | ⬜ TODO |                                                                                 |
-| 6. Integracja | ⬜ TODO |                                                                                 |
+| 4. Hooki      | ✅ DONE | use-history / use-viewport / use-elements (nowy) / use-clipboard / use-selection / use-realtime |
+| 5. Komponenty | ⬜ TODO |                                                                                  |
+| 6. Integracja | ⬜ TODO |                                                                                  |
 
 ---
 
