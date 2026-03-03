@@ -1,54 +1,86 @@
-# Backend (FastAPI)
-# Aktywacja środowiska, instalacja zależności, uruchomienie serwera
+
+# ================================================
+#   BACKEND (FastAPI) — uruchamianie
+# ================================================
+
+# Tworzenie venv (tylko raz po sklonowaniu repo)
+cd backend
 python -m venv .venv
-.\\.venv\Scripts\Activate.ps1
-pip install -r backend/requirements.txt
 
-## Error Type
-Build Error
+# Aktywacja venv (za każdym razem przed pracą)
+.\.venv\Scripts\Activate.ps1
 
-## Error Message
-Export createClient doesn't exist in target module
+# Instalacja zależności (tylko raz po sklonowaniu)
+pip install -r requirements.txt
 
-## Build Output
-./src/app/dashboard/Header/popups/NotificationsPopup.tsx:12:1
-Export createClient doesn't exist in target module
-  10 | } from '@/workspace_api/api';
-  11 | import { useWorkspaces } from '@/app/context/WorkspaceContext';
-> 12 | import { createClient } from '@/lib/supabase';
-     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  13 |
-  14 | interface NotificationsPopupProps {
-  15 |   onClose: () => void;
+# Uruchomienie serwera (z folderu /backend, venv musi być aktywny)
+uvicorn main:app --reload
 
-The export createClient was not found in module [project]/src/lib/supabase.ts [app-client] (ecmascript).
-Did you mean to import supabase?
-All exports of the module are statically known (It doesn't have dynamic exports). So it's known statically that the requested export doesn't exist.
 
-Import traces:
-  Client Component Browser:
-    ./src/app/dashboard/Header/popups/NotificationsPopup.tsx [Client Component Browser]
-    ./src/app/dashboard/Header/DashboardHeader.tsx [Client Component Browser]
-    ./src/app/dashboard/page.tsx [Client Component Browser]
-    ./src/app/dashboard/page.tsx [Server Component]
+# ================================================
+#   FRONTEND (Next.js) — uruchamianie
+# ================================================
 
-  Client Component SSR:
-    ./src/app/dashboard/Header/popups/NotificationsPopup.tsx [Client Component SSR]
-    ./src/app/dashboard/Header/DashboardHeader.tsx [Client Component SSR]
-    ./src/app/dashboard/page.tsx [Client Component SSR]
-    ./src/app/dashboard/page.tsx [Server Component]
-
-Next.js version: 16.1.1 (Turbopack)
- z glownego lub z /backend
-
-# Frontend (Next.js)
-# Instalacja zależności, uruchomienie serwera developerskiego
+# Instalacja zależności (tylko raz po sklonowaniu)
 npm install
+
+# Uruchomienie serwera developerskiego (z głównego folderu)
 npm run dev
 
-# alembic push do neon
+
+# ================================================
+#   GIT — BRANCHE
+# ================================================
+
+# Sprawdź na którym branchu jesteś
+git branch
+
+# Sprawdź wszystkie branche (też zdalne)
+git branch -a
+
+# Stwórz nowy branch i od razu na niego przejdź
+git checkout -b nazwa-brancha
+
+# Przejdź na istniejący branch
+git checkout nazwa-brancha
+
+# Wróć do maina (bezpieczna, działająca wersja)
+git checkout main
+
+# Zapisz postęp na branchu (snapshot)
+git add .
+git commit -m "opis co zrobiłem"
+
+# Wyślij branch na GitHub (pierwszy raz)
+git push -u origin nazwa-brancha
+
+# Wyślij branch na GitHub (kolejne razy)
+git push
+
+# Połącz branch z mainem (rób to będąc na main)
+git checkout main
+git merge nazwa-brancha
+
+# Usuń branch po zakończeniu (lokalnie)
+git branch -d nazwa-brancha
+
+# Aktualny stan plików (co zmienione, co niezapisane)
+git status
+
+# Historia commitów
+git log --oneline
+
+
+# ================================================
+#   ALEMBIC — migracje bazy danych (Neon)
+# ================================================
+
 alembic revision --autogenerate -m "opis zmiany"
 alembic upgrade head
 
-# odpalanie testów
-pytest tests\ -v 
+
+# ================================================
+#   TESTY
+# ================================================
+
+pytest tests\ -v

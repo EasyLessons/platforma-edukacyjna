@@ -25,13 +25,36 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
-import WhiteboardCanvas from './whiteboard/WhiteboardCanvas';
+// [Etap 6] Nowa implementacja — podłączone wszystkie narzędzia
+import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
 import { getMyRoleInWorkspace } from '@/workspace_api/api';
-import { BoardHeader } from './components/BoardHeader';
-import { HomeButton } from './components/HomeButton';
+import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
+import { HomeButton } from '@/_new/features/whiteboard/components/layout/home-button';
+import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
+import type { BoardSettings } from '@/_new/features/board/types';
+
+// Helper do odczytania user_id z JWT (payload.sub)
+function getUserIdFromToken(): number | null {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('access_token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub ? Number(payload.sub) : null;
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_BOARD_SETTINGS: BoardSettings = {
+  ai_enabled: true,
+  grid_visible: true,
+  smartsearch_visible: true,
+  toolbar_visible: true,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
@@ -48,6 +71,10 @@ export function TablicaContent() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
+  const [isOwner, setIsOwner] = useState(false);
+  const [showBoardSettings, setShowBoardSettings] = useState(false);
+  const [boardOwnerId, setBoardOwnerId] = useState<number | null>(null);
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
@@ -69,6 +96,14 @@ export function TablicaContent() {
         if (board) {
           setBoardName(board.name);
           setWorkspaceId(board.workspace_id);
+          setBoardOwnerId(board.owner_id);
+          // Sprawdz czy biezacy uzytkownik jest wlascicielem tablicy
+          const currentUserId = getUserIdFromToken();
+          setIsOwner(!!currentUserId && board.owner_id === currentUserId);
+          // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
+          if (board.settings) {
+            setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...board.settings });
+          }
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {
@@ -225,10 +260,22 @@ export function TablicaContent() {
       {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
       <HomeButton />
 
+      {/* Panel ustawień tablicy */}
+      {showBoardSettings && boardId && boardId !== 'demo-board' && (
+        <BoardSettingsPanel
+          boardId={parseInt(boardId, 10)}
+          isOwner={userRole === 'owner'}
+          settings={boardSettings}
+          onSettingsChange={setBoardSettings}
+          onClose={() => setShowBoardSettings(false)}
+        />
+      )}
+
       {/* Nagłówek z logo, nazwą tablicy i przyciskiem Premium */}
-      <BoardHeader 
-        boardName={boardName} 
+      <BoardHeader
+        boardName={boardName}
         boardId={boardId}
+        onSettingsClick={userRole === 'owner' && boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
       />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
@@ -239,6 +286,7 @@ export function TablicaContent() {
             boardId={boardId}
             arkuszPath={arkuszPath}
             userRole={userRole || 'editor'}
+            boardSettings={boardSettings}
           />
         </VoiceChatProvider>
       </BoardRealtimeProvider>

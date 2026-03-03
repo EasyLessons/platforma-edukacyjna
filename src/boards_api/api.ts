@@ -64,6 +64,12 @@ export interface Board {
   owner_id: number;
   owner_username: string;
   is_favourite: boolean;
+  settings?: {
+    ai_enabled: boolean;
+    grid_visible: boolean;
+    smartsearch_visible: boolean;
+    toolbar_visible: boolean;
+  } | null;
   last_modified: string; // ISO 8601 string
   last_modified_by: string | null;
   last_opened: string | null; // ISO 8601 string

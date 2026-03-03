@@ -20,6 +20,8 @@ import type {
   BoardListResponse,
   BoardToggleFavouriteRequest,
   BoardToggleFavouriteResponse,
+  BoardSettings,
+  BoardMember,
 } from '../types';
 import type { OnlineUser } from '@/_new/shared/types/user';
 
@@ -205,6 +207,62 @@ export const fetchBoardOnlineUsers = async (
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
+    }
+  );
+
+  return handleResponse(response);
+};
+
+// BOARD SETTINGS & MEMBERS
+// ================================
+
+// fetchBoardMembers - Pobiera członków tablicy (workspace members)
+export const fetchBoardMembers = async (
+  boardId: number
+): Promise<BoardMember[]> => {
+  const token = getToken();
+  if (!token) throw new Error('Musisz być zalogowany');
+
+  const response = await fetch(`${API_BASE_URL}/api/boards/${boardId}/members`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  });
+
+  const data = await handleResponse(response);
+  return data.members as BoardMember[];
+};
+
+// updateBoardSettings - Aktualizuje ustawienia tablicy (tylko właściciel)
+export const updateBoardSettings = async (
+  boardId: number,
+  settings: BoardSettings
+): Promise<{ success: boolean; settings: BoardSettings }> => {
+  const token = getToken();
+  if (!token) throw new Error('Musisz być zalogowany');
+
+  const response = await fetch(`${API_BASE_URL}/api/boards/${boardId}/settings`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ settings }),
+  });
+
+  return handleResponse(response);
+};
+
+// updateBoardMemberRole - Zmienia rolę workspace dla użytkownika (tylko właściciel)
+export const updateBoardMemberRole = async (
+  boardId: number,
+  targetUserId: number,
+  role: 'admin' | 'member' | 'viewer'
+): Promise<{ success: boolean; user_id: number; new_role: string }> => {
+  const token = getToken();
+  if (!token) throw new Error('Musisz być zalogowany');
+
+  const response = await fetch(
+    `${API_BASE_URL}/api/boards/${boardId}/members/${targetUserId}/role?role=${role}`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     }
   );
 
