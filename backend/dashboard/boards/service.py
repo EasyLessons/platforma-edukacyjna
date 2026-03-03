@@ -13,7 +13,7 @@ from dashboard.boards.schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite, 
     OnlineUserInfo, BoardResponse, BoardListResponse, 
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
-    ToggleFavouriteResponse
+    ToggleFavouriteResponse, BoardSettings
 )
 
 logger = get_logger(__name__)
@@ -89,6 +89,7 @@ class BoardService:
             owner_id=user_id,
             owner_username=owner.username,
             is_favourite=False,
+            settings=BoardSettings(**(new_board.settings or {})),
             last_modified=new_board.last_modified,
             last_modified_by=owner.username,
             last_opened=datetime.utcnow(),
@@ -142,6 +143,7 @@ class BoardService:
             owner_id=board.created_by,
             owner_username=owner.username,
             is_favourite=board_user.is_favourite if board_user else False,
+            settings=BoardSettings(**(board.settings or {})),
             last_modified=board.last_modified,
             last_modified_by=modifier.username,
             last_opened=board_user.last_opened if board_user else None,
@@ -327,6 +329,7 @@ class BoardService:
                     owner_id=owner_info.user_id,
                     owner_username=owner_info.username,
                     is_favourite=any(bu.is_favourite for bu in board.users if bu.user_id == user_id),
+                    settings=BoardSettings(**(board.settings or {})),
                     last_modified=board.last_modified,
                     last_modified_by=last_modifier_info.username,
                     last_opened=last_opened_info.last_opened if last_opened_info else None,

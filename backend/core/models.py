@@ -87,7 +87,8 @@ class Board(Base):
     bg_color = Column(String(50), default="bg-gray-500")
     last_modified = Column(DateTime, default=datetime.utcnow, nullable=False)
     last_modified_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
-    
+    settings = Column(JSONB, nullable=True, default=None)
+
     # Relationships
     workspace = relationship("Workspace", back_populates="boards")
     creator = relationship("User", foreign_keys=[created_by], back_populates="created_boards")

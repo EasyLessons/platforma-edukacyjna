@@ -14,7 +14,8 @@ from dashboard.boards.schemas import (
     BoardListResponse, UpdateBoard,
     ToggleFavourite, ToggleFavouriteResponse,
     OnlineUserInfo, BoardOwnerInfo, 
-    LastModifiedByInfo, LastOpenedInfo
+    LastModifiedByInfo, LastOpenedInfo,
+    BoardSettings, UpdateBoardSettings, BoardMember, BoardMembersResponse
 )
 from dashboard.boards.service import BoardService
 from dashboard.boards.utils import get_current_user_id
@@ -98,6 +99,7 @@ async def get_board(
         owner_id=board.created_by,
         owner_username=owner.username if owner else "Unknown",
         is_favourite=board_user.is_favourite if board_user else False,
+        settings=BoardSettings(**(board.settings or {})),
         last_modified=board.last_modified,
         last_modified_by=last_modifier.username if last_modifier else None,
         last_opened=board_user.last_opened if board_user else None,
@@ -482,3 +484,113 @@ async def join_board_workspace(
         "board_id": board_id,
         "message": "Dołączono do workspace"
     }
+
+
+# ─── SETTINGS & MEMBERS ───────────────────────────────────────────────────────
+
+@router.get("/{board_id}/members", response_model=BoardMembersResponse)
+async def get_board_members(
+    board_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Zwraca listę członków workspace powiązanych z tablicą.
+    Tylko członkowie workspace mają dostęp do tablicy — ich role są workspace-level.
+    """
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board nie znaleziony")
+
+    # Sprawdź dostęp
+    member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == user_id
+    ).first()
+    if not member and board.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Brak dostępu")
+
+    # Pobierz członków workspace
+    ws_members = (
+        db.query(WorkspaceMember, User)
+        .join(User, User.id == WorkspaceMember.user_id)
+        .filter(WorkspaceMember.workspace_id == board.workspace_id)
+        .all()
+    )
+
+    result = []
+    for wm, u in ws_members:
+        role = "owner" if u.id == board.created_by else wm.role
+        result.append(BoardMember(
+            user_id=u.id,
+            username=u.username,
+            email=u.email,
+            role=role,
+            is_owner=(u.id == board.created_by),
+            joined_at=wm.joined_at
+        ))
+
+    return BoardMembersResponse(members=result)
+
+
+@router.put("/{board_id}/settings")
+async def update_board_settings(
+    board_id: int,
+    body: UpdateBoardSettings,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Aktualizuje ustawienia tablicy (tylko właściciel).
+    ai_enabled, grid_visible, smartsearch_visible, toolbar_visible
+    """
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board nie znaleziony")
+
+    if board.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Tylko właściciel może zmieniać ustawienia")
+
+    board.settings = body.settings.model_dump()
+    db.commit()
+    db.refresh(board)
+
+    return {"success": True, "settings": board.settings}
+
+
+@router.put("/{board_id}/members/{target_user_id}/role")
+async def update_member_role(
+    board_id: int,
+    target_user_id: int,
+    role: str,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """
+    Zmienia rolę workspace dla użytkownika (tylko właściciel tablicy).
+    Role: admin | member | viewer
+    """
+    if role not in ("admin", "member", "viewer"):
+        raise HTTPException(status_code=400, detail="Nieprawidłowa rola. Dozwolone: admin, member, viewer")
+
+    board = db.query(Board).filter(Board.id == board_id).first()
+    if not board:
+        raise HTTPException(status_code=404, detail="Board nie znaleziony")
+
+    if board.created_by != user_id:
+        raise HTTPException(status_code=403, detail="Tylko właściciel może zmieniać role")
+
+    if target_user_id == user_id:
+        raise HTTPException(status_code=400, detail="Nie możesz zmienić własnej roli")
+
+    wm = db.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == board.workspace_id,
+        WorkspaceMember.user_id == target_user_id
+    ).first()
+    if not wm:
+        raise HTTPException(status_code=404, detail="Użytkownik nie jest członkiem workspace")
+
+    wm.role = role
+    db.commit()
+
+    return {"success": True, "user_id": target_user_id, "new_role": role}
