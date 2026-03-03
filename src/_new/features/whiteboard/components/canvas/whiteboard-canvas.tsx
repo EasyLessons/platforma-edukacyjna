@@ -499,6 +499,7 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
       vp.handleStopFollowing();
+      sel.clearSelection(); // 🆕 Wyczyść zaznaczenie (ukryje properties panel)
       // Ukryj HTML overlaye — pojawią się z powrotem po setViewport (mouseup)
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
@@ -634,10 +635,11 @@ export default function WhiteboardCanvasNew({
   /** Ukrywa wszystkie HTML-overlaye natychmiast — bez re-renderu React */
   const hideOverlaysForPan = useCallback(() => {
     isPanningRef.current = true;
+    sel.clearSelection(); // 🆕 Wyczyść zaznaczenie (ukryje properties panel)
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
-  }, []);
+  }, [sel]);
 
   /** Przywraca overlaye i synchronizuje React viewport state raz po zakończeniu pana */
   const restoreOverlaysAfterPan = useCallback(() => {
