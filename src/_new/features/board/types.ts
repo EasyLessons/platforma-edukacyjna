@@ -9,6 +9,22 @@
 // CORE TYPES
 // ================================
 
+export interface BoardSettings {
+  ai_enabled: boolean;
+  grid_visible: boolean;
+  smartsearch_visible: boolean;
+  toolbar_visible: boolean;
+}
+
+export interface BoardMember {
+  user_id: number;
+  username: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  is_owner: boolean;
+  joined_at: string | null;
+}
+
 export interface Board {
   id: number;
   name: string;
@@ -22,6 +38,9 @@ export interface Board {
 
   // Statusy
   is_favourite: boolean;
+
+  // Ustawienia tablicy
+  settings: BoardSettings | null;
 
   // Timestamps
   last_modified: string;

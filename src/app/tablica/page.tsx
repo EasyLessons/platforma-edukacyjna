@@ -33,6 +33,28 @@ import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
 import { getMyRoleInWorkspace } from '@/workspace_api/api';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { HomeButton } from '@/_new/features/whiteboard/components/layout/home-button';
+import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
+import type { BoardSettings } from '@/_new/features/board/types';
+
+// Helper do odczytania user_id z JWT (payload.sub)
+function getUserIdFromToken(): number | null {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('access_token');
+  if (!token) return null;
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload.sub ? Number(payload.sub) : null;
+  } catch {
+    return null;
+  }
+}
+
+const DEFAULT_BOARD_SETTINGS: BoardSettings = {
+  ai_enabled: true,
+  grid_visible: true,
+  smartsearch_visible: true,
+  toolbar_visible: true,
+};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
@@ -49,6 +71,10 @@ export function TablicaContent() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
   const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [boardSettings, setBoardSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
+  const [isOwner, setIsOwner] = useState(false);
+  const [showBoardSettings, setShowBoardSettings] = useState(false);
+  const [boardOwnerId, setBoardOwnerId] = useState<number | null>(null);
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
@@ -70,6 +96,14 @@ export function TablicaContent() {
         if (board) {
           setBoardName(board.name);
           setWorkspaceId(board.workspace_id);
+          setBoardOwnerId(board.owner_id);
+          // Sprawdz czy biezacy uzytkownik jest wlascicielem tablicy
+          const currentUserId = getUserIdFromToken();
+          setIsOwner(!!currentUserId && board.owner_id === currentUserId);
+          // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
+          if (board.settings) {
+            setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...board.settings });
+          }
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {
@@ -226,6 +260,54 @@ export function TablicaContent() {
       {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
       <HomeButton />
 
+      {/* Przycisk ustawień tablicy — widoczny dla właściciela */}
+      {isOwner && boardId && boardId !== 'demo-board' && (
+        <button
+          onClick={() => setShowBoardSettings(true)}
+          title="Ustawienia tablicy"
+          style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            zIndex: 100,
+            padding: '10px',
+            backgroundColor: 'white',
+            border: '2px solid #e0e0e0',
+            borderRadius: '12px',
+            cursor: 'pointer',
+            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+          }}
+          onMouseOver={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f9fafb';
+          }}
+          onMouseOut={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2M2 12h2M20 12h2"/>
+          </svg>
+        </button>
+      )}
+
+      {/* Panel ustawień tablicy */}
+      {showBoardSettings && boardId && boardId !== 'demo-board' && (
+        <BoardSettingsPanel
+          boardId={parseInt(boardId, 10)}
+          isOwner={isOwner}
+          settings={boardSettings}
+          onSettingsChange={setBoardSettings}
+          onClose={() => setShowBoardSettings(false)}
+        />
+      )}
+
       {/* Nagłówek z logo, nazwą tablicy i przyciskiem Premium */}
       <BoardHeader 
         boardName={boardName} 
@@ -240,6 +322,7 @@ export function TablicaContent() {
             boardId={boardId}
             arkuszPath={arkuszPath}
             userRole={userRole || 'editor'}
+            boardSettings={boardSettings}
           />
         </VoiceChatProvider>
       </BoardRealtimeProvider>

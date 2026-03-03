@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 class CreateBoard(BaseModel):
     """Schema do tworzenia nowej tablicy"""
@@ -26,6 +26,33 @@ class ToggleFavouriteResponse(BaseModel):
     
     class Config:
         from_attributes = True
+
+class BoardSettings(BaseModel):
+    """Ustawienia tablicy zarządzane przez właściciela"""
+    ai_enabled: bool = True
+    grid_visible: bool = True
+    smartsearch_visible: bool = True
+    toolbar_visible: bool = True
+
+class UpdateBoardSettings(BaseModel):
+    """Schema do aktualizacji ustawień tablicy"""
+    settings: BoardSettings
+
+class BoardMember(BaseModel):
+    """Członek tablicy (z poziomu workspace)"""
+    user_id: int
+    username: str
+    email: str
+    role: str  # owner | admin | member | viewer
+    is_owner: bool
+    joined_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class BoardMembersResponse(BaseModel):
+    """Lista członków tablicy"""
+    members: List[BoardMember]
 
 class OnlineUserInfo(BaseModel):
     """Użytkownicy korzystający z danej tablicy"""
@@ -59,6 +86,9 @@ class BoardResponse(BaseModel):
     
     # Statusy
     is_favourite: bool
+    
+    # Ustawienia tablicy (domyślne gdy None)
+    settings: Optional[BoardSettings] = None
     
     # Timestamps
     last_modified: datetime

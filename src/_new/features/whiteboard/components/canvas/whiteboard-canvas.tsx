@@ -98,6 +98,7 @@ import type {
 } from '../../types';
 import type { Tool, ShapeType } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
+import type { BoardSettings } from '@/_new/features/board/types';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -108,17 +109,30 @@ export interface WhiteboardCanvasNewProps {
   arkuszPath?: string | null;
   /** Rola użytkownika — viewer dostaje tylko 'pan' */
   userRole?: 'owner' | 'editor' | 'viewer';
+  /** Ustawienia tablicy z backendu (JSONB) */
+  boardSettings?: BoardSettings;
   className?: string;
 }
 
 // ─── Komponent ────────────────────────────────────────────────────────────────
 
+const DEFAULT_BOARD_SETTINGS: BoardSettings = {
+  ai_enabled: true,
+  grid_visible: true,
+  smartsearch_visible: true,
+  toolbar_visible: true,
+};
+
 export default function WhiteboardCanvasNew({
   boardId,
   arkuszPath: _arkuszPath,
   userRole = 'editor',
+  boardSettings: boardSettingsProp,
   className = '',
 }: WhiteboardCanvasNewProps) {
+
+  // Zmerguj props z domyślnymi — używamy ref żeby nie powiązać przez state
+  const settings = boardSettingsProp ?? DEFAULT_BOARD_SETTINGS;
   // ─── Refs do DOM ────────────────────────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -298,8 +312,10 @@ export default function WhiteboardCanvasNew({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    // Siatka kartezjańska (układ współrzędnych)
-    drawGrid(ctx, viewport, width, height);
+    // Siatka kartezjańska (układ współrzędnych) — ukrywana gdy settings.grid_visible = false
+    if (settings.grid_visible) {
+      drawGrid(ctx, viewport, width, height);
+    }
 
     // Markdown + Table renderowane jako HTML overlay — canvas je pomija
     for (const element of el.elementsRef.current) {
@@ -1240,7 +1256,7 @@ export default function WhiteboardCanvasNew({
         )}
 
         {/* ── SMARTSEARCH BAR ───────────────────────────────────────────── */}
-        {userRole !== 'viewer' && (
+        {userRole !== 'viewer' && settings.smartsearch_visible && (
           <div
             className="absolute top-4 z-50 pointer-events-auto"
             style={{
@@ -1291,7 +1307,7 @@ export default function WhiteboardCanvasNew({
         )}
 
         {/* ── TOOLBAR ───────────────────────────────────────────────────── */}
-        <Toolbar
+        {settings.toolbar_visible && <Toolbar
           tool={tool}
           setTool={setTool}
           selectedShape={selectedShape}
@@ -1320,7 +1336,7 @@ export default function WhiteboardCanvasNew({
           isCalculatorOpen={isCalculatorOpen}
           onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
           isReadOnly={userRole === 'viewer'}
-        />
+        />}
 
         {/* ── ZOOM CONTROLS ─────────────────────────────────────────────── */}
         <ZoomControls
@@ -1674,15 +1690,17 @@ export default function WhiteboardCanvasNew({
         />
 
         {/* ── MATH CHATBOT ──────────────────────────────────────────────── */}
-        <MathChatbot
-          canvasWidth={canvasWidth}
-          canvasHeight={canvasHeight}
-          onAddToBoard={handleChatbotAddToBoard}
-          messages={chatMessages}
-          setMessages={setChatMessages}
-          onActiveChange={setIsCardViewerActive}
-          userRole={userRole}
-        />
+        {settings.ai_enabled && (
+          <MathChatbot
+            canvasWidth={canvasWidth}
+            canvasHeight={canvasHeight}
+            onAddToBoard={handleChatbotAddToBoard}
+            messages={chatMessages}
+            setMessages={setChatMessages}
+            onActiveChange={setIsCardViewerActive}
+            userRole={userRole}
+          />
+        )}
 
       </div>
     </div>
