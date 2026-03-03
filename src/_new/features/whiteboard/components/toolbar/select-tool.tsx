@@ -2011,6 +2011,12 @@ export function SelectTool({
   };
 
   const renderSelectionBox = () => {
+    // 🟡 DEBUG: Sprawdzamy kiedy selection box jest renderowany
+    console.log('[SELECTION BOX] isOverlayVisible:', isOverlayVisible, 'selectedIds:', selectedIds.size, 'timestamp:', Date.now());
+    
+    // 🆕 Nie renderuj selection box gdy overlay jest ukryty
+    if (!isOverlayVisible) return null;
+    
     const bbox = getSelectionBoundingBox();
     if (!bbox || selectedIds.size === 0) return null;
 
@@ -2163,6 +2169,9 @@ export function SelectTool({
 
   // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek lub markdown
   const renderPropertiesPanel = () => {
+    // 🟡 DEBUG: Sprawdzamy kiedy panel jest renderowany
+    console.log('[PROPERTIES PANEL] isOverlayVisible:', isOverlayVisible, 'selectedIds:', selectedIds.size, 'timestamp:', Date.now());
+    
     // 🆕 Nie renderuj wcale gdy overlay jest ukryty (zapobiega "latającemu" panelowi podczas scroll/pan)
     if (!isOverlayVisible) return null;
     if (selectedIds.size === 0 || !onElementUpdateWithHistory) return null;

@@ -640,9 +640,9 @@ export default function WhiteboardCanvasNew({
   /** Ukrywa wszystkie HTML-overlaye natychmiast — bez re-renderu React */
   const hideOverlaysForPan = useCallback(() => {
     isPanningRef.current = true;
-    setOverlaysVisible(false); // 🆕 State → wymusza re-render SelectTool
     // 🆕 Wyczyść zaznaczenie SYNCHRONICZNIE (flushSync) — panel zniknie natychmiast
     flushSync(() => {
+      setOverlaysVisible(false); // 🆕 SYNCHRONICZNIE - wymusza natychmiastowy re-render SelectTool
       sel.clearSelection();
     });
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
@@ -677,15 +677,21 @@ export default function WhiteboardCanvasNew({
     
     // 🆕 Ukryj overlaye i wyczyść selection PRZED zmianą viewport
     // (zapobiega renderowaniu properties panel z nowym viewport ale starym selection)
-    setOverlaysVisible(false); // 🆕 State → wymusza re-render SelectTool
+    // CSS ukrycie - natychmiastowe
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
     
-    // Wyczyść zaznaczenie jeśli nie jest to aktywny pan gesture (np. wheel scroll)
+    // State + selection - SYNCHRONICZNIE przez flushSync
     if (!isPanningRef.current && sel.selectedElementIds.size > 0) {
       flushSync(() => {
+        setOverlaysVisible(false); // 🆕 SYNCHRONICZNIE - wymusza natychmiastowy re-render
         sel.clearSelection();
+      });
+    } else {
+      // Jeśli pan gesture w toku, tylko state bez selection
+      flushSync(() => {
+        setOverlaysVisible(false);
       });
     }
     
@@ -704,7 +710,8 @@ export default function WhiteboardCanvasNew({
     viewportChangeTimerRef.current = setTimeout(() => {
       viewportChangeTimerRef.current = null;
       if (isPanningRef.current) return; // gest wciąż trwa — poczekaj na restoreOverlaysAfterPan
-      setOverlaysVisible(true); // 🆕 State → wymusza re-render SelectTool
+      // Nie używamy flushSync tutaj - to już post-timeout, nie hot path
+      setOverlaysVisible(true);
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
