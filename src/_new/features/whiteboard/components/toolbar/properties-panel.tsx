@@ -179,11 +179,11 @@ export function SelectionPropertiesPanel({
             <div className="relative group ">
               <button
                 onClick={onCopySelected}
-                className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-md cursor-pointer text-gray-700 hover:bg-gray-100"
               >
                 <Copy className="w-5 h-5" />
               </button>
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                 Kopiuj (Ctrl+C)
               </span>
             </div>
@@ -194,11 +194,11 @@ export function SelectionPropertiesPanel({
             <div className="relative group">
               <button
                 onClick={onDuplicateSelected}
-                className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-gray-100"
+                className="p-1.5 rounded-md cursor-pointer text-gray-700 hover:bg-gray-100"
               >
                 <Files className="w-5 h-5" />
               </button>
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                 Duplikuj (Ctrl+D)
               </span>
             </div>
@@ -206,77 +206,20 @@ export function SelectionPropertiesPanel({
 
           <div className="w-px h-6 bg-gray-200" />
 
-          {/* Rozwiąż z AI - z gradientem i animacją */}
+          {/* Rozwiąż z AI - UPROSZCZONE bez animacji */}
           <div className="relative group">
             <button
-  onClick={() => console.log('🤖 AI - funkcja w przygotowaniu')}
-  className="mt-2 relative rounded-lg cursor-pointer transition-all duration-300 hover:scale-105"
-  style={{
-    padding: '1px',
-    background: 'linear-gradient(90deg, rgba(96, 165, 250, 0.6), rgba(168, 85, 247, 0.6), rgba(96, 165, 250, 0.6))',
-    backgroundSize: '200% 100%',
-    animation: 'gradientMove 3s linear infinite',
-    boxShadow: '0 0 12px rgba(139, 92, 246, 0.4)'
-  }}
->
-  {/* Tło przycisku - ciemne z gradientem */}
-  <div 
-    className="relative bg-gradient-to-br from-slate-900 via-slate-950 to-black rounded-[7px] px-4 py-2 overflow-hidden"
-  >
-    
-    {/* Shimmer effect */}
-    <div 
-      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/8 to-transparent pointer-events-none"
-      style={{
-        backgroundSize: '200% 100%',
-        animation: 'shimmerMove 2s linear infinite'
-      }}
-    />
-    
-    {/* Gradient overlay - jasny góra, ciemny dół */}
-    <div className="absolute inset-0 bg-gradient-to-b from-white/5 to-transparent pointer-events-none" />
-    
-    {/* Zawartość przycisku */}
-    <div className="relative flex items-center gap-2">
-      {/* SVG Ikona */}
-      <svg 
-        viewBox="0 0 512 512" 
-        xmlns="http://www.w3.org/2000/svg" 
-        className="w-4 h-4 drop-shadow-[0_0_6px_rgba(147,112,219,0.1)] animate-pulse-slow"
-      >
-        <path 
-          fill="url(#aiGradient)" 
-          d="M256 25.063c-61.584 61.583-76.97 107.77-76.97 138.562 0 30.792 46.18 46.188 76.97 46.188 30.792 0 76.97-15.396 76.97-46.188S317.583 86.647 256 25.062zM132.72 204.125c-9.21-.108-20.947 1.46-36.72 5.688 11.27 42.062 24.604 49.77 37.938 57.468C147.27 274.98 168.3 269.335 176 256c7.698-13.333 2.053-34.365-11.28-42.063-8.334-4.81-16.654-9.632-32-9.812zm246.56 0c-15.346.18-23.666 5-32 9.813-13.332 7.697-18.978 28.73-11.28 42.062 7.698 13.333 28.73 18.98 42.063 11.28 13.333-7.697 26.667-15.405 37.937-57.467-15.774-4.227-27.51-5.796-36.72-5.688zM256 240.595c-34.01 0-61.594 27.58-61.594 61.593 0 34.01 27.583 61.593 61.594 61.593 34.01 0 61.594-27.58 61.594-61.592S290.01 240.594 256 240.594zm-144.03 60.218c-5.005.098-9.887 1.353-14.47 4C70.833 320.21 38.542 356.625 16 440.75c84.125 22.54 131.833 12.77 158.5-2.625 26.667-15.396 16.896-63.083 1.5-89.75-12.75-22.084-39.923-48.04-64.03-47.563zm286.686 0c-23.76.5-50.147 25.895-62.656 47.562-15.396 26.667-25.167 74.354 1.5 89.75s74.375 25.166 158.5 2.625c-22.54-84.126-54.833-120.54-81.5-135.938-5-2.886-10.36-4.115-15.844-4zM256 394.563c-15.396 0-30.78 15.385-30.78 30.78 0 15.397-.012 30.803 30.78 61.594 30.792-30.792 30.78-46.198 30.78-61.593 0-15.396-15.384-30.78-30.78-30.78z"
-        />
-        <defs>
-          <linearGradient id="aiGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#e5dfff" />
-            <stop offset="50%" stopColor="#c3b2f7" />
-            <stop offset="100%" stopColor="#b292fd" />
-          </linearGradient>
-        </defs>
-      </svg>
-      
-      {/* Tekst z gradientem */}
-      <span className="text-transparent bg-clip-text bg-gradient-to-b from-violet-100/70 via-purple-100 to-violet-400 font-semibold text-sm">
-        Rozwiąż z <strong>AI</strong>
-      </span>
-    </div>
-  </div>
-  
-  {/* Dodajemy style animacji inline */}
-  <style dangerouslySetInnerHTML={{__html: `
-    @keyframes gradientMove {
-      0%, 100% { background-position: 0% 50%; }
-      50% { background-position: 100% 50%; }
-    }
-    @keyframes shimmerMove {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-  `}} />
-</button>
-            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              onClick={() => console.log('🤖 AI - funkcja w przygotowaniu')}
+              className="relative rounded-lg cursor-pointer px-4 py-2 bg-gradient-to-br from-slate-900 via-slate-950 to-black text-white"
+              style={{
+                border: '1px solid rgba(139, 92, 246, 0.4)'
+              }}
+            >
+              <span className="text-xs font-semibold text-violet-200">
+                Rozwiąż z AI
+              </span>
+            </button>
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
               Rozwiąż zadanie z pomocą AI
             </span>
           </div>
@@ -288,11 +231,11 @@ export function SelectionPropertiesPanel({
             <div className="relative group">
               <button
                 onClick={onDeleteSelected}
-                className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-red-50 hover:text-red-600"
+                className="p-1.5 rounded-md cursor-pointer text-gray-700 hover:bg-red-50 hover:text-red-600"
               >
                 <XIcon className="w-5 h-5" />
               </button>
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                 Usuń (Del)
               </span>
             </div>
@@ -315,7 +258,7 @@ export function SelectionPropertiesPanel({
               onChange={(e) => handleWidthChange(Number(e.target.value))}
               className="w-20 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
             />
-            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-5 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-5 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
               Grubość: {currentWidth}px
             </span>
           </div>
@@ -326,7 +269,7 @@ export function SelectionPropertiesPanel({
           <div className="relative group">
             <div
               onClick={() => colorInputRef.current?.click()}
-              className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 transition-all cursor-pointer"
+              className="w-8 h-8 rounded-full border-2 border-gray-300 hover:border-gray-400 cursor-pointer"
               style={{ backgroundColor: currentColor }}
             />
             <input
@@ -337,7 +280,7 @@ export function SelectionPropertiesPanel({
               className="absolute opacity-0 pointer-events-none"
             />
            
-            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
               {hasMultiple && !allSameColor ? 'Różne kolory' : 'Kolor'}
             </span>
           </div>
@@ -349,7 +292,7 @@ export function SelectionPropertiesPanel({
               <div className="relative group">
                 <button
                   onClick={() => handleFillChange(!currentFill)}
-                  className={`w-8 h-8 rounded-md transition-all cursor-pointer ${
+                  className={`w-8 h-8 rounded-md cursor-pointer ${
                     currentFill
                       ? 'bg-blue-500/20 text-blue-600'
                       : 'text-gray-700 hover:bg-gray-100'
@@ -358,7 +301,7 @@ export function SelectionPropertiesPanel({
                   <span className="text-lg">{currentFill ? '◼' : '◻'}</span>
                 </button>
                 
-                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                   {currentFill ? 'Wypełniony' : 'Kontur'}
             </span>
               </div>
@@ -372,12 +315,12 @@ export function SelectionPropertiesPanel({
             <div className="relative group">
               <button
                 onClick={onDeleteSelected}
-                className="p-1.5 rounded-md transition-all cursor-pointer text-gray-700 hover:bg-red-50 hover:text-red-600"
+                className="p-1.5 rounded-md cursor-pointer text-gray-700 hover:bg-red-50 hover:text-red-600"
               >
                 <XIcon className="w-5 h-5" />
               </button>
               
-              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+              <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                 Usuń zaznaczone (Del)            
               </span>
               
@@ -402,7 +345,7 @@ export function SelectionPropertiesPanel({
               <button
                 key={preset.label}
                 onClick={() => handleContentScaleChange(preset.value)}
-                className={`px-2 py-1 text-xs font-medium transition-all ${
+                className={`px-2 py-1 text-xs font-medium ${
                   Math.abs(currentContentScale - preset.value) < 0.01
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
