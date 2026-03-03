@@ -670,12 +670,21 @@ export default function WhiteboardCanvasNew({
 
   const handleViewportChange = useCallback((newVp: ViewportTransform) => {
     const constrained = constrainViewport(newVp);
-    vp.viewportRef.current = constrained;
-
-    // Ukryj overlaye natychmiast (każda zmiana viewport — wheel, scroll, pan)
+    
+    // 🆕 Ukryj overlaye i wyczyść selection PRZED zmianą viewport
+    // (zapobiega renderowaniu properties panel z nowym viewport ale starym selection)
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
+    
+    // Wyczyść zaznaczenie jeśli nie jest to aktywny pan gesture (np. wheel scroll)
+    if (!isPanningRef.current && sel.selectedElementIds.size > 0) {
+      flushSync(() => {
+        sel.clearSelection();
+      });
+    }
+    
+    vp.viewportRef.current = constrained;
 
     // Podczas aktywnego pana gestu — tylko ref + redraw canvas, bez setViewport (brak re-renderów React)
     if (isPanningRef.current) {
@@ -694,7 +703,7 @@ export default function WhiteboardCanvasNew({
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
     }, 80);
-  }, [vp.setViewport, vp.viewportRef]);
+  }, [vp.setViewport, vp.viewportRef, sel]);
 
   /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
   const handleCenterViewAndSelectElements = useCallback((
