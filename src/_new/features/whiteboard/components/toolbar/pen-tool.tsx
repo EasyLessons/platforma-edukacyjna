@@ -167,6 +167,9 @@ export function PenTool({
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     // 🔴 DEBUG — usuń po naprawie
+    const dpr = window.devicePixelRatio || 1;
+    const centerX = canvasWidth / 2;
+    const centerY = canvasHeight / 2;
     console.log('🔴 PEN DEBUG pointerDown:', {
       clientX: e.clientX,
       clientY: e.clientY,
@@ -175,6 +178,9 @@ export function PenTool({
       viewport: { x: viewport.x, y: viewport.y, scale: viewport.scale },
       canvasWidth,
       canvasHeight,
+      centerX,
+      centerY,
+      dpr,
       worldPoint,
     });
 
