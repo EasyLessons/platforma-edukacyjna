@@ -1,28 +1,5 @@
 ﻿/**
  * ============================================================================
- * PLIK: src/app/tablica/toolbar/PanTool.tsx
- * ============================================================================
- *
- * IMPORTUJE Z:
- * - react (useState, useCallback)
- * - ../whiteboard/types (Point, ViewportTransform)
- * - ../whiteboard/viewport (panViewportWithMouse, zoomViewport, panViewportWithWheel, constrainViewport)
- *
- * EKSPORTUJE:
- * - PanTool (component) - narzędzie przesuwania viewport
- *
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (aktywne gdy tool === 'pan')
- *
- * ⚠️ ZALEŻNOŚCI:
- * - viewport.ts - używa funkcji transformacji i zoom/pan
- * - WhiteboardCanvas.tsx - dostarcza callback: onViewportChange
- *
- * ⚠️ WAŻNE - WHEEL EVENTS:
- * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
- * - onWheel obsługuje zoom (Ctrl+scroll) i pan (scroll)
- * - Drag to pan (LMB lub środkowy przycisk myszy)
- *
  * PRZEZNACZENIE:
  * Przesuwanie viewport przez przeciąganie myszką lub scroll/pinch.
  * ============================================================================
@@ -121,11 +98,13 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
   }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
 
   // Pointer down - rozpocznij panning
+  // button 0 = LPM, button 1 = scroll (kółko), button 2 = PPM
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       gestures.handlePointerDown(e);
-      if (e.button === 0 || e.button === 1) {
+      if (e.button === 0 || e.button === 1 || e.button === 2) {
         e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
         isPanningRef.current = true;
         lastMousePosRef.current = { x: e.clientX, y: e.clientY };
         setIsPanningVisual(true);
@@ -161,6 +140,10 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
     (e: React.PointerEvent) => {
       gestures.handlePointerUp(e);
       if (isPanningRef.current) {
+
+        if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        }
         onPanEnd?.();
       }
       isPanningRef.current = false;
@@ -181,6 +164,7 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
+        onContextMenu={(e) => e.preventDefault()}
       />
     </div>
   );
