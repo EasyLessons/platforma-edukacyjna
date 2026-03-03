@@ -133,6 +133,9 @@ export default function WhiteboardCanvasNew({
 
   // Zmerguj props z domyślnymi — używamy ref żeby nie powiązać przez state
   const settings = boardSettingsProp ?? DEFAULT_BOARD_SETTINGS;
+  // Ref do settings — unika stale closure w useCallback renderowania
+  const settingsRef = useRef(settings);
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
   // ─── Refs do DOM ────────────────────────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -313,7 +316,7 @@ export default function WhiteboardCanvasNew({
     ctx.clearRect(0, 0, width, height);
 
     // Siatka kartezjańska (układ współrzędnych) — ukrywana gdy settings.grid_visible = false
-    if (settings.grid_visible) {
+    if (settingsRef.current.grid_visible) {
       drawGrid(ctx, viewport, width, height);
     }
 
@@ -342,7 +345,7 @@ export default function WhiteboardCanvasNew({
     redrawCanvasRef.current = redrawCanvas;
   }, [redrawCanvas]);
 
-  // Przerysuj przy każdej zmianie elementów / viewportu / obrazów
+  // Przerysuj przy każdej zmianie elementów / viewportu / obrazów / settings
   useEffect(() => {
     if (rafIdRef.current !== null) {
       cancelAnimationFrame(rafIdRef.current);
@@ -351,7 +354,7 @@ export default function WhiteboardCanvasNew({
       redrawCanvasRef.current();
       rafIdRef.current = null;
     });
-  }, [el.elements, el.loadedImages, vp.viewport]);
+  }, [el.elements, el.loadedImages, vp.viewport, boardSettingsProp]);
 
   // ─── RESIZE CANVAS ─────────────────────────────────────────────────────────
 
@@ -1307,36 +1310,38 @@ export default function WhiteboardCanvasNew({
         )}
 
         {/* ── TOOLBAR ───────────────────────────────────────────────────── */}
-        {settings.toolbar_visible && <Toolbar
-          tool={tool}
-          setTool={setTool}
-          selectedShape={selectedShape}
-          setSelectedShape={setSelectedShape}
-          polygonSides={polygonSides}
-          setPolygonSides={setPolygonSides}
-          color={color}
-          setColor={setColor}
-          lineWidth={lineWidth}
-          setLineWidth={setLineWidth}
-          fontSize={fontSize}
-          setFontSize={setFontSize}
-          fillShape={fillShape}
-          setFillShape={setFillShape}
-          onUndo={hist.undo}
-          onRedo={hist.redo}
-          onClear={clearCanvas}
-          onResetView={resetView}
-          canUndo={hist.canUndo}
-          canRedo={hist.canRedo}
-          hasSelection={sel.selectedElementIds.size > 0}
-          onDeleteSelected={deleteSelectedElements}
-          onImagePaste={handleImageToolPaste}
-          onImageUpload={handleImageToolUpload}
-          onPDFUpload={handleImageToolUpload}
-          isCalculatorOpen={isCalculatorOpen}
-          onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
-          isReadOnly={userRole === 'viewer'}
-        />}
+        {settings.toolbar_visible && (
+          <Toolbar
+            tool={tool}
+            setTool={setTool}
+            selectedShape={selectedShape}
+            setSelectedShape={setSelectedShape}
+            polygonSides={polygonSides}
+            setPolygonSides={setPolygonSides}
+            color={color}
+            setColor={setColor}
+            lineWidth={lineWidth}
+            setLineWidth={setLineWidth}
+            fontSize={fontSize}
+            setFontSize={setFontSize}
+            fillShape={fillShape}
+            setFillShape={setFillShape}
+            onUndo={hist.undo}
+            onRedo={hist.redo}
+            onClear={clearCanvas}
+            onResetView={resetView}
+            canUndo={hist.canUndo}
+            canRedo={hist.canRedo}
+            hasSelection={sel.selectedElementIds.size > 0}
+            onDeleteSelected={deleteSelectedElements}
+            onImagePaste={handleImageToolPaste}
+            onImageUpload={handleImageToolUpload}
+            onPDFUpload={handleImageToolUpload}
+            isCalculatorOpen={isCalculatorOpen}
+            onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
+            isReadOnly={userRole === 'viewer'}
+          />
+        )}
 
         {/* ── ZOOM CONTROLS ─────────────────────────────────────────────── */}
         <ZoomControls

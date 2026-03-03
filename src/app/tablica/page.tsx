@@ -261,7 +261,7 @@ export function TablicaContent() {
       <HomeButton />
 
       {/* Przycisk ustawień tablicy — widoczny dla właściciela */}
-      {isOwner && boardId && boardId !== 'demo-board' && (
+      {userRole === 'owner' && boardId && boardId !== 'demo-board' && (
         <button
           onClick={() => setShowBoardSettings(true)}
           title="Ustawienia tablicy"
@@ -301,7 +301,7 @@ export function TablicaContent() {
       {showBoardSettings && boardId && boardId !== 'demo-board' && (
         <BoardSettingsPanel
           boardId={parseInt(boardId, 10)}
-          isOwner={isOwner}
+          isOwner={userRole === 'owner'}
           settings={boardSettings}
           onSettingsChange={setBoardSettings}
           onClose={() => setShowBoardSettings(false)}
