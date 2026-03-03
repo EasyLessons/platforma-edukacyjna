@@ -499,7 +499,10 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
       vp.handleStopFollowing();
-      sel.clearSelection(); // 🆕 Wyczyść zaznaczenie (ukryje properties panel)
+      // 🆕 Wyczyść zaznaczenie SYNCHRONICZNIE — panel zniknie natychmiast
+      flushSync(() => {
+        sel.clearSelection();
+      });
       // Ukryj HTML overlaye — pojawią się z powrotem po setViewport (mouseup)
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
@@ -536,7 +539,7 @@ export default function WhiteboardCanvasNew({
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
+  }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef, sel]);
 
   // ─── SKRÓTY KLAWISZOWE ─────────────────────────────────────────────────────
 
@@ -635,7 +638,10 @@ export default function WhiteboardCanvasNew({
   /** Ukrywa wszystkie HTML-overlaye natychmiast — bez re-renderu React */
   const hideOverlaysForPan = useCallback(() => {
     isPanningRef.current = true;
-    sel.clearSelection(); // 🆕 Wyczyść zaznaczenie (ukryje properties panel)
+    // 🆕 Wyczyść zaznaczenie SYNCHRONICZNIE (flushSync) — panel zniknie natychmiast
+    flushSync(() => {
+      sel.clearSelection();
+    });
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
