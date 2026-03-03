@@ -147,6 +147,7 @@ export interface TableElement {
   headerCol?: boolean;
   borderColor?: string;
   headerBgColor?: string;
+  fontSize?: number;            // Rozmiar tekstu — obliczany raz przy tworzeniu/resizing
 }
 
 /** Strzałka łącząca elementy (narzędzie: arrow) */

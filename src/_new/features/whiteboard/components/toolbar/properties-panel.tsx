@@ -19,7 +19,8 @@
 
 import { useRef, useState } from 'react';
 import { X as XIcon, Copy, Files } from 'lucide-react';
-import { DrawingElement, DrawingPath, Shape, MarkdownNote, ImageElement } from '@/_new/features/whiteboard/types';
+import { DrawingElement, DrawingPath, Shape, MarkdownNote, ImageElement, TableElement } from '@/_new/features/whiteboard/types';
+import { resizeTableCells, calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 
 interface SelectionPropertiesPanelProps {
   elements: DrawingElement[];
@@ -76,8 +77,32 @@ export function SelectionPropertiesPanel({
     (el) => el.type === 'image'
   ) as ImageElement[];
 
-  // Jeśli nie ma żadnych elementów do edycji - nie pokazuj panelu
-  if (editableElements.length === 0 && markdownElements.length === 0 && imageElements.length === 0) return null;
+  // 🆕 Filtruj tabele
+  const tableElements = selectedElements.filter(
+    (el) => el.type === 'table'
+  ) as TableElement[];
+
+  console.log('📊 [Properties Panel] Selected elements:', {
+    total: selectedElements.length,
+    editableElements: editableElements.length,
+    markdownElements: markdownElements.length,
+    imageElements: imageElements.length,
+    tableElements: tableElements.length,
+    types: selectedElements.map(el => el.type),
+  });
+
+  // Jeśli nie ma żądnych elementów do edycji - nie pokazuj panelu
+  if (
+    editableElements.length === 0 && 
+    markdownElements.length === 0 && 
+    imageElements.length === 0 && 
+    tableElements.length === 0
+  ) {
+    console.log('📊 [Properties Panel] HIDING - no elements to show');
+    return null;
+  }
+
+  console.log('📊 [Properties Panel] SHOWING at position:', position);
 
   // ══════════════════════════════════════════════════════════════════════════
   // LOGIKA DLA SHAPE/PATH
@@ -124,7 +149,14 @@ export function SelectionPropertiesPanel({
   // ══════════════════════════════════════════════════════════════════════════
 
   const hasImageElements = imageElements.length > 0;
+  // ═══════════════════════════════════════════════════════════════════════
+  // 🆕 LOGIKA DLA TABLE (rows/cols)
+  // ═══════════════════════════════════════════════════════════════════════
 
+  const hasTableElements = tableElements.length > 0;
+  const firstTable = tableElements[0];
+  
+  console.log('📊 [Table Logic] hasTableElements:', hasTableElements, 'firstTable:', firstTable);
   // Sprawdź czy wszystkie markdown mają tę samą skalę
   const allSameContentScale =
     hasMarkdownElements &&
@@ -173,6 +205,24 @@ export function SelectionPropertiesPanel({
 
   const currentBgColor =
     markdownElements.length > 0 ? (markdownElements[0].backgroundColor ?? '#ffffff') : '#ffffff';
+
+  // 🆕 Handlery dla tabeli (dodaj/usuń rows/cols)
+  const handleTableRowsChange = (delta: number) => {
+    tableElements.forEach((table) => {
+      const newRows = Math.max(1, table.rows + delta);
+      const newCells = resizeTableCells(table.cells, table.rows, table.cols, newRows, table.cols);
+      const newFontSize = calculateTableFontSize(table.height, newRows);
+      onElementUpdate(table.id, { rows: newRows, cells: newCells, fontSize: newFontSize });
+    });
+  };
+
+  const handleTableColsChange = (delta: number) => {
+    tableElements.forEach((table) => {
+      const newCols = Math.max(1, table.cols + delta);
+      const newCells = resizeTableCells(table.cells, table.rows, table.cols, table.rows, newCols);
+      onElementUpdate(table.id, { cols: newCols, cells: newCells });
+    });
+  };
 
   return (
     <div
@@ -256,6 +306,13 @@ export function SelectionPropertiesPanel({
             </div>
           )}
         </>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          SEPARATOR między Images a innymi elementami
+          ═══════════════════════════════════════════════════════════════════════ */}
+      {hasImageElements && (hasEditableElements || hasMarkdownElements || hasTableElements) && (
+        <div className="w-px h-6 bg-gray-300 mx-1" />
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
@@ -345,9 +402,14 @@ export function SelectionPropertiesPanel({
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
-          🆕 SEPARATOR JEŚLI SĄ OBA TYPY
+          🆕 SEPARATOR JEŚLI SĄ OBA TYPY (editableElements + markdown)
           ═══════════════════════════════════════════════════════════════════════ */}
       {hasEditableElements && hasMarkdownElements && <div className="w-px h-6 bg-gray-300 mx-1" />}
+
+      {/* Separator między editableElements a table (gdy nie ma markdown) */}
+      {hasEditableElements && hasTableElements && !hasMarkdownElements && (
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════════════
           🆕 KONTROLKI DLA MARKDOWN (contentScale)
@@ -473,6 +535,73 @@ export function SelectionPropertiesPanel({
           {/* Info o liczbie zaznaczonych markdown */}
           {markdownElements.length > 1 && (
             <span className="text-xs text-gray-400">({markdownElements.length})</span>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          🆕 SEPARATOR JEŚLI SĄ OBA TYPY (markdown + table)
+          ═══════════════════════════════════════════════════════════════════════ */}
+      {hasMarkdownElements && hasTableElements && <div className="w-px h-6 bg-gray-300 mx-1" />}
+
+      {/* Separator między images a table (gdy nie ma editableElements ani markdown) */}
+      {hasImageElements && hasTableElements && !hasEditableElements && !hasMarkdownElements && (
+        <div className="w-px h-6 bg-gray-300 mx-1" />
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          🆕 KONTROLKI DLA TABLE (rows/cols)
+          ═══════════════════════════════════════════════════════════════════════ */}
+      {hasTableElements && (
+        <div className="flex items-center gap-2">
+          {console.log('📊 [Table Controls] RENDERING table controls')}
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">Wiersze:</span>
+            <button
+              onClick={() => handleTableRowsChange(-1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Usuń wiersz"
+            >
+              −
+            </button>
+            <span className="text-xs font-mono text-gray-700 min-w-[2ch] text-center">
+              {firstTable?.rows ?? 0}
+            </span>
+            <button
+              onClick={() => handleTableRowsChange(1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Dodaj wiersz"
+            >
+              +
+            </button>
+          </div>
+
+          <div className="w-px h-5 bg-gray-200" />
+
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">Kolumny:</span>
+            <button
+              onClick={() => handleTableColsChange(-1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Usuń kolumnę"
+            >
+              −
+            </button>
+            <span className="text-xs font-mono text-gray-700 min-w-[2ch] text-center">
+              {firstTable?.cols ?? 0}
+            </span>
+            <button
+              onClick={() => handleTableColsChange(1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Dodaj kolumnę"
+            >
+              +
+            </button>
+          </div>
+
+          {/* Info o liczbie zaznaczonych tabel */}
+          {tableElements.length > 1 && (
+            <span className="text-xs text-gray-400">({tableElements.length})</span>
           )}
         </div>
       )}

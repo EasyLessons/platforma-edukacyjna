@@ -26,6 +26,7 @@ import { TextMiniToolbar } from './text-mini-toolbar';
 import { SelectionPropertiesPanel } from './properties-panel';
 import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '@/_new/features/whiteboard/selection/snap-utils';
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
+import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -419,12 +420,22 @@ export function SelectTool({
             const newWidth = originalEl.width * scaleX;
             const newHeight = originalEl.height * scaleY;
 
-            updates.set(id, {
+            const partialUpdate: Partial<DrawingElement> = {
               x: newX,
               y: newY,
               width: Math.max(MIN_SIZE, newWidth),
               height: Math.max(MIN_SIZE, newHeight),
-            });
+            };
+
+            // Przeoblicz fontSize dla tabeli przy zmianie rozmiaru
+            if (originalEl.type === 'table') {
+              partialUpdate.fontSize = calculateTableFontSize(
+                Math.max(MIN_SIZE, newHeight),
+                originalEl.rows
+              );
+            }
+
+            updates.set(id, partialUpdate);
           }
         });
 
@@ -2180,9 +2191,22 @@ export function SelectTool({
     const hasMarkdownElements = selectedElements.some((el) => el.type === 'markdown');
     // 🆕 Czy są zaznaczone obrazki?
     const hasImageElements = selectedElements.some((el) => el.type === 'image');
+    // 🆕 Czy są zaznaczone tabele?
+    const hasTableElements = selectedElements.some((el) => el.type === 'table');
 
-    // Jeśli nie ma ani edytowalnych kształtów ani markdown ani obrazków, nie pokazuj
-    if (!hasEditableElements && !hasMarkdownElements && !hasImageElements) return null;
+    console.log('📊 [renderPropertiesPanel] Check:', {
+      hasEditableElements,
+      hasMarkdownElements,
+      hasImageElements,
+      hasTableElements,
+      selectedTypes: selectedElements.map(el => el.type),
+    });
+
+    // Jeśli nie ma ani edytowalnych kształtów ani markdown ani obrazków ani tabel, nie pokazuj
+    if (!hasEditableElements && !hasMarkdownElements && !hasImageElements && !hasTableElements) {
+      console.log('📊 [renderPropertiesPanel] SKIPPING - no valid elements');
+      return null;
+    }
 
     // Nie pokazuj jeśli zaznaczony jest tylko tekst (bez shape/path/markdown/image)
     const onlyText = selectedElements.every((el) => el.type === 'text');

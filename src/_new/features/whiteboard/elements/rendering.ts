@@ -782,7 +782,11 @@ export function drawTable(
   }
 
   // --- Tekst komórek ---
-  const fontSize = Math.max(10, Math.min(cellHeight * 0.42, 15));
+  // fontSize w world units, przemnożone przez scale dla ekranu
+  const worldFontSize = table.fontSize ?? 0.12; // fallback dla starych tabel bez fontSize
+  const screenFontSize = worldFontSize * viewport.scale * 100; // scale*100 = px per world unit
+  const fontSize = Math.max(10, Math.min(screenFontSize, 15)); // clamp 10-15px
+
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 

@@ -54,6 +54,8 @@ export function useViewport(): UseViewportReturn {
   });
 
   const [followingUserId, setFollowingUserId] = useState<number | null>(null);
+  // Target viewport dla smooth follow — interpolujemy w kierunku tego celu
+  const followTargetRef = useRef<ViewportTransform | null>(null);
 
   // Stabilna referencja — event handlery czytają viewportRef.current bez re-rerenderów
   const viewportRef = useRef<ViewportTransform>(viewport);
@@ -61,10 +63,71 @@ export function useViewport(): UseViewportReturn {
     viewportRef.current = viewport;
   }, [viewport]);
 
+  // ─── Smooth follow interpolation loop ───────────────────────────────────
+  useEffect(() => {
+    if (!followingUserId) return;
+
+    console.log('🎯 [Follow Mode] RAF loop started for user:', followingUserId);
+
+    let rafId: number;
+    let lastTime = performance.now();
+    let frameCount = 0;
+
+    const interpolate = (currentTime: number) => {
+      const dt = Math.min((currentTime - lastTime) / 1000, 0.1); // max 100ms delta
+      lastTime = currentTime;
+
+      const target = followTargetRef.current;
+      if (!target) {
+        // Brak targetu ale nadal followujemy - czekaj na nowy viewport
+        rafId = requestAnimationFrame(interpolate);
+        return;
+      }
+
+      const current = viewportRef.current;
+
+      // Lerp factor — większy = bardziej responsywny
+      const lerpFactor = Math.min(1, dt * 10); // 10 = prędkość
+
+      const newX = current.x + (target.x - current.x) * lerpFactor;
+      const newY = current.y + (target.y - current.y) * lerpFactor;
+      const newScale = current.scale + (target.scale - current.scale) * lerpFactor;
+
+      // Jeśli blisko celu (< 0.005 jednostek), snap do targetu
+      const dx = Math.abs(target.x - newX);
+      const dy = Math.abs(target.y - newY);
+      const ds = Math.abs(target.scale - newScale);
+
+      if (dx < 0.005 && dy < 0.005 && ds < 0.0005) {
+        setViewport(target);
+      } else {
+        setViewport({ x: newX, y: newY, scale: newScale });
+      }
+
+      // Debug co 60 frames
+      frameCount++;
+      if (frameCount % 60 === 0) {
+        console.log('🎯 [Follow] Frame:', frameCount, 'Target:', target, 'Current:', current, 'Delta:', dx.toFixed(3), dy.toFixed(3));
+      }
+
+      // ZAWSZE kontynuuj loop dopóki followingUserId jest ustawione
+      rafId = requestAnimationFrame(interpolate);
+    };
+
+    rafId = requestAnimationFrame(interpolate);
+    return () => {
+      console.log('🎯 [Follow Mode] RAF loop stopped');
+      cancelAnimationFrame(rafId);
+    };
+  }, [followingUserId]);
+
   // ─── Follow mode ──────────────────────────────────────────────────────
   const handleFollowUser = useCallback(
     (userId: number, x: number, y: number, scale: number) => {
+      console.log('🎯 [Follow] Starting to follow user:', userId, 'at', { x, y, scale });
+      // Natychmiastowy skok przy pierwszym follow (żeby user od razu zobaczył cel)
       setViewport({ x, y, scale });
+      followTargetRef.current = { x, y, scale };
       setFollowingUserId(userId);
     },
     []
@@ -72,18 +135,23 @@ export function useViewport(): UseViewportReturn {
 
   const handleStopFollowing = useCallback(() => {
     setFollowingUserId(null);
+    followTargetRef.current = null;
   }, []);
 
   /**
    * Aplikuj zdalny viewport — wywoływane przez use-realtime.ts gdy przyjdzie
    * event `viewport-changed` od śledzonego użytkownika.
-   * Ignoruje update jeśli nie śledzimy tego konkretnego użytkownika.
+   * Smooth interpolacja w kierunku nowego celu (followTargetRef).
    */
   const applyRemoteViewport = useCallback(
     (x: number, y: number, scale: number, fromUserId: number) => {
       setFollowingUserId((currentFollowing) => {
         if (currentFollowing === fromUserId) {
-          setViewport({ x, y, scale });
+          console.log('🎯 [Follow] Received viewport update from followed user:', fromUserId, { x, y, scale });
+          // Ustaw nowy target — RAF loop będzie interpolował
+          followTargetRef.current = { x, y, scale };
+        } else if (currentFollowing !== null) {
+          console.log('🎯 [Follow] Ignoring viewport from user:', fromUserId, '(following:', currentFollowing, ')');
         }
         return currentFollowing;
       });

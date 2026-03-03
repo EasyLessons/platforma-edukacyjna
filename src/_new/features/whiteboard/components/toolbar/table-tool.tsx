@@ -18,6 +18,7 @@ import {
   panViewportWithWheel,
   constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 import { Plus, Minus } from 'lucide-react';
 
 interface TableToolProps {
@@ -109,20 +110,25 @@ export function TableTool({
     // Rozmiary komórek w world units (0.6 = 60px, 0.28 = 28px)
     const cellWidth = 0.6;
     const cellHeight = 0.28;
+    const tableWidth = cols * cellWidth;
+    const tableHeight = rows * cellHeight;
+    // fontSize obliczany raz przy tworzeniu
+    const fontSize = calculateTableFontSize(tableHeight, rows);
 
     const newTable: TableElement = {
       id: Date.now().toString(),
       type: 'table',
       x: worldPoint.x,
       y: worldPoint.y,
-      width: cols * cellWidth,
-      height: rows * cellHeight,
+      width: tableWidth,
+      height: tableHeight,
       rows,
       cols,
       cells,
       headerRow,
       borderColor: '#d1d5db',
       headerBgColor: '#f3f4f6',
+      fontSize,
     };
 
     onTableCreate(newTable);
