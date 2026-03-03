@@ -483,63 +483,79 @@ export default function WhiteboardCanvasNew({
     return () => container.removeEventListener('pointermove', handlePointerMove);
   }, [rt.broadcastCursorMove, vp.viewportRef]);
 
-  // ─── PAN środkowym przyciskiem myszy (wciśnięcie kółka + przeciągnięcie) ──
+  // ─── PAN środkowym przyciskiem myszy (scroll) lub prawym (PPM) ──────────────
+  //
+  // ⚠️ WAŻNE: używamy pointerdown z { capture: true } zamiast mousedown.
+  // Dzięki temu event dociera do tego handlera PRZED child-overlayami (SelectTool itp.).
+  // e.preventDefault() wywołany w capture phase zapobiega uruchomieniu przez
+  // przeglądarkę "autoscroll mode" (animowane kółko ze strzałkami przy MMB),
+  // który przechwytywał pointer i blokował ruch po puszczeniu.
+  // PPM (button=2) też działa — onContextMenu na overlayach go blokuje.
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let isPanning = false;
+    let isPanningId: number | null = null; // pointerId aktywnego pana
     let lastX = 0;
     let lastY = 0;
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if (e.button !== 1) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      // button 1 = scroll (MMB), button 2 = PPM
+      if (e.button !== 1 && e.button !== 2) return;
       e.preventDefault();
-      isPanning = true;
+      e.stopPropagation();
+      isPanningId = e.pointerId;
       lastX = e.clientX;
       lastY = e.clientY;
       document.body.style.cursor = 'grabbing';
+      // Zablokuj natywne menu kontekstowe (PPM)
+      container.addEventListener('contextmenu', preventContextMenu, { once: true });
       vp.handleStopFollowing();
-      // 🆕 Wyczyść zaznaczenie SYNCHRONICZNIE — panel zniknie natychmiast
-      flushSync(() => {
-        sel.clearSelection();
-      });
-      // Ukryj HTML overlaye — pojawią się z powrotem po setViewport (mouseup)
+      flushSync(() => { sel.clearSelection(); });
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPanning) return;
+    const handlePointerMove = (e: PointerEvent) => {
+      if (isPanningId === null || e.pointerId !== isPanningId) return;
       const dx = e.clientX - lastX;
       const dy = e.clientY - lastY;
       lastX = e.clientX;
       lastY = e.clientY;
       const next = panViewportWithMouse(vp.viewportRef.current, dx, dy);
       const constrained = constrainViewport(next);
-
-      // ⚡ PERF: tylko ref — bez React re-render w hot-path
+      // ⚡ PERF: tylko ref + RAF — bez React re-render w hot-path
       vp.viewportRef.current = constrained;
       requestAnimationFrame(() => redrawCanvasRef.current());
     };
 
-    const handleMouseUp = (e: MouseEvent) => {
-      if (e.button !== 1) return;
-      isPanning = false;
+    const handlePointerUp = (e: PointerEvent) => {
+      if (isPanningId === null || e.pointerId !== isPanningId) return;
+      isPanningId = null;
       document.body.style.cursor = '';
+      // Przywróć overlaye
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
+      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
       // Zsynchronizuj React state raz na koniec gestu
       vp.setViewport(vp.viewportRef.current);
     };
 
-    container.addEventListener('mousedown', handleMouseDown);
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    const preventContextMenu = (e: Event) => e.preventDefault();
+
+    // capture: true — handlery działają PRZED child-overlayami
+    container.addEventListener('pointerdown', handlePointerDown, { capture: true });
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('pointercancel', handlePointerUp as EventListener);
     return () => {
-      container.removeEventListener('mousedown', handleMouseDown);
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('pointercancel', handlePointerUp as EventListener);
+      container.removeEventListener('contextmenu', preventContextMenu);
     };
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef, sel]);
 
