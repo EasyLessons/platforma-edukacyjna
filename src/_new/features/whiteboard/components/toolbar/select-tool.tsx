@@ -2194,17 +2194,8 @@ export function SelectTool({
     // 🆕 Czy są zaznaczone tabele?
     const hasTableElements = selectedElements.some((el) => el.type === 'table');
 
-    console.log('📊 [renderPropertiesPanel] Check:', {
-      hasEditableElements,
-      hasMarkdownElements,
-      hasImageElements,
-      hasTableElements,
-      selectedTypes: selectedElements.map(el => el.type),
-    });
-
     // Jeśli nie ma ani edytowalnych kształtów ani markdown ani obrazków ani tabel, nie pokazuj
     if (!hasEditableElements && !hasMarkdownElements && !hasImageElements && !hasTableElements) {
-      console.log('📊 [renderPropertiesPanel] SKIPPING - no valid elements');
       return null;
     }
 

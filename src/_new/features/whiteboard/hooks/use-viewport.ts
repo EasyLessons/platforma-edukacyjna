@@ -67,11 +67,8 @@ export function useViewport(): UseViewportReturn {
   useEffect(() => {
     if (!followingUserId) return;
 
-    console.log('🎯 [Follow Mode] RAF loop started for user:', followingUserId);
-
     let rafId: number;
     let lastTime = performance.now();
-    let frameCount = 0;
 
     const interpolate = (currentTime: number) => {
       const dt = Math.min((currentTime - lastTime) / 1000, 0.1); // max 100ms delta
@@ -104,27 +101,17 @@ export function useViewport(): UseViewportReturn {
         setViewport({ x: newX, y: newY, scale: newScale });
       }
 
-      // Debug co 60 frames
-      frameCount++;
-      if (frameCount % 60 === 0) {
-        console.log('🎯 [Follow] Frame:', frameCount, 'Target:', target, 'Current:', current, 'Delta:', dx.toFixed(3), dy.toFixed(3));
-      }
-
       // ZAWSZE kontynuuj loop dopóki followingUserId jest ustawione
       rafId = requestAnimationFrame(interpolate);
     };
 
     rafId = requestAnimationFrame(interpolate);
-    return () => {
-      console.log('🎯 [Follow Mode] RAF loop stopped');
-      cancelAnimationFrame(rafId);
-    };
+    return () => cancelAnimationFrame(rafId);
   }, [followingUserId]);
 
   // ─── Follow mode ──────────────────────────────────────────────────────
   const handleFollowUser = useCallback(
     (userId: number, x: number, y: number, scale: number) => {
-      console.log('🎯 [Follow] Starting to follow user:', userId, 'at', { x, y, scale });
       // Natychmiastowy skok przy pierwszym follow (żeby user od razu zobaczył cel)
       setViewport({ x, y, scale });
       followTargetRef.current = { x, y, scale };
@@ -147,11 +134,8 @@ export function useViewport(): UseViewportReturn {
     (x: number, y: number, scale: number, fromUserId: number) => {
       setFollowingUserId((currentFollowing) => {
         if (currentFollowing === fromUserId) {
-          console.log('🎯 [Follow] Received viewport update from followed user:', fromUserId, { x, y, scale });
           // Ustaw nowy target — RAF loop będzie interpolował
           followTargetRef.current = { x, y, scale };
-        } else if (currentFollowing !== null) {
-          console.log('🎯 [Follow] Ignoring viewport from user:', fromUserId, '(following:', currentFollowing, ')');
         }
         return currentFollowing;
       });

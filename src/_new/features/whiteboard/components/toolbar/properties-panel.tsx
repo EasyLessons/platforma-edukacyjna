@@ -82,15 +82,6 @@ export function SelectionPropertiesPanel({
     (el) => el.type === 'table'
   ) as TableElement[];
 
-  console.log('📊 [Properties Panel] Selected elements:', {
-    total: selectedElements.length,
-    editableElements: editableElements.length,
-    markdownElements: markdownElements.length,
-    imageElements: imageElements.length,
-    tableElements: tableElements.length,
-    types: selectedElements.map(el => el.type),
-  });
-
   // Jeśli nie ma żądnych elementów do edycji - nie pokazuj panelu
   if (
     editableElements.length === 0 && 
@@ -98,11 +89,8 @@ export function SelectionPropertiesPanel({
     imageElements.length === 0 && 
     tableElements.length === 0
   ) {
-    console.log('📊 [Properties Panel] HIDING - no elements to show');
     return null;
   }
-
-  console.log('📊 [Properties Panel] SHOWING at position:', position);
 
   // ══════════════════════════════════════════════════════════════════════════
   // LOGIKA DLA SHAPE/PATH
@@ -155,8 +143,6 @@ export function SelectionPropertiesPanel({
 
   const hasTableElements = tableElements.length > 0;
   const firstTable = tableElements[0];
-  
-  console.log('📊 [Table Logic] hasTableElements:', hasTableElements, 'firstTable:', firstTable);
   // Sprawdź czy wszystkie markdown mają tę samą skalę
   const allSameContentScale =
     hasMarkdownElements &&
@@ -221,6 +207,14 @@ export function SelectionPropertiesPanel({
       const newCols = Math.max(1, table.cols + delta);
       const newCells = resizeTableCells(table.cells, table.rows, table.cols, table.rows, newCols);
       onElementUpdate(table.id, { cols: newCols, cells: newCells });
+    });
+  };
+
+  const handleTableFontSizeChange = (delta: number) => {
+    tableElements.forEach((table) => {
+      const currentSize = table.fontSize ?? 0.12;
+      const newSize = Math.max(0.05, Math.min(1.0, currentSize + delta * 0.05)); // 5-100% range, step 5%
+      onElementUpdate(table.id, { fontSize: newSize });
     });
   };
 
@@ -554,7 +548,6 @@ export function SelectionPropertiesPanel({
           ═══════════════════════════════════════════════════════════════════════ */}
       {hasTableElements && (
         <div className="flex items-center gap-2">
-          {console.log('📊 [Table Controls] RENDERING table controls')}
           <div className="flex items-center gap-1">
             <span className="text-xs text-gray-500">Wiersze:</span>
             <button
@@ -594,6 +587,29 @@ export function SelectionPropertiesPanel({
               onClick={() => handleTableColsChange(1)}
               className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
               title="Dodaj kolumnę"
+            >
+              +
+            </button>
+          </div>
+
+          <div className="w-px h-5 bg-gray-200" />
+
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-gray-500">Czcionka:</span>
+            <button
+              onClick={() => handleTableFontSizeChange(-1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Zmniejsz czcionkę"
+            >
+              −
+            </button>
+            <span className="text-xs font-mono text-gray-700 min-w-[3ch] text-center">
+              {Math.round((firstTable?.fontSize ?? 0.12) * 100)}%
+            </span>
+            <button
+              onClick={() => handleTableFontSizeChange(1)}
+              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
+              title="Zwiększ czcionkę"
             >
               +
             </button>

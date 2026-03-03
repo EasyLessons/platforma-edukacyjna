@@ -41,7 +41,10 @@ export function TableTool({
   const [rows, setRows] = useState(3);
   const [cols, setCols] = useState(3);
   const [headerRow, setHeaderRow] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
 
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
@@ -148,15 +151,51 @@ export function TableTool({
       {/* Popup konfiguracji tabeli */}
       {showConfig && configPosition && (
         <div
+          ref={dialogRef}
           className="absolute z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-4 pointer-events-auto"
           style={{
-            left: configPosition.x,
-            top: configPosition.y,
+            left: isDragging ? configPosition.x + dragOffset.x : configPosition.x,
+            top: isDragging ? configPosition.y + dragOffset.y : configPosition.y,
             transform: 'translate(-50%, 10px)',
+            cursor: isDragging ? 'grabbing' : 'grab',
           }}
           onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => {
+            if (e.target === dialogRef.current || (e.target as HTMLElement).tagName === 'H3') {
+              setIsDragging(true);
+              setDragOffset({ x: 0, y: 0 });
+            }
+          }}
+          onMouseMove={(e) => {
+            if (isDragging) {
+              setDragOffset(prev => ({
+                x: prev.x + e.movementX,
+                y: prev.y + e.movementY,
+              }));
+            }
+          }}
+          onMouseUp={() => {
+            if (isDragging) {
+              setConfigPosition({
+                x: configPosition.x + dragOffset.x,
+                y: configPosition.y + dragOffset.y,
+              });
+              setDragOffset({ x: 0, y: 0 });
+              setIsDragging(false);
+            }
+          }}
+          onMouseLeave={() => {
+            if (isDragging) {
+              setConfigPosition({
+                x: configPosition.x + dragOffset.x,
+                y: configPosition.y + dragOffset.y,
+              });
+              setDragOffset({ x: 0, y: 0 });
+              setIsDragging(false);
+            }
+          }}
         >
-          <h3 className="text-sm font-semibold text-gray-800 mb-3">Utwórz tabelę</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3 cursor-grab active:cursor-grabbing">Utwórz tabelę</h3>
 
           {/* Wiersze */}
           <div className="flex items-center justify-between mb-2">
@@ -164,14 +203,14 @@ export function TableTool({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setRows(Math.max(1, rows - 1))}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 text-black"
               >
                 <Minus className="w-3 h-3" />
               </button>
-              <span className="w-6 text-center text-sm font-medium">{rows}</span>
+              <span className="w-6 text-center text-sm font-medium text-black">{rows}</span>
               <button
                 onClick={() => setRows(Math.min(20, rows + 1))}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 text-black"
               >
                 <Plus className="w-3 h-3" />
               </button>
@@ -184,14 +223,14 @@ export function TableTool({
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setCols(Math.max(1, cols - 1))}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 text-black"
               >
                 <Minus className="w-3 h-3" />
               </button>
-              <span className="w-6 text-center text-sm font-medium">{cols}</span>
+              <span className="w-6 text-center text-sm font-medium text-black">{cols}</span>
               <button
                 onClick={() => setCols(Math.min(10, cols + 1))}
-                className="p-1 rounded hover:bg-gray-100"
+                className="p-1 rounded hover:bg-gray-100 text-black"
               >
                 <Plus className="w-3 h-3" />
               </button>
@@ -209,18 +248,19 @@ export function TableTool({
             <span className="text-xs text-gray-600">Wiersz nagłówka</span>
           </label>
 
-          {/* Preview */}
+          {/* Preview - dynamicznie dopasowany do rows/cols */}
           <div className="mb-3 border border-gray-200 rounded overflow-hidden">
             <table className="w-full text-xs">
               <tbody>
-                {Array.from({ length: Math.min(rows, 4) }).map((_, r) => (
+                {Array.from({ length: rows }).map((_, r) => (
                   <tr key={r} className={r === 0 && headerRow ? 'bg-gray-100' : ''}>
-                    {Array.from({ length: Math.min(cols, 4) }).map((_, c) => (
+                    {Array.from({ length: cols }).map((_, c) => (
                       <td
                         key={c}
                         className="border border-gray-200 px-2 py-1 text-center text-gray-400"
+                        style={{ minWidth: '30px', height: '20px' }}
                       >
-                        {r === 0 && headerRow ? `K${c + 1}` : '...'}
+                        {r === 0 && headerRow ? `K${c + 1}` : ''}
                       </td>
                     ))}
                   </tr>
