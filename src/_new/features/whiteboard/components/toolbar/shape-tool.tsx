@@ -44,7 +44,6 @@ import {
 import { ShapeType } from '@/_new/features/whiteboard/types';
 import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
-import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
