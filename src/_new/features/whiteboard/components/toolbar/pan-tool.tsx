@@ -42,6 +42,8 @@ import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-mult
 
 interface PanToolProps {
   viewport: ViewportTransform;
+  /** Stabilna referencja do aktualnego viewportu (z whiteboard-canvas) — używana w event handlerach */
+  viewportRef?: React.RefObject<ViewportTransform>;
   canvasWidth: number;
   canvasHeight: number;
   onViewportChange: (viewport: ViewportTransform) => void;
@@ -51,10 +53,16 @@ interface PanToolProps {
   onPanEnd?: () => void;
 }
 
-export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange, onPanStart, onPanEnd }: PanToolProps) {
-  const [isPanning, setIsPanning] = useState(false);
-  const [lastMousePos, setLastMousePos] = useState<Point | null>(null);
+export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth, canvasHeight, onViewportChange, onPanStart, onPanEnd }: PanToolProps) {
+  /** Refs zamiast state — eliminują stale closures w hot-path pointer events */
+  const isPanningRef = useRef(false);
+  const lastMousePosRef = useRef<Point | null>(null);
+  // Stan tylko do aktualizacji kursora (cursor: grabbing vs grab)
+  const [isPanningVisual, setIsPanningVisual] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
+
+  /** Zawsze używaj najbardziej aktualnego viewportu (bez opóźnienia debounce) */
+  const getViewport = () => canvasViewportRef?.current ?? viewport;
 
   const gestures = useMultiTouchGestures({
     viewport,
@@ -86,18 +94,24 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange,
       e.preventDefault();
       e.stopPropagation();
 
+      // Użyj canvasViewportRef — bez opóźnienia debounce 80ms
+      const vp = canvasViewportRef?.current ?? viewport;
       if (e.ctrlKey) {
+        // Przelicz pozycję myszy względem canvas (nie przeglądarki)
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const newViewport = zoomViewport(
-          viewport,
+          vp,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          mouseX,
+          mouseY,
           canvasWidth,
           canvasHeight
         );
         onViewportChange(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
     };
@@ -112,8 +126,9 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange,
       gestures.handlePointerDown(e);
       if (e.button === 0 || e.button === 1) {
         e.preventDefault();
-        setIsPanning(true);
-        setLastMousePos({ x: e.clientX, y: e.clientY });
+        isPanningRef.current = true;
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+        setIsPanningVisual(true);
         onPanStart?.();
       }
     },
@@ -126,41 +141,37 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange,
       gestures.handlePointerMove(e);
       if (gestures.isGestureActive()) return; // Gesty mają priorytet
 
-      if (!isPanning || !lastMousePos) return;
+      if (!isPanningRef.current || !lastMousePosRef.current) return;
 
-      const dx = e.clientX - lastMousePos.x;
-      const dy = e.clientY - lastMousePos.y;
+      const dx = e.clientX - lastMousePosRef.current.x;
+      const dy = e.clientY - lastMousePosRef.current.y;
 
-      const newViewport = panViewportWithMouse(viewport, dx, dy);
+      // Zawsze używaj aktualnego viewportu z canvasViewportRef
+      const newViewport = panViewportWithMouse(getViewport(), dx, dy);
       onViewportChange(constrainViewport(newViewport));
 
-      setLastMousePos({ x: e.clientX, y: e.clientY });
+      // Aktualizuj ref natychmiast (bez setState — brak re-renderu)
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
     },
-    [isPanning, lastMousePos, viewport, onViewportChange, gestures]
+    [gestures, onViewportChange]
   );
 
   // Pointer up - zakończ panning
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       gestures.handlePointerUp(e);
-      if (isPanning) {
+      if (isPanningRef.current) {
         onPanEnd?.();
       }
-      setIsPanning(false);
-      setLastMousePos(null);
+      isPanningRef.current = false;
+      lastMousePosRef.current = null;
+      setIsPanningVisual(false);
     },
-    [gestures, isPanning, onPanEnd]
+    [gestures, onPanEnd]
   );
 
   return (
-    <div className="absolute inset-0 z-20" style={{ cursor: isPanning ? 'grabbing' : 'grab' }}>
-      {/* Debug info */}
-      {isPanning && (
-        <div className="absolute top-4 left-4 bg-black/70 text-white text-xs p-2 rounded pointer-events-none z-50">
-          Przesuwanie viewport...
-        </div>
-      )}
-
+    <div className="absolute inset-0 z-20" style={{ cursor: isPanningVisual ? 'grabbing' : 'grab' }}>
       {/* Overlay dla pointer events */}
       <div
         ref={overlayRef}

@@ -1404,6 +1404,7 @@ export default function WhiteboardCanvasNew({
         {tool === 'pen' && canvasWidth > 0 && (
           <PenTool
             viewport={vp.viewport}
+            viewportRef={vp.viewportRef}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             color={color}
@@ -1416,6 +1417,7 @@ export default function WhiteboardCanvasNew({
         {tool === 'shape' && canvasWidth > 0 && (
           <ShapeTool
             viewport={vp.viewport}
+            viewportRef={vp.viewportRef}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             selectedShape={selectedShape}
@@ -1431,6 +1433,7 @@ export default function WhiteboardCanvasNew({
         {tool === 'pan' && canvasWidth > 0 && (
           <PanTool
             viewport={vp.viewport}
+            viewportRef={vp.viewportRef}
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onViewportChange={handleViewportChange}

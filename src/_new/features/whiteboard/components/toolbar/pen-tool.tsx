@@ -45,6 +45,8 @@ import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-mult
 
 interface PenToolProps {
   viewport: ViewportTransform;
+  /** Stabilna referencja do aktualnego viewportu (z whiteboard-canvas) — używana w event handlerach */
+  viewportRef?: React.RefObject<ViewportTransform>;
   canvasWidth: number;
   canvasHeight: number;
   color: string;
@@ -55,6 +57,7 @@ interface PenToolProps {
 
 export function PenTool({
   viewport,
+  viewportRef: canvasViewportRef,
   canvasWidth,
   canvasHeight,
   color,
@@ -62,6 +65,8 @@ export function PenTool({
   onPathCreate,
   onViewportChange,
 }: PenToolProps) {
+  /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
+  const getViewport = () => canvasViewportRef?.current ?? viewport;
   const isDrawingRef = useRef(false);
   const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -90,18 +95,24 @@ export function PenTool({
       e.preventDefault();
       e.stopPropagation();
 
+      // Użyj canvasViewportRef jeśli dostępny (bez opóźnienia debounce)
+      const vp = canvasViewportRef?.current ?? viewport;
       if (e.ctrlKey) {
+        // Przelicz pozycję myszy względem canvas (nie przeglądarki)
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
         const newViewport = zoomViewport(
-          viewport,
+          vp,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          mouseX,
+          mouseY,
           canvasWidth,
           canvasHeight
         );
         onViewportChange(constrainViewport(newViewport));
       } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
+        const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
         onViewportChange(constrainViewport(newViewport));
       }
     };
@@ -152,7 +163,8 @@ export function PenTool({
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
     const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    // Użyj canvasViewportRef — brak opóźnienia debounce 80ms
+    const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     pointsRef.current = [worldPoint];
     
@@ -199,7 +211,7 @@ export function PenTool({
     e.stopPropagation();
 
     const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     // Wygładzanie - dodaj punkt tylko jeśli jest wystarczająco daleko od poprzedniego
     const lastPoint = pointsRef.current[pointsRef.current.length - 1];

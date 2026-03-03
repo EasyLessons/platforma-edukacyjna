@@ -42,10 +42,13 @@ import {
   constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { ShapeType } from '@/_new/features/whiteboard/types';
+import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
+  /** Stabilna referencja do aktualnego viewportu (z whiteboard-canvas) — używana w event handlerach */
+  viewportRef?: React.RefObject<ViewportTransform>;
   canvasWidth: number;
   canvasHeight: number;
   selectedShape: ShapeType;
@@ -59,6 +62,7 @@ interface ShapeToolProps {
 
 export function ShapeTool({
   viewport,
+  viewportRef: canvasViewportRef,
   canvasWidth,
   canvasHeight,
   selectedShape,
@@ -69,6 +73,8 @@ export function ShapeTool({
   onShapeCreate,
   onViewportChange,
 }: ShapeToolProps) {
+  /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
+  const getViewport = () => canvasViewportRef?.current ?? viewport;
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -110,9 +116,14 @@ export function ShapeTool({
       e.preventDefault();
       e.stopPropagation();
 
-      const vp = viewportRef.current;
+      // Użyj canvasViewportRef jeśli dostępny (najprecyzyjniejszy), inaczej lokalny ref
+      const vp = canvasViewportRef?.current ?? viewportRef.current;
       if (e.ctrlKey) {
-        const newViewport = zoomViewport(vp, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight);
+        // Przelicz pozycję myszy względem canvas (nie względem przeglądarki)
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        const newViewport = zoomViewport(vp, e.deltaY, mouseX, mouseY, canvasWidth, canvasHeight);
         onViewportChangeRef.current(constrainViewport(newViewport));
       } else {
         const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
@@ -133,7 +144,8 @@ export function ShapeTool({
     if (gestures.isGestureActive()) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    // Użyj canvasViewportRef — brak opóźnienia debounce 80ms
+    const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     const newShape: Shape = {
       id: Date.now().toString(),
@@ -161,7 +173,7 @@ export function ShapeTool({
     if (!isDrawing || !currentShape) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     setCurrentShape({
       ...currentShape,
@@ -217,7 +229,7 @@ export function ShapeTool({
             width={Math.abs(width)}
             height={Math.abs(height)}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -231,7 +243,7 @@ export function ShapeTool({
             rx={radiusX}
             ry={radiusY}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -245,7 +257,7 @@ export function ShapeTool({
           <polygon
             points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -259,7 +271,7 @@ export function ShapeTool({
             x2={end.x}
             y2={end.y}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             strokeLinecap="round"
           />
         );
@@ -286,7 +298,7 @@ export function ShapeTool({
               x2={end.x}
               y2={end.y}
               stroke={currentShape.color}
-              strokeWidth={currentShape.strokeWidth}
+              strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
               strokeLinecap="round"
             />
             <polygon
@@ -318,7 +330,7 @@ export function ShapeTool({
           <polygon
             points={polygonPoints.join(' ')}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
