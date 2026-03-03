@@ -380,6 +380,8 @@ export default function WhiteboardCanvasNew({
       setCanvasHeight(h);
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        // Reset transform before scaling to prevent accumulation
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.scale(dpr, dpr);
         redrawCanvasRef.current();
       }
