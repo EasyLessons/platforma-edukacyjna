@@ -210,13 +210,7 @@ export function SelectionPropertiesPanel({
     });
   };
 
-  const handleTableFontSizeChange = (delta: number) => {
-    tableElements.forEach((table) => {
-      const currentSize = table.fontSize ?? 0.12;
-      const newSize = Math.max(0.05, Math.min(1.0, currentSize + delta * 0.05)); // 5-100% range, step 5%
-      onElementUpdate(table.id, { fontSize: newSize });
-    });
-  };
+  // 🚫 USUNIĘTE: handleTableFontSizeChange - fontSize teraz tylko automatyczny przy resize
 
   return (
     <div
@@ -592,28 +586,7 @@ export function SelectionPropertiesPanel({
             </button>
           </div>
 
-          <div className="w-px h-5 bg-gray-200" />
-
-          <div className="flex items-center gap-1">
-            <span className="text-xs text-gray-500">Czcionka:</span>
-            <button
-              onClick={() => handleTableFontSizeChange(-1)}
-              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
-              title="Zmniejsz czcionkę"
-            >
-              −
-            </button>
-            <span className="text-xs font-mono text-gray-700 min-w-[3ch] text-center">
-              {Math.round((firstTable?.fontSize ?? 0.12) * 100)}%
-            </span>
-            <button
-              onClick={() => handleTableFontSizeChange(1)}
-              className="px-2 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded border border-gray-300"
-              title="Zwiększ czcionkę"
-            >
-              +
-            </button>
-          </div>
+          {/* 🚫 USUNIĘTE: Kontrolki fontSize - teraz tylko automatyczne przy resize */}
 
           {/* Info o liczbie zaznaczonych tabel */}
           {tableElements.length > 1 && (

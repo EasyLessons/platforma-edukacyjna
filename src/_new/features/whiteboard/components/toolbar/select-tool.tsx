@@ -384,6 +384,7 @@ export function SelectTool({
             const newWidth = (originalEl.width || 3) * scaleX;
             const newHeight = (originalEl.height || 1) * scaleY;
 
+            // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tekstu przy resize
             const avgScale = (scaleX + scaleY) / 2;
             const newFontSize = originalEl.fontSize * avgScale;
 
@@ -427,7 +428,8 @@ export function SelectTool({
               height: Math.max(MIN_SIZE, newHeight),
             };
 
-            // Przeoblicz fontSize dla tabeli przy zmianie rozmiaru
+            // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tabeli przy resize
+            // ALE bez kontrolki w properties - tylko automatyczne
             if (originalEl.type === 'table') {
               (partialUpdate as any).fontSize = calculateTableFontSize(
                 Math.max(MIN_SIZE, newHeight),

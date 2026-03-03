@@ -203,7 +203,7 @@ export default function WhiteboardCanvasNew({
     screenWidth: number;
     screenHeight: number;
   } | null>(null);
-  const cellEditorInputRef = useRef<HTMLInputElement>(null);
+  const cellEditorInputRef = useRef<HTMLTextAreaElement>(null);
   /** Aktualny stan editingTableCell bez stałej closure — do użytku w handlerach */
   const editingTableCellRef = useRef(editingTableCell);
   useEffect(() => { editingTableCellRef.current = editingTableCell; }, [editingTableCell]);
@@ -1329,7 +1329,7 @@ export default function WhiteboardCanvasNew({
     });
   }, [el.elementsRef, vp.viewportRef, canvasWidth, canvasHeight]);
 
-  const handleCellEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleCellEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const editing = editingTableCellRef.current;
     if (!editing) return;
     const table = el.elementsRef.current.find((el) => el.id === editing.tableId) as TableElement | undefined;
@@ -1346,9 +1346,13 @@ export default function WhiteboardCanvasNew({
       } else {
         setEditingTableCell(null);
       }
-    } else if (e.key === 'Enter' || e.key === 'Escape') {
+    } else if (e.key === 'Escape') {
+      setEditingTableCell(null);
+    } else if (e.key === 'Enter' && e.shiftKey) {
+      // Shift+Enter kończy edytowanie
       setEditingTableCell(null);
     }
+    // Zwykły Enter (bez Shift) dodaje nową linię w textarea
   }, [el.elementsRef, openCellEditor]);
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1823,9 +1827,8 @@ export default function WhiteboardCanvasNew({
           const cellValue = table?.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
           const isHeader = editingTableCell.row === 0 && (table?.headerRow ?? false);
           return (
-            <input
+            <textarea
               ref={cellEditorInputRef}
-              type="text"
               defaultValue={cellValue}
               onChange={(e) =>
                 handleTableCellChange(
@@ -1837,17 +1840,20 @@ export default function WhiteboardCanvasNew({
               }
               onBlur={() => setEditingTableCell(null)}
               onKeyDown={handleCellEditorKeyDown}
-              className="absolute z-[100] border-2 border-blue-500 outline-none px-1"
+              className="absolute z-[100] border-2 border-blue-500 outline-none px-1 resize-none"
               style={{
                 left:       editingTableCell.screenLeft,
                 top:        editingTableCell.screenTop,
                 width:      editingTableCell.screenWidth,
                 height:     editingTableCell.screenHeight,
-                fontSize:   Math.max(10, Math.min(editingTableCell.screenHeight * 0.42, 15)),
+                fontSize:   Math.max(10, Math.min(editingTableCell.screenHeight * 0.42, 30)), // ZWIĘKSZONE z 15 do 30
                 background: isHeader ? (table?.headerBgColor || '#f3f4f6') : '#fff',
                 fontWeight: isHeader ? 700 : 400,
                 color:      '#111827',
                 boxSizing:  'border-box',
+                whiteSpace: 'pre-wrap', // Obsługa nowych linii
+                wordBreak: 'break-word',
+                lineHeight: '1.2',
               }}
             />
           );

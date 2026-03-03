@@ -785,7 +785,7 @@ export function drawTable(
   // fontSize w world units, przemnożone przez scale dla ekranu
   const worldFontSize = table.fontSize ?? 0.12; // fallback dla starych tabel bez fontSize
   const screenFontSize = worldFontSize * viewport.scale * 100; // scale*100 = px per world unit
-  const fontSize = Math.max(10, Math.min(screenFontSize, 15)); // clamp 10-15px
+  const fontSize = Math.max(10, Math.min(screenFontSize, 30)); // clamp 10-30px - ZWIĘKSZONE z 15px
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -807,7 +807,18 @@ export function drawTable(
       ctx.beginPath();
       ctx.rect(topLeft.x + c * cellWidth + 3, topLeft.y + r * cellHeight + 2, cellWidth - 6, cellHeight - 4);
       ctx.clip();
-      ctx.fillText(cellText, cx, cy, cellWidth - 8);
+      
+      // Obsługa wielu linii tekstu w komórce
+      const lines = cellText.split('\n');
+      const lineHeight = fontSize * 1.2;
+      const totalTextHeight = lines.length * lineHeight;
+      const startY = cy - (totalTextHeight - lineHeight) / 2;
+      
+      lines.forEach((line, lineIndex) => {
+        const lineY = startY + lineIndex * lineHeight;
+        ctx.fillText(line, cx, lineY, cellWidth - 8);
+      });
+      
       ctx.restore();
     }
   }
