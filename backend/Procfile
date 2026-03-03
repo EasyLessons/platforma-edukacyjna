@@ -1,8 +1,1 @@
-web: uvicorn main:app --host 0.0.0.0 --port $PORT
-
-```
-
-#### **B) Stwórz plik `runtime.txt` w `backend/`:**
-```
-
-python-3.12.0
+﻿web: alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port $PORT
