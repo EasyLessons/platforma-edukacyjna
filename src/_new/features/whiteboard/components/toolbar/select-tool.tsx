@@ -429,7 +429,7 @@ export function SelectTool({
 
             // Przeoblicz fontSize dla tabeli przy zmianie rozmiaru
             if (originalEl.type === 'table') {
-              partialUpdate.fontSize = calculateTableFontSize(
+              (partialUpdate as any).fontSize = calculateTableFontSize(
                 Math.max(MIN_SIZE, newHeight),
                 originalEl.rows
               );
