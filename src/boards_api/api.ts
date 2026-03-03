@@ -290,8 +290,8 @@ export const fetchBoardById = async (boardId: string | number): Promise<Board | 
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      // Dodaj timeout i retry policy
-      signal: AbortSignal.timeout(10000), // 10s timeout
+      // Dodaj timeout — Neon DB (free tier) potrzebuje ~20s na cold start
+      signal: AbortSignal.timeout(30000), // 30s timeout
     });
 
     if (!response.ok) {
@@ -624,6 +624,7 @@ export const loadBoardElements = async (
       Authorization: `Bearer ${token}`,
       'Content-Type': 'application/json',
     },
+    signal: AbortSignal.timeout(30000), // 30s timeout — Neon DB cold start może trwać ~20s
   });
 
   return handleResponse(response);

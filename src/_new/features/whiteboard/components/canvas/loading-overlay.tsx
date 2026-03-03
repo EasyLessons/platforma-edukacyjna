@@ -15,6 +15,7 @@
  */
 
 import NextImage from 'next/image';
+import { useState, useEffect } from 'react';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -28,6 +29,18 @@ interface LoadingOverlayProps {
 // ─── Komponent ───────────────────────────────────────────────────────────────
 
 export function LoadingOverlay({ isLoading, progress }: LoadingOverlayProps) {
+  const [showSlowHint, setShowSlowHint] = useState(false);
+
+  useEffect(() => {
+    if (!isLoading) {
+      setShowSlowHint(false);
+      return;
+    }
+    // Pokaż hint po 8s gdy postęp utknął na 10% (baza danych się budzi)
+    const timer = setTimeout(() => setShowSlowHint(true), 8000);
+    return () => clearTimeout(timer);
+  }, [isLoading]);
+
   if (!isLoading) return null;
 
   return (
@@ -39,6 +52,7 @@ export function LoadingOverlay({ isLoading, progress }: LoadingOverlayProps) {
           alt="EasyLesson"
           width={200}
           height={80}
+          style={{ width: 'auto', height: 'auto' }}
           priority
         />
       </div>
@@ -55,6 +69,13 @@ export function LoadingOverlay({ isLoading, progress }: LoadingOverlayProps) {
       <p className="mt-4 text-sm text-gray-600">
         Ładowanie tablicy... {Math.round(progress)}%
       </p>
+
+      {/* Hint przy wolnym starcie bazy (Neon cold start) */}
+      {showSlowHint && (
+        <p className="mt-2 text-xs text-gray-400 max-w-xs text-center">
+          Pierwsze połączenie może trwać do 30 sekund — baza danych się uruchamia.
+        </p>
+      )}
     </div>
   );
 }
