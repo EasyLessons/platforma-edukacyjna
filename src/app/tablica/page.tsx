@@ -260,43 +260,6 @@ export function TablicaContent() {
       {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
       <HomeButton />
 
-      {/* Przycisk ustawień tablicy — widoczny dla właściciela */}
-      {userRole === 'owner' && boardId && boardId !== 'demo-board' && (
-        <button
-          onClick={() => setShowBoardSettings(true)}
-          title="Ustawienia tablicy"
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            zIndex: 100,
-            padding: '10px',
-            backgroundColor: 'white',
-            border: '2px solid #e0e0e0',
-            borderRadius: '12px',
-            cursor: 'pointer',
-            boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.2s',
-          }}
-          onMouseOver={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f9fafb';
-          }}
-          onMouseOut={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
-          }}
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14M12 2v2M12 20v2M2 12h2M20 12h2"/>
-          </svg>
-        </button>
-      )}
-
       {/* Panel ustawień tablicy */}
       {showBoardSettings && boardId && boardId !== 'demo-board' && (
         <BoardSettingsPanel
@@ -309,9 +272,10 @@ export function TablicaContent() {
       )}
 
       {/* Nagłówek z logo, nazwą tablicy i przyciskiem Premium */}
-      <BoardHeader 
-        boardName={boardName} 
+      <BoardHeader
+        boardName={boardName}
         boardId={boardId}
+        onSettingsClick={userRole === 'owner' && boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
       />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}

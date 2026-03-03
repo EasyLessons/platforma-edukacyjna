@@ -37,9 +37,10 @@ function ComparisonRow({ feature, free, premium }: { feature: string; free: stri
 interface BoardHeaderProps {
   boardName: string;
   boardId: string;
+  onSettingsClick?: () => void;
 }
 
-export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
+export function BoardHeader({ boardName, boardId, onSettingsClick }: BoardHeaderProps) {
   const [showComparison, setShowComparison] = useState(false);
   const [showTooltip, setShowTooltip] = useState(false);
   const [windowWidth, setWindowWidth] = useState(0);
@@ -182,6 +183,37 @@ export function BoardHeader({ boardName, boardId }: BoardHeaderProps) {
                   backgroundColor: '#e5e7eb',
                 }}
               />
+            )}
+
+            {/* Przycisk ustawień tablicy — widoczny gdy onSettingsClick jest przekazane */}
+            {onSettingsClick && (
+              <button
+                onClick={onSettingsClick}
+                title="Ustawienia tablicy"
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: '4px',
+                  transition: 'background 0.15s',
+                }}
+                onMouseOver={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseOut={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </button>
             )}
 
             {/* Przycisk Premium */}
