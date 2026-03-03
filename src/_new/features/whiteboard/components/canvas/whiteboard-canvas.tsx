@@ -51,7 +51,7 @@ import { FunctionTool } from '../toolbar/function-tool';
 import { ImageTool, ImageToolRef } from '../toolbar/image-tool';
 import { EraserTool } from '../toolbar/eraser-tool';
 import { MarkdownNoteTool, MarkdownNoteView } from '../toolbar/markdown-note-tool';
-import { TableTool, TableView } from '../toolbar/table-tool';
+import { TableTool } from '../toolbar/table-tool';
 import { ArrowTool } from '../toolbar/arrow-tool';
 import { CalculatorTool } from '../toolbar/calculator-tool';
 import { ActivityHistory } from '../toolbar/activity-history';
@@ -80,8 +80,8 @@ import {
   zoomViewport,
   panViewportWithWheel,
   panViewportWithMouse,
-  transformPoint,
   inverseTransformPoint,
+  transformPoint,
 } from '../../navigation/viewport-math';
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
@@ -144,11 +144,11 @@ export default function WhiteboardCanvasNew({
   const boardIdRef = useRef<string>(boardId);
   /** Ref do ImageTool (forwardRef — potrzebny do triggerFileUpload / handlePasteFromClipboard) */
   const imageToolRef = useRef<ImageToolRef>(null);
-  /** Ref do wrappera wszystkich HTML overlaysów (SelectTool, Markdown, Table) — ukrywany podczas pan by uniknąć lag pozycjonowania */
+  /** Ref do wrappera HTMLoverlayów SelectTool — ukrywany podczas pan by uniknąć lag pozycjonowania */
   const htmlOverlaysRef = useRef<HTMLDivElement>(null);
-  /** Ref do wrappera Markdown + Table overlayów — ukrywany podczas pan razem z htmlOverlaysRef */
+  /** Ref do wrappera Markdown overlayów — transform aktualizowany synchronicznie z RAF canvasa */
   const mdTableOverlaysRef = useRef<HTMLDivElement>(null);
-  /** Ref do RemoteCursors — ukrywany podczas pan (viewport stale → złe pozycje ekranowe) */
+  /** Ref do RemoteCursors — transform aktualizowany synchronicznie z RAF canvasa */
   const remoteCursorsRef = useRef<HTMLDivElement>(null);
   /** Czy trwa aktywny pan gestem (PanTool lub wheel) — pomija setViewport w hot-path */
   const isPanningRef = useRef(false);
@@ -191,6 +191,29 @@ export default function WhiteboardCanvasNew({
 
   /** Aktywne linie snap — aktualizuje SelectTool podczas przeciągania */
   const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
+
+  // ─── Edytor komórki tabeli ──────────────────────────────────────────
+  /** Aktualnie edytowana komórka tabeli — null gdy żadna nie jest edytowana */
+  const [editingTableCell, setEditingTableCell] = useState<{
+    tableId: string;
+    row: number;
+    col: number;
+    screenLeft: number;
+    screenTop: number;
+    screenWidth: number;
+    screenHeight: number;
+  } | null>(null);
+  const cellEditorInputRef = useRef<HTMLInputElement>(null);
+  /** Aktualny stan editingTableCell bez stałej closure — do użytku w handlerach */
+  const editingTableCellRef = useRef(editingTableCell);
+  useEffect(() => { editingTableCellRef.current = editingTableCell; }, [editingTableCell]);
+  // Autofocus + zaznaczenie całości przy otwarciu edytora
+  useEffect(() => {
+    if (editingTableCell) {
+      cellEditorInputRef.current?.focus();
+      cellEditorInputRef.current?.select();
+    }
+  }, [editingTableCell]);
 
   /**
    * Wymiary canvasa w CSS-px — potrzebne przez wszystkie komponenty narzędzi.
@@ -323,9 +346,10 @@ export default function WhiteboardCanvasNew({
       drawGrid(ctx, viewport, width, height);
     }
 
-    // Markdown + Table renderowane jako HTML overlay — canvas je pomija
+    // Markdown renderowana jako HTML overlay — canvas pomija.
+    // Tabela rysowana na canvas przez drawElement → drawTable.
     for (const element of el.elementsRef.current) {
-      if (element.type === 'markdown' || element.type === 'table') continue;
+      if (element.type === 'markdown') continue;
       drawElement(
         ctx,
         element,
@@ -338,6 +362,17 @@ export default function WhiteboardCanvasNew({
         el.elementsRef.current
       );
     }
+
+    // Aktualizuj transform HTML overlaysów synchronicznie z rysowaniem canvasa.
+    // Wzór: translate(w/2, h/2) scale(s) translate(-vp.x×100, -vp.y×100)
+    // Nota/kursor w world-punkcie (wx,wy) z CSS left=wx×100 ląduje na dokładnie
+    // tym samym pikselu co drawElement — zero lagu podczas panu/zooma.
+    const overlayTransform =
+      `translate(${width / 2}px, ${height / 2}px) ` +
+      `scale(${viewport.scale}) ` +
+      `translate(${-viewport.x * 100}px, ${-viewport.y * 100}px)`;
+    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.transform = overlayTransform;
+    if (remoteCursorsRef.current) remoteCursorsRef.current.style.transform = overlayTransform;
 
     ctx.restore();
   }, [el.elementsRef, el.loadedImages, vp.viewportRef]);
@@ -418,8 +453,6 @@ export default function WhiteboardCanvasNew({
   // Po każdej aktualizacji React-stanu viewportu (po re-renderze z poprawnymi pozycjami) — przywróć widoczność wszystkich HTML overlaysów
   useEffect(() => {
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
-    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
   }, [vp.viewport]);
 
   useEffect(() => {
@@ -429,10 +462,9 @@ export default function WhiteboardCanvasNew({
     const handleWheel = (e: WheelEvent) => {
       e.preventDefault();
       vp.handleStopFollowing();
-      // Ukryj HTML overlaye — pojawią się z powrotem po zsynchronizowaniu React-stanu viewport (useEffect wyżej)
+      // Ukryj SelectTool overlay — wyrówna się po zsynchronizowaniu React-stanu viewport.
+      // Markdown i kursory nie są ukrywane — transform CSS nadraża za canvasem natychmiast.
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
-      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
-      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
 
       const rect = container.getBoundingClientRect();
       const mouseX = e.clientX - rect.left;
@@ -483,6 +515,55 @@ export default function WhiteboardCanvasNew({
     return () => container.removeEventListener('pointermove', handlePointerMove);
   }, [rt.broadcastCursorMove, vp.viewportRef]);
 
+  // ─── DBLCLICK na tabeli → edytor komórki ───────────────────────────────
+  // Double-click wykrywa która komórka tabeli została kliknięta i otwiera
+  // pływający <input> na jej pozycji ekranowej (nie wrapper-transform).
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleDblClick = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const worldPos = inverseTransformPoint(
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
+        vp.viewportRef.current,
+        rect.width,
+        rect.height
+      );
+      const tables = el.elementsRef.current.filter((el) => el.type === 'table') as TableElement[];
+      for (const t of tables) {
+        if (
+          worldPos.x >= t.x && worldPos.x <= t.x + t.width &&
+          worldPos.y >= t.y && worldPos.y <= t.y + t.height
+        ) {
+          const col = Math.min(Math.floor((worldPos.x - t.x) / (t.width / t.cols)), t.cols - 1);
+          const row = Math.min(Math.floor((worldPos.y - t.y) / (t.height / t.rows)), t.rows - 1);
+          // Oblicz pozycję ekranową komórki z aktualnego vp.viewportRef
+          const cellW = t.width / t.cols;
+          const cellH = t.height / t.rows;
+          const tl = transformPoint(
+            { x: t.x + col * cellW, y: t.y + row * cellH },
+            vp.viewportRef.current, rect.width, rect.height
+          );
+          const br = transformPoint(
+            { x: t.x + (col + 1) * cellW, y: t.y + (row + 1) * cellH },
+            vp.viewportRef.current, rect.width, rect.height
+          );
+          setEditingTableCell({
+            tableId: t.id, row, col,
+            screenLeft: tl.x, screenTop: tl.y,
+            screenWidth: br.x - tl.x, screenHeight: br.y - tl.y,
+          });
+          return;
+        }
+      }
+    };
+
+    container.addEventListener('dblclick', handleDblClick);
+    return () => container.removeEventListener('dblclick', handleDblClick);
+  }, [el.elementsRef, vp.viewportRef]);
+
   // ─── PAN środkowym przyciskiem myszy (scroll) lub prawym (PPM) ──────────────
   //
   // Strategia: pointerdown w capture phase NA KONTENERZE — łapie event PRZED
@@ -495,6 +576,8 @@ export default function WhiteboardCanvasNew({
   // gdy effect re-runował z powodu zmiany zależności (np. sel).
 
   const panLastPosRef = useRef({ x: 0, y: 0 });
+  /** Który przycisk rozpoczął pan (1=MMB, 2=PPM) — używane do filtrowania pointerup */
+  const panButtonRef = useRef<number>(-1);
   /** Czy PPM/MMB pan właśnie się zakończył — blokuje contextmenu po puszczeniu PPM */
   const panDidDragRef = useRef(false);
 
@@ -511,20 +594,29 @@ export default function WhiteboardCanvasNew({
       e.stopPropagation();     // blokuje tool-overlay od widzenia pointerdown
 
       isPanningRef.current = true;
+      panButtonRef.current = e.button;  // 1=MMB, 2=PPM
       panDidDragRef.current = false;
       panLastPosRef.current = { x: e.clientX, y: e.clientY };
 
       document.body.style.cursor = 'grabbing';
       vp.handleStopFollowing();
 
-      // Ukryj HTML overlaye — pojawią się po zakończeniu pana (po setViewport)
+      // Ukryj SelectTool overlay (stare pozycje zaznaczenia) — wróci po pointerup.
+      // Markdown i kursory nie są ukrywane — CSS transform nadraża w tym samym RAF.
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
-      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
-      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
     };
 
     const handlePointerMove = (e: PointerEvent) => {
       if (!isPanningRef.current) return;
+
+      // e.buttons to bitmask aktualnie wciśniętych przycisków:
+      // 1=LPM, 2=PPM, 4=MMB. Jeśli przycisk który zaczął pan nie jest już
+      // wciśnięty — zatrzymaj pan teraz, nawet jeśli pointerup zniknął.
+      const expectedMask = panButtonRef.current === 2 ? 2 : 4; // PPM=2, MMB=4
+      if ((e.buttons & expectedMask) === 0) {
+        stopPan();
+        return;
+      }
 
       const dx = e.clientX - panLastPosRef.current.x;
       const dy = e.clientY - panLastPosRef.current.y;
@@ -538,37 +630,62 @@ export default function WhiteboardCanvasNew({
       requestAnimationFrame(() => redrawCanvasRef.current());
     };
 
-    const handlePointerUp = () => {
+    const stopPan = () => {
       if (!isPanningRef.current) return;
       isPanningRef.current = false;
       document.body.style.cursor = '';
 
-      // Przywróć overlaye
+      // Przywróć SelectTool overlay
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
-      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
 
       // Zsynchronizuj React state — aktualizuje ZoomControls + HTML overlays
       vp.setViewport(vp.viewportRef.current);
     };
 
-    // Blokuj context menu po zakończonym panie PPM
-    const handleContextMenu = (e: MouseEvent) => {
-      if (panDidDragRef.current) {
-        e.preventDefault();
-        panDidDragRef.current = false;
-      }
+    const handlePointerUp = (e: PointerEvent) => {
+      if (e.button !== panButtonRef.current) return;
+      stopPan();
     };
 
+    // Fallback: mouseup łapie puszczenie PPM gdy pointerup nie dotrze
+    // (np. gdy przeglądarka pochłonęła zdarzenie przez context menu)
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button !== panButtonRef.current) return;
+      stopPan();
+    };
+
+    // pointercancel — np. gdy okno traci fokus w trakcie pana
+    const handlePointerCancel = () => stopPan();
+
+    // Blokuj gest "wstecz/naprzód" przeglądarki (Chrome: PPM + ruch w lewo/prawo).
+    // MUSI być na mousedown w capture phase — pointerdown nie zawsze wystarczy.
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.button === 2 || e.button === 1) e.preventDefault();
+    };
+
+    // Blokuj context menu po zakończonym panie PPM + zatrzymaj pan.
+    // Zawsze preventDefault — na tablicy nie potrzebujemy menu kontekstowego przeglądarki.
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      panDidDragRef.current = false;
+      stopPan();
+    };
+
+    container.addEventListener('mousedown', handleMouseDown, { capture: true });
     container.addEventListener('pointerdown', handlePointerDown, { capture: true });
     document.addEventListener('pointermove', handlePointerMove);
     document.addEventListener('pointerup', handlePointerUp);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('pointercancel', handlePointerCancel);
     container.addEventListener('contextmenu', handleContextMenu);
 
     return () => {
+      container.removeEventListener('mousedown', handleMouseDown, { capture: true });
       container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
       document.removeEventListener('pointermove', handlePointerMove);
       document.removeEventListener('pointerup', handlePointerUp);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener('pointercancel', handlePointerCancel);
       container.removeEventListener('contextmenu', handleContextMenu);
       // Cleanup gdyby pan był aktywny w momencie odmontowania
       if (isPanningRef.current) {
@@ -681,8 +798,7 @@ export default function WhiteboardCanvasNew({
       sel.clearSelection();
     });
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
-    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
-    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
+    // Markdown i kursory nie potrzebują ukrywania — CSS transform zawsze aktualny
   }, [sel]);
 
   /** Przywraca overlaye i synchronizuje React viewport state raz po zakończeniu pana */
@@ -703,8 +819,6 @@ export default function WhiteboardCanvasNew({
     });
     // Dopiero teraz odkryj overlaye — panele są już na właściwych pozycjach
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
-    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
   }, [vp.setViewport, vp.viewportRef]);
 
   const handleViewportChange = useCallback((newVp: ViewportTransform) => {
@@ -714,8 +828,7 @@ export default function WhiteboardCanvasNew({
     // (zapobiega renderowaniu properties panel z nowym viewport ale starym selection)
     // CSS ukrycie - natychmiastowe
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
-    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
-    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
+    // Markdown i kursory nie potrzebują ukrywania — CSS transform zawsze aktualny
     
     // State + selection - SYNCHRONICZNIE przez flushSync
     if (!isPanningRef.current && sel.selectedElementIds.size > 0) {
@@ -748,8 +861,6 @@ export default function WhiteboardCanvasNew({
       // Nie używamy flushSync tutaj - to już post-timeout, nie hot path
       setOverlaysVisible(true);
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
-      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
     }, 80);
   }, [vp.setViewport, vp.viewportRef, sel]);
 
@@ -1189,6 +1300,57 @@ export default function WhiteboardCanvasNew({
     [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
   );
 
+  /** Przechodzi do następnej komórki tabeli (Tab) lub zamyka edytor (Enter/Escape) */
+  const openCellEditor = useCallback((tableId: string, row: number, col: number) => {
+    const table = el.elementsRef.current.find((e) => e.id === tableId) as TableElement | undefined;
+    if (!table) return;
+    const cellW = table.width / table.cols;
+    const cellH = table.height / table.rows;
+    const cellTopLeft = transformPoint(
+      { x: table.x + col * cellW, y: table.y + row * cellH },
+      vp.viewportRef.current,
+      canvasWidth,
+      canvasHeight
+    );
+    const cellBottomRight = transformPoint(
+      { x: table.x + (col + 1) * cellW, y: table.y + (row + 1) * cellH },
+      vp.viewportRef.current,
+      canvasWidth,
+      canvasHeight
+    );
+    setEditingTableCell({
+      tableId,
+      row,
+      col,
+      screenLeft:   cellTopLeft.x,
+      screenTop:    cellTopLeft.y,
+      screenWidth:  cellBottomRight.x - cellTopLeft.x,
+      screenHeight: cellBottomRight.y - cellTopLeft.y,
+    });
+  }, [el.elementsRef, vp.viewportRef, canvasWidth, canvasHeight]);
+
+  const handleCellEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    const editing = editingTableCellRef.current;
+    if (!editing) return;
+    const table = el.elementsRef.current.find((el) => el.id === editing.tableId) as TableElement | undefined;
+    if (!table) return;
+
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const nextCol = editing.col + 1;
+      const nextRow = editing.row + 1;
+      if (nextCol < table.cols) {
+        openCellEditor(editing.tableId, editing.row, nextCol);
+      } else if (nextRow < table.rows) {
+        openCellEditor(editing.tableId, nextRow, 0);
+      } else {
+        setEditingTableCell(null);
+      }
+    } else if (e.key === 'Enter' || e.key === 'Escape') {
+      setEditingTableCell(null);
+    }
+  }, [el.elementsRef, openCellEditor]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // USUWANIE ZAZNACZONYCH
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1580,58 +1742,39 @@ export default function WhiteboardCanvasNew({
         )}
 
         {/* ═══════════════════════════════════════════════════════════════
-            HTML OVERLAYS (Markdown + Table) — ukrywane podczas pan
-            Render wszystkich HTML-pozycjonowanych elementów świata
+            HTML OVERLAY (Markdown) — notatki pozycjonowane w world-pixels (×100).
+            Transform wrappera aktualizowany synchronicznie z canvas RAF → zero lagu.
+            Każda notatka: left=x×100 top=y×100, wrapper skaluje przez viewport.
+            Tabela: renderowana wyłącznie na canvasie (drawTable).
             ═══════════════════════════════════════════════════════════════ */}
         <div
           ref={mdTableOverlaysRef}
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
+          style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', overflow: 'visible' }}
         >
-          {/* MARKDOWN */}
           {canvasWidth > 0 &&
             el.elements
               .filter((e) => e.type === 'markdown')
               .map((e) => {
                 const note = e as MarkdownNote;
-                const topLeft = transformPoint(
-                  { x: note.x, y: note.y },
-                  vp.viewport,
-                  canvasWidth,
-                  canvasHeight
-                );
-                const baseWidth = note.width * 100; // 100px = 1 world unit
-                const baseHeight = note.height * 100;
-                const scaledW = baseWidth * vp.viewport.scale;
-                const scaledH = baseHeight * vp.viewport.scale;
-
-                // Culling — nie renderuj jeśli poza ekranem lub za małe
-                if (scaledW < 30 || scaledH < 30) return null;
-                if (topLeft.x + scaledW < 0 || topLeft.x > canvasWidth) return null;
-                if (topLeft.y + scaledH < 0 || topLeft.y > canvasHeight) return null;
-
                 const isBeingEdited = sel.editingMarkdownId === note.id;
-                // contentScale kontroluje rozmiar tekstu (1 = domyślny, 2 = 2x większy)
                 const contentScale = note.contentScale ?? 1;
 
                 return (
                   <div
                     key={note.id}
-                    className="absolute rounded-lg shadow-md border overflow-hidden"
+                    className="absolute rounded-lg shadow-lg border overflow-hidden backdrop-blur-md"
                     style={{
-                      left: topLeft.x,
-                      top: topLeft.y,
-                      width: baseWidth,
-                      height: baseHeight,
-                      transform: `scale(${vp.viewport.scale})`,
-                      transformOrigin: 'top left',
-                      willChange: 'transform',
-                      backgroundColor: note.backgroundColor || '#fffde7',
-                      borderColor: note.borderColor || '#fbc02d',
+                      left: note.x * 100,
+                      top: note.y * 100,
+                      width: note.width * 100,
+                      height: note.height * 100,
+                      backgroundColor: note.backgroundColor || 'rgba(255, 255, 255, 0.75)',
+                      borderColor: note.borderColor || 'rgba(229, 231, 235, 0.8)',
                       pointerEvents: isBeingEdited ? 'auto' : 'none',
                       zIndex: isBeingEdited ? 50 : 10,
                     }}
                   >
-                    {/* Inner wrapper dla contentScale (rozmiar tekstu) */}
+                    {/* Inner wrapper dla contentScale (rozmiar tekstu wewnątrz notki) */}
                     <div
                       style={{
                         width: `${100 / contentScale}%`,
@@ -1655,59 +1798,7 @@ export default function WhiteboardCanvasNew({
                   </div>
                 );
               })}
-
         </div>
-
-        {/* TABLE — osobny wrapper, NIE ukrywany podczas pan */}
-        {canvasWidth > 0 &&
-          el.elements
-            .filter((e) => e.type === 'table')
-            .map((e) => {
-              const table = e as TableElement;
-              const topLeft = transformPoint(
-                { x: table.x, y: table.y },
-                vp.viewport,
-                canvasWidth,
-                canvasHeight
-              );
-              const bottomRight = transformPoint(
-                { x: table.x + table.width, y: table.y + table.height },
-                vp.viewport,
-                canvasWidth,
-                canvasHeight
-              );
-              const screenW = bottomRight.x - topLeft.x;
-              const screenH = bottomRight.y - topLeft.y;
-
-              if (screenW < 20 || screenH < 20) return null;
-              if (topLeft.x + screenW < 0 || topLeft.x > canvasWidth) return null;
-              if (topLeft.y + screenH < 0 || topLeft.y > canvasHeight) return null;
-
-              const isSelected = sel.selectedElementIds.has(table.id);
-
-              return (
-                <div
-                  key={table.id}
-                  className="absolute"
-                  style={{
-                    left: topLeft.x,
-                    top: topLeft.y,
-                    width: screenW,
-                    minHeight: screenH,
-                    pointerEvents: isSelected ? 'auto' : 'none',
-                    zIndex: isSelected ? 35 : 10,
-                    overflow: 'visible',
-                  }}
-                >
-                  <TableView
-                    table={table}
-                    onCellChange={(row, col, value) =>
-                      handleTableCellChange(table.id, row, col, value)
-                    }
-                  />
-                </div>
-              );
-            })}
 
         {/* ═══════════════════════════════════════════════════════════════
             CANVAS — pointer-events: none
@@ -1726,14 +1817,50 @@ export default function WhiteboardCanvasNew({
           }}
         />
 
+        {/* ── EDYTOR KOMÓRKI TABELI ──────────────────────────── */}
+        {editingTableCell && (() => {
+          const table = el.elements.find((e) => e.id === editingTableCell.tableId) as TableElement | undefined;
+          const cellValue = table?.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
+          const isHeader = editingTableCell.row === 0 && (table?.headerRow ?? false);
+          return (
+            <input
+              ref={cellEditorInputRef}
+              type="text"
+              defaultValue={cellValue}
+              onChange={(e) =>
+                handleTableCellChange(
+                  editingTableCell.tableId,
+                  editingTableCell.row,
+                  editingTableCell.col,
+                  e.target.value
+                )
+              }
+              onBlur={() => setEditingTableCell(null)}
+              onKeyDown={handleCellEditorKeyDown}
+              className="absolute z-[100] border-2 border-blue-500 outline-none px-1"
+              style={{
+                left:       editingTableCell.screenLeft,
+                top:        editingTableCell.screenTop,
+                width:      editingTableCell.screenWidth,
+                height:     editingTableCell.screenHeight,
+                fontSize:   Math.max(10, Math.min(editingTableCell.screenHeight * 0.42, 15)),
+                background: isHeader ? (table?.headerBgColor || '#f3f4f6') : '#fff',
+                fontWeight: isHeader ? 700 : 400,
+                color:      '#111827',
+                boxSizing:  'border-box',
+              }}
+            />
+          );
+        })()}
+
         {/* ── KURSORY INNYCH UŻYTKOWNIKÓW ───────────────────────────────── */}
         {canvasWidth > 0 && (
-          <div ref={remoteCursorsRef} style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}>
-            <RemoteCursorsContainer
-              viewport={vp.viewport}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-            />
+          <div
+            ref={remoteCursorsRef}
+            style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', overflow: 'visible' }}
+          >
+            {/* transform ustawiany synchronicznie w redrawCanvas — zero lagu */}
+            <RemoteCursorsContainer />
           </div>
         )}
 

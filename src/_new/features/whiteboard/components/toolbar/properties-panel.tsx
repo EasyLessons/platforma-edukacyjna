@@ -17,8 +17,8 @@
 
 'use client';
 
-import { useRef } from 'react';
-import { X as XIcon, Copy, Files, Sparkles } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { X as XIcon, Copy, Files } from 'lucide-react';
 import { DrawingElement, DrawingPath, Shape, MarkdownNote, ImageElement } from '@/_new/features/whiteboard/types';
 
 interface SelectionPropertiesPanelProps {
@@ -31,14 +31,12 @@ interface SelectionPropertiesPanelProps {
   onDuplicateSelected?: () => void;
 }
 
-// 🆕 Presety skali zawartości dla markdown
+// Szybkie presety skali — reszta przez wpisanie wartości
 const CONTENT_SCALE_PRESETS = [
-  { label: 'XS', value: 0.6 },
-  { label: 'S', value: 0.8 },
-  { label: 'M', value: 1 },
-  { label: 'L', value: 1.25 },
-  { label: 'XL', value: 1.5 },
-  { label: '2XL', value: 2 },
+  { label: '50%',  value: 0.5 },
+  { label: '100%', value: 1   },
+  { label: '200%', value: 2   },
+  { label: '500%', value: 5   },
 ];
 
 export function SelectionPropertiesPanel({
@@ -52,6 +50,13 @@ export function SelectionPropertiesPanel({
 }: SelectionPropertiesPanelProps) {
   // Ref dla input koloru
   const colorInputRef = useRef<HTMLInputElement>(null);
+
+  // Lokalny stan wpisywanej wartości skali tekstu (string podczas edycji)
+  const [scaleInput, setScaleInput] = useState<string>('');
+  const [isEditingScale, setIsEditingScale] = useState(false);
+
+  // Ref dla color pickera tła markdown
+  const bgColorInputRef = useRef<HTMLInputElement>(null);
 
   // Pobierz zaznaczone elementy
   const selectedElements = elements.filter((el) => selectedIds.has(el.id));
@@ -158,6 +163,16 @@ export function SelectionPropertiesPanel({
       onElementUpdate(el.id, { contentScale: newScale });
     });
   };
+
+  // 🆕 Handler dla backgroundColor notatki
+  const handleBgColorChange = (newColor: string) => {
+    markdownElements.forEach((el) => {
+      onElementUpdate(el.id, { backgroundColor: newColor });
+    });
+  };
+
+  const currentBgColor =
+    markdownElements.length > 0 ? (markdownElements[0].backgroundColor ?? '#ffffff') : '#ffffff';
 
   return (
     <div
@@ -338,33 +353,126 @@ export function SelectionPropertiesPanel({
           🆕 KONTROLKI DLA MARKDOWN (contentScale)
           ═══════════════════════════════════════════════════════════════════════ */}
       {hasMarkdownElements && (
-        <div className="flex items-center gap-1">
-          <label className="text-xs text-gray-500 mr-1">Tekst:</label>
-          <div className="flex rounded-md overflow-hidden border border-gray-300">
+        <div className="flex items-center gap-1.5">
+          {/* Kolor tła notatki */}
+          <div className="relative group">
+            <div
+              onClick={() => bgColorInputRef.current?.click()}
+              className="w-7 h-7 rounded-md border-2 border-gray-300 hover:border-gray-400 cursor-pointer shadow-sm"
+              style={{ backgroundColor: currentBgColor }}
+              title="Kolor tła notatki"
+            />
+            <input
+              ref={bgColorInputRef}
+              type="color"
+              value={currentBgColor}
+              onChange={(e) => handleBgColorChange(e.target.value)}
+              className="absolute opacity-0 pointer-events-none"
+            />
+            <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
+              Kolor tła
+            </span>
+          </div>
+
+          <div className="w-px h-5 bg-gray-200" />
+
+          <label className="text-xs text-gray-500">Tekst:</label>
+
+          {/* Szybkie presety */}
+          <div className="flex rounded-md overflow-hidden border border-gray-200">
             {CONTENT_SCALE_PRESETS.map((preset) => (
               <button
                 key={preset.label}
                 onClick={() => handleContentScaleChange(preset.value)}
-                className={`px-2 py-1 text-xs font-medium ${
+                title={`Skala ${Math.round(preset.value * 100)}%`}
+                className={`px-2 py-1 text-xs font-medium transition-colors ${
                   Math.abs(currentContentScale - preset.value) < 0.01
                     ? 'bg-blue-500 text-white'
                     : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
-                title={`Skala ${Math.round(preset.value * 100)}%`}
               >
                 {preset.label}
               </button>
             ))}
           </div>
 
-          {/* Pokaż aktualną skalę w % */}
-          <span className="text-xs text-gray-500 ml-1">
-            {Math.round(currentContentScale * 100)}%
-          </span>
+          <div className="w-px h-5 bg-gray-200" />
+
+          {/* Stepper z dowolną wartością */}
+          <div className="flex items-center border border-gray-300 rounded-md overflow-hidden">
+            {/* Przycisk minus — krok −25% */}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const next = Math.max(0.1, Math.round((currentContentScale - 1) * 100) / 100);
+                handleContentScaleChange(next);
+              }}
+              className="px-1.5 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 select-none"
+              title="Zmniejsz o 100%"
+            >
+              −
+            </button>
+
+            {/* Input liczbowy — wpisz dowolną wartość i zatwierdź Enter / Tab / blur */}
+            <input
+              type="text"
+              inputMode="numeric"
+              value={
+                isEditingScale
+                  ? scaleInput
+                  : String(Math.round(currentContentScale * 100))
+              }
+              onFocus={() => {
+                setScaleInput(String(Math.round(currentContentScale * 100)));
+                setIsEditingScale(true);
+              }}
+              onChange={(e) => {
+                // Pozwól wpisywać tylko cyfry
+                if (/^\d*$/.test(e.target.value)) setScaleInput(e.target.value);
+              }}
+              onBlur={() => {
+                const val = parseInt(scaleInput, 10);
+                if (!isNaN(val) && val >= 10 && val <= 10000) {
+                  handleContentScaleChange(val / 100);
+                }
+                setIsEditingScale(false);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === 'Tab') {
+                  const val = parseInt(scaleInput, 10);
+                  if (!isNaN(val) && val >= 10 && val <= 10000) {
+                    handleContentScaleChange(val / 100);
+                  }
+                  setIsEditingScale(false);
+                  (e.target as HTMLInputElement).blur();
+                }
+                if (e.key === 'Escape') {
+                  setIsEditingScale(false);
+                  (e.target as HTMLInputElement).blur();
+                }
+              }}
+              className="w-14 text-center text-xs py-1 border-none outline-none bg-white font-mono text-black"
+              title="Wpisz rozmiar w % (np. 500, 1000) i naciśnij Enter"
+            />
+            <span className="text-xs text-gray-500 pr-1 select-none">%</span>
+
+            {/* Przycisk plus — krok +25% */}
+            <button
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => {
+                const next = Math.min(100, Math.round((currentContentScale + 1) * 100) / 100);
+                handleContentScaleChange(next);
+              }}
+              className="px-1.5 py-1 text-sm font-bold text-gray-600 hover:bg-gray-100 select-none"
+              title="Zwiększ o 100%"
+            >
+              +
+            </button>
+          </div>
 
           {/* Info o liczbie zaznaczonych markdown */}
           {markdownElements.length > 1 && (
-            <span className="text-xs text-gray-400 ml-1">({markdownElements.length})</span>
+            <span className="text-xs text-gray-400">({markdownElements.length})</span>
           )}
         </div>
       )}

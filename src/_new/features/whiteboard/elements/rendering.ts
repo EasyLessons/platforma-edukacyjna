@@ -679,10 +679,7 @@ export function drawElement(
     // Rysowanie na canvas powodowaĹ‚o ghosting (podwĂłjne renderowanie)
     return;
   } else if (element.type === 'table') {
-    // UWAGA: Tabele NIE sÄ… rysowane na canvas!
-    // SÄ… renderowane TYLKO jako HTML overlay przez TableView
-    // Rysowanie na canvas powodowaĹ‚o ghosting (podwĂłjne renderowanie)
-    return;
+    drawTable(ctx, element, viewport, canvasWidth, canvasHeight);
   }
 }
 
@@ -782,6 +779,33 @@ export function drawTable(
     ctx.moveTo(x, topLeft.y);
     ctx.lineTo(x, topLeft.y + screenHeight);
     ctx.stroke();
+  }
+
+  // --- Tekst komórek ---
+  const fontSize = Math.max(10, Math.min(cellHeight * 0.42, 15));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let r = 0; r < table.rows; r++) {
+    for (let c = 0; c < table.cols; c++) {
+      const cellText = table.cells[r]?.[c] ?? '';
+      if (!cellText) continue;
+      const cx = topLeft.x + c * cellWidth + cellWidth / 2;
+      const cy = topLeft.y + r * cellHeight + cellHeight / 2;
+      if (r === 0 && table.headerRow) {
+        ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.fillStyle = '#111827';
+      } else {
+        ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.fillStyle = '#374151';
+      }
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(topLeft.x + c * cellWidth + 3, topLeft.y + r * cellHeight + 2, cellWidth - 6, cellHeight - 4);
+      ctx.clip();
+      ctx.fillText(cellText, cx, cy, cellWidth - 8);
+      ctx.restore();
+    }
   }
 }
 

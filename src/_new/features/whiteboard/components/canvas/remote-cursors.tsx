@@ -16,21 +16,13 @@
 
 import { memo, useState, useEffect, useRef } from 'react';
 import { RemoteCursor, useBoardRealtime } from '@/app/context/BoardRealtimeContext';
-import { ViewportTransform } from '@/_new/features/whiteboard/types';
-import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
 
 interface RemoteCursorsProps {
   cursors: RemoteCursor[];
-  viewport: ViewportTransform;
-  canvasWidth: number;
-  canvasHeight: number;
 }
 
-interface RemoteCursorsContainerProps {
-  viewport: ViewportTransform;
-  canvasWidth: number;
-  canvasHeight: number;
-}
+// RemoteCursorsContainerProps — brak propsów, wrapper w rodzicu dostaje transform
+type RemoteCursorsContainerProps = Record<string, never>;
 
 // Kolory w stylu Figjam - bardzo żywe i nasycone
 const CURSOR_COLORS = [
@@ -52,13 +44,9 @@ const CURSOR_HIDE_DELAY_MS = 4000;
 // Pojedynczy kursor - memo żeby nie re-renderować gdy inne kursory się zmieniają
 const SingleCursor = memo(function SingleCursor({
   cursor,
-  screenX,
-  screenY,
   color,
 }: {
   cursor: RemoteCursor;
-  screenX: number;
-  screenY: number;
   color: string;
 }) {
   const [visible, setVisible] = useState(true);
@@ -88,7 +76,9 @@ const SingleCursor = memo(function SingleCursor({
         style={{
           left: 0,
           top: 0,
-          transform: `translate(${screenX - 2}px, ${screenY - 2}px)`,
+          // Pozycja w world-pixels — wrapper rodzica ma transform viewportu,
+          // więc kursor automatycznie podąża za canvas bez opóźnień Reacta.
+          transform: `translate(${cursor.x * 100 - 2}px, ${cursor.y * 100 - 2}px)`,
           transition: 'transform 100ms ease-out',
           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.25))',
           willChange: 'transform',
@@ -120,7 +110,7 @@ const SingleCursor = memo(function SingleCursor({
         style={{
           left: 0,
           top: 0,
-          transform: `translate(${screenX + 26}px, ${screenY + 14}px)`,
+          transform: `translate(${cursor.x * 100 + 26}px, ${cursor.y * 100 + 14}px)`,
           transition: 'transform 150ms ease-out',
           willChange: 'transform',
         }}
@@ -143,46 +133,18 @@ const SingleCursor = memo(function SingleCursor({
 // Prezentacyjny komponent - memo
 const RemoteCursorsInner = memo(function RemoteCursorsInner({
   cursors,
-  viewport,
-  canvasWidth,
-  canvasHeight,
 }: RemoteCursorsProps) {
   if (cursors.length === 0) return null;
 
   return (
-    <div
-      className="absolute inset-0 pointer-events-none z-40"
-      style={{ width: canvasWidth, height: canvasHeight, overflow: 'visible' }}
-    >
+    <div className="absolute inset-0 pointer-events-none" style={{ overflow: 'visible' }}>
       {cursors.map((cursor) => {
-        // Transform world coordinates to screen coordinates
-        const screenPos = transformPoint(
-          { x: cursor.x, y: cursor.y },
-          viewport,
-          canvasWidth,
-          canvasHeight
-        );
-
-        // Ukryj kursory daleko poza widocznym obszarem (duży margines na wypadek lagu viewport)
-        if (
-          screenPos.x < -300 ||
-          screenPos.x > canvasWidth + 300 ||
-          screenPos.y < -300 ||
-          screenPos.y > canvasHeight + 300
-        ) {
-          return null;
-        }
-
-        // Przypisz kolor (deterministycznie na podstawie userId)
         const colorIndex = Math.abs(cursor.userId) % CURSOR_COLORS.length;
         const color = CURSOR_COLORS[colorIndex];
-
         return (
           <SingleCursor
             key={cursor.userId}
             cursor={cursor}
-            screenX={screenPos.x}
-            screenY={screenPos.y}
             color={color}
           />
         );
@@ -192,17 +154,13 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
 });
 
 /**
- * 🆕 CONTAINER - sam subskrybuje kursory z context
- *
- * To jest kluczowe dla wydajności! Ten komponent sam zarządza
- * subskrypcją kursorów, więc zmiany kursorów powodują re-render
- * TYLKO tego komponentu, nie WhiteboardCanvas.
+ * CONTAINER — sam subskrybuje kursory z context.
+ * NIE przyjmuje viewport/canvasWidth/canvasHeight — pozycja kursorów wyrażona
+ * w world-pixels, a rodzic (whiteboard-canvas.tsx) ustawia transform CSS na
+ * refie wrappera synchronicznie z rysowaniem canvasa (RAF). Dzięki temu
+ * kursory są zawsze widoczne i nie lagują podczas panu/zooma.
  */
-export function RemoteCursorsContainer({
-  viewport,
-  canvasWidth,
-  canvasHeight,
-}: RemoteCursorsContainerProps) {
+export function RemoteCursorsContainer(_props: RemoteCursorsContainerProps) {
   const { subscribeCursors } = useBoardRealtime();
   const [cursors, setCursors] = useState<RemoteCursor[]>([]);
 
@@ -213,14 +171,7 @@ export function RemoteCursorsContainer({
     return unsubscribe;
   }, [subscribeCursors]);
 
-  return (
-    <RemoteCursorsInner
-      cursors={cursors}
-      viewport={viewport}
-      canvasWidth={canvasWidth}
-      canvasHeight={canvasHeight}
-    />
-  );
+  return <RemoteCursorsInner cursors={cursors} />;
 }
 
 // Legacy export dla kompatybilności wstecznej

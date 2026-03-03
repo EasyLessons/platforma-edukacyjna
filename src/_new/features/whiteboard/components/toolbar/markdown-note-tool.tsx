@@ -124,8 +124,8 @@ export function MarkdownNoteTool({
       width,
       height,
       content: '',
-      backgroundColor: '#ffffff',
-      borderColor: '#e5e7eb',
+      backgroundColor: 'rgba(255, 255, 255, 0.75)',
+      borderColor: 'rgba(229, 231, 235, 0.8)',
     };
     onNoteCreate(newNote);
 
@@ -258,7 +258,7 @@ export const MarkdownNoteView = memo(
           onChange={(e) => setEditContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-full h-full p-2 resize-none border-none outline-none bg-white/50 font-mono text-black"
+          className="w-full h-full p-2 resize-none border-none outline-none backdrop-blur-md bg-white/60 font-mono text-black"
           style={{ fontSize: `${fontSize}px` }}
           placeholder="Wpisz tekst markdown..."
         />
