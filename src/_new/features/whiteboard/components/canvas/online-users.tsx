@@ -23,7 +23,7 @@ import { useState } from 'react';
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 import { useAuth } from '@/app/context/AuthContext';
 import { Plus, Check, Eye } from 'lucide-react';
-import VoiceChat from '@/app/tablica/whiteboard/VoiceChat';
+import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)

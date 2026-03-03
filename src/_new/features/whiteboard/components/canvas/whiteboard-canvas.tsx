@@ -63,11 +63,11 @@ import { StatusIndicators } from './status-indicators';
 import { SnapGuides } from './snap-guides';
 
 // ─── SmartSearch ─────────────────────────────────────────────────────────────
-import { SmartSearchBar, CardViewer } from '@/app/tablica/smartsearch';
-import type { FormulaResource, CardResource } from '@/app/tablica/smartsearch';
+import { SmartSearchBar, CardViewer } from '@/_new/features/whiteboard/components/smartsearch';
+import type { FormulaResource, CardResource } from '@/_new/features/whiteboard/components/smartsearch';
 
 // ─── MathChatbot ─────────────────────────────────────────────────────────────
-import { MathChatbot } from '@/app/tablica/toolbar/MathChatbot';
+import { MathChatbot } from '@/_new/features/whiteboard/components/toolbar/math-chatbot';
 
 // ─── Renderowanie canvas ──────────────────────────────────────────────────────
 import { drawElement } from '../../elements/rendering';
