@@ -134,6 +134,8 @@ export default function WhiteboardCanvasNew({
   const remoteCursorsRef = useRef<HTMLDivElement>(null);
   /** Czy trwa aktywny pan gestem (PanTool lub wheel) — pomija setViewport w hot-path */
   const isPanningRef = useRef(false);
+  /** Debounced timer do przywrócenia overlayów po zakończeniu viewport scrollu/pana */
+  const viewportChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     boardIdRef.current = boardId;
@@ -619,6 +621,11 @@ export default function WhiteboardCanvasNew({
   /** Przywraca overlaye i synchronizuje React viewport state raz po zakończeniu pana */
   const restoreOverlaysAfterPan = useCallback(() => {
     isPanningRef.current = false;
+    // Anuluj debounce — przywróć natychmiast (gest skończony, pozycja znana)
+    if (viewportChangeTimerRef.current) {
+      clearTimeout(viewportChangeTimerRef.current);
+      viewportChangeTimerRef.current = null;
+    }
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
@@ -629,12 +636,29 @@ export default function WhiteboardCanvasNew({
   const handleViewportChange = useCallback((newVp: ViewportTransform) => {
     const constrained = constrainViewport(newVp);
     vp.viewportRef.current = constrained;
-    // Podczas aktywnego pana — tylko ref + redraw canvas, bez setViewport (brak re-renderów React)
+
+    // Ukryj overlaye natychmiast (każda zmiana viewport — wheel, scroll, pan)
+    if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
+    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
+    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
+
+    // Podczas aktywnego pana gestu — tylko ref + redraw canvas, bez setViewport (brak re-renderów React)
     if (isPanningRef.current) {
       requestAnimationFrame(() => redrawCanvasRef.current());
       return;
     }
+
     vp.setViewport(constrained);
+
+    // Przywróć overlaye po 80ms ciszy — panel pojawi się w dobrym miejscu
+    if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
+    viewportChangeTimerRef.current = setTimeout(() => {
+      viewportChangeTimerRef.current = null;
+      if (isPanningRef.current) return; // gest wciąż trwa — poczekaj na restoreOverlaysAfterPan
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+      if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
+      if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
+    }, 80);
   }, [vp.setViewport, vp.viewportRef]);
 
   /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
