@@ -1170,7 +1170,12 @@ export default function WhiteboardCanvasNew({
       >
 
         {/* ── ONLINE USERS ──────────────────────────────────────────────── */}
-        <OnlineUsers onFollowUser={handleFollowUser} userRole={userRole} />
+        <OnlineUsers
+          onFollowUser={handleFollowUser}
+          onStopFollowing={handleStopFollowing}
+          followingUserId={vp.followingUserId}
+          userRole={userRole}
+        />
 
         {/* ── FOLLOW MODE BANNER ────────────────────────────────────────── */}
         {vp.followingUserId && (

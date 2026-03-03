@@ -39,7 +39,7 @@ import {
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
-import { DrawingElement } from '@/app/tablica/whiteboard/types';
+import { DrawingElement } from '@/_new/features/whiteboard/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📝 TYPY

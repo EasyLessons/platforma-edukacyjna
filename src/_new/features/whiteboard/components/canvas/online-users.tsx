@@ -19,10 +19,10 @@
 
 'use client';
 
-import { useState } from 'react';
-import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
+import { useState, useRef, useEffect } from 'react';
+import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeContext';
 import { useAuth } from '@/app/context/AuthContext';
-import { Plus, Check, Eye } from 'lucide-react';
+import { Plus, Check, Eye, EyeOff } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -61,13 +61,24 @@ interface OnlineUsersProps {
     viewportY: number,
     viewportScale: number
   ) => void;
-  userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
+  onStopFollowing?: () => void;
+  followingUserId?: number | null;
+  userRole?: 'owner' | 'editor' | 'viewer';
 }
 
-export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
-  const { onlineUsers, isConnected } = useBoardRealtime();
+export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, userRole }: OnlineUsersProps) {
+  const { onlineUsers, isConnected, subscribeViewports } = useBoardRealtime();
   const { user: currentUser } = useAuth();
   const [linkCopied, setLinkCopied] = useState(false);
+
+  // Trzymaj aktualny snapshot viewportów innych użytkowników
+  const remoteViewportsRef = useRef<RemoteViewport[]>([]);
+  useEffect(() => {
+    const unsubscribe = subscribeViewports((viewports) => {
+      remoteViewportsRef.current = viewports;
+    });
+    return unsubscribe;
+  }, [subscribeViewports]);
 
   // Kopiowanie linku do tablicy
   const handleCopyLink = async () => {
@@ -115,32 +126,35 @@ export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
         <div className="flex -space-x-2">
           {onlineUsers.map((onlineUser, index) => {
             const isCurrentUser = onlineUser.user_id === currentUser?.id;
+            const isBeingFollowed = followingUserId === onlineUser.user_id;
             const color = getAvatarColor(onlineUser.user_id);
             const initials = getInitials(onlineUser.username);
-            const hasViewport =
-              onlineUser.viewport_x !== undefined && onlineUser.viewport_y !== undefined;
 
             // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
             const uniqueKey = `${onlineUser.user_id}-${onlineUser.online_at || index}`;
 
-            // Handler kliknięcia - przeniesienie do viewport użytkownika
+            // Handler kliknięcia
             const handleClick = () => {
-              if (!isCurrentUser && hasViewport && onFollowUser) {
-                console.log(
-                  '👁️ Kliknięto użytkownika:',
-                  onlineUser.username,
-                  'viewport:',
-                  onlineUser.viewport_x,
-                  onlineUser.viewport_y,
-                  onlineUser.viewport_scale
-                );
-                onFollowUser(
-                  onlineUser.user_id,
-                  onlineUser.viewport_x!,
-                  onlineUser.viewport_y!,
-                  onlineUser.viewport_scale || 1
-                );
+              if (isCurrentUser) return;
+
+              // Jeśli już śledzimy tego użytkownika → zatrzymaj
+              if (isBeingFollowed && onStopFollowing) {
+                onStopFollowing();
+                return;
               }
+
+              if (!onFollowUser) return;
+
+              // Pobierz ostatni znany viewport z subskrypcji
+              const remoteVp = remoteViewportsRef.current.find(
+                (v) => v.userId === onlineUser.user_id
+              );
+              onFollowUser(
+                onlineUser.user_id,
+                remoteVp?.x ?? 0,
+                remoteVp?.y ?? 0,
+                remoteVp?.scale ?? 1
+              );
             };
 
             return (
@@ -154,19 +168,29 @@ export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
                   text-white text-sm font-bold
                   transition-transform hover:scale-110 hover:z-10
                   ${
-                    !isCurrentUser && hasViewport
-                      ? 'ring-4 ring-green-400 cursor-pointer shadow-lg'
-                      : 'ring-2 ring-white'
+                    isBeingFollowed
+                      ? 'ring-4 ring-blue-400 cursor-pointer shadow-lg'
+                      : !isCurrentUser
+                        ? 'ring-4 ring-green-400 cursor-pointer shadow-lg'
+                        : 'ring-2 ring-white'
                   }
                 `}
                 title={onlineUser.username}
               >
                 {initials}
 
-                {/* 🆕 Ikonka oka - widoczna zawsze gdy można przejść do widoku */}
-                {!isCurrentUser && hasViewport && (
-                  <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1 shadow-md border-2 border-white">
-                    <Eye size={12} className="text-white" />
+                {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
+                {!isCurrentUser && (
+                  <div
+                    className={`absolute -bottom-1 -right-1 rounded-full p-1 shadow-md border-2 border-white ${
+                      isBeingFollowed ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
+                    }`}
+                  >
+                    {isBeingFollowed ? (
+                      <EyeOff size={12} className="text-white" />
+                    ) : (
+                      <Eye size={12} className="text-white" />
+                    )}
                   </div>
                 )}
 
@@ -185,7 +209,7 @@ export function OnlineUsers({ onFollowUser, userRole }: OnlineUsersProps) {
                 >
                   {onlineUser.username}
                   {isCurrentUser && userRole && ` (${userRole})`}
-                  {!isCurrentUser && hasViewport && ' - Przejdź do widoku'}
+                  {!isCurrentUser && (isBeingFollowed ? ' – Kliknij aby przestać śledzić' : ' – Kliknij aby śledzić')}
                 </div>
               </div>
             );

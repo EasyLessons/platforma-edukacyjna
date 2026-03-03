@@ -31,8 +31,8 @@ import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
 import { getMyRoleInWorkspace } from '@/workspace_api/api';
-import { BoardHeader } from './components/BoardHeader';
-import { HomeButton } from './components/HomeButton';
+import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
+import { HomeButton } from '@/_new/features/whiteboard/components/layout/home-button';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GŁÓWNY KOMPONENT (z Suspense dla useSearchParams)
