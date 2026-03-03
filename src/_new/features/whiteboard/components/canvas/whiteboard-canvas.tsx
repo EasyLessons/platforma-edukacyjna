@@ -130,8 +130,10 @@ export default function WhiteboardCanvasNew({
   const htmlOverlaysRef = useRef<HTMLDivElement>(null);
   /** Ref do wrappera Markdown + Table overlayów — ukrywany podczas pan razem z htmlOverlaysRef */
   const mdTableOverlaysRef = useRef<HTMLDivElement>(null);
-  /** Ref do wrappera RemoteCursors — ukrywany podczas pan (viewport stale → złe pozycje ekranowe) */
+  /** Ref do RemoteCursors — ukrywany podczas pan (viewport stale → złe pozycje ekranowe) */
   const remoteCursorsRef = useRef<HTMLDivElement>(null);
+  /** Czy trwa aktywny pan gestem (PanTool lub wheel) — pomija setViewport w hot-path */
+  const isPanningRef = useRef(false);
 
   useEffect(() => {
     boardIdRef.current = boardId;
@@ -606,9 +608,32 @@ export default function WhiteboardCanvasNew({
   // HANDLER VIEWPORT (wywołują narzędzia podczas pan/zoom przez touch/drag)
   // ═══════════════════════════════════════════════════════════════════════════
 
+  /** Ukrywa wszystkie HTML-overlaye natychmiast — bez re-renderu React */
+  const hideOverlaysForPan = useCallback(() => {
+    isPanningRef.current = true;
+    if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
+    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
+    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
+  }, []);
+
+  /** Przywraca overlaye i synchronizuje React viewport state raz po zakończeniu pana */
+  const restoreOverlaysAfterPan = useCallback(() => {
+    isPanningRef.current = false;
+    if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+    if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
+    if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
+    // Synchronizuj React state raz — overlaye dostaną nowy viewport i narysują się w dobrym miejscu
+    vp.setViewport(vp.viewportRef.current);
+  }, [vp.setViewport, vp.viewportRef]);
+
   const handleViewportChange = useCallback((newVp: ViewportTransform) => {
     const constrained = constrainViewport(newVp);
     vp.viewportRef.current = constrained;
+    // Podczas aktywnego pana — tylko ref + redraw canvas, bez setViewport (brak re-renderów React)
+    if (isPanningRef.current) {
+      requestAnimationFrame(() => redrawCanvasRef.current());
+      return;
+    }
     vp.setViewport(constrained);
   }, [vp.setViewport, vp.viewportRef]);
 
@@ -1357,6 +1382,8 @@ export default function WhiteboardCanvasNew({
             canvasWidth={canvasWidth}
             canvasHeight={canvasHeight}
             onViewportChange={handleViewportChange}
+            onPanStart={hideOverlaysForPan}
+            onPanEnd={restoreOverlaysAfterPan}
           />
         )}
 

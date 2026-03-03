@@ -45,9 +45,13 @@ interface PanToolProps {
   canvasWidth: number;
   canvasHeight: number;
   onViewportChange: (viewport: ViewportTransform) => void;
+  /** Wywoływane gdy użytkownik zaczyna ciągnąć canvas — ukryj overlaye */
+  onPanStart?: () => void;
+  /** Wywoływane gdy użytkownik puści canvas — pokaż overlaye */
+  onPanEnd?: () => void;
 }
 
-export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange }: PanToolProps) {
+export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange, onPanStart, onPanEnd }: PanToolProps) {
   const [isPanning, setIsPanning] = useState(false);
   const [lastMousePos, setLastMousePos] = useState<Point | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -106,15 +110,14 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       gestures.handlePointerDown(e);
-      // Pan działa zawsze - gesty multitouch mają priorytet ale pojedynczy pan też działa
-
       if (e.button === 0 || e.button === 1) {
         e.preventDefault();
         setIsPanning(true);
         setLastMousePos({ x: e.clientX, y: e.clientY });
+        onPanStart?.();
       }
     },
-    [gestures]
+    [gestures, onPanStart]
   );
 
   // Pointer move - kontynuuj panning
@@ -140,11 +143,13 @@ export function PanTool({ viewport, canvasWidth, canvasHeight, onViewportChange 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       gestures.handlePointerUp(e);
-
+      if (isPanning) {
+        onPanEnd?.();
+      }
       setIsPanning(false);
       setLastMousePos(null);
     },
-    [gestures]
+    [gestures, isPanning, onPanEnd]
   );
 
   return (
