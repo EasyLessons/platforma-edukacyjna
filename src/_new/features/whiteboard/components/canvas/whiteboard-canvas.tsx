@@ -152,6 +152,8 @@ export default function WhiteboardCanvasNew({
   const remoteCursorsRef = useRef<HTMLDivElement>(null);
   /** Czy trwa aktywny pan gestem (PanTool lub wheel) — pomija setViewport w hot-path */
   const isPanningRef = useRef(false);
+  /** Czy overlaye są FAKTYCZNIE widoczne (false = ukryte podczas scroll/pan/wheel) */
+  const overlaysVisibleRef = useRef(true);
   /** Debounced timer do przywrócenia overlayów po zakończeniu viewport scrollu/pana */
   const viewportChangeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -638,6 +640,7 @@ export default function WhiteboardCanvasNew({
   /** Ukrywa wszystkie HTML-overlaye natychmiast — bez re-renderu React */
   const hideOverlaysForPan = useCallback(() => {
     isPanningRef.current = true;
+    overlaysVisibleRef.current = false; // 🆕 Śledzenie widoczności
     // 🆕 Wyczyść zaznaczenie SYNCHRONICZNIE (flushSync) — panel zniknie natychmiast
     flushSync(() => {
       sel.clearSelection();
@@ -650,6 +653,7 @@ export default function WhiteboardCanvasNew({
   /** Przywraca overlaye i synchronizuje React viewport state raz po zakończeniu pana */
   const restoreOverlaysAfterPan = useCallback(() => {
     isPanningRef.current = false;
+    overlaysVisibleRef.current = true; // 🆕 Śledzenie widoczności
     // Anuluj debounce — przywróć natychmiast (gest skończony, pozycja znana)
     if (viewportChangeTimerRef.current) {
       clearTimeout(viewportChangeTimerRef.current);
@@ -673,6 +677,7 @@ export default function WhiteboardCanvasNew({
     
     // 🆕 Ukryj overlaye i wyczyść selection PRZED zmianą viewport
     // (zapobiega renderowaniu properties panel z nowym viewport ale starym selection)
+    overlaysVisibleRef.current = false; // 🆕 Śledzenie widoczności
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
@@ -699,6 +704,7 @@ export default function WhiteboardCanvasNew({
     viewportChangeTimerRef.current = setTimeout(() => {
       viewportChangeTimerRef.current = null;
       if (isPanningRef.current) return; // gest wciąż trwa — poczekaj na restoreOverlaysAfterPan
+      overlaysVisibleRef.current = true; // 🆕 Śledzenie widoczności
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
@@ -1403,6 +1409,7 @@ export default function WhiteboardCanvasNew({
               canvasHeight={canvasHeight}
               elements={el.elements}
               selectedIds={sel.selectedElementIds}
+              isOverlayVisible={overlaysVisibleRef.current}
               onSelectionChange={handleSelectionChange}
               onElementUpdate={handleElementUpdate}
               onElementUpdateWithHistory={handleElementUpdateWithHistory}

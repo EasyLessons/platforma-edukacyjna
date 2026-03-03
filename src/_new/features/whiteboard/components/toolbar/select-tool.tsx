@@ -33,6 +33,7 @@ interface SelectToolProps {
   canvasHeight: number;
   elements: DrawingElement[];
   selectedIds: Set<string>;
+  isOverlayVisible?: boolean; // 🆕 Czy overlay jest widoczny (nie renderuj properties panel gdy false)
   onSelectionChange: (ids: Set<string>) => void;
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
   onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void;
@@ -62,6 +63,7 @@ export function SelectTool({
   canvasHeight,
   elements,
   selectedIds,
+  isOverlayVisible = true, // 🆕 Domyślnie widoczny
   onSelectionChange,
   onElementUpdate,
   onElementUpdateWithHistory,
@@ -2161,6 +2163,8 @@ export function SelectTool({
 
   // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek lub markdown
   const renderPropertiesPanel = () => {
+    // 🆕 Nie renderuj wcale gdy overlay jest ukryty (zapobiega "latającemu" panelowi podczas scroll/pan)
+    if (!isOverlayVisible) return null;
     if (selectedIds.size === 0 || !onElementUpdateWithHistory) return null;
 
     const selectedElements = elements.filter((el) => selectedIds.has(el.id));
