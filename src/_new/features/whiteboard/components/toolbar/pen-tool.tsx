@@ -162,7 +162,8 @@ export function PenTool({
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
     // Użyj canvasViewportRef — brak opóźnienia debounce 80ms
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
@@ -210,7 +211,8 @@ export function PenTool({
     e.preventDefault();
     e.stopPropagation();
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     // Wygładzanie - dodaj punkt tylko jeśli jest wystarczająco daleko od poprzedniego
