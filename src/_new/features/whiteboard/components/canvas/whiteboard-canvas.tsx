@@ -485,18 +485,16 @@ export default function WhiteboardCanvasNew({
 
   // ─── PAN środkowym przyciskiem myszy (scroll) lub prawym (PPM) ──────────────
   //
-  // ⚠️ WAŻNE: używamy pointerdown z { capture: true } zamiast mousedown.
-  // Dzięki temu event dociera do tego handlera PRZED child-overlayami (SelectTool itp.).
-  // e.preventDefault() wywołany w capture phase zapobiega uruchomieniu przez
-  // przeglądarkę "autoscroll mode" (animowane kółko ze strzałkami przy MMB),
-  // który przechwytywał pointer i blokował ruch po puszczeniu.
-  // PPM (button=2) też działa — onContextMenu na overlayach go blokuje.
+  // Strategia: pointerdown w capture phase (łapie przed child-overlayami),
+  // a pointermove/pointerup RÓWNIEŻ na kontenerze (nie document!), bo
+  // setPointerCapture kieruje przyszłe eventy do kontenera — listener
+  // na document ich nie zobaczy.
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let isPanningId: number | null = null; // pointerId aktywnego pana
+    let isPanningId: number | null = null;
     let lastX = 0;
     let lastY = 0;
 
@@ -508,13 +506,10 @@ export default function WhiteboardCanvasNew({
       isPanningId = e.pointerId;
       lastX = e.clientX;
       lastY = e.clientY;
-      // 🔑 KLUCZOWE: pointer capture przekierowuje WSZYSTKIE przyszłe pointermove/pointerup
-      // bezpośrednio do kontenera, omijając nakładkę PanToola (która inaczej blokuje eventy).
-      // Bez tego PPM+drag zmienia tylko kursor, bo pointermove trafia do nakładki PanToola
-      // która nic nie robi (isPanningRef=false), a event nie dociera do document listenera.
+      // setPointerCapture → wszystkie przyszłe pointermove/pointerup dla tego
+      // pointera trafiają do `container`, nawet gdy kursor wyjdzie poza okno.
       container.setPointerCapture(e.pointerId);
       document.body.style.cursor = 'grabbing';
-      // Zablokuj natywne menu kontekstowe (PPM)
       container.addEventListener('contextmenu', preventContextMenu, { once: true });
       vp.handleStopFollowing();
       flushSync(() => { sel.clearSelection(); });
@@ -531,7 +526,6 @@ export default function WhiteboardCanvasNew({
       lastY = e.clientY;
       const next = panViewportWithMouse(vp.viewportRef.current, dx, dy);
       const constrained = constrainViewport(next);
-      // ⚡ PERF: tylko ref + RAF — bez React re-render w hot-path
       vp.viewportRef.current = constrained;
       requestAnimationFrame(() => redrawCanvasRef.current());
     };
@@ -540,26 +534,29 @@ export default function WhiteboardCanvasNew({
       if (isPanningId === null || e.pointerId !== isPanningId) return;
       isPanningId = null;
       document.body.style.cursor = '';
-      // Przywróć overlaye
+      if (container.hasPointerCapture(e.pointerId)) {
+        container.releasePointerCapture(e.pointerId);
+      }
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
-      // Zsynchronizuj React state raz na koniec gestu
       vp.setViewport(vp.viewportRef.current);
     };
 
     const preventContextMenu = (e: Event) => e.preventDefault();
 
-    // capture: true — handlery działają PRZED child-overlayami
+    // pointerdown: capture phase → łapie PRZED child-overlayami (SelectTool, PanTool itp.)
+    // pointermove/pointerup: na KONTENERZE (nie document!) — bo setPointerCapture
+    //   przekierowuje eventy do kontenera; listener na document ich nie widzi.
     container.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    document.addEventListener('pointermove', handlePointerMove);
-    document.addEventListener('pointerup', handlePointerUp);
-    document.addEventListener('pointercancel', handlePointerUp as EventListener);
+    container.addEventListener('pointermove', handlePointerMove);
+    container.addEventListener('pointerup', handlePointerUp);
+    container.addEventListener('pointercancel', handlePointerUp as EventListener);
     return () => {
       container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      document.removeEventListener('pointermove', handlePointerMove);
-      document.removeEventListener('pointerup', handlePointerUp);
-      document.removeEventListener('pointercancel', handlePointerUp as EventListener);
+      container.removeEventListener('pointermove', handlePointerMove);
+      container.removeEventListener('pointerup', handlePointerUp);
+      container.removeEventListener('pointercancel', handlePointerUp as EventListener);
       container.removeEventListener('contextmenu', preventContextMenu);
     };
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef, sel]);
