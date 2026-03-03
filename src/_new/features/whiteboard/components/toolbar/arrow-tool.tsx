@@ -161,6 +161,8 @@ export function ArrowTool({
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
+    if (e.button === 1 || e.button === 2) return;
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 

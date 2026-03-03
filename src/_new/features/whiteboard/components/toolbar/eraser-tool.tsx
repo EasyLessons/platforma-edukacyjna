@@ -254,6 +254,8 @@ export function EraserTool({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
+      if (e.button === 1 || e.button === 2) return;
       gestures.handlePointerDown(e);
       if (gestures.isGestureActive()) return;
 

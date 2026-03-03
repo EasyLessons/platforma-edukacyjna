@@ -35,6 +35,7 @@ Technologie:
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import NullPool
 from core.config import get_settings
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -46,26 +47,21 @@ settings = get_settings()
 # ENGINE - Silnik połączenia z bazą danych
 # ============================================
 # 
-# Co to jest engine?
-#   - "Silnik" który zarządza połączeniami z bazą
-#   - Tworzy pool (pulę) połączeń do reużycia
-#   - Wydajniejsze niż tworzenie nowego połączenia za każdym razem
+# NullPool — wyłącza LOKALNY connection pool w SQLAlchemy.
 #
-# Parametry:
-#   pool_pre_ping=True
-#     - Przed użyciem połączenia sprawdza czy działa
-#     - Jeśli nie działa (np. timeout) → tworzy nowe
-#     - Zapobiega błędom "connection closed"
+# DLACZEGO?
+#   Neon używa wbudowanego PgBouncer pooler (widać w URL: "...pooler.eu-west-2...").
+#   PgBouncer już zarządza pulą połączeń po stronie serwera.
+#   Jeśli SQLAlchemy też trzyma swój pool, to mamy "double pooling":
+#     SQLAlchemy trzyma stare połączenie → Neon/PgBouncer je zamyka po timeout →
+#     SQLAlchemy próbuje użyć martwego połączenia → "server closed the connection unexpectedly"
 #
-#   pool_recycle=1800 (30 minut)
-#     - Automatycznie odnawia połączenie co 30 minut
-#     - DLACZEGO? Neon serverless zamyka nieaktywne połączenia po ~5 min
-#     - Zapobiega SSL timeout errors
+#   NullPool = każdy request tworzy NOWE połączenie i zamyka je po zakończeniu.
+#   PgBouncer i tak je zrecykluje po stronie serwera — zero marnotrawstwa.
 #
 engine = create_engine(
     settings.database_url,
-    pool_pre_ping=True,  # Testuj połączenie przed użyciem
-    pool_recycle=1800,   # Odnawiaj połączenie co 30 min
+    poolclass=NullPool,  # Bez lokalnego poola — Neon pooler zarządza połączeniami
 )
 
 # ============================================

@@ -485,81 +485,98 @@ export default function WhiteboardCanvasNew({
 
   // ─── PAN środkowym przyciskiem myszy (scroll) lub prawym (PPM) ──────────────
   //
-  // Strategia: pointerdown w capture phase (łapie przed child-overlayami),
-  // a pointermove/pointerup RÓWNIEŻ na kontenerze (nie document!), bo
-  // setPointerCapture kieruje przyszłe eventy do kontenera — listener
-  // na document ich nie zobaczy.
+  // Strategia: pointerdown w capture phase NA KONTENERZE — łapie event PRZED
+  // tool-overlayami (SelectTool, PenTool itd.). stopPropagation blokuje narzędzia
+  // od widzenia pointerdown. pointermove/pointerup na document (bubble) — zawsze
+  // docierają bo nie używamy pointer-capture API.
+  //
+  // WAŻNE: Stan pana (isPanningRef, panLastPos) trzymany w REFS — przeżywają
+  // re-rendery Reacta. Poprzednia wersja z let isPanning w closure była resetowana
+  // gdy effect re-runował z powodu zmiany zależności (np. sel).
+
+  const panLastPosRef = useRef({ x: 0, y: 0 });
+  /** Czy PPM/MMB pan właśnie się zakończył — blokuje contextmenu po puszczeniu PPM */
+  const panDidDragRef = useRef(false);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    let isPanningId: number | null = null;
-    let lastX = 0;
-    let lastY = 0;
-
+    // pointerdown w capture phase na kontenerze — odpala się PRZED tool-overlayami
     const handlePointerDown = (e: PointerEvent) => {
       // button 1 = scroll (MMB), button 2 = PPM
       if (e.button !== 1 && e.button !== 2) return;
-      e.preventDefault();
-      e.stopPropagation();
-      isPanningId = e.pointerId;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      // setPointerCapture → wszystkie przyszłe pointermove/pointerup dla tego
-      // pointera trafiają do `container`, nawet gdy kursor wyjdzie poza okno.
-      container.setPointerCapture(e.pointerId);
+
+      e.preventDefault();      // blokuje autoscroll (MMB) + zapobiega mousedown
+      e.stopPropagation();     // blokuje tool-overlay od widzenia pointerdown
+
+      isPanningRef.current = true;
+      panDidDragRef.current = false;
+      panLastPosRef.current = { x: e.clientX, y: e.clientY };
+
       document.body.style.cursor = 'grabbing';
-      container.addEventListener('contextmenu', preventContextMenu, { once: true });
       vp.handleStopFollowing();
-      flushSync(() => { sel.clearSelection(); });
+
+      // Ukryj HTML overlaye — pojawią się po zakończeniu pana (po setViewport)
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = 'hidden';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = 'hidden';
     };
 
     const handlePointerMove = (e: PointerEvent) => {
-      if (isPanningId === null || e.pointerId !== isPanningId) return;
-      const dx = e.clientX - lastX;
-      const dy = e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
+      if (!isPanningRef.current) return;
+
+      const dx = e.clientX - panLastPosRef.current.x;
+      const dy = e.clientY - panLastPosRef.current.y;
+      panLastPosRef.current = { x: e.clientX, y: e.clientY };
+
+      if (dx !== 0 || dy !== 0) panDidDragRef.current = true;
+
       const next = panViewportWithMouse(vp.viewportRef.current, dx, dy);
       const constrained = constrainViewport(next);
       vp.viewportRef.current = constrained;
       requestAnimationFrame(() => redrawCanvasRef.current());
     };
 
-    const handlePointerUp = (e: PointerEvent) => {
-      if (isPanningId === null || e.pointerId !== isPanningId) return;
-      isPanningId = null;
+    const handlePointerUp = () => {
+      if (!isPanningRef.current) return;
+      isPanningRef.current = false;
       document.body.style.cursor = '';
-      if (container.hasPointerCapture(e.pointerId)) {
-        container.releasePointerCapture(e.pointerId);
-      }
+
+      // Przywróć overlaye
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
       if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
       if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
+
+      // Zsynchronizuj React state — aktualizuje ZoomControls + HTML overlays
       vp.setViewport(vp.viewportRef.current);
     };
 
-    const preventContextMenu = (e: Event) => e.preventDefault();
+    // Blokuj context menu po zakończonym panie PPM
+    const handleContextMenu = (e: MouseEvent) => {
+      if (panDidDragRef.current) {
+        e.preventDefault();
+        panDidDragRef.current = false;
+      }
+    };
 
-    // pointerdown: capture phase → łapie PRZED child-overlayami (SelectTool, PanTool itp.)
-    // pointermove/pointerup: na KONTENERZE (nie document!) — bo setPointerCapture
-    //   przekierowuje eventy do kontenera; listener na document ich nie widzi.
     container.addEventListener('pointerdown', handlePointerDown, { capture: true });
-    container.addEventListener('pointermove', handlePointerMove);
-    container.addEventListener('pointerup', handlePointerUp);
-    container.addEventListener('pointercancel', handlePointerUp as EventListener);
+    document.addEventListener('pointermove', handlePointerMove);
+    document.addEventListener('pointerup', handlePointerUp);
+    container.addEventListener('contextmenu', handleContextMenu);
+
     return () => {
       container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      container.removeEventListener('pointermove', handlePointerMove);
-      container.removeEventListener('pointerup', handlePointerUp);
-      container.removeEventListener('pointercancel', handlePointerUp as EventListener);
-      container.removeEventListener('contextmenu', preventContextMenu);
+      document.removeEventListener('pointermove', handlePointerMove);
+      document.removeEventListener('pointerup', handlePointerUp);
+      container.removeEventListener('contextmenu', handleContextMenu);
+      // Cleanup gdyby pan był aktywny w momencie odmontowania
+      if (isPanningRef.current) {
+        isPanningRef.current = false;
+        document.body.style.cursor = '';
+      }
     };
-  }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef, sel]);
+  }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
 
   // ─── SKRÓTY KLAWISZOWE ─────────────────────────────────────────────────────
 
