@@ -174,10 +174,12 @@ export function drawShape(
 
     case 'triangle':
       const midX = (start.x + end.x) / 2;
+      const triTopY = Math.min(start.y, end.y);
+      const triBottomY = Math.max(start.y, end.y);
       ctx.beginPath();
-      ctx.moveTo(midX, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.lineTo(start.x, end.y);
+      ctx.moveTo(midX, triTopY);
+      ctx.lineTo(end.x, triBottomY);
+      ctx.lineTo(start.x, triBottomY);
       ctx.closePath();
       if (shape.fill) {
         ctx.fill();

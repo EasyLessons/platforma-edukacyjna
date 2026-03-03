@@ -43,6 +43,7 @@ import {
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { ShapeType } from '@/_new/features/whiteboard/types';
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
+import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
@@ -217,7 +218,7 @@ export function ShapeTool({
             width={Math.abs(width)}
             height={Math.abs(height)}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -231,7 +232,7 @@ export function ShapeTool({
             rx={radiusX}
             ry={radiusY}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -245,7 +246,7 @@ export function ShapeTool({
           <polygon
             points={`${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
@@ -259,7 +260,7 @@ export function ShapeTool({
             x2={end.x}
             y2={end.y}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             strokeLinecap="round"
           />
         );
@@ -286,7 +287,7 @@ export function ShapeTool({
               x2={end.x}
               y2={end.y}
               stroke={currentShape.color}
-              strokeWidth={currentShape.strokeWidth}
+              strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
               strokeLinecap="round"
             />
             <polygon
@@ -318,7 +319,7 @@ export function ShapeTool({
           <polygon
             points={polygonPoints.join(' ')}
             stroke={currentShape.color}
-            strokeWidth={currentShape.strokeWidth}
+            strokeWidth={clampLineWidth(currentShape.strokeWidth, viewport.scale)}
             fill={currentShape.fill ? currentShape.color : 'none'}
           />
         );
