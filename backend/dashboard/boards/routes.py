@@ -459,13 +459,18 @@ async def join_board_workspace(
         WorkspaceMember.user_id == user_id
     ).first()
     
+    is_owner = (board.created_by == user_id)
+
     if existing_member:
         # Już jest członkiem - zwróć sukces
         return {
             "success": True,
             "already_member": True,
             "workspace_id": board.workspace_id,
-            "board_id": board_id
+            "board_id": board_id,
+            "owner_id": board.created_by,
+            "is_owner": is_owner,
+            "user_role": "owner" if is_owner else existing_member.role,
         }
     
     # Dodaj jako member workspace
@@ -482,6 +487,9 @@ async def join_board_workspace(
         "already_member": False,
         "workspace_id": board.workspace_id,
         "board_id": board_id,
+        "owner_id": board.created_by,
+        "is_owner": is_owner,
+        "user_role": "owner" if is_owner else "member",
         "message": "Dołączono do workspace"
     }
 

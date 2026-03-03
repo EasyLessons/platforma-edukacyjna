@@ -140,6 +140,19 @@ export function TablicaContent() {
               console.log('📦 Workspace ID z join:', result.workspace_id);
             }
 
+            // Ustaw rolę i ownership bezpośrednio z join — nie czekamy na fetchBoardById
+            if (result.is_owner !== undefined) {
+              setIsOwner(result.is_owner);
+              console.log('👑 Właściciel tablicy (z join):', result.is_owner);
+            }
+            if (result.owner_id !== undefined) {
+              setBoardOwnerId(result.owner_id);
+            }
+            if (result.user_role !== undefined) {
+              setUserRole(result.user_role as 'owner' | 'editor' | 'viewer');
+              console.log('👤 Rola użytkownika (z join):', result.user_role);
+            }
+
             if (!result.already_member) {
               console.log('🆕 Dołączono do nowego workspace!');
             }
@@ -275,7 +288,7 @@ export function TablicaContent() {
       <BoardHeader
         boardName={boardName}
         boardId={boardId}
-        onSettingsClick={userRole === 'owner' && boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
+        onSettingsClick={isOwner && boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
       />
 
       {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}

@@ -799,6 +799,9 @@ export const joinBoardWorkspace = async (
   already_member: boolean;
   workspace_id: number;
   board_id: number;
+  owner_id?: number;
+  is_owner?: boolean;
+  user_role?: string;
   message?: string;
 }> => {
   const token = getToken();
