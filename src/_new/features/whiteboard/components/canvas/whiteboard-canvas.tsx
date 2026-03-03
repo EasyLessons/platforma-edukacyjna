@@ -508,6 +508,11 @@ export default function WhiteboardCanvasNew({
       isPanningId = e.pointerId;
       lastX = e.clientX;
       lastY = e.clientY;
+      // 🔑 KLUCZOWE: pointer capture przekierowuje WSZYSTKIE przyszłe pointermove/pointerup
+      // bezpośrednio do kontenera, omijając nakładkę PanToola (która inaczej blokuje eventy).
+      // Bez tego PPM+drag zmienia tylko kursor, bo pointermove trafia do nakładki PanToola
+      // która nic nie robi (isPanningRef=false), a event nie dociera do document listenera.
+      container.setPointerCapture(e.pointerId);
       document.body.style.cursor = 'grabbing';
       // Zablokuj natywne menu kontekstowe (PPM)
       container.addEventListener('contextmenu', preventContextMenu, { once: true });
