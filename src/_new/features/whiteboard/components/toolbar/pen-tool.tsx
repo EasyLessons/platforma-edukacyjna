@@ -151,8 +151,21 @@ export function PenTool({
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
+    const overlayRect = overlayRef.current?.getBoundingClientRect();
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+
+    // 🔴 DEBUG — usuń po naprawie
+    console.log('🔴 PEN DEBUG pointerDown:', {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      overlayRect: overlayRect ? { left: overlayRect.left, top: overlayRect.top, width: overlayRect.width, height: overlayRect.height } : null,
+      screenPoint,
+      viewport: { x: viewport.x, y: viewport.y, scale: viewport.scale },
+      canvasWidth,
+      canvasHeight,
+      worldPoint,
+    });
 
     pointsRef.current = [worldPoint];
     
