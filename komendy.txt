@@ -14,7 +14,12 @@ python -m venv .venv
 pip install -r requirements.txt
 
 # Uruchomienie serwera (z folderu /backend, venv musi być aktywny)
+cd backend
+.\.venv\Scripts\Activate.ps1
 uvicorn main:app --reload
+
+# LUB jedną komendą (bez aktywacji venv, bezpośrednio przez .venv):
+# cd backend; .\.venv\Scripts\uvicorn.exe main:app --reload
 
 
 # ================================================
