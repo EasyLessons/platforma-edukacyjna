@@ -29,6 +29,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
+import { flushSync } from 'react-dom';
 
 // ─── Nowe hooki ───────────────────────────────────────────────────────────────
 import { useViewport } from '../../hooks/use-viewport';
@@ -645,11 +646,17 @@ export default function WhiteboardCanvasNew({
       clearTimeout(viewportChangeTimerRef.current);
       viewportChangeTimerRef.current = null;
     }
+    // Najpierw synchronicznie zaktualizuj React state — React przerenderuje
+    // wszystkie pozycje (w tym SelectionPropertiesPanel) jeszcze zanim
+    // overlaye staną się widoczne. Bez tego panel przez ułamek sekundy
+    // byłby widoczny na starej pozycji (efekt "leci za nami").
+    flushSync(() => {
+      vp.setViewport(vp.viewportRef.current);
+    });
+    // Dopiero teraz odkryj overlaye — panele są już na właściwych pozycjach
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.visibility = '';
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.visibility = '';
-    // Synchronizuj React state raz — overlaye dostaną nowy viewport i narysują się w dobrym miejscu
-    vp.setViewport(vp.viewportRef.current);
   }, [vp.setViewport, vp.viewportRef]);
 
   const handleViewportChange = useCallback((newVp: ViewportTransform) => {
