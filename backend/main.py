@@ -2,8 +2,9 @@
 MAIN.PY - Entry point aplikacji
 """
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import logging
 
 from core.logging import setup_logging
@@ -24,6 +25,49 @@ logger = logging.getLogger(__name__)
 # Aplikacja
 app = FastAPI(title="Education Platform API")
 
+# Lista dozwolonych origindów (zsynchronizowana z CORSMiddleware poniżej)
+ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://platforma-edukacyjna-five.vercel.app",
+    "https://platforma-edukacyjna-one.vercel.app",
+    "https://easylesson.app",
+    "https://www.easylesson.app",
+]
+ALLOWED_ORIGIN_REGEX = r"https://(www\.)?easylesson\.app|https://.*\.vercel\.app"
+
+import re as _re
+
+def _cors_origin_for(request: Request) -> str | None:
+    """Zwróć origin jeśli znajduje się na liście dozwolonych."""
+    origin = request.headers.get("origin")
+    if not origin:
+        return None
+    if origin in ALLOWED_ORIGINS:
+        return origin
+    if _re.match(ALLOWED_ORIGIN_REGEX, origin):
+        return origin
+    return None
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """
+    Globalny handler dla nieobsłużonych wyjątków (500).
+    Zawsze dodaje nagłówki CORS — bez tego przeglądarka blokuje odpowiedź
+    zanim JavaScript zdąży przeczytać kod błędu.
+    """
+    logger.error(f"Unhandled exception on {request.method} {request.url}: {exc}", exc_info=True)
+    origin = _cors_origin_for(request)
+    headers = {}
+    if origin:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers,
+    )
+
 @app.on_event("startup")
 async def startup_event():
     """Event wywoływany przy starcie aplikacji"""
@@ -35,25 +79,11 @@ async def shutdown_event():
     """Event wywoływany przy zamknięciu aplikacji"""
     logger.info("🛑 Aplikacja Education Platform zatrzymana!")
 
-# CORS - ZAKTUALIZOWANE DLA TWOICH DOMEN
-# 🛡️ Używamy allow_origin_regex dla elastyczności z subdomenami
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        # Development (localhost)
-        "http://localhost:3000",
-        "http://localhost:8000",
-        
-        # Production - Vercel domains
-        "https://platforma-edukacyjna-five.vercel.app",
-        "https://platforma-edukacyjna-one.vercel.app",
-        
-        # Production - Custom domain (z i bez www)
-        "https://easylesson.app",
-        "https://www.easylesson.app",
-    ],
-    # 🛡️ REGEX: akceptuj wszystkie subdomeny easylesson.app i vercel.app
-    allow_origin_regex=r"https://(www\.)?easylesson\.app|https://.*\.vercel\.app",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
