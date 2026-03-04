@@ -1,45 +1,34 @@
 ﻿/**
  * ============================================================================
- * PLIK: src/app/tablica/toolbar/TextTool.tsx
+ * PLIK: text-tool.tsx — model Miro
  * ============================================================================
  *
- * IMPORTUJE Z:
- * - react (useState, useRef, useEffect)
- * - lucide-react (ikony: Bold, Italic, AlignLeft, AlignCenter, AlignRight)
- * - ../whiteboard/types (Point, ViewportTransform, TextElement)
- * - ../whiteboard/viewport (transformPoint, inverseTransformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
+ * TWORZENIE:
+ *   Przeciągnij → ramka definiuje JEDEN WIERSZ tekstu.
+ *   Czcionka dopasowuje się do WYSOKOŚCI ramki (fontSize = worldH * 100 * FONT_HEIGHT_RATIO).
+ *   Po puszczeniu myszy → od razu tryb edycji, cały tekst zaznaczony.
  *
- * EKSPORTUJE:
- * - TextTool (component) - narzędzie tworzenia/edycji tekstów
+ * EDYCJA:
+ *   • Textarea siedzi DOKŁADNIE na elemencie (te same world-coords co canvas).
+ *   • Widoczna niebieska ramka + 4 uchwyty narożnikowe.
+ *   • Tekst zawija się do nowej linii gdy nie mieści się w szerokości (overflowX hidden).
+ *   • Na początku cały tekst zaznaczony → wpisanie ZASTĘPUJE go (Miro-style).
+ *   • Ponowne kliknięcie w textarea → zwykłe ustawienie kursora.
+ *   • ESC / klik poza = zapis.
  *
- * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (aktywne gdy tool === 'text')
+ * RESIZE:
+ *   4 narożniki (tl/tr/bl/br). Każdy przesuwa odpowiednie krawędzie.
+ *   Czcionka automatycznie przeliczana z nowej wysokości.
  *
- * ⚠️ ZALEŻNOŚCI:
- * - types.ts - używa TextElement (zmiana interfejsu wymaga aktualizacji)
- * - viewport.ts - używa funkcji transformacji i zoom/pan
- * - WhiteboardCanvas.tsx - dostarcza callback'i: onTextCreate, onTextUpdate, onTextDelete
- *
- * ⚠️ WAŻNE - WHEEL EVENTS:
- * - Blokuje wheel gdy isEditing (scrollowanie w textarea)
- * - Obsługuje wheel gdy przeciąga ramkę (zoom/pan)
- * - touchAction: 'none' blokuje domyślny zoom przeglądarki
- *
- * ⚠️ EDYCJA TEKSTU:
- * - editingTextId (z props) - ID tekstu do edycji (z double-click w SelectTool)
- * - Automatyczne zapisywanie przy kliknięciu poza edytor
- * - ESC anuluje edycję
- *
- * PRZEZNACZENIE:
- * Tworzenie nowych tekstów (drag box → edytor) i edycja istniejących.
- * Mini toolbar z formatowaniem: rozmiar, kolor, bold, italic, wyrównanie.
+ * INTEGRACJA Z SelectTool:
+ *   • Double-click na tekst (cold start) → onTextEdit(id)
+ *   • Single-click na już zaznaczony tekst → onTextEdit(id)  [select-tool.tsx]
  * ============================================================================
  */
 
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
-import { Bold, Italic, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Point, ViewportTransform, TextElement } from '@/_new/features/whiteboard/types';
 import {
   transformPoint,
@@ -50,6 +39,23 @@ import {
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { TextMiniToolbar } from './text-mini-toolbar';
 
+// ─── STAŁA SKALOWANIA CZCIONKI ─────────────────────────────────────────────
+// fontSize (px przy scale=1) = worldH * 100 * FONT_HEIGHT_RATIO
+//
+// Jak to działa:
+//   worldH = wysokość ramki w jednostkach świata (1 world unit = 100px przy scale=1)
+//   worldH * 100 = wysokość ramki w pikselach przy scale=1
+//   * FONT_HEIGHT_RATIO = jaki procent tej wysokości zajmuje czcionka
+//
+// Przykład: worldH=0.4 → box=40px, fontSize=26px, linia=26*1.4=36.4px ≤ 40px ✓
+// Wzór działa tak samo przy każdym zoom — zarówno canvas jak textarea skalują przez scale
+const FONT_HEIGHT_RATIO = 0.65;
+
+// Minimalne rozmiary ramki (world units) — żeby nie można było "spłaszczyć" do zera
+const MIN_WORLD_W = 0.8;  // 80px przy scale=1
+const MIN_WORLD_H = 0.18; // 18px przy scale=1
+
+// ─── INTERFEJSY ─────────────────────────────────────────────────────────────
 interface TextToolProps {
   viewport: ViewportTransform;
   canvasWidth: number;
@@ -61,25 +67,35 @@ interface TextToolProps {
   onTextDelete: (id: string) => void;
   onEditingComplete?: () => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
-  /** Ref do kontenera edytora — aktualizowany przez whiteboard-canvas w RAF dla zero-lag panu */
+  /** Ref do outer diva edytora — aktualizowany przez whiteboard-canvas w RAF (zero-lag pan) */
   editorDivRef?: React.RefObject<HTMLDivElement | null>;
 }
 
-interface TextDraft {
-  id: string;
-  screenStart: Point;
-  screenEnd: Point;
-  worldStart: Point;
-  worldEnd: Point;
-  fontSize: number;
-  color: string;
+/**
+ * Draft = roboczy obiekt edytowanego/tworzonego tekstu.
+ * TYLKO world-units (nie screen-px) — przeliczamy na ekran w każdym renderze.
+ * Dzięki temu po pan/zoom edytor automatycznie trafia w dobre miejsce.
+ *
+ * @property isExisting  - true gdy edytujemy istniejący element (nie nowo tworzony)
+ * @property fontSize    - px przy scale=1, obliczany z worldH * 100 * FONT_HEIGHT_RATIO
+ */
+interface Draft {
+  id:         string;
+  worldX:     number; // lewy górny X
+  worldY:     number; // lewy górny Y
+  worldW:     number; // szerokość
+  worldH:     number; // wysokość
+  fontSize:   number; // px przy scale=1
+  color:      string;
   fontFamily: string;
   fontWeight: 'normal' | 'bold';
-  fontStyle: 'normal' | 'italic';
-  textAlign: 'left' | 'center' | 'right';
+  fontStyle:  'normal' | 'italic';
+  textAlign:  'left' | 'center' | 'right';
+  isExisting: boolean;
 }
 
-export const TextTool = function TextTool({
+// ─── GŁÓWNY KOMPONENT ────────────────────────────────────────────────────────
+export function TextTool({
   viewport,
   canvasWidth,
   canvasHeight,
@@ -92,418 +108,428 @@ export const TextTool = function TextTool({
   onViewportChange,
   editorDivRef,
 }: TextToolProps) {
-  const [isDragging, setIsDragging] = useState(false);
-  const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingText, setEditingText] = useState('');
-  const [editingId, setEditingId] = useState<string | null>(null); // 🆕 ID edytowanego tekstu
+
+  // ── FAZY ────────────────────────────────────────────────────────────────
+  // 'idle'    → overlay wychwytuje kliknięcia, nic nie jest otwarte
+  // 'drawing' → użytkownik przeciąga myszką tworząc nową ramkę
+  // 'editing' → edytor tekstowy widoczny, textarea aktywna
+  const [phase, setPhase] = useState<'idle' | 'drawing' | 'editing'>('idle');
+
+  // ── DRAFT — roboczy obiekt tekstu ────────────────────────────────────────
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  // Punkty startu/końca podczas przeciągania (refs = nie powodują re-renderów)
+  const drawStartWorld = useRef<Point | null>(null);
+  const drawCurrWorld  = useRef<Point | null>(null);
+
+  // Preview ramki podczas rysowania (state bo musi triggerować re-render)
+  const [drawPreview, setDrawPreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+
+  // ── TEKST EDYTORA ────────────────────────────────────────────────────────
+  const [editText, setEditText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const editorRef = useRef<HTMLDivElement>(null);
 
-  // 🆕 Auto-resize textarea height based on content
+  // ── RESIZE ───────────────────────────────────────────────────────────────
+  // isResizing=true blokuje clickOutside (żeby nie zamknąć edytora podczas resize)
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeHandleRef     = useRef<string>('');             // 'tl'|'tr'|'bl'|'br'
+  const resizeStartMouse    = useRef<Point>({ x: 0, y: 0 }); // pozycja myszy na starcie
+  const resizeDraftSnapshot = useRef<Draft | null>(null);     // kopia draftu na starcie
+
+  // ── REF DO OUTER DIVA EDYTORA ─────────────────────────────────────────
+  const editorRef = useRef<HTMLDivElement | null>(null);
+
+  // ── VIEWPORT REF (dla wheel handlera bez re-subscribe) ──────────────────
+  const viewportRef = useRef(viewport);
+  useEffect(() => { viewportRef.current = viewport; }, [viewport]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // HELPER: fontSize z wysokości ramki
+  // ══════════════════════════════════════════════════════════════════════════
+  /**
+   * Oblicza fontSize (px przy scale=1) na podstawie wysokości w world units.
+   * Na canvas: rendering.ts używa clampFontSize(fontSize, scale) = fontSize*scale
+   * W edytorze: textarea używa fontSize*viewport.scale
+   * → obydwa źródła wyglądają identycznie przy każdym zoom ✓
+   */
+  const fontSizeFromHeight = (worldH: number): number =>
+    Math.max(8, worldH * 100 * FONT_HEIGHT_RATIO);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // OTWIERANIE EDYCJI ISTNIEJĄCEGO TEKSTU (sygnał z SelectTool)
+  // ══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
-    if (!isEditing || !textareaRef.current || !editorRef.current || !textDraft) return;
+    if (!editingTextId) return;
+    const el = elements.find((e) => e.id === editingTextId);
+    if (!el) return;
 
-    const textarea = textareaRef.current;
-    const editor = editorRef.current;
+    setDraft({
+      id:         el.id,
+      worldX:     el.x,
+      worldY:     el.y,
+      worldW:     el.width  ?? 3,
+      worldH:     el.height ?? 0.4,
+      fontSize:   el.fontSize,
+      color:      el.color,
+      fontFamily: el.fontFamily  ?? 'Arial, sans-serif',
+      fontWeight: el.fontWeight  ?? 'normal',
+      fontStyle:  el.fontStyle   ?? 'normal',
+      textAlign:  el.textAlign   ?? 'left',
+      isExisting: true,
+    });
+    setEditText(el.text);
+    setPhase('editing');
+  // Celowo pomijamy `elements` — chcemy odpalić tylko gdy zmienia się id
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editingTextId]);
 
-    // Reset height to recalculate
-    textarea.style.height = 'auto';
+  // Gdy faza zmienia się na 'editing' → zaznacz cały tekst (Miro: pisanie zastępuje)
+  // requestAnimationFrame żeby textarea zdążyła się zamontować
+  useEffect(() => {
+    if (phase !== 'editing') return;
+    requestAnimationFrame(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.select();
+    });
+  }, [phase]);
 
-    // Get scroll height (content height)
-    const scrollHeight = textarea.scrollHeight;
-    const currentHeight = Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y);
+  // ══════════════════════════════════════════════════════════════════════════
+  // RESIZE — document-level mouse listeners
+  // ══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (!isResizing) return;
 
-    // If content is taller than current box, expand
-    if (scrollHeight > currentHeight) {
-      // Calculate new height in world coordinates
-      const newHeightWorld = scrollHeight / (viewport.scale * 100);
-      const newScreenHeight = scrollHeight;
+    const onMove = (e: MouseEvent) => {
+      const snap   = resizeDraftSnapshot.current;
+      const handle = resizeHandleRef.current;
+      if (!snap) return;
 
-      // Update textDraft with new height
-      setTextDraft((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          screenEnd: {
-            ...prev.screenEnd,
-            y: prev.screenStart.y + newScreenHeight,
-          },
-          worldEnd: {
-            ...prev.worldEnd,
-            y: prev.worldStart.y + newHeightWorld,
-          },
-        };
-      });
+      // Piksele przesunięcia → world units
+      // pxPerUnit = ile pikseli ekranu odpowiada 1 world unit przy bieżącym zoom
+      const pxPerUnit = viewport.scale * 100;
+      const dxW = (e.clientX - resizeStartMouse.current.x) / pxPerUnit;
+      const dyW = (e.clientY - resizeStartMouse.current.y) / pxPerUnit;
 
-      // Update editor div height
-      editor.style.height = `${newScreenHeight}px`;
-      textarea.style.height = `${newScreenHeight}px`;
-    } else {
-      // Keep current height
-      textarea.style.height = `${currentHeight}px`;
-    }
-  }, [editingText, isEditing, textDraft, viewport.scale]);
+      // Każdy narożnik przesuwa odpowiednie dwie krawędzie:
+      //   'l' = lewa krawędź → X zwiększa się, W maleje o tę samą deltę
+      //   'r' = prawa krawędź → W rośnie
+      //   't' = górna krawędź → Y zwiększa się, H maleje
+      //   'b' = dolna krawędź → H rośnie
+      let newX = snap.worldX, newY = snap.worldY;
+      let newW = snap.worldW, newH = snap.worldH;
 
-  // 🆕 Handler dla wheel event - blokuje TYLKO gdy aktywnie edytujemy
-  const handleWheel = (e: React.WheelEvent) => {
-    if (isEditing) {
-      // Gdy edytujemy tekst - zablokuj zoom/pan (chcemy scrollować w textarea)
-      e.stopPropagation();
+      if (handle.includes('l')) { newX = snap.worldX + dxW; newW = snap.worldW - dxW; }
+      if (handle.includes('r')) {                            newW = snap.worldW + dxW; }
+      if (handle.includes('t')) { newY = snap.worldY + dyW; newH = snap.worldH - dyW; }
+      if (handle.includes('b')) {                            newH = snap.worldH + dyW; }
+
+      // Wymuś minima — nie pozwól "odwrócić" ramki
+      if (newW < MIN_WORLD_W) { if (handle.includes('l')) newX = snap.worldX + snap.worldW - MIN_WORLD_W; newW = MIN_WORLD_W; }
+      if (newH < MIN_WORLD_H) { if (handle.includes('t')) newY = snap.worldY + snap.worldH - MIN_WORLD_H; newH = MIN_WORLD_H; }
+
+      setDraft(prev => prev ? { ...prev, worldX: newX, worldY: newY, worldW: newW, worldH: newH, fontSize: fontSizeFromHeight(newH) } : prev);
+    };
+
+    const onUp = () => setIsResizing(false);
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',  onUp);
+    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+  // viewport.scale potrzebny do przeliczenia px→world podczas resize
+  }, [isResizing, viewport.scale]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ZAPIS / ANULOWANIE
+  // ══════════════════════════════════════════════════════════════════════════
+  const handleSave = useCallback(() => {
+    if (!draft) return;
+    const trimmed = editText.trim();
+
+    if (!trimmed) {
+      // Pusty tekst → usuń istniejący lub po prostu zamknij
+      if (draft.isExisting) onTextDelete(draft.id);
+      setPhase('idle'); setDraft(null); setEditText('');
+      onEditingComplete?.();
       return;
     }
 
-    // Gdy tylko przeciągamy ramkę - obsłuż zoom/pan
-    if (!onViewportChange) return;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    if (e.ctrlKey) {
-      // Zoom
-      const newViewport = zoomViewport(
-        viewport,
-        e.deltaY,
-        e.clientX,
-        e.clientY,
-        canvasWidth,
-        canvasHeight
-      );
-      onViewportChange(constrainViewport(newViewport));
-    } else {
-      // Pan
-      const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-      onViewportChange(constrainViewport(newViewport));
-    }
-  };
-
-  // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
-  // Pozycja i rozmiar aktualizują się gdy viewport się zmienia
-  useEffect(() => {
-    if (editingTextId && editingId !== editingTextId) { // Tylko jeśli się różnią
-      const textToEdit = elements.find((el) => el.id === editingTextId);
-      if (textToEdit) {
-        // Przelicz pozycję ekranową z współrzędnych świata
-        const topLeft = transformPoint(
-          { x: textToEdit.x, y: textToEdit.y },
-          viewport,
-          canvasWidth,
-          canvasHeight
-        );
-
-        const width = (textToEdit.width || 3) * viewport.scale * 100;
-        const height = (textToEdit.height || 1) * viewport.scale * 100;
-
-        setTextDraft({
-          id: textToEdit.id,
-          screenStart: topLeft,
-          screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
-          worldStart: { x: textToEdit.x, y: textToEdit.y },
-          worldEnd: {
-            x: textToEdit.x + (textToEdit.width || 3),
-            y: textToEdit.y + (textToEdit.height || 1),
-          },
-          fontSize: textToEdit.fontSize,
-          color: textToEdit.color,
-          fontFamily: textToEdit.fontFamily || 'Arial, sans-serif',
-          fontWeight: textToEdit.fontWeight || 'normal',
-          fontStyle: textToEdit.fontStyle || 'normal',
-          textAlign: textToEdit.textAlign || 'left',
-        });
-
-        setEditingText(textToEdit.text);
-        setEditingId(textToEdit.id);
-        setIsEditing(true);
-      }
-    }
-  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing]); // Usunięto editingId aby zatrzymać pętlę
-
-  // Start dragging to create text box
-  const handleMouseDown = (e: React.MouseEvent) => {
-    // Jeśli już edytujemy - ignoruj
-    if (isEditing) return;
-
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-
-    const newDraft: TextDraft = {
-      id: Date.now().toString(),
-      screenStart: screenPoint,
-      screenEnd: screenPoint,
-      worldStart: worldPoint,
-      worldEnd: worldPoint,
-      fontSize: 24,
-      color: '#000000',
-      fontFamily: 'Arial, sans-serif',
-      fontWeight: 'normal',
-      fontStyle: 'normal',
-      textAlign: 'left',
+    const data: Partial<TextElement> = {
+      x: draft.worldX, y: draft.worldY, width: draft.worldW, height: draft.worldH,
+      text: editText, fontSize: draft.fontSize,
+      color: draft.color, fontFamily: draft.fontFamily,
+      fontWeight: draft.fontWeight, fontStyle: draft.fontStyle, textAlign: draft.textAlign,
     };
 
-    setTextDraft(newDraft);
-    setIsDragging(true);
+    if (draft.isExisting) onTextUpdate(draft.id, data);
+    else onTextCreate({ id: draft.id, type: 'text', ...data } as TextElement);
+
+    setPhase('idle'); setDraft(null); setEditText('');
+    onEditingComplete?.();
+  }, [draft, editText, onTextCreate, onTextUpdate, onTextDelete, onEditingComplete]);
+
+  const handleCancel = useCallback(() => {
+    setPhase('idle'); setDraft(null); setEditText(''); setIsResizing(false);
+    onEditingComplete?.();
+  }, [onEditingComplete]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // KLIK POZA EDYTOREM = ZAPIS
+  // ══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (phase !== 'editing') return;
+
+    const onDown = (e: MouseEvent) => {
+      if (isResizing) return; // resize w toku — nie zamykaj
+      if (editorRef.current?.contains(e.target as Node)) return;
+      handleSave();
+    };
+
+    // Delay 100ms — żeby nie zapalić się od mousedown który otworzył edytor
+    const t = setTimeout(() => document.addEventListener('mousedown', onDown), 100);
+    return () => { clearTimeout(t); document.removeEventListener('mousedown', onDown); };
+  }, [phase, isResizing, handleSave]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LIVE UPDATE CANVAS podczas pisania/resize (tylko istniejące elementy)
+  // ══════════════════════════════════════════════════════════════════════════
+  // Nowe elementy live-update nie mają sensu — element jeszcze nie istnieje na canvas.
+  useEffect(() => {
+    if (phase !== 'editing' || !draft?.isExisting) return;
+    onTextUpdate(draft.id, {
+      x: draft.worldX, y: draft.worldY, width: draft.worldW, height: draft.worldH,
+      text: editText, fontSize: draft.fontSize,
+      color: draft.color, fontFamily: draft.fontFamily,
+      fontWeight: draft.fontWeight, fontStyle: draft.fontStyle, textAlign: draft.textAlign,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editText, draft?.worldX, draft?.worldY, draft?.worldW, draft?.worldH,
+     draft?.fontSize, draft?.color, draft?.fontWeight, draft?.fontStyle, draft?.textAlign]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // WHEEL — PAN/ZOOM (wyłączony podczas edycji — textarea ma własny scroll)
+  // ══════════════════════════════════════════════════════════════════════════
+  const overlayRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const overlay = overlayRef.current;
+    if (!overlay || !onViewportChange) return;
+    const onWheel = (e: WheelEvent) => {
+      if (phase === 'editing') return; // textarea obsługuje scroll sama
+      e.preventDefault(); e.stopPropagation();
+      const vp = viewportRef.current;
+      if (e.ctrlKey) onViewportChange(constrainViewport(zoomViewport(vp, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight)));
+      else           onViewportChange(constrainViewport(panViewportWithWheel(vp, e.deltaX, e.deltaY)));
+    };
+    overlay.addEventListener('wheel', onWheel, { passive: false });
+    return () => overlay.removeEventListener('wheel', onWheel);
+  }, [canvasWidth, canvasHeight, onViewportChange, phase]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RYSOWANIE NOWEJ RAMKI
+  // ══════════════════════════════════════════════════════════════════════════
+  const handleOverlayDown = (e: React.MouseEvent) => {
+    if (phase === 'editing' || e.button !== 0) return;
+    const world = inverseTransformPoint({ x: e.clientX, y: e.clientY }, viewport, canvasWidth, canvasHeight);
+    drawStartWorld.current = world;
+    drawCurrWorld.current  = world;
+    setPhase('drawing');
+    setDrawPreview({ x: world.x, y: world.y, w: 0, h: 0 });
   };
 
-  // Update text box size while dragging
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !textDraft) return;
-
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-
-    setTextDraft({
-      ...textDraft,
-      screenEnd: screenPoint,
-      worldEnd: worldPoint,
+  const handleOverlayMove = (e: React.MouseEvent) => {
+    if (phase !== 'drawing' || !drawStartWorld.current) return;
+    const world = inverseTransformPoint({ x: e.clientX, y: e.clientY }, viewport, canvasWidth, canvasHeight);
+    drawCurrWorld.current = world;
+    setDrawPreview({
+      x: Math.min(drawStartWorld.current.x, world.x),
+      y: Math.min(drawStartWorld.current.y, world.y),
+      w: Math.abs(world.x - drawStartWorld.current.x),
+      h: Math.abs(world.y - drawStartWorld.current.y),
     });
   };
 
-  // Finish dragging and show textarea
-  const handleMouseUp = () => {
-    if (!isDragging || !textDraft) return;
+  const handleOverlayUp = () => {
+    if (phase !== 'drawing' || !drawStartWorld.current || !drawCurrWorld.current) {
+      setPhase('idle'); setDrawPreview(null); return;
+    }
+    const sx = drawStartWorld.current.x, sy = drawStartWorld.current.y;
+    const ex = drawCurrWorld.current.x,  ey = drawCurrWorld.current.y;
 
-    setIsDragging(false);
+    let worldX = Math.min(sx, ex), worldY = Math.min(sy, ey);
+    let worldW = Math.abs(ex - sx), worldH = Math.abs(ey - sy);
 
-    // Calculate box dimensions
-    const width = Math.abs(textDraft.screenEnd.x - textDraft.screenStart.x);
-    const height = Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y);
-
-    // Minimum size: 100x50
-    if (width < 100 || height < 50) {
-      setTextDraft({
-        ...textDraft,
-        screenEnd: {
-          x: textDraft.screenStart.x + 300,
-          y: textDraft.screenStart.y + 100,
-        },
-        worldEnd: {
-          x: textDraft.worldStart.x + 3,
-          y: textDraft.worldStart.y + 1,
-        },
-      });
+    // Klik bez przeciągnięcia → domyślna ramka (3 world wide × 0.4 high)
+    if (worldW < MIN_WORLD_W || worldH < MIN_WORLD_H) {
+      worldW = 3.0; worldH = 0.4;
     }
 
-    setIsEditing(true);
-    setEditingText('');
+    setDraft({
+      id: Date.now().toString(),
+      worldX, worldY, worldW, worldH,
+      fontSize:   fontSizeFromHeight(worldH),
+      color:      '#000000',
+      fontFamily: 'Arial, sans-serif',
+      fontWeight: 'normal',
+      fontStyle:  'normal',
+      textAlign:  'left',
+      isExisting: false,
+    });
+    setEditText('');
+    setPhase('editing');
+    setDrawPreview(null);
+    drawStartWorld.current = null;
+    drawCurrWorld.current  = null;
   };
 
-  // Save text element (automatyczne - tworzy nowy LUB aktualizuje istniejący)
-  const handleSave = () => {
-    if (!textDraft) return;
-
-    // Jeśli pusty tekst - po prostu anuluj (nie zapisuj)
-    if (!editingText.trim()) {
-      // Jeśli edytujemy istniejący tekst i go wyczyszczono - usuń go
-      if (editingId) {
-        onTextDelete(editingId);
-      }
-      handleCancel();
-      return;
-    }
-
-    const width = Math.abs(textDraft.worldEnd.x - textDraft.worldStart.x);
-    const height = Math.abs(textDraft.worldEnd.y - textDraft.worldStart.y);
-
-    const textData: Partial<TextElement> = {
-      x: Math.min(textDraft.worldStart.x, textDraft.worldEnd.x),
-      y: Math.min(textDraft.worldStart.y, textDraft.worldEnd.y),
-      width: width,
-      height: height,
-      text: editingText.trim(),
-      fontSize: textDraft.fontSize,
-      color: textDraft.color,
-      fontFamily: textDraft.fontFamily,
-      fontWeight: textDraft.fontWeight,
-      fontStyle: textDraft.fontStyle,
-      textAlign: textDraft.textAlign,
-    };
-
-    if (editingId) {
-      // 🆕 Aktualizuj istniejący tekst
-      onTextUpdate(editingId, textData);
-    } else {
-      // Utwórz nowy tekst
-      const newText: TextElement = {
-        id: textDraft.id,
-        type: 'text',
-        ...textData,
-      } as TextElement;
-      onTextCreate(newText);
-    }
-
-    // Reset
-    setTextDraft(null);
-    setIsEditing(false);
-    setEditingText('');
-    setEditingId(null);
-    onEditingComplete?.(); // 🆕 Powiadom że edycja zakończona
+  // ══════════════════════════════════════════════════════════════════════════
+  // HELPER UCHWYTÓW RESIZE
+  // ══════════════════════════════════════════════════════════════════════════
+  /**
+   * Zwraca onMouseDown dla narożnika 'tl'|'tr'|'bl'|'br'.
+   * Zapisuje snapshot draftu i pozycję myszy → aktywuje document-level listener.
+   */
+  const makeResizeHandler = (handle: string) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation(); // blokuje clickOutside
+    resizeHandleRef.current     = handle;
+    resizeStartMouse.current    = { x: e.clientX, y: e.clientY };
+    resizeDraftSnapshot.current = draft ? { ...draft } : null;
+    setIsResizing(true);
   };
 
-  // Cancel text creation
-  const handleCancel = () => {
-    setTextDraft(null);
-    setIsEditing(false);
-    setEditingText('');
-    setEditingId(null);
-    setIsDragging(false);
-    onEditingComplete?.(); // 🆕 Powiadom że edycja zakończona
+  // ══════════════════════════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════════════════════════
+
+  // Pozycja ekranowa edytora (z world coords + bieżącego viewport)
+  // Przeliczane w każdym renderze → edytor zawsze na właściwym miejscu po pan/zoom
+  let edLeft = 0, edTop = 0, edWidth = 0, edHeight = 0;
+  if (draft && phase === 'editing') {
+    const tl = transformPoint({ x: draft.worldX, y: draft.worldY }, viewport, canvasWidth, canvasHeight);
+    const br = transformPoint({ x: draft.worldX + draft.worldW, y: draft.worldY + draft.worldH }, viewport, canvasWidth, canvasHeight);
+    edLeft = tl.x; edTop = tl.y; edWidth = br.x - tl.x; edHeight = br.y - tl.y;
+  }
+
+  // fontSize w pikselach ekranu = worldFontSize * scale
+  // Taki sam wzór jak w rendering.ts (clampFontSize) → edytor = canvas ✓
+  const fontSizePx = draft ? Math.max(8, draft.fontSize * viewport.scale) : 14;
+
+  // Styl wspólny dla 4 uchwytów
+  const HS = 10; // rozmiar kółka w px
+  const handleStyle: React.CSSProperties = {
+    position: 'absolute', width: HS, height: HS,
+    borderRadius: '50%', background: '#fff', border: '2px solid #3b82f6',
+    zIndex: 70, pointerEvents: 'auto',
   };
 
-  // Kliknięcie poza edytorem = automatycznie zapisz
-  useEffect(() => {
-    if (!isEditing) return;
-
-    const handleClickOutside = (e: MouseEvent) => {
-      if (editorRef.current && !editorRef.current.contains(e.target as Node)) {
-        handleSave();
-      }
-    };
-
-    // Dodaj listener po małym delay (żeby nie trigger od razu)
-    const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
-    }, 100);
-
-    return () => {
-      clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isEditing, textDraft, editingText]);
-
-  // Auto-focus textarea
-  useEffect(() => {
-    if (isEditing && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [isEditing]);
+  // Preview ramki (world → screen)
+  let previewRect: React.CSSProperties | null = null;
+  if (phase === 'drawing' && drawPreview) {
+    const tl = transformPoint({ x: drawPreview.x, y: drawPreview.y }, viewport, canvasWidth, canvasHeight);
+    const br = transformPoint({ x: drawPreview.x + drawPreview.w, y: drawPreview.y + drawPreview.h }, viewport, canvasWidth, canvasHeight);
+    previewRect = { left: tl.x, top: tl.y, width: br.x - tl.x, height: br.y - tl.y };
+  }
 
   return (
-    <div className="absolute inset-0 z-20" style={{ cursor: isEditing ? 'default' : 'crosshair' }}>
-      {/* Overlay dla mouse events */}
-      {!isEditing && (
+    <div className="absolute inset-0 z-20" style={{ cursor: phase === 'editing' ? 'default' : 'text' }}>
+
+      {/* OVERLAY — wychwytuje kliknięcia do rysowania (tylko gdy nie edytujemy) */}
+      {phase !== 'editing' && (
         <div
+          ref={overlayRef}
           className="absolute inset-0 pointer-events-auto z-30"
           style={{ touchAction: 'none' }}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onWheel={handleWheel}
+          onMouseDown={handleOverlayDown}
+          onMouseMove={handleOverlayMove}
+          onMouseUp={handleOverlayUp}
+          onMouseLeave={handleOverlayUp}
         />
       )}
 
-      {/* Dragging box preview */}
-      {isDragging && textDraft && (
+      {/* PREVIEW RAMKI podczas rysowania */}
+      {phase === 'drawing' && previewRect && (
         <div
-          className="absolute border-2 border-dashed z-40 border-blue-500 bg-blue-50/20 pointer-events-none"
-          style={{
-            left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
-            top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
-            width: Math.abs(textDraft.screenEnd.x - textDraft.screenStart.x),
-            height: Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y),
-          }}
+          className="absolute pointer-events-none z-40 border-2 border-dashed border-blue-400 bg-blue-50/10"
+          style={previewRect}
         />
       )}
 
-      {/* EDYTOR TEKSTOWY */}
-      {isEditing && textDraft && (() => {
-        // Pozycja liczona dynamicznie z world coords + bieżącego viewport —
-        // edytor zawsze wyrównany do elementu nawet po pan/zoom
-        const tl = transformPoint(textDraft.worldStart, viewport, canvasWidth, canvasHeight);
-        const br = transformPoint(textDraft.worldEnd,   viewport, canvasWidth, canvasHeight);
-        const edLeft   = Math.min(tl.x, br.x);
-        const edTop    = Math.min(tl.y, br.y);
-        const edWidth  = Math.abs(br.x - tl.x);
-        const edHeight = Math.abs(br.y - tl.y);
-        return (
+      {/* ════════════════════════════════════════════════════════════════════
+          EDYTOR TEKSTOWY — dwuwarstwowy:
+          ┌─ OUTER WRAPPER (overflow:visible) ──────────────────────────────┐
+          │  handles resign na narożnikach (wychodzą poza border = visible) │
+          │  ┌─ INNER BOX (overflow:hidden + border 2px blue) ────────────┐ │
+          │  │  textarea 100%×100%                                        │ │
+          │  │  overflowX:hidden → tekst zawija się po szerokości         │ │
+          │  └────────────────────────────────────────────────────────────┘ │
+          └──────────────────────────────────────────────────────────────────┘
+          ════════════════════════════════════════════════════════════════════ */}
+      {phase === 'editing' && draft && (
+        // OUTER WRAPPER
         <div
           ref={(node) => {
-            (editorRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            editorRef.current = node;
             if (editorDivRef) (editorDivRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
-          className="absolute pointer-events-auto z-50 overflow-hidden"
-          style={{ left: edLeft, top: edTop, width: edWidth, height: edHeight }}
+          className="absolute pointer-events-auto z-50"
+          style={{ left: edLeft, top: edTop, width: edWidth, height: edHeight, overflow: 'visible', outline: '2px solid #3b82f6', outlineOffset: '0px' }}
         >
-          {/* Mini Toolbar */}
+          {/* MINI TOOLBAR */}
           <div className="absolute -top-12 left-0 z-50">
             <TextMiniToolbar
+              style={{ fontSize: draft.fontSize, color: draft.color, fontWeight: draft.fontWeight, fontStyle: draft.fontStyle, textAlign: draft.textAlign }}
+              onChange={(updates) => setDraft(prev => prev ? { ...prev, ...updates } : prev)}
+            />
+          </div>
+
+          {/* INNER BOX — overflow:hidden przycina textarea → zawijanie tekstu */}
+          <div style={{ position: 'absolute', inset: 0, boxSizing: 'border-box', overflow: 'hidden', background: 'rgba(255,255,255,0.93)' }}>
+            {/*
+              TEXTAREA
+              overflowX:hidden  → brak poziomego scrolla → tekst MUSI zawijać do nowej linii
+              overflowY:auto    → pionowy scroll gdy wiele linii
+              whiteSpace:pre-wrap     → zachowuje entery i spacje, ale zawija długie linie
+              overflowWrap:break-word → łamie bardzo długie słowa bez spacji
+              fontSize = draft.fontSize * scale → identycznie jak canvas (clampFontSize)
+            */}
+            <textarea
+              ref={textareaRef}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); handleCancel(); } }}
+              placeholder="Wpisz tekst..."
+              className="no-scrollbar px-3 py-2 border-none bg-transparent resize-none outline-none"
               style={{
-                fontSize: textDraft.fontSize,
-                color: textDraft.color,
-                fontWeight: textDraft.fontWeight,
-                fontStyle: textDraft.fontStyle,
-                textAlign: textDraft.textAlign,
-              }}
-              onChange={(updates) => {
-                const updatedDraft = { ...textDraft, ...updates };
-                setTextDraft(updatedDraft);
-                
-                // 🔥 LIVE UPDATE - aktualizuj style w czasie rzeczywistym
-                if (editingId) {
-                  onTextUpdate(editingId, { 
-                    text: editingText,
-                    fontSize: updatedDraft.fontSize,
-                    color: updatedDraft.color,
-                    fontWeight: updatedDraft.fontWeight,
-                    fontStyle: updatedDraft.fontStyle,
-                    textAlign: updatedDraft.textAlign,
-                  });
-                }
+                fontSize:     `${fontSizePx}px`,
+                color:         draft.color,
+                fontFamily:    draft.fontFamily,
+                fontWeight:    draft.fontWeight,
+                fontStyle:     draft.fontStyle,
+                textAlign:     draft.textAlign,
+                lineHeight:    '1.4',
+                overflowWrap: 'break-word' as const,
+                whiteSpace:   'pre-wrap'   as const,
+                overflowX:    'hidden'     as const,
+                overflowY:    'auto'       as const,
+                width:        '100%',
+                height:       '100%',
+                boxSizing:    'border-box',
               }}
             />
           </div>
 
-          {/* Textarea owrapowana w div clipujący scrollbar */}
-          <div className="w-full h-full" style={{ overflow: 'hidden', position: 'relative' }}>
-            <textarea
-              ref={textareaRef}
-              value={editingText}
-              onChange={(e) => {
-              const newText = e.target.value;
-              setEditingText(newText);
-              
-              // 🔥 LIVE UPDATE - aktualizuj obiekt w czasie rzeczywistym podczas pisania
-              if (editingId && textDraft) {
-                onTextUpdate(editingId, { 
-                  text: newText,
-                  fontSize: textDraft.fontSize,
-                  color: textDraft.color,
-                  fontWeight: textDraft.fontWeight,
-                  fontStyle: textDraft.fontStyle,
-                  textAlign: textDraft.textAlign,
-                });
-              }
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') {
-                e.preventDefault();
-                handleCancel();
-              }
-            }}
-            placeholder="Wpisz tekst..."
-            className="no-scrollbar px-3 py-2 border-none rounded bg-transparent resize-none outline-none"
-            style={{
-              fontSize: `${textDraft.fontSize * viewport.scale}px`,
-              color: textDraft.color,
-              fontFamily: textDraft.fontFamily,
-              fontWeight: textDraft.fontWeight,
-              fontStyle: textDraft.fontStyle,
-              textAlign: textDraft.textAlign,
-              lineHeight: '1.4',
-              wordBreak: 'break-word',
-              whiteSpace: 'pre-wrap',
-              // Trick na Windows: textarea szersza/wyższa o 20px → scrollbar wychodzi poza klipujący div
-              width: 'calc(100% + 20px)',
-              height: 'calc(100% + 20px)',
-              overflow: 'scroll',
-              scrollbarWidth: 'none' as const,
-              msOverflowStyle: 'none' as const,
-            }}
-          />
-          </div>
+          {/* 4 UCHWYTY RESIZE (position:absolute względem OUTER WRAPPERA)
+              translate(-50%,-50%) centruje kółko dokładnie na narożniku outer diva
+              Widoczne bo outer ma overflow:visible */}
+
+          {/* Lewy górny — przesuwa lewą i górną krawędź */}
+          <div style={{ ...handleStyle, left: 0, top: 0, transform: 'translate(-50%,-50%)', cursor: 'nwse-resize' }} onMouseDown={makeResizeHandler('tl')} />
+          {/* Prawy górny — przesuwa prawą i górną krawędź */}
+          <div style={{ ...handleStyle, right: 0, top: 0, transform: 'translate(50%,-50%)', cursor: 'nesw-resize' }} onMouseDown={makeResizeHandler('tr')} />
+          {/* Lewy dolny — przesuwa lewą i dolną krawędź */}
+          <div style={{ ...handleStyle, left: 0, bottom: 0, transform: 'translate(-50%,50%)', cursor: 'nesw-resize' }} onMouseDown={makeResizeHandler('bl')} />
+          {/* Prawy dolny — przesuwa prawą i dolną krawędź */}
+          <div style={{ ...handleStyle, right: 0, bottom: 0, transform: 'translate(50%,50%)', cursor: 'nwse-resize' }} onMouseDown={makeResizeHandler('br')} />
         </div>
-        );
-      })()}
+      )}
     </div>
   );
 }
-
