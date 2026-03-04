@@ -439,28 +439,18 @@ export function SelectTool({
           } else if (originalEl.type === 'text') {
             const newX = pivotX + (originalEl.x - pivotX) * scaleX;
             const newY = pivotY + (originalEl.y - pivotY) * scaleY;
+
+            // 🔥 MIRO-STYLE: Czyste matematyczne skalowanie.
+            // Szerokość i czcionka rosną o ten sam %, układ tekstu (łamanie wierszy) ZAWSZE taki sam.
             const newWidth = (originalEl.width || 3) * scaleX;
             const newHeight = (originalEl.height || 1) * scaleY;
-
-            // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tekstu przy resize
-            const avgScale = (scaleX + scaleY) / 2;
-            const newFontSize = Math.max(8, Math.min(120, originalEl.fontSize * avgScale));
-
-            // Dynamiczne minimum na podstawie rzeczywistej zawartości tekstu
-            const { minWidth: dynMinW, minHeight: dynMinH } = measureTextMinDimensions(
-              originalEl.text || '',
-              newFontSize,
-              originalEl.fontFamily || 'Arial, sans-serif',
-              originalEl.fontWeight || 'normal',
-              originalEl.fontStyle || 'normal',
-              viewportRef.current.scale
-            );
+            const newFontSize = originalEl.fontSize * scaleX;
 
             updates.set(id, {
               x: newX,
               y: newY,
-              width: Math.max(dynMinW, newWidth),
-              height: Math.max(dynMinH, newHeight),
+              width: newWidth,
+              height: newHeight,
               fontSize: newFontSize,
             });
           } else if (originalEl.type === 'image') {

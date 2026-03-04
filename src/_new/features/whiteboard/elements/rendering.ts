@@ -355,7 +355,8 @@ export function drawText(
   const fontWeight = textEl.fontWeight || 'normal';
   const fontStyle = textEl.fontStyle || 'normal';
   const fontFamily = textEl.fontFamily || 'Arial, sans-serif';
-  const fontSize = clampFontSize(textEl.fontSize, viewport.scale);
+  // Pozwalamy czcionce naturalnie maleć przy zoom-out, brak clampowania.
+  const fontSize = textEl.fontSize * viewport.scale;
 
   ctx.fillStyle = textEl.color;
   ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -785,7 +786,8 @@ export function drawTable(
   // fontSize w world units, przemnożone przez scale dla ekranu
   const worldFontSize = table.fontSize ?? 0.12; // fallback dla starych tabel bez fontSize
   const screenFontSize = worldFontSize * viewport.scale * 100; // scale*100 = px per world unit
-  const fontSize = Math.max(10, Math.min(screenFontSize, 30)); // clamp 10-30px - ZWIĘKSZONE z 15px
+  // Pełne skalowanie wraz z viewportem - bez sztywnych limitów px!
+  const fontSize = screenFontSize;
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
