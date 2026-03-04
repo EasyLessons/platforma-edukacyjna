@@ -258,7 +258,7 @@ export const MarkdownNoteView = memo(
           onChange={(e) => setEditContent(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
-          className="w-full h-full p-2 resize-none border-none outline-none backdrop-blur-md bg-white/60 font-mono text-black"
+          className="w-full h-full p-2 resize-none border-none outline-none backdrop-blur-md bg-white/60 font-mono text-black no-scrollbar"
           style={{ fontSize: `${fontSize}px` }}
           placeholder="Wpisz tekst markdown..."
         />
@@ -276,7 +276,7 @@ export const MarkdownNoteView = memo(
           </div>
         )}
         <div
-          className="w-full h-full p-2 overflow-auto cursor-pointer text-black"
+          className="w-full h-full p-2 overflow-hidden cursor-pointer text-black"
           style={{ fontSize: `${fontSize}px`, paddingTop: remoteTypingUser ? '24px' : '8px' }}
           onDoubleClick={() => onEditStart(noteId)}
         >

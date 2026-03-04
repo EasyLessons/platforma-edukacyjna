@@ -28,6 +28,61 @@ import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '@/_new
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 
+// Jeden canvas wielokrotnego użytku do pomiarów tekstu (unikamy GC przy resize)
+let _textMeasureCanvas: HTMLCanvasElement | null = null;
+function getTextMeasureCtx(): CanvasRenderingContext2D | null {
+  if (typeof document === 'undefined') return null;
+  if (!_textMeasureCanvas) _textMeasureCanvas = document.createElement('canvas');
+  return _textMeasureCanvas.getContext('2d');
+}
+
+/**
+ * Mierzy minimalny rozmiar (w jednostkach świata) potrzebny do zmieszczenia tekstu.
+ * Padding: 12px poziomo, 8px pionowo (jak w textarea px-3 py-2).
+ */
+function measureTextMinDimensions(
+  text: string,
+  fontSize: number,
+  fontFamily: string,
+  fontWeight: string,
+  fontStyle: string,
+  viewportScale: number
+): { minWidth: number; minHeight: number } {
+  if (typeof document === 'undefined' || !text.trim()) {
+    return { minWidth: 1.5, minHeight: 0.4 };
+  }
+
+  const ctx = getTextMeasureCtx();
+  if (!ctx) return { minWidth: 1.5, minHeight: 0.4 };
+
+  // fontSize to wartość w jednostkach świata (jak w textEl.fontSize)
+  // renderowanie używa: clampFontSize(fontSize, viewportScale) = fontSize * viewportScale (clamped 10-200)
+  const screenFontSize = Math.max(10, Math.min(200, fontSize * viewportScale));
+  ctx.font = `${fontStyle} ${fontWeight} ${screenFontSize}px ${fontFamily}`;
+
+  const paddingX = 12; // px-3
+  const paddingY = 8;  // py-2
+  const lineHeight = screenFontSize * 1.4;
+
+  // Najszersza linia bez zawijania → minimalna szerokość boksa
+  const lines = text.split('\n');
+  let maxLineWidth = 0;
+  for (const line of lines) {
+    const w = ctx.measureText(line || ' ').width;
+    if (w > maxLineWidth) maxLineWidth = w;
+  }
+
+  const minScreenWidth = maxLineWidth + paddingX * 2;
+  const minScreenHeight = lines.length * lineHeight + paddingY * 2;
+
+  // Przelicz na jednostki świata
+  const worldScale = viewportScale * 100;
+  return {
+    minWidth: minScreenWidth / worldScale,
+    minHeight: minScreenHeight / worldScale,
+  };
+}
+
 interface SelectToolProps {
   viewport: ViewportTransform;
   canvasWidth: number;
@@ -386,14 +441,24 @@ export function SelectTool({
 
             // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tekstu przy resize
             const avgScale = (scaleX + scaleY) / 2;
-            const newFontSize = originalEl.fontSize * avgScale;
+            const newFontSize = Math.max(8, Math.min(120, originalEl.fontSize * avgScale));
+
+            // Dynamiczne minimum na podstawie rzeczywistej zawartości tekstu
+            const { minWidth: dynMinW, minHeight: dynMinH } = measureTextMinDimensions(
+              originalEl.text || '',
+              newFontSize,
+              originalEl.fontFamily || 'Arial, sans-serif',
+              originalEl.fontWeight || 'normal',
+              originalEl.fontStyle || 'normal',
+              viewportRef.current.scale
+            );
 
             updates.set(id, {
               x: newX,
               y: newY,
-              width: Math.max(MIN_SIZE, newWidth),
-              height: Math.max(MIN_SIZE, newHeight),
-              fontSize: Math.max(8, Math.min(120, newFontSize)),
+              width: Math.max(dynMinW, newWidth),
+              height: Math.max(dynMinH, newHeight),
+              fontSize: newFontSize,
             });
           } else if (originalEl.type === 'image') {
             const newX = pivotX + (originalEl.x - pivotX) * scaleX;

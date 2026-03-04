@@ -13,17 +13,20 @@ import { WorkspaceProvider } from './context/WorkspaceContext';
 const geistSans = Geist({
   variable: '--font-geist-sans',
   subsets: ['latin'],
+  preload: false,
 });
 
 const geistMono = Geist_Mono({
   variable: '--font-geist-mono',
   subsets: ['latin'],
+  preload: false,
 });
 
 const playfair = Playfair_Display({
   variable: '--font-playfair',
   subsets: ['latin'],
   style: ['normal', 'italic'],
+  preload: false,
 });
 
 function LayoutContent({ children }: { children: React.ReactNode }) {

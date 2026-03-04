@@ -33,9 +33,11 @@ Technologie:
     - Neon - serverless PostgreSQL hosting
 """
 
-from sqlalchemy import create_engine
+import time
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
+from sqlalchemy.exc import OperationalError
 from core.config import get_settings
 from sqlalchemy.ext.declarative import declarative_base
 
@@ -136,22 +138,37 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 def get_db():
     """
     Generator sesji bazy danych dla FastAPI Dependency Injection
-    
+
+    Zawiera retry logic dla Neon serverless:
+        Neon może zwrócić "Control plane request failed" gdy compute
+        endpoint właśnie się budzi po auto-suspend (cold start).
+        Próbujemy połączenia do 3 razy z wykładniczym backoffem (1s, 2s).
+
     Yields:
         Session: Sesja SQLAlchemy do wykonywania operacji na bazie
-    
-    Użycie:
-        @router.post("/endpoint")
-        async def endpoint(db: Session = Depends(get_db)):
-            # Używaj db do query, add, commit, etc.
-            pass
-    
-    Automatycznie:
-        - Tworzy nową sesję przed requestem
-        - Zamyka sesję po zakończeniu requestu (nawet przy błędzie)
     """
-    db = SessionLocal()
+    MAX_RETRIES = 3
+    db = None
+    last_exc = None
+
+    for attempt in range(MAX_RETRIES):
+        db = SessionLocal()
+        try:
+            db.execute(text("SELECT 1"))  # Eagerly test connection (cold start Neon)
+            last_exc = None
+            break
+        except OperationalError as e:
+            db.close()
+            db = None
+            last_exc = e
+            if attempt < MAX_RETRIES - 1:
+                time.sleep(2 ** attempt)  # 1s, 2s
+
+    if last_exc is not None:
+        raise last_exc
+
     try:
-        yield db  # Pożycz sesję do endpointu
+        yield db
     finally:
-        db.close()  # Zawsze zamknij sesję 
+        if db is not None:
+            db.close()

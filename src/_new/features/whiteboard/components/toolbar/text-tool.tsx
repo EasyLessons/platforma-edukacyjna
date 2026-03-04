@@ -429,7 +429,7 @@ export function TextTool({
       {isEditing && textDraft && (
         <div
           ref={editorRef}
-          className="absolute pointer-events-auto z-50"
+          className="absolute pointer-events-auto z-50 overflow-hidden"
           style={{
             left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
             top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
@@ -466,11 +466,12 @@ export function TextTool({
             />
           </div>
 
-          {/* Textarea */}
-          <textarea
-            ref={textareaRef}
-            value={editingText}
-            onChange={(e) => {
+          {/* Textarea owrapowana w div clipujący scrollbar */}
+          <div className="w-full h-full" style={{ overflow: 'hidden', position: 'relative' }}>
+            <textarea
+              ref={textareaRef}
+              value={editingText}
+              onChange={(e) => {
               const newText = e.target.value;
               setEditingText(newText);
               
@@ -493,17 +494,26 @@ export function TextTool({
               }
             }}
             placeholder="Wpisz tekst..."
-            className="w-full h-full px-3 py-2 border-none rounded bg-transparent resize-none outline-none overflow-hidden"
+            className="no-scrollbar px-3 py-2 border-none rounded bg-transparent resize-none outline-none"
             style={{
-              fontSize: `${textDraft.fontSize * viewport.scale}px`, // 🔥 Skaluj czcionkę z viewport
+              fontSize: `${textDraft.fontSize * viewport.scale}px`,
               color: textDraft.color,
               fontFamily: textDraft.fontFamily,
               fontWeight: textDraft.fontWeight,
               fontStyle: textDraft.fontStyle,
               textAlign: textDraft.textAlign,
               lineHeight: '1.4',
+              wordBreak: 'break-word',
+              whiteSpace: 'pre-wrap',
+              // Trick na Windows: textarea szersza/wyższa o 20px → scrollbar wychodzi poza klipujący div
+              width: 'calc(100% + 20px)',
+              height: 'calc(100% + 20px)',
+              overflow: 'scroll',
+              scrollbarWidth: 'none' as const,
+              msOverflowStyle: 'none' as const,
             }}
           />
+          </div>
         </div>
       )}
     </div>
