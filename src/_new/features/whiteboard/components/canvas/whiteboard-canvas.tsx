@@ -326,6 +326,9 @@ export default function WhiteboardCanvasNew({
 
   const rafIdRef = useRef<number | null>(null);
 
+  // Ref do editingTextId — canvas zawsze ma aktualną wartość bez przechwytywania
+  const editingTextIdRef = useRef<string | null>(sel.editingTextId);
+
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -350,6 +353,8 @@ export default function WhiteboardCanvasNew({
     // Tabela rysowana na canvas przez drawElement → drawTable.
     for (const element of el.elementsRef.current) {
       if (element.type === 'markdown') continue;
+      // Pomiń rysowanie tekstu jeśli jest aktualnie edytowany (textarea go zastępuje)
+      if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
       drawElement(
         ctx,
         element,
@@ -382,6 +387,12 @@ export default function WhiteboardCanvasNew({
   useEffect(() => {
     redrawCanvasRef.current = redrawCanvas;
   }, [redrawCanvas]);
+
+  // Aktualizuj editingTextIdRef i przerysuj canvas gdy zmienia się edytowany element
+  useEffect(() => {
+    editingTextIdRef.current = sel.editingTextId;
+    requestAnimationFrame(() => redrawCanvasRef.current());
+  }, [sel.editingTextId]);
 
   // Przerysuj przy każdej zmianie elementów / viewportu / obrazów / settings
   useEffect(() => {
@@ -1137,6 +1148,7 @@ export default function WhiteboardCanvasNew({
     if (userRole === 'viewer') return;
     const current = el.elementsRef.current.find((e) => e.id === id);
     if (!current) return;
+    console.log('📝 Handle text update dla ID:', id, 'Updates:', updates);
     const updated = { ...current, ...updates } as DrawingElement;
     el.updateElement(updated);
     el.markUnsaved([id]);

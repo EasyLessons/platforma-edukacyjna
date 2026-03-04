@@ -177,7 +177,7 @@ export function TextTool({
   // 🆕 Obsługa edycji istniejącego tekstu (z double-click)
   // Pozycja i rozmiar aktualizują się gdy viewport się zmienia
   useEffect(() => {
-    if (editingTextId) {
+    if (editingTextId && editingId !== editingTextId) { // Tylko jeśli się różnią
       const textToEdit = elements.find((el) => el.id === editingTextId);
       if (textToEdit) {
         // Przelicz pozycję ekranową z współrzędnych świata
@@ -237,7 +237,7 @@ export function TextTool({
         );
       }
     }
-  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing, editingId]);
+  }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing]); // Usunięto editingId aby zatrzymać pętlę
 
   // Start dragging to create text box
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -447,7 +447,22 @@ export function TextTool({
                 fontStyle: textDraft.fontStyle,
                 textAlign: textDraft.textAlign,
               }}
-              onChange={(updates) => setTextDraft({ ...textDraft, ...updates })}
+              onChange={(updates) => {
+                const updatedDraft = { ...textDraft, ...updates };
+                setTextDraft(updatedDraft);
+                
+                // 🔥 LIVE UPDATE - aktualizuj style w czasie rzeczywistym
+                if (editingId) {
+                  onTextUpdate(editingId, { 
+                    text: editingText,
+                    fontSize: updatedDraft.fontSize,
+                    color: updatedDraft.color,
+                    fontWeight: updatedDraft.fontWeight,
+                    fontStyle: updatedDraft.fontStyle,
+                    textAlign: updatedDraft.textAlign,
+                  });
+                }
+              }}
             />
           </div>
 
@@ -455,7 +470,22 @@ export function TextTool({
           <textarea
             ref={textareaRef}
             value={editingText}
-            onChange={(e) => setEditingText(e.target.value)}
+            onChange={(e) => {
+              const newText = e.target.value;
+              setEditingText(newText);
+              
+              // 🔥 LIVE UPDATE - aktualizuj obiekt w czasie rzeczywistym podczas pisania
+              if (editingId && textDraft) {
+                onTextUpdate(editingId, { 
+                  text: newText,
+                  fontSize: textDraft.fontSize,
+                  color: textDraft.color,
+                  fontWeight: textDraft.fontWeight,
+                  fontStyle: textDraft.fontStyle,
+                  textAlign: textDraft.textAlign,
+                });
+              }
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Escape') {
                 e.preventDefault();
@@ -463,7 +493,7 @@ export function TextTool({
               }
             }}
             placeholder="Wpisz tekst..."
-            className="w-full h-full px-3 py-2 border-2 border-blue-500 rounded bg-transparent resize-none outline-none overflow-hidden"
+            className="w-full h-full px-3 py-2 border-none rounded bg-transparent resize-none outline-none overflow-hidden"
             style={{
               fontSize: `${textDraft.fontSize * viewport.scale}px`, // 🔥 Skaluj czcionkę z viewport
               color: textDraft.color,
