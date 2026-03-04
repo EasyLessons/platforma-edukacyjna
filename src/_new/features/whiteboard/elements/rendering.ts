@@ -43,6 +43,7 @@ import {
 } from '@/_new/features/whiteboard/types';
 import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { clampLineWidth, clampFontSize, evaluateExpression } from '@/_new/features/whiteboard/elements/math-eval';
+import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
 
 /**
  * Rysuje Ĺ›cieĹĽkÄ™ (path) - linie rysowane piĂłrem
@@ -645,8 +646,9 @@ export function drawImage(
 }
 
 /**
- * Rysuje pojedynczy element (dispatcher)
- * Wybiera odpowiedniÄ… funkcjÄ™ w zaleĹĽnoĹ›ci od typu
+ * Rysuje pojedynczy element (dispatcher) — Strategy Pattern.
+ * Zamiast if/else używa ElementRegistry: każdy typ ma własny handler.
+ * Typ 'function' obsługiwany bezpośrednio (brak handlera w rejestrze).
  */
 export function drawElement(
   ctx: CanvasRenderingContext2D,
@@ -659,29 +661,20 @@ export function drawElement(
   onAutoExpand?: (elementId: string, newHeight: number) => void,
   elements?: DrawingElement[]
 ): void {
-  if (element.type === 'path') {
-    drawPath(ctx, element, viewport, canvasWidth, canvasHeight);
-  } else if (element.type === 'shape') {
-    drawShape(ctx, element, viewport, canvasWidth, canvasHeight);
-  } else if (element.type === 'text') {
-    const result = drawText(ctx, element, viewport, canvasWidth, canvasHeight, debug);
-
-    // Auto-expand if needed
-    if (result.requiredHeight && onAutoExpand) {
-      onAutoExpand(element.id, result.requiredHeight);
-    }
-  } else if (element.type === 'function') {
+  // Wykres funkcji – jedyny typ bez handlera (niezaznaczalny)
+  if (element.type === 'function') {
     drawFunction(ctx, element, viewport, canvasWidth, canvasHeight);
-  } else if (element.type === 'image' && loadedImages) {
-    drawImage(ctx, element, viewport, canvasWidth, canvasHeight, loadedImages);
-  } else if (element.type === 'markdown') {
-    // UWAGA: Notatki markdown NIE sÄ… rysowane na canvas!
-    // SÄ… renderowane TYLKO jako HTML overlay przez MarkdownNoteView
-    // Rysowanie na canvas powodowaĹ‚o ghosting (podwĂłjne renderowanie)
     return;
-  } else if (element.type === 'table') {
-    drawTable(ctx, element, viewport, canvasWidth, canvasHeight);
   }
+
+  const handler = ElementRegistry[element.type];
+  if (!handler) return;
+
+  handler.render(ctx, element, viewport, canvasWidth, canvasHeight, {
+    loadedImages,
+    debug,
+    onAutoExpand,
+  });
 }
 
 /**

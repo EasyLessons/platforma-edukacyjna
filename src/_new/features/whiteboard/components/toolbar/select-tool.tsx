@@ -26,62 +26,7 @@ import { TextMiniToolbar } from './text-mini-toolbar';
 import { SelectionPropertiesPanel } from './properties-panel';
 import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '@/_new/features/whiteboard/selection/snap-utils';
 import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
-import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
-
-// Jeden canvas wielokrotnego użytku do pomiarów tekstu (unikamy GC przy resize)
-let _textMeasureCanvas: HTMLCanvasElement | null = null;
-function getTextMeasureCtx(): CanvasRenderingContext2D | null {
-  if (typeof document === 'undefined') return null;
-  if (!_textMeasureCanvas) _textMeasureCanvas = document.createElement('canvas');
-  return _textMeasureCanvas.getContext('2d');
-}
-
-/**
- * Mierzy minimalny rozmiar (w jednostkach świata) potrzebny do zmieszczenia tekstu.
- * Padding: 12px poziomo, 8px pionowo (jak w textarea px-3 py-2).
- */
-function measureTextMinDimensions(
-  text: string,
-  fontSize: number,
-  fontFamily: string,
-  fontWeight: string,
-  fontStyle: string,
-  viewportScale: number
-): { minWidth: number; minHeight: number } {
-  if (typeof document === 'undefined' || !text.trim()) {
-    return { minWidth: 1.5, minHeight: 0.4 };
-  }
-
-  const ctx = getTextMeasureCtx();
-  if (!ctx) return { minWidth: 1.5, minHeight: 0.4 };
-
-  // fontSize to wartość w jednostkach świata (jak w textEl.fontSize)
-  // renderowanie używa: clampFontSize(fontSize, viewportScale) = fontSize * viewportScale (clamped 10-200)
-  const screenFontSize = Math.max(10, Math.min(200, fontSize * viewportScale));
-  ctx.font = `${fontStyle} ${fontWeight} ${screenFontSize}px ${fontFamily}`;
-
-  const paddingX = 12; // px-3
-  const paddingY = 8;  // py-2
-  const lineHeight = screenFontSize * 1.4;
-
-  // Najszersza linia bez zawijania → minimalna szerokość boksa
-  const lines = text.split('\n');
-  let maxLineWidth = 0;
-  for (const line of lines) {
-    const w = ctx.measureText(line || ' ').width;
-    if (w > maxLineWidth) maxLineWidth = w;
-  }
-
-  const minScreenWidth = maxLineWidth + paddingX * 2;
-  const minScreenHeight = lines.length * lineHeight + paddingY * 2;
-
-  // Przelicz na jednostki świata
-  const worldScale = viewportScale * 100;
-  return {
-    minWidth: minScreenWidth / worldScale,
-    minHeight: minScreenHeight / worldScale,
-  };
-}
+import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
 
 interface SelectToolProps {
   viewport: ViewportTransform;
@@ -423,82 +368,11 @@ export function SelectTool({
 
         const updates = new Map<string, Partial<DrawingElement>>();
 
+        // Strategy Pattern: każdy typ elementu ma własny handler – brak if/else
         resizeOriginalElements.forEach((originalEl, id) => {
-          if (originalEl.type === 'shape') {
-            const newStartX = pivotX + (originalEl.startX - pivotX) * scaleX;
-            const newStartY = pivotY + (originalEl.startY - pivotY) * scaleY;
-            const newEndX = pivotX + (originalEl.endX - pivotX) * scaleX;
-            const newEndY = pivotY + (originalEl.endY - pivotY) * scaleY;
-
-            updates.set(id, {
-              startX: newStartX,
-              startY: newStartY,
-              endX: newEndX,
-              endY: newEndY,
-            });
-          } else if (originalEl.type === 'text') {
-            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
-            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
-
-            // 🔥 MIRO-STYLE: Czyste matematyczne skalowanie.
-            // Szerokość i czcionka rosną o ten sam %, układ tekstu (łamanie wierszy) ZAWSZE taki sam.
-            const newWidth = (originalEl.width || 3) * scaleX;
-            const newHeight = (originalEl.height || 1) * scaleY;
-            const newFontSize = originalEl.fontSize * scaleX;
-
-            updates.set(id, {
-              x: newX,
-              y: newY,
-              width: newWidth,
-              height: newHeight,
-              fontSize: newFontSize,
-            });
-          } else if (originalEl.type === 'image') {
-            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
-            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
-            const newWidth = originalEl.width * scaleX;
-            const newHeight = originalEl.height * scaleY;
-
-            updates.set(id, {
-              x: newX,
-              y: newY,
-              width: Math.max(MIN_SIZE, newWidth),
-              height: Math.max(MIN_SIZE, newHeight),
-            });
-          } else if (originalEl.type === 'path') {
-            const newPoints = originalEl.points.map((p: Point) => ({
-              x: pivotX + (p.x - pivotX) * scaleX,
-              y: pivotY + (p.y - pivotY) * scaleY,
-            }));
-
-            updates.set(id, { points: newPoints });
-          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
-            // 🆕 Resize dla markdown i table
-            const newX = pivotX + (originalEl.x - pivotX) * scaleX;
-            const newY = pivotY + (originalEl.y - pivotY) * scaleY;
-            const newWidth = originalEl.width * scaleX;
-            const newHeight = originalEl.height * scaleY;
-
-            const minW = originalEl.type === 'markdown' ? MARKDOWN_MIN_W : MIN_SIZE;
-            const minH = originalEl.type === 'markdown' ? MARKDOWN_MIN_H : MIN_SIZE;
-
-            const partialUpdate: Partial<DrawingElement> = {
-              x: newX,
-              y: newY,
-              width: Math.max(minW, newWidth),
-              height: Math.max(minH, newHeight),
-            };
-
-            // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tabeli przy resize
-            // ALE bez kontrolki w properties - tylko automatyczne
-            if (originalEl.type === 'table') {
-              (partialUpdate as any).fontSize = calculateTableFontSize(
-                Math.max(MIN_SIZE, newHeight),
-                originalEl.rows
-              );
-            }
-
-            updates.set(id, partialUpdate);
+          const handler = ElementRegistry[originalEl.type as keyof typeof ElementRegistry];
+          if (handler) {
+            updates.set(id, handler.resize(originalEl, pivotX, pivotY, scaleX, scaleY));
           }
         });
 
@@ -518,39 +392,17 @@ export function SelectTool({
             maxX = -Infinity,
             maxY = -Infinity;
 
+          // Strategy Pattern: getBoundingBox per handler – brak if/else per typ
           draggedElements.forEach((el) => {
-            if (el.type === 'path') {
-              el.points.forEach((p: Point) => {
-                const px = p.x + dx;
-                const py = p.y + dy;
-                minX = Math.min(minX, px);
-                minY = Math.min(minY, py);
-                maxX = Math.max(maxX, px);
-                maxY = Math.max(maxY, py);
-              });
-            } else if (el.type === 'shape') {
-              const x1 = el.startX + dx;
-              const y1 = el.startY + dy;
-              const x2 = el.endX + dx;
-              const y2 = el.endY + dy;
-              minX = Math.min(minX, x1, x2);
-              minY = Math.min(minY, y1, y2);
-              maxX = Math.max(maxX, x1, x2);
-              maxY = Math.max(maxY, y1, y2);
-            } else if (
-              el.type === 'text' ||
-              el.type === 'image' ||
-              el.type === 'markdown' ||
-              el.type === 'table' ||
-              el.type === 'pdf'
-            ) {
-              const x = el.x + dx;
-              const y = el.y + dy;
-              minX = Math.min(minX, x);
-              minY = Math.min(minY, y);
-              maxX = Math.max(maxX, x + (el.width || 0));
-              maxY = Math.max(maxY, y + (el.height || 0));
-            }
+            const handler = ElementRegistry[el.type as keyof typeof ElementRegistry];
+            if (!handler) return;
+            const bbox = handler.getBoundingBox(el);
+            const projX = bbox.x + dx;
+            const projY = bbox.y + dy;
+            minX = Math.min(minX, projX);
+            minY = Math.min(minY, projY);
+            maxX = Math.max(maxX, projX + bbox.width);
+            maxY = Math.max(maxY, projY + bbox.height);
           });
 
           const width = maxX - minX;
@@ -569,40 +421,11 @@ export function SelectTool({
 
           const updates = new Map<string, Partial<DrawingElement>>();
 
+          // Strategy Pattern: move per handler – brak if/else per typ
           draggedElementsOriginal.forEach((originalEl, id) => {
-            if (originalEl.type === 'path') {
-              const newPoints = originalEl.points.map((p: Point) => ({
-                x: p.x + dx + snapDx,
-                y: p.y + dy + snapDy,
-              }));
-              updates.set(id, { points: newPoints });
-            } else if (originalEl.type === 'shape') {
-              updates.set(id, {
-                startX: originalEl.startX + dx + snapDx,
-                startY: originalEl.startY + dy + snapDy,
-                endX: originalEl.endX + dx + snapDx,
-                endY: originalEl.endY + dy + snapDy,
-              });
-            } else if (originalEl.type === 'text') {
-              updates.set(id, {
-                x: originalEl.x + dx + snapDx,
-                y: originalEl.y + dy + snapDy,
-              });
-            } else if (originalEl.type === 'image') {
-              updates.set(id, {
-                x: originalEl.x + dx + snapDx,
-                y: originalEl.y + dy + snapDy,
-              });
-            } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
-              updates.set(id, {
-                x: originalEl.x + dx + snapDx,
-                y: originalEl.y + dy + snapDy,
-              });
-            } else if (originalEl.type === 'pdf') {
-              updates.set(id, {
-                x: originalEl.x + dx + snapDx,
-                y: originalEl.y + dy + snapDy,
-              });
+            const handler = ElementRegistry[originalEl.type as keyof typeof ElementRegistry];
+            if (handler) {
+              updates.set(id, handler.move(originalEl, dx + snapDx, dy + snapDy));
             }
           });
 
@@ -669,120 +492,13 @@ export function SelectTool({
         const cos = Math.cos(rotationAngle);
         const sin = Math.sin(rotationAngle);
 
-        // Funkcja pomocnicza do rotacji punktu wokół pivota
-        const rotatePointAroundPivot = (point: Point, pivot: Point): Point => {
-          const dx = point.x - pivot.x;
-          const dy = point.y - pivot.y;
-          return {
-            x: pivot.x + dx * cos - dy * sin,
-            y: pivot.y + dx * sin + dy * cos,
-          };
-        };
-
         const updates = new Map<string, Partial<DrawingElement>>();
 
+        // Strategy Pattern: rotate per handler – brak if/else per typ
         rotationOriginalElements.forEach((originalEl, id) => {
-          if (originalEl.type === 'shape') {
-            // Dla shape: obróć oba punkty wokół środka shape, potem obróć środek wokół pivota
-            const centerX = (originalEl.startX + originalEl.endX) / 2;
-            const centerY = (originalEl.startY + originalEl.endY) / 2;
-
-            // Obróć środek shape wokół pivota zaznaczenia
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            // Obróć punkty shape wokół jego własnego środka
-            const localStart = rotatePointAroundPivot(
-              { x: originalEl.startX, y: originalEl.startY },
-              { x: centerX, y: centerY }
-            );
-            const localEnd = rotatePointAroundPivot(
-              { x: originalEl.endX, y: originalEl.endY },
-              { x: centerX, y: centerY }
-            );
-
-            // Przesunięcie od starego środka do nowego
-            const offsetX = newCenter.x - centerX;
-            const offsetY = newCenter.y - centerY;
-
-            updates.set(id, {
-              startX: localStart.x + offsetX,
-              startY: localStart.y + offsetY,
-              endX: localEnd.x + offsetX,
-              endY: localEnd.y + offsetY,
-              // 🚫 Usunięte: rotation dla shape
-            });
-          } else if (originalEl.type === 'path') {
-            // Dla path: oblicz środek, obróć wszystkie punkty wokół środka, potem obróć środek wokół pivota
-            const xs = originalEl.points.map((p: Point) => p.x);
-            const ys = originalEl.points.map((p: Point) => p.y);
-            const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-            const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-
-            // Obróć środek path wokół pivota zaznaczenia
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            // Obróć każdy punkt wokół własnego środka path
-            const rotatedPoints = originalEl.points.map((p: Point) =>
-              rotatePointAroundPivot(p, { x: centerX, y: centerY })
-            );
-
-            // Przesunięcie od starego środka do nowego
-            const offsetX = newCenter.x - centerX;
-            const offsetY = newCenter.y - centerY;
-
-            const newPoints = rotatedPoints.map((p) => ({
-              x: p.x + offsetX,
-              y: p.y + offsetY,
-            }));
-
-            updates.set(id, { points: newPoints });
-          } else if (originalEl.type === 'text') {
-            // Dla text: obróć środek wokół pivota
-            const centerX = originalEl.x + (originalEl.width || 3) / 2;
-            const centerY = originalEl.y + (originalEl.height || 1) / 2;
-
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            updates.set(id, {
-              x: newCenter.x - (originalEl.width || 3) / 2,
-              y: newCenter.y - (originalEl.height || 1) / 2,
-              rotation: (originalEl.rotation || 0) + rotationAngle,
-            });
-          } else if (originalEl.type === 'image') {
-            // Dla image: obróć środek wokół pivota + zapisz rotation
-            const centerX = originalEl.x + originalEl.width / 2;
-            const centerY = originalEl.y + originalEl.height / 2;
-
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            updates.set(id, {
-              x: newCenter.x - originalEl.width / 2,
-              y: newCenter.y - originalEl.height / 2,
-              rotation: (originalEl.rotation || 0) + rotationAngle,
-            });
-          } else if (originalEl.type === 'markdown' || originalEl.type === 'table') {
-            // Dla markdown/table: obróć środek wokół pivota
-            const centerX = originalEl.x + originalEl.width / 2;
-            const centerY = originalEl.y + originalEl.height / 2;
-
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            updates.set(id, {
-              x: newCenter.x - originalEl.width / 2,
-              y: newCenter.y - originalEl.height / 2,
-            });
-          } else if (originalEl.type === 'pdf') {
-            // 🆕 Dla PDF: obróć środek wokół pivota
-            const centerX = originalEl.x + originalEl.width / 2;
-            const centerY = originalEl.y + originalEl.height / 2;
-
-            const newCenter = rotatePointAroundPivot({ x: centerX, y: centerY }, rotationPivot);
-
-            updates.set(id, {
-              x: newCenter.x - originalEl.width / 2,
-              y: newCenter.y - originalEl.height / 2,
-              rotation: (originalEl.rotation || 0) + rotationAngle,
-            });
+          const handler = ElementRegistry[originalEl.type as keyof typeof ElementRegistry];
+          if (handler) {
+            updates.set(id, handler.rotate(originalEl, rotationAngle, rotationPivot, cos, sin));
           }
         });
 
@@ -899,94 +615,15 @@ export function SelectTool({
     let maxX = -Infinity;
     let maxY = -Infinity;
 
+    // Strategy Pattern: getBoundingBox per handler – brak if/else per typ
     previewElements.forEach((el) => {
-      if (el.type === 'path') {
-        el.points.forEach((p) => {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
-        });
-      } else if (el.type === 'shape') {
-        minX = Math.min(minX, el.startX, el.endX);
-        minY = Math.min(minY, el.startY, el.endY);
-        maxX = Math.max(maxX, el.startX, el.endX);
-        maxY = Math.max(maxY, el.startY, el.endY);
-      } else if (el.type === 'text') {
-        const width = el.width || 3;
-        const height = el.height || 1;
-        
-        // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
-        if (el.rotation && el.rotation !== 0) {
-          const centerX = el.x + width / 2;
-          const centerY = el.y + height / 2;
-          
-          const corners = [
-            { x: el.x, y: el.y },
-            { x: el.x + width, y: el.y },
-            { x: el.x + width, y: el.y + height },
-            { x: el.x, y: el.y + height },
-          ];
-          
-          const cos = Math.cos(el.rotation);
-          const sin = Math.sin(el.rotation);
-          
-          corners.forEach((corner) => {
-            const dx = corner.x - centerX;
-            const dy = corner.y - centerY;
-            const rotatedX = centerX + dx * cos - dy * sin;
-            const rotatedY = centerY + dx * sin + dy * cos;
-            
-            minX = Math.min(minX, rotatedX);
-            minY = Math.min(minY, rotatedY);
-            maxX = Math.max(maxX, rotatedX);
-            maxY = Math.max(maxY, rotatedY);
-          });
-        } else {
-          minX = Math.min(minX, el.x);
-          minY = Math.min(minY, el.y);
-          maxX = Math.max(maxX, el.x + width);
-          maxY = Math.max(maxY, el.y + height);
-        }
-      } else if (el.type === 'image') {
-        // 🆕 Dla obróconych obrazków oblicz rotowane narożniki
-        if (el.rotation && el.rotation !== 0) {
-          const centerX = el.x + el.width / 2;
-          const centerY = el.y + el.height / 2;
-          
-          const corners = [
-            { x: el.x, y: el.y },
-            { x: el.x + el.width, y: el.y },
-            { x: el.x + el.width, y: el.y + el.height },
-            { x: el.x, y: el.y + el.height },
-          ];
-          
-          const cos = Math.cos(el.rotation);
-          const sin = Math.sin(el.rotation);
-          
-          corners.forEach((corner) => {
-            const dx = corner.x - centerX;
-            const dy = corner.y - centerY;
-            const rotatedX = centerX + dx * cos - dy * sin;
-            const rotatedY = centerY + dx * sin + dy * cos;
-            
-            minX = Math.min(minX, rotatedX);
-            minY = Math.min(minY, rotatedY);
-            maxX = Math.max(maxX, rotatedX);
-            maxY = Math.max(maxY, rotatedY);
-          });
-        } else {
-          minX = Math.min(minX, el.x);
-          minY = Math.min(minY, el.y);
-          maxX = Math.max(maxX, el.x + el.width);
-          maxY = Math.max(maxY, el.y + el.height);
-        }
-      } else if (el.type === 'markdown' || el.type === 'table') {
-        minX = Math.min(minX, el.x);
-        minY = Math.min(minY, el.y);
-        maxX = Math.max(maxX, el.x + el.width);
-        maxY = Math.max(maxY, el.y + el.height);
-      }
+      const handler = ElementRegistry[el.type as keyof typeof ElementRegistry];
+      if (!handler) return;
+      const bbox = handler.getBoundingBox(el);
+      minX = Math.min(minX, bbox.x);
+      minY = Math.min(minY, bbox.y);
+      maxX = Math.max(maxX, bbox.x + bbox.width);
+      maxY = Math.max(maxY, bbox.y + bbox.height);
     });
 
     if (minX === Infinity || minY === Infinity) return null;
@@ -1010,95 +647,15 @@ export function SelectTool({
     let maxX = -Infinity;
     let maxY = -Infinity;
 
+    // Strategy Pattern: getBoundingBox per handler – brak if/else per typ
     selectedElements.forEach((el) => {
-      if (el.type === 'path') {
-        el.points.forEach((p) => {
-          minX = Math.min(minX, p.x);
-          minY = Math.min(minY, p.y);
-          maxX = Math.max(maxX, p.x);
-          maxY = Math.max(maxY, p.y);
-        });
-      } else if (el.type === 'shape') {
-        minX = Math.min(minX, el.startX, el.endX);
-        minY = Math.min(minY, el.startY, el.endY);
-        maxX = Math.max(maxX, el.startX, el.endX);
-        maxY = Math.max(maxY, el.startY, el.endY);
-      } else if (el.type === 'text') {
-        const width = el.width || 3;
-        const height = el.height || 1;
-        
-        // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
-        if (el.rotation && el.rotation !== 0) {
-          const centerX = el.x + width / 2;
-          const centerY = el.y + height / 2;
-          
-          const corners = [
-            { x: el.x, y: el.y },
-            { x: el.x + width, y: el.y },
-            { x: el.x + width, y: el.y + height },
-            { x: el.x, y: el.y + height },
-          ];
-          
-          const cos = Math.cos(el.rotation);
-          const sin = Math.sin(el.rotation);
-          
-          corners.forEach((corner) => {
-            const dx = corner.x - centerX;
-            const dy = corner.y - centerY;
-            const rotatedX = centerX + dx * cos - dy * sin;
-            const rotatedY = centerY + dx * sin + dy * cos;
-            
-            minX = Math.min(minX, rotatedX);
-            minY = Math.min(minY, rotatedY);
-            maxX = Math.max(maxX, rotatedX);
-            maxY = Math.max(maxY, rotatedY);
-          });
-        } else {
-          minX = Math.min(minX, el.x);
-          minY = Math.min(minY, el.y);
-          maxX = Math.max(maxX, el.x + width);
-          maxY = Math.max(maxY, el.y + height);
-        }
-      } else if (el.type === 'image') {
-        // 🆕 Dla obróconych obrazków oblicz rotowane narożniki
-        if (el.rotation && el.rotation !== 0) {
-          const centerX = el.x + el.width / 2;
-          const centerY = el.y + el.height / 2;
-          
-          const corners = [
-            { x: el.x, y: el.y },
-            { x: el.x + el.width, y: el.y },
-            { x: el.x + el.width, y: el.y + el.height },
-            { x: el.x, y: el.y + el.height },
-          ];
-          
-          const cos = Math.cos(el.rotation);
-          const sin = Math.sin(el.rotation);
-          
-          corners.forEach((corner) => {
-            const dx = corner.x - centerX;
-            const dy = corner.y - centerY;
-            const rotatedX = centerX + dx * cos - dy * sin;
-            const rotatedY = centerY + dx * sin + dy * cos;
-            
-            minX = Math.min(minX, rotatedX);
-            minY = Math.min(minY, rotatedY);
-            maxX = Math.max(maxX, rotatedX);
-            maxY = Math.max(maxY, rotatedY);
-          });
-        } else {
-          minX = Math.min(minX, el.x);
-          minY = Math.min(minY, el.y);
-          maxX = Math.max(maxX, el.x + el.width);
-          maxY = Math.max(maxY, el.y + el.height);
-        }
-      } else if (el.type === 'markdown' || el.type === 'table') {
-        // 🆕 Obsługa markdown i table - mają x, y, width, height
-        minX = Math.min(minX, el.x);
-        minY = Math.min(minY, el.y);
-        maxX = Math.max(maxX, el.x + el.width);
-        maxY = Math.max(maxY, el.y + el.height);
-      }
+      const handler = ElementRegistry[el.type as keyof typeof ElementRegistry];
+      if (!handler) return;
+      const bbox = handler.getBoundingBox(el);
+      minX = Math.min(minX, bbox.x);
+      minY = Math.min(minY, bbox.y);
+      maxX = Math.max(maxX, bbox.x + bbox.width);
+      maxY = Math.max(maxY, bbox.y + bbox.height);
     });
 
     // 🛡️ Walidacja - jeśli nie znaleziono żadnych współrzędnych
@@ -1114,101 +671,11 @@ export function SelectTool({
     };
   }, [elements, selectedIds]);
 
+  // Strategy Pattern: isPointInElement deleguje do handlera danego typu
   const isPointInElement = (worldPoint: Point, element: DrawingElement): boolean => {
-    if (element.type === 'shape') {
-      const minX = Math.min(element.startX, element.endX);
-      const maxX = Math.max(element.startX, element.endX);
-      const minY = Math.min(element.startY, element.endY);
-      const maxY = Math.max(element.startY, element.endY);
-
-      return (
-        worldPoint.x >= minX && worldPoint.x <= maxX && worldPoint.y >= minY && worldPoint.y <= maxY
-      );
-    } else if (element.type === 'text') {
-      const width = element.width || 3;
-      const height = element.height || 1;
-      
-      // 🆕 Obsługa rotacji dla text
-      if (element.rotation && element.rotation !== 0) {
-        // Środek elementu
-        const centerX = element.x + width / 2;
-        const centerY = element.y + height / 2;
-        
-        // Odwróć punkt o -rotation wokół środka
-        const cos = Math.cos(-element.rotation);
-        const sin = Math.sin(-element.rotation);
-        const dx = worldPoint.x - centerX;
-        const dy = worldPoint.y - centerY;
-        const rotatedX = centerX + dx * cos - dy * sin;
-        const rotatedY = centerY + dx * sin + dy * cos;
-        
-        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
-        return (
-          rotatedX >= element.x &&
-          rotatedX <= element.x + width &&
-          rotatedY >= element.y &&
-          rotatedY <= element.y + height
-        );
-      }
-      
-      return (
-        worldPoint.x >= element.x &&
-        worldPoint.x <= element.x + width &&
-        worldPoint.y >= element.y &&
-        worldPoint.y <= element.y + height
-      );
-    } else if (element.type === 'image') {
-      // 🆕 Obsługa rotacji dla image
-      if (element.rotation && element.rotation !== 0) {
-        // Środek elementu
-        const centerX = element.x + element.width / 2;
-        const centerY = element.y + element.height / 2;
-        
-        // Odwróć punkt o -rotation wokół środka
-        const cos = Math.cos(-element.rotation);
-        const sin = Math.sin(-element.rotation);
-        const dx = worldPoint.x - centerX;
-        const dy = worldPoint.y - centerY;
-        const rotatedX = centerX + dx * cos - dy * sin;
-        const rotatedY = centerY + dx * sin + dy * cos;
-        
-        // Sprawdź czy odwrócony punkt jest w nieobróconym prostokącie
-        return (
-          rotatedX >= element.x &&
-          rotatedX <= element.x + element.width &&
-          rotatedY >= element.y &&
-          rotatedY <= element.y + element.height
-        );
-      }
-      
-      return (
-        worldPoint.x >= element.x &&
-        worldPoint.x <= element.x + element.width &&
-        worldPoint.y >= element.y &&
-        worldPoint.y <= element.y + element.height
-      );
-    } else if (element.type === 'path') {
-      const xs = element.points.map((p: Point) => p.x);
-      const ys = element.points.map((p: Point) => p.y);
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      const minY = Math.min(...ys);
-      const maxY = Math.max(...ys);
-
-      return (
-        worldPoint.x >= minX && worldPoint.x <= maxX && worldPoint.y >= minY && worldPoint.y <= maxY
-      );
-    } else if (element.type === 'markdown' || element.type === 'table') {
-      // 🆕 Obsługa markdown i table - mają x, y, width, height
-      return (
-        worldPoint.x >= element.x &&
-        worldPoint.x <= element.x + element.width &&
-        worldPoint.y >= element.y &&
-        worldPoint.y <= element.y + element.height
-      );
-    }
-
-    return false;
+    const handler = ElementRegistry[element.type as keyof typeof ElementRegistry];
+    if (!handler) return false;
+    return handler.isPointInElement(worldPoint, element);
   };
 
   // 🆕 Sprawdza czy punkt jest w bounding box (dla przeciągania zaznaczonych elementów)
