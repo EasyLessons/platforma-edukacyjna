@@ -54,13 +54,15 @@ interface TextToolProps {
   viewport: ViewportTransform;
   canvasWidth: number;
   canvasHeight: number;
-  elements: TextElement[]; // 🆕 Lista wszystkich tekstów
-  editingTextId: string | null; // 🆕 ID tekstu do edycji (z double-click)
+  elements: TextElement[];
+  editingTextId: string | null;
   onTextCreate: (text: TextElement) => void;
   onTextUpdate: (id: string, updates: Partial<TextElement>) => void;
   onTextDelete: (id: string) => void;
-  onEditingComplete?: () => void; // 🆕 Callback po zakończeniu edycji
-  onViewportChange?: (viewport: ViewportTransform) => void; // 🆕 Do obsługi wheel
+  onEditingComplete?: () => void;
+  onViewportChange?: (viewport: ViewportTransform) => void;
+  /** Ref do kontenera edytora — aktualizowany przez whiteboard-canvas w RAF dla zero-lag panu */
+  editorDivRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 interface TextDraft {
@@ -77,7 +79,7 @@ interface TextDraft {
   textAlign: 'left' | 'center' | 'right';
 }
 
-export function TextTool({
+export const TextTool = function TextTool({
   viewport,
   canvasWidth,
   canvasHeight,
@@ -87,7 +89,8 @@ export function TextTool({
   onTextUpdate,
   onTextDelete,
   onEditingComplete,
-  onViewportChange, // 🆕
+  onViewportChange,
+  editorDivRef,
 }: TextToolProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [textDraft, setTextDraft] = useState<TextDraft | null>(null);
@@ -211,30 +214,6 @@ export function TextTool({
         setEditingText(textToEdit.text);
         setEditingId(textToEdit.id);
         setIsEditing(true);
-      }
-    } else if (isEditing && textDraft && editingId) {
-      // Jeśli edytujemy istniejący tekst i viewport się zmienił - zaktualizuj pozycję
-      const textToEdit = elements.find((el) => el.id === editingId);
-      if (textToEdit) {
-        const topLeft = transformPoint(
-          { x: textToEdit.x, y: textToEdit.y },
-          viewport,
-          canvasWidth,
-          canvasHeight
-        );
-
-        const width = (textToEdit.width || 3) * viewport.scale * 100;
-        const height = (textToEdit.height || 1) * viewport.scale * 100;
-
-        setTextDraft((prev) =>
-          prev
-            ? {
-                ...prev,
-                screenStart: topLeft,
-                screenEnd: { x: topLeft.x + width, y: topLeft.y + height },
-              }
-            : null
-        );
       }
     }
   }, [editingTextId, elements, viewport, canvasWidth, canvasHeight, isEditing]); // Usunięto editingId aby zatrzymać pętlę
@@ -426,16 +405,23 @@ export function TextTool({
       )}
 
       {/* EDYTOR TEKSTOWY */}
-      {isEditing && textDraft && (
+      {isEditing && textDraft && (() => {
+        // Pozycja liczona dynamicznie z world coords + bieżącego viewport —
+        // edytor zawsze wyrównany do elementu nawet po pan/zoom
+        const tl = transformPoint(textDraft.worldStart, viewport, canvasWidth, canvasHeight);
+        const br = transformPoint(textDraft.worldEnd,   viewport, canvasWidth, canvasHeight);
+        const edLeft   = Math.min(tl.x, br.x);
+        const edTop    = Math.min(tl.y, br.y);
+        const edWidth  = Math.abs(br.x - tl.x);
+        const edHeight = Math.abs(br.y - tl.y);
+        return (
         <div
-          ref={editorRef}
-          className="absolute pointer-events-auto z-50 overflow-hidden"
-          style={{
-            left: Math.min(textDraft.screenStart.x, textDraft.screenEnd.x),
-            top: Math.min(textDraft.screenStart.y, textDraft.screenEnd.y),
-            width: Math.abs(textDraft.screenEnd.x - textDraft.screenStart.x),
-            height: Math.abs(textDraft.screenEnd.y - textDraft.screenStart.y),
+          ref={(node) => {
+            (editorRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            if (editorDivRef) (editorDivRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
+          className="absolute pointer-events-auto z-50 overflow-hidden"
+          style={{ left: edLeft, top: edTop, width: edWidth, height: edHeight }}
         >
           {/* Mini Toolbar */}
           <div className="absolute -top-12 left-0 z-50">
@@ -515,7 +501,8 @@ export function TextTool({
           />
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

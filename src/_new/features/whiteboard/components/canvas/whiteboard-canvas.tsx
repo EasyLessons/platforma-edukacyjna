@@ -150,6 +150,8 @@ export default function WhiteboardCanvasNew({
   const mdTableOverlaysRef = useRef<HTMLDivElement>(null);
   /** Ref do RemoteCursors — transform aktualizowany synchronicznie z RAF canvasa */
   const remoteCursorsRef = useRef<HTMLDivElement>(null);
+  /** Ref do kontenera edytora tekstu — pozycja aktualizowana w RAF (zero-lag pan/zoom) */
+  const textEditorDivRef = useRef<HTMLDivElement | null>(null);
   /** Czy trwa aktywny pan gestem (PanTool lub wheel) — pomija setViewport w hot-path */
   const isPanningRef = useRef(false);
   /** Czy overlaye są FAKTYCZNIE widoczne (false = ukryte podczas scroll/pan/wheel) - STATE aby wymusić re-render SelectTool */
@@ -198,10 +200,6 @@ export default function WhiteboardCanvasNew({
     tableId: string;
     row: number;
     col: number;
-    screenLeft: number;
-    screenTop: number;
-    screenWidth: number;
-    screenHeight: number;
   } | null>(null);
   const cellEditorInputRef = useRef<HTMLTextAreaElement>(null);
   /** Aktualny stan editingTableCell bez stałej closure — do użytku w handlerach */
@@ -378,6 +376,46 @@ export default function WhiteboardCanvasNew({
       `translate(${-viewport.x * 100}px, ${-viewport.y * 100}px)`;
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.transform = overlayTransform;
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.transform = overlayTransform;
+
+    // Imperatywny update edytora tekstu — ta sama ramka co canvas, zero lagu przy pan/zoom
+    if (editingTextIdRef.current && textEditorDivRef.current) {
+      const textEl = el.elementsRef.current.find((e) => e.id === editingTextIdRef.current);
+      if (textEl && textEl.type === 'text') {
+        const tl = transformPoint({ x: textEl.x, y: textEl.y }, viewport, width, height);
+        const elW = (textEl.width  || 3) * viewport.scale * 100;
+        const elH = (textEl.height || 1) * viewport.scale * 100;
+        const d = textEditorDivRef.current;
+        d.style.left   = `${tl.x}px`;
+        d.style.top    = `${tl.y}px`;
+        d.style.width  = `${elW}px`;
+        d.style.height = `${elH}px`;
+      }
+    }
+
+    // Imperatywny update edytora komórki tabeli — ta sama ramka co canvas, zero lagu
+    if (editingTableCellRef.current && cellEditorInputRef.current) {
+      const editing = editingTableCellRef.current;
+      const table = el.elementsRef.current.find((e) => e.id === editing.tableId);
+      if (table && table.type === 'table') {
+        const t = table as TableElement;
+        const cellW = t.width  / t.cols;
+        const cellH = t.height / t.rows;
+        const tl = transformPoint(
+          { x: t.x + editing.col * cellW, y: t.y + editing.row * cellH },
+          viewport, width, height
+        );
+        const br = transformPoint(
+          { x: t.x + (editing.col + 1) * cellW, y: t.y + (editing.row + 1) * cellH },
+          viewport, width, height
+        );
+        const inp = cellEditorInputRef.current;
+        inp.style.left     = `${tl.x}px`;
+        inp.style.top      = `${tl.y}px`;
+        inp.style.width    = `${br.x - tl.x}px`;
+        inp.style.height   = `${br.y - tl.y}px`;
+        inp.style.fontSize = `${Math.max(10, Math.min((br.y - tl.y) * 0.42, 30))}px`;
+      }
+    }
 
     ctx.restore();
   }, [el.elementsRef, el.loadedImages, vp.viewportRef]);
@@ -561,11 +599,7 @@ export default function WhiteboardCanvasNew({
             { x: t.x + (col + 1) * cellW, y: t.y + (row + 1) * cellH },
             vp.viewportRef.current, rect.width, rect.height
           );
-          setEditingTableCell({
-            tableId: t.id, row, col,
-            screenLeft: tl.x, screenTop: tl.y,
-            screenWidth: br.x - tl.x, screenHeight: br.y - tl.y,
-          });
+          setEditingTableCell({ tableId: t.id, row, col });
           return;
         }
       }
@@ -1314,32 +1348,8 @@ export default function WhiteboardCanvasNew({
 
   /** Przechodzi do następnej komórki tabeli (Tab) lub zamyka edytor (Enter/Escape) */
   const openCellEditor = useCallback((tableId: string, row: number, col: number) => {
-    const table = el.elementsRef.current.find((e) => e.id === tableId) as TableElement | undefined;
-    if (!table) return;
-    const cellW = table.width / table.cols;
-    const cellH = table.height / table.rows;
-    const cellTopLeft = transformPoint(
-      { x: table.x + col * cellW, y: table.y + row * cellH },
-      vp.viewportRef.current,
-      canvasWidth,
-      canvasHeight
-    );
-    const cellBottomRight = transformPoint(
-      { x: table.x + (col + 1) * cellW, y: table.y + (row + 1) * cellH },
-      vp.viewportRef.current,
-      canvasWidth,
-      canvasHeight
-    );
-    setEditingTableCell({
-      tableId,
-      row,
-      col,
-      screenLeft:   cellTopLeft.x,
-      screenTop:    cellTopLeft.y,
-      screenWidth:  cellBottomRight.x - cellTopLeft.x,
-      screenHeight: cellBottomRight.y - cellTopLeft.y,
-    });
-  }, [el.elementsRef, vp.viewportRef, canvasWidth, canvasHeight]);
+    setEditingTableCell({ tableId, row, col });
+  }, []);
 
   const handleCellEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     const editing = editingTableCellRef.current;
@@ -1618,6 +1628,7 @@ export default function WhiteboardCanvasNew({
             onTextDelete={handleTextDelete}
             onEditingComplete={handleEditingComplete}
             onViewportChange={handleViewportChange}
+            editorDivRef={textEditorDivRef}
           />
         )}
 
@@ -1836,8 +1847,23 @@ export default function WhiteboardCanvasNew({
         {/* ── EDYTOR KOMÓRKI TABELI ──────────────────────────── */}
         {editingTableCell && (() => {
           const table = el.elements.find((e) => e.id === editingTableCell.tableId) as TableElement | undefined;
-          const cellValue = table?.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
-          const isHeader = editingTableCell.row === 0 && (table?.headerRow ?? false);
+          if (!table) return null;
+          const cellValue = table.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
+          const isHeader = editingTableCell.row === 0 && (table.headerRow ?? false);
+          // Pozycja liczona dynamicznie z bieżącego vp.viewport — edytor zawsze
+          // zostaje wyrównany do komórki nawet po pan/zoom (brak frozen screen coords)
+          const cellW = table.width / table.cols;
+          const cellH = table.height / table.rows;
+          const tl = transformPoint(
+            { x: table.x + editingTableCell.col * cellW, y: table.y + editingTableCell.row * cellH },
+            vp.viewport, canvasWidth, canvasHeight
+          );
+          const br = transformPoint(
+            { x: table.x + (editingTableCell.col + 1) * cellW, y: table.y + (editingTableCell.row + 1) * cellH },
+            vp.viewport, canvasWidth, canvasHeight
+          );
+          const cellScreenW = br.x - tl.x;
+          const cellScreenH = br.y - tl.y;
           return (
             <textarea
               ref={cellEditorInputRef}
@@ -1852,19 +1878,19 @@ export default function WhiteboardCanvasNew({
               }
               onBlur={() => setEditingTableCell(null)}
               onKeyDown={handleCellEditorKeyDown}
-              className="absolute z-[100] border-2 border-blue-500 outline-none px-1 resize-none"
+              className="absolute z-[100] border-2 border-blue-500 outline-none px-1 resize-none no-scrollbar"
               style={{
-                left:       editingTableCell.screenLeft,
-                top:        editingTableCell.screenTop,
-                width:      editingTableCell.screenWidth,
-                height:     editingTableCell.screenHeight,
-                fontSize:   Math.max(10, Math.min(editingTableCell.screenHeight * 0.42, 30)), // ZWIĘKSZONE z 15 do 30
-                background: isHeader ? (table?.headerBgColor || '#f3f4f6') : '#fff',
+                left:       tl.x,
+                top:        tl.y,
+                width:      cellScreenW,
+                height:     cellScreenH,
+                fontSize:   Math.max(10, Math.min(cellScreenH * 0.42, 30)),
+                background: isHeader ? (table.headerBgColor || '#f3f4f6') : '#fff',
                 fontWeight: isHeader ? 700 : 400,
                 color:      '#111827',
                 boxSizing:  'border-box',
-                whiteSpace: 'pre-wrap', // Obsługa nowych linii
-                wordBreak: 'break-word',
+                whiteSpace: 'pre-wrap',
+                wordBreak:  'break-word',
                 lineHeight: '1.2',
               }}
             />

@@ -251,6 +251,9 @@ export function SelectTool({
         let newBoxHeight = resizeOriginalBox.height;
 
         const MIN_SIZE = 0.1;
+        // Minimalne wymiary notatki markdown (~150×100px przy scale=1)
+        const MARKDOWN_MIN_W = 1.5;
+        const MARKDOWN_MIN_H = 1.0;
 
         // Zachowaj oryginalne proporcje (aspect ratio)
         const aspectRatio = resizeOriginalBox.width / resizeOriginalBox.height;
@@ -486,11 +489,14 @@ export function SelectTool({
             const newWidth = originalEl.width * scaleX;
             const newHeight = originalEl.height * scaleY;
 
+            const minW = originalEl.type === 'markdown' ? MARKDOWN_MIN_W : MIN_SIZE;
+            const minH = originalEl.type === 'markdown' ? MARKDOWN_MIN_H : MIN_SIZE;
+
             const partialUpdate: Partial<DrawingElement> = {
               x: newX,
               y: newY,
-              width: Math.max(MIN_SIZE, newWidth),
-              height: Math.max(MIN_SIZE, newHeight),
+              width: Math.max(minW, newWidth),
+              height: Math.max(minH, newHeight),
             };
 
             // ✅ PRZYWRÓCONE: automatyczne skalowanie fontSize dla tabeli przy resize
