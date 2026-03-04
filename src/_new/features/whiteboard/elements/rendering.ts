@@ -370,8 +370,8 @@ export function drawText(
   const lineHeight = fontSize * 1.4;
 
   // Padding (matching textarea px-3 py-2 = 12px 8px)
-  const paddingX = 12; // 12px horizontal padding (px-3 = 0.75rem = 12px)
-  const paddingY = 8; // 8px vertical padding (py-2 = 0.5rem = 8px)
+  const paddingX = 0; 
+  const paddingY = 0; 
 
   // đź†• Calculate X position based on alignment and width
   let textX = pos.x + paddingX;
