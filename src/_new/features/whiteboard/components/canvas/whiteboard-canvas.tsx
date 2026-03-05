@@ -250,6 +250,9 @@ export default function WhiteboardCanvasNew({
   const broadcastDeletedRef = useRef<(id: string) => Promise<void>>(
     async () => {}
   );
+  const broadcastUpdatedRef = useRef<(el: DrawingElement) => Promise<void>>(
+    async () => {}
+  );
 
   // ─── HOOK: viewport ─────────────────────────────────────────────────────────
   const vp = useViewport();
@@ -269,8 +272,10 @@ export default function WhiteboardCanvasNew({
     // Używamy ref żeby nie tworzyć pętli zależności z rt
     onBroadcastCreated: (element) => broadcastCreatedRef.current(element),
     onBroadcastDeleted: (elementId) => broadcastDeletedRef.current(elementId),
+    onBroadcastUpdated: (element) => broadcastUpdatedRef.current(element),
     onRemoveElement: (elementId) => el.removeElement(elementId),
     onAddElement: (element) => el.addElements([element]),
+    onUpdateElement: (element) => el.updateElement(element),
     onClearSelection: sel.clearSelection,
     unsavedElementsRef: el.unsavedElementsRef,
     boardIdRef,
@@ -330,7 +335,8 @@ export default function WhiteboardCanvasNew({
   useEffect(() => {
     broadcastCreatedRef.current = rt.broadcastElementCreated;
     broadcastDeletedRef.current = rt.broadcastElementDeleted;
-  }, [rt.broadcastElementCreated, rt.broadcastElementDeleted]);
+    broadcastUpdatedRef.current = rt.broadcastElementUpdated;
+  }, [rt.broadcastElementCreated, rt.broadcastElementDeleted, rt.broadcastElementUpdated]);
 
   // ─── HOOK: clipboard ────────────────────────────────────────────────────────
   const clip = useClipboard({
@@ -455,12 +461,69 @@ useMultiTouchGestures({
       drawGrid(ctx, viewport, width, height);
     }
 
+    // ─── 🚀 VIEWPORT CULLING (Odrzucanie niewidocznych elementów) ───
+    // 1. Granice widocznego "świata"
+    const visibleMinX = -viewport.x / viewport.scale;
+    const visibleMinY = -viewport.y / viewport.scale;
+    const visibleMaxX = (width - viewport.x) / viewport.scale;
+    const visibleMaxY = (height - viewport.y) / viewport.scale;
+
+    // 2. Margines błędu — elementy nie znikają nagle przy krawędzi ekranu
+    const padding = 100 / viewport.scale;
+
     // Markdown renderowana jako HTML overlay — canvas pomija.
     // Tabela rysowana na canvas przez drawElement → drawTable.
     for (const element of el.elementsRef.current) {
       if (element.type === 'markdown') continue;
       // Pomiń rysowanie tekstu jeśli jest aktualnie edytowany (textarea go zastępuje)
       if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
+
+      // 3. Bounding Box elementu
+      let minX = 0, minY = 0, maxX = 0, maxY = 0;
+
+      if (element.type === 'shape') {
+        minX = Math.min(element.startX, element.endX);
+        maxX = Math.max(element.startX, element.endX);
+        minY = Math.min(element.startY, element.endY);
+        maxY = Math.max(element.startY, element.endY);
+      } else if (element.type === 'path') {
+        if (element.points.length > 0) {
+          minX = element.points[0].x; maxX = minX;
+          minY = element.points[0].y; maxY = minY;
+          const step = Math.max(1, Math.floor(element.points.length / 10));
+          for (let i = 1; i < element.points.length; i += step) {
+            const p = element.points[i];
+            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+          }
+        }
+      } else if (element.type === 'arrow') {
+        minX = Math.min(element.startX, element.endX);
+        maxX = Math.max(element.startX, element.endX);
+        minY = Math.min(element.startY, element.endY);
+        maxY = Math.max(element.startY, element.endY);
+      } else if (element.type === 'function') {
+        // Funkcje rysują się na całą szerokość ekranu — nigdy nie cullujemy
+        minX = visibleMinX; maxX = visibleMaxX;
+        minY = visibleMinY; maxY = visibleMaxY;
+      } else if ('x' in element && 'y' in element) {
+        // Obrazki, teksty, tabele
+        minX = element.x;
+        minY = element.y;
+        maxX = element.x + ((element as any).width || 0);
+        maxY = element.y + ((element as any).height || 0);
+      }
+
+      // 4. Test widoczności — pomiń jeśli poza ekranem
+      if (
+        minX > visibleMaxX + padding ||
+        maxX < visibleMinX - padding ||
+        minY > visibleMaxY + padding ||
+        maxY < visibleMinY - padding
+      ) {
+        continue;
+      }
+
       drawElement(
               ctx,
               element,
@@ -469,7 +532,6 @@ useMultiTouchGestures({
               height,
               el.loadedImages,
               false,
-              // 🔥 POPRAWIONE: Type-guard dla TypeScripta ('height' in current)
               (id: string, newHeight: number) => {
                 setTimeout(() => {
                   const current = el.elementsRef.current.find((e) => e.id === id);
@@ -1324,6 +1386,7 @@ useMultiTouchGestures({
       el.updateElement(updated);
       el.markUnsaved([id]);
       rt.broadcastElementUpdated(updated);
+      hist.pushUserAction({ type: 'update', before: current, after: updated });
       hist.saveToHistory(
         el.elementsRef.current.map((e) => (e.id === id ? updated : e))
       );
@@ -1331,7 +1394,7 @@ useMultiTouchGestures({
     [
       userRole,
       el.elementsRef, el.updateElement, el.markUnsaved,
-      rt.broadcastElementUpdated, hist.saveToHistory,
+      rt.broadcastElementUpdated, hist.pushUserAction, hist.saveToHistory,
     ]
   );
 
@@ -1373,10 +1436,29 @@ useMultiTouchGestures({
   );
   
   /** Wywoływane przez SelectTool po zakończeniu operacji (mouseup) */
-  const handleSelectionFinish = useCallback(() => {
+  const handleSelectionFinish = useCallback((originalElementsMap?: Map<string, DrawingElement>) => {
     if (userRole === 'viewer') return;
     const currentElements = el.elementsRef.current;
     const selectedIds = Array.from(sel.selectedElementIdsRef.current);
+
+    if (originalElementsMap && originalElementsMap.size > 0) {
+      const batchActions = selectedIds
+        .map((id) => {
+          const before = originalElementsMap.get(id);
+          const after = currentElements.find((e) => e.id === id);
+          if (before && after && JSON.stringify(before) !== JSON.stringify(after)) {
+            return { type: 'update' as const, before, after };
+          }
+          return null;
+        })
+        .filter((a): a is NonNullable<typeof a> => a !== null);
+      if (batchActions.length === 1) {
+        hist.pushUserAction(batchActions[0]);
+      } else if (batchActions.length > 1) {
+        hist.pushUserAction({ type: 'batch', actions: batchActions });
+      }
+    }
+
     hist.saveToHistory(currentElements);
     selectedIds.forEach((id) => {
       const found = currentElements.find((e) => e.id === id);
@@ -1387,7 +1469,7 @@ useMultiTouchGestures({
     userRole,
     el.elementsRef, el.markUnsaved,
     sel.selectedElementIdsRef,
-    hist.saveToHistory,
+    hist.saveToHistory, hist.pushUserAction,
     rt.broadcastElementUpdated,
   ]);
 
@@ -1399,6 +1481,7 @@ useMultiTouchGestures({
     if (userRole === 'viewer') return;
     const current = el.elementsRef.current.find((e) => e.id === id);
     el.removeElement(id);
+    if (el.loadedImages && el.loadedImages[id]) delete el.loadedImages[id];
     rt.broadcastElementDeleted(id);
     const boardIdNum = parseInt(boardIdRef.current);
     if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
@@ -1491,14 +1574,45 @@ useMultiTouchGestures({
     const ids = sel.selectedElementIdsRef.current;
     if (ids.size === 0) return;
     const boardIdNum = parseInt(boardIdRef.current);
-    ids.forEach((id) => {
-      const element = el.elementsRef.current.find((e) => e.id === id);
+
+    const idsArray = Array.from(ids);
+    const elementsToDelete = idsArray
+      .map((id) => el.elementsRef.current.find((e) => e.id === id))
+      .filter((e): e is DrawingElement => e !== undefined);
+
+    // 1. Natychmiastowe usunięcie lokalne
+    idsArray.forEach((id) => {
       el.removeElement(id);
-      rt.broadcastElementDeleted(id);
-      if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
-      if (element) hist.pushUserAction({ type: 'delete', element });
+      if (el.loadedImages && el.loadedImages[id]) delete el.loadedImages[id];
     });
     sel.clearSelection();
+
+    // 2. Zapis w historii jako jedna paczka
+    if (elementsToDelete.length === 1) {
+      hist.pushUserAction({ type: 'delete', element: elementsToDelete[0] });
+    } else if (elementsToDelete.length > 1) {
+      hist.pushUserAction({
+        type: 'batch',
+        actions: elementsToDelete.map((e) => ({ type: 'delete' as const, element: e })),
+      });
+    }
+
+    // 3. Broadcast + baza w paczkach po 20 (ochrona przed rate limit)
+    const processInChunks = async () => {
+      for (let i = 0; i < idsArray.length; i += 20) {
+        const chunk = idsArray.slice(i, i + 20);
+        chunk.forEach((id) => rt.broadcastElementDeleted(id));
+        if (!isNaN(boardIdNum)) {
+          await Promise.all(
+            chunk.map((id) => el.deleteElementDirectly(boardIdNum, id).catch(console.error))
+          );
+        }
+        if (i + 20 < idsArray.length) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+      }
+    };
+    processInChunks();
   }, [
     userRole,
     sel.selectedElementIdsRef, sel.clearSelection,
@@ -1543,19 +1657,47 @@ useMultiTouchGestures({
     if (userRole === 'viewer') return;
     const boardIdNum = parseInt(boardIdRef.current);
     const snapshot = [...el.elementsRef.current];
+    if (snapshot.length === 0) return;
+
+    // 1. Natychmiastowe usunięcie lokalne
     snapshot.forEach((e) => {
       el.removeElement(e.id);
-      rt.broadcastElementDeleted(e.id);
-      if (!isNaN(boardIdNum)) {
-        el.deleteElementDirectly(boardIdNum, e.id).catch(console.error);
-      }
+      if (el.loadedImages && el.loadedImages[e.id]) delete el.loadedImages[e.id];
     });
     sel.clearSelection();
+
+    // 2. Zapis w historii jako jedna paczka
+    if (snapshot.length === 1) {
+      hist.pushUserAction({ type: 'delete', element: snapshot[0] });
+    } else if (snapshot.length > 1) {
+      hist.pushUserAction({
+        type: 'batch',
+        actions: snapshot.map((e) => ({ type: 'delete' as const, element: e })),
+      });
+    }
+
+    // 3. Broadcast + baza w paczkach po 20 (ochrona przed rate limit)
+    const processInChunks = async () => {
+      for (let i = 0; i < snapshot.length; i += 20) {
+        const chunk = snapshot.slice(i, i + 20);
+        chunk.forEach((e) => rt.broadcastElementDeleted(e.id));
+        if (!isNaN(boardIdNum)) {
+          await Promise.all(
+            chunk.map((e) => el.deleteElementDirectly(boardIdNum, e.id).catch(console.error))
+          );
+        }
+        if (i + 20 < snapshot.length) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+      }
+    };
+    processInChunks();
   }, [
     userRole,
     el.elementsRef, el.removeElement, el.deleteElementDirectly,
     rt.broadcastElementDeleted,
     sel.clearSelection,
+    hist.pushUserAction,
   ]);
 
   // ═══════════════════════════════════════════════════════════════════════════

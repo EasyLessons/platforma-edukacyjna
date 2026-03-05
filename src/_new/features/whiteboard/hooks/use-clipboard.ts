@@ -165,8 +165,10 @@ export function useClipboard({
         }
       });
     }
-    // Zarejestruj każdy nowy element w undo stack
-    newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
+    // Zarejestruj nowe elementy jako jedną batch akcję w undo stack
+    if (newElements.length > 0) {
+      onPushUserAction?.({ type: 'batch', actions: newElements.map(el => ({ type: 'create' as const, element: el })) });
+    }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
   }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
@@ -216,8 +218,10 @@ export function useClipboard({
         }
       });
     }
-    // Zarejestruj każdy nowy element w undo stack
-    newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
+    // Zarejestruj nowe elementy jako jedną batch akcję w undo stack
+    if (newElements.length > 0) {
+      onPushUserAction?.({ type: 'batch', actions: newElements.map(el => ({ type: 'create' as const, element: el })) });
+    }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
   }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);

@@ -276,11 +276,58 @@ const handlePointerUp = (e: React.PointerEvent) => {
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
 
     if (currentPathRef.current && pointsRef.current.length >= 1) {
-      // Utwórz finalną ścieżkę z kopiami punktów
+      let finalPoints = [...pointsRef.current];
+      let finalWidths = widthsRef.current.length > 0 ? [...widthsRef.current] : undefined;
+
+      // 🚀 OPTYMALIZACJA: Algorytm Douglas-Peucker (upraszczanie ścieżki)
+      if (finalPoints.length > 2) {
+        const tolerance = 0.005 / (viewport.scale || 1);
+        const sqTolerance = tolerance * tolerance;
+
+        const retainedIndices = new Set<number>([0, finalPoints.length - 1]);
+
+        const simplifyDPStep = (first: number, last: number) => {
+          let maxSqDist = sqTolerance;
+          let index = -1;
+          for (let i = first + 1; i < last; i++) {
+            const p = finalPoints[i];
+            const p1 = finalPoints[first];
+            const p2 = finalPoints[last];
+            let x = p1.x, y = p1.y, dx = p2.x - x, dy = p2.y - y;
+            if (dx !== 0 || dy !== 0) {
+              const t = ((p.x - x) * dx + (p.y - y) * dy) / (dx * dx + dy * dy);
+              if (t > 1) { x = p2.x; y = p2.y; }
+              else if (t > 0) { x += dx * t; y += dy * t; }
+            }
+            dx = p.x - x; dy = p.y - y;
+            const sqDist = dx * dx + dy * dy;
+            if (sqDist > maxSqDist) {
+              index = i;
+              maxSqDist = sqDist;
+            }
+          }
+          if (index > 0) {
+            simplifyDPStep(first, index);
+            retainedIndices.add(index);
+            simplifyDPStep(index, last);
+          }
+        };
+
+        simplifyDPStep(0, finalPoints.length - 1);
+
+        const sortedIndices = Array.from(retainedIndices).sort((a, b) => a - b);
+        finalPoints = sortedIndices.map(i => finalPoints[i]);
+        if (finalWidths) {
+          finalWidths = sortedIndices.map(i => finalWidths![i]);
+        }
+
+        console.log(`🧹 Uproszczono linię: z ${pointsRef.current.length} do ${finalPoints.length} punktów!`);
+      }
+
       const finalPath: DrawingPath = {
         ...currentPathRef.current,
-        points: [...pointsRef.current],
-        widths: widthsRef.current.length > 0 ? [...widthsRef.current] : undefined,
+        points: finalPoints,
+        widths: finalWidths,
       };
       onPathCreate(finalPath);
     }

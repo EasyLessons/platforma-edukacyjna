@@ -39,7 +39,7 @@ interface SelectToolProps {
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
   onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void;
   onElementsUpdate: (updates: Map<string, Partial<DrawingElement>>) => void;
-  onOperationFinish?: () => void;
+  onOperationFinish?: (originalElements?: Map<string, DrawingElement>) => void;
   onTextEdit?: (id: string) => void;
   onMarkdownEdit?: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
@@ -537,11 +537,11 @@ export function SelectTool({
 
     const handleGlobalPointerUp = (e: PointerEvent) => {
       if (isDragging && draggedElementsOriginal.size > 0) {
-        onOperationFinish?.();
+        onOperationFinish?.(draggedElementsOriginal);
       }
 
       if (isResizing && resizeOriginalElements.size > 0) {
-        onOperationFinish?.();
+        onOperationFinish?.(resizeOriginalElements);
       }
 
       if (isRotating && rotationOriginalElements.size > 0) {
@@ -574,7 +574,7 @@ export function SelectTool({
           onElementsUpdate(finalUpdates);
         }
         
-        onOperationFinish?.();
+        onOperationFinish?.(rotationOriginalElements);
       }
 
       setIsDragging(false);

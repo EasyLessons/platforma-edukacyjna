@@ -24,11 +24,12 @@ export interface Point {
 
 /**
  * Akcja użytkownika zapisywana na stosie undo/redo.
- * Tylko dwa typy: create i delete — update jest obsługiwany przez SelectTool.
  */
 export type UserAction =
   | { type: 'create'; element: DrawingElement }
-  | { type: 'delete'; element: DrawingElement };
+  | { type: 'delete'; element: DrawingElement }
+  | { type: 'update'; before: DrawingElement; after: DrawingElement }
+  | { type: 'batch'; actions: UserAction[] };
 
 // ─── TYPY ELEMENTÓW ──────────────────────────────────────────────────────────
 
