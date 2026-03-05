@@ -17,6 +17,9 @@ interface UseMultiTouchGesturesProps {
   onGestureEnd?: () => void;
 }
 
+// Progi czułości, by "pan" nie wywoływał "zoomu" przypadkiem
+const PINCH_THRESHOLD = 3; // Ignoruj zmiany odległości mniejsze niż 3px
+
 export function useMultiTouchGestures({
   containerRef,
   viewportRef,
@@ -65,7 +68,6 @@ export function useMultiTouchGestures({
         if (pointers.length === 2) {
           lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
         }
-        
         e.stopPropagation();
       }
     };
@@ -88,42 +90,42 @@ export function useMultiTouchGestures({
 
         const newCenter = getCenter(pointers);
         const viewport = viewportRef.current;
-        if (!viewport) return;
+        if (!viewport || !lastCenterRef.current) return;
 
-        if (lastCenterRef.current && lastDistanceRef.current) {
+        // 1. OBLICZANIE PAN (Przesuwanie)
+        const deltaX = newCenter.x - lastCenterRef.current.x;
+        const deltaY = newCenter.y - lastCenterRef.current.y;
+
+        // 2. OBLICZANIE ZOOM (Pinch)
+        let newScale = viewport.scale;
+        if (pointers.length === 2 && lastDistanceRef.current !== null) {
           const newDistance = getDistance(pointers[0], pointers[1]);
-          const distanceRatio = newDistance / lastDistanceRef.current;
-          
-          // 1. Obliczamy nową skalę
-          const newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
-          
-          // 2. Pobieramy wymiary kontenera
-          const rect = container.getBoundingClientRect();
-          
-          // 3. Obliczamy środek palców względem canvasa
-          const centerX = newCenter.x - rect.left;
-          const centerY = newCenter.y - rect.top;
+          const distanceDiff = Math.abs(newDistance - lastDistanceRef.current);
 
-          // 4. Stała przelicznika (100px = 1 unit)
-          const scaleFull = viewport.scale * 100;
-
-          // 5. Znajdujemy punkt w świecie pod środkiem palców
-          const worldX = viewport.x + (centerX - rect.width / 2) / scaleFull;
-          const worldY = viewport.y + (centerY - rect.height / 2) / scaleFull;
-
-          // 6. Ruch palców (pan)
-          const dx = newCenter.x - lastCenterRef.current.x;
-          const dy = newCenter.y - lastCenterRef.current.y;
-
-          onViewportChange({
-            scale: newScale,
-            x: worldX - (centerX - rect.width / 2) / (newScale * 100) - (dx / (newScale * 100)),
-            y: worldY - (centerY - rect.height / 2) / (newScale * 100) - (dy / (newScale * 100)),
-          });
-          
-          lastDistanceRef.current = newDistance;
-          lastCenterRef.current = newCenter;
+          // 🔥 POPRAWKA: Reaguj na zoom tylko jeśli zmiana odległości jest wyraźna
+          if (distanceDiff > PINCH_THRESHOLD) {
+            const distanceRatio = newDistance / lastDistanceRef.current;
+            newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
+            lastDistanceRef.current = newDistance;
+          }
         }
+
+        // 3. MATEMATYKA PIVOTU (Zoom względem środka palców)
+        const rect = container.getBoundingClientRect();
+        const centerX = newCenter.x - rect.left;
+        const centerY = newCenter.y - rect.top;
+        const scaleFull = viewport.scale * 100;
+
+        const worldX = viewport.x + (centerX - rect.width / 2) / scaleFull;
+        const worldY = viewport.y + (centerY - rect.height / 2) / scaleFull;
+
+        onViewportChange({
+          scale: newScale,
+          x: worldX - (centerX - rect.width / 2) / (newScale * 100) - (deltaX / (newScale * 100)),
+          y: worldY - (centerY - rect.height / 2) / (newScale * 100) - (deltaY / (newScale * 100)),
+        });
+        
+        lastCenterRef.current = newCenter;
       }
     };
 
