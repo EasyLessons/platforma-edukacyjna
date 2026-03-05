@@ -29,10 +29,14 @@ export function useMultiTouchGestures({
   const lastDistanceRef = useRef<number | null>(null);
   const isGestureActiveRef = useRef(false);
   
-  // --- NOWE: Blokada Zoomu ---
+  // --- STABILIZACJA GESTU ---
   const isZoomingRef = useRef(false); 
   const initialDistanceRef = useRef<number | null>(null);
-  const ZOOM_THRESHOLD = 15; // Musisz zmienić odległość o 15px, żeby zacząć zoomować
+  
+  // PRÓG STARTU: Zwiększamy do 35px, aby wyeliminować przypadkowy zoom przy ruchu góra-dół
+  const ZOOM_START_THRESHOLD = 35; 
+  // CZUŁOŚĆ: 0.7 sprawia, że zoom jest bardziej przewidywalny i mniej "nerwowy"
+  const ZOOM_SMOOTHING = 0.7; 
 
   const getCenter = (pointers: TouchPointer[]): { x: number; y: number } => {
     const sum = pointers.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
@@ -49,25 +53,6 @@ export function useMultiTouchGestures({
     const container = containerRef.current;
     if (!container) return;
 
-    const handlePointerDown = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
-
-      const pointers = Array.from(activePointersRef.current.values());
-      if (pointers.length >= 2) {
-        if (!isGestureActiveRef.current) {
-          isGestureActiveRef.current = true;
-          isZoomingRef.current = false; // Reset blokady przy nowym dotyku
-          onGestureStart?.();
-        }
-        lastCenterRef.current = getCenter(pointers);
-        const dist = getDistance(pointers[0], pointers[1]);
-        lastDistanceRef.current = dist;
-        initialDistanceRef.current = dist; // Zapamiętaj startową odległość
-        e.stopPropagation();
-      }
-    };
-
     const handlePointerMove = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || !activePointersRef.current.has(e.pointerId)) return;
       activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
@@ -81,36 +66,39 @@ export function useMultiTouchGestures({
         const viewport = viewportRef.current;
         if (!viewport || !lastCenterRef.current || !lastDistanceRef.current) return;
 
-        // 1. OBLICZANIE ZOOMU (z blokadą)
+        // 1. LOGIKA ZOOMU (z wysokim progiem wejścia)
         const currentDistance = getDistance(pointers[0], pointers[1]);
         let targetScale = viewport.scale;
 
-        // Sprawdź, czy już odblokowaliśmy zoom, albo czy właśnie przekraczamy próg
+        // Aktywuj zoom tylko jeśli zmiana odległości od początku gestu jest znacząca
         if (!isZoomingRef.current && initialDistanceRef.current !== null) {
-          if (Math.abs(currentDistance - initialDistanceRef.current) > ZOOM_THRESHOLD) {
+          const totalDistChange = Math.abs(currentDistance - initialDistanceRef.current);
+          if (totalDistChange > ZOOM_START_THRESHOLD) {
             isZoomingRef.current = true;
+            // Aby uniknąć przeskoku, ustawiamy lastDistance na obecny, by od teraz liczyć deltę
+            lastDistanceRef.current = currentDistance;
           }
         }
 
         if (isZoomingRef.current) {
           const ratio = currentDistance / lastDistanceRef.current;
-          // Dodatkowe wygładzenie zmiany (damping)
-          const smoothedRatio = 1 + (ratio - 1) * 0.85; 
+          // Zastosuj wygładzanie zmiany skali
+          const smoothedRatio = 1 + (ratio - 1) * ZOOM_SMOOTHING;
           targetScale = Math.max(0.1, Math.min(5, viewport.scale * smoothedRatio));
         }
 
-        // 2. OBLICZANIE PAN (Przesuwanie)
+        // 2. LOGIKA PAN (Przesuwanie - zawsze aktywne)
         const deltaX = newCenter.x - lastCenterRef.current.x;
         const deltaY = newCenter.y - lastCenterRef.current.y;
 
-        // 3. MATEMATYKA PIVOTU
+        // 3. MATEMATYKA VIEWPORTU
         const rect = container.getBoundingClientRect();
         const centerX = newCenter.x - rect.left;
         const centerY = newCenter.y - rect.top;
-        const currentScaleFactor = viewport.scale * 100;
+        const scaleFactor = viewport.scale * 100;
 
-        const worldX = viewport.x + (centerX - rect.width / 2) / currentScaleFactor;
-        const worldY = viewport.y + (centerY - rect.height / 2) / currentScaleFactor;
+        const worldX = viewport.x + (centerX - rect.width / 2) / scaleFactor;
+        const worldY = viewport.y + (centerY - rect.height / 2) / scaleFactor;
 
         onViewportChange({
           scale: targetScale,
@@ -118,9 +106,27 @@ export function useMultiTouchGestures({
           y: worldY - (centerY - rect.height / 2) / (targetScale * 100) - (deltaY / (targetScale * 100)),
         });
 
-        // KRYTYCZNE: Aktualizujemy bazę CO KLATKĘ, żeby ruch był płynny
         lastCenterRef.current = newCenter;
         lastDistanceRef.current = currentDistance;
+      }
+    };
+
+    const handlePointerDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+
+      const pointers = Array.from(activePointersRef.current.values());
+      if (pointers.length >= 2) {
+        if (!isGestureActiveRef.current) {
+          isGestureActiveRef.current = true;
+          isZoomingRef.current = false; 
+          onGestureStart?.();
+        }
+        lastCenterRef.current = getCenter(pointers);
+        const dist = getDistance(pointers[0], pointers[1]);
+        lastDistanceRef.current = dist;
+        initialDistanceRef.current = dist;
+        e.stopPropagation();
       }
     };
 
@@ -136,7 +142,7 @@ export function useMultiTouchGestures({
         lastDistanceRef.current = null;
         initialDistanceRef.current = null;
       } else if (pointers.length >= 2) {
-        // Reset bazy przy zmianie liczby palców (np. z 3 na 2)
+        // Reset bazy przy zmianie liczby palców
         lastCenterRef.current = getCenter(pointers);
         const dist = getDistance(pointers[0], pointers[1]);
         lastDistanceRef.current = dist;
