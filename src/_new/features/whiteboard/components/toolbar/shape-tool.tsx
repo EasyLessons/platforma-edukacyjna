@@ -58,6 +58,7 @@ interface ShapeToolProps {
   fillShape: boolean;
   onShapeCreate: (shape: Shape) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function ShapeTool({
@@ -72,6 +73,7 @@ export function ShapeTool({
   fillShape,
   onShapeCreate,
   onViewportChange,
+  isGestureActive,
 }: ShapeToolProps) {
   /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
   const getViewport = () => canvasViewportRef?.current ?? viewport;
@@ -79,6 +81,12 @@ export function ShapeTool({
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+useEffect(() => {
+    if (isGestureActive && isDrawing) {
+      setIsDrawing(false);
+      setCurrentShape(null);
+    }
+  }, [isGestureActive, isDrawing]);
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -131,6 +139,7 @@ export function ShapeTool({
 
   // Pointer down - rozpocznij rysowanie kształtu
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (isGestureActive) return; 
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 

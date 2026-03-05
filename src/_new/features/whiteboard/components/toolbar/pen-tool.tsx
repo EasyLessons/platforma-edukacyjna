@@ -45,7 +45,6 @@ import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-mult
 
 interface PenToolProps {
   viewport: ViewportTransform;
-  /** Stabilna referencja do aktualnego viewportu (z whiteboard-canvas) — używana w event handlerach */
   viewportRef?: React.RefObject<ViewportTransform>;
   canvasWidth: number;
   canvasHeight: number;
@@ -53,6 +52,7 @@ interface PenToolProps {
   lineWidth: number;
   onPathCreate: (path: DrawingPath) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean; // <-- DODAJ TĘ LINIĘ
 }
 
 export function PenTool({
@@ -64,10 +64,21 @@ export function PenTool({
   lineWidth,
   onPathCreate,
   onViewportChange,
+  isGestureActive,
 }: PenToolProps) {
   /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
   const getViewport = () => canvasViewportRef?.current ?? viewport;
   const isDrawingRef = useRef(false);
+
+  useEffect(() => {
+      if (isGestureActive && isDrawingRef.current) {
+        isDrawingRef.current = false;
+        currentPathRef.current = null;
+        pointsRef.current = [];
+        forceUpdate({}); // Czyści podgląd linii spod palca
+      }
+    }, [isGestureActive]);
+
   const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const pointsRef = useRef<Point[]>([]);
@@ -129,6 +140,7 @@ export function PenTool({
 
   // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (isGestureActive) return;
     // 🆕 Wykryj czy to pióro i aktywuj pen mode (jak Excalidraw)
     if (e.pointerType === 'pen') {
       isPenModeRef.current = true;

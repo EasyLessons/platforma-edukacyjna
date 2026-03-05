@@ -138,6 +138,7 @@ export default function WhiteboardCanvasNew({
   className = '',
 }: WhiteboardCanvasNewProps) {
   const boardRt = useBoardRealtime();
+  const [isGestureActive, setIsGestureActive] = useState(false);
   // Zmerguj props z domyślnymi — używamy ref żeby nie powiązać przez state
   const settings = boardSettingsProp ?? DEFAULT_BOARD_SETTINGS;
   // Ref do settings — unika stale closure w useCallback renderowania
@@ -348,22 +349,61 @@ export default function WhiteboardCanvasNew({
     onPushUserAction: hist.pushUserAction,
   });
 
-// 🔥 POPRAWIONE: Globalny przechwytywacz gestów multitouch
-  useMultiTouchGestures({
+
+const handleViewportChange = useCallback((newVp: ViewportTransform) => {
+    const constrained = constrainViewport(newVp);
+    
+    // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
+    vp.viewportRef.current = constrained;
+
+    // 2. Jeśli overlaye są widoczne, ukryj je TYLKO wizualnie (bez czyszczenia zaznaczenia!)
+    // Używamy CSS dla szybkości, by nie wymuszać ciężkiego re-renderu całego drzewa Reacta
+    if (htmlOverlaysRef.current && htmlOverlaysRef.current.style.visibility !== 'hidden') {
+      htmlOverlaysRef.current.style.visibility = 'hidden';
+    }
+
+    // 3. Zarządzanie renderowaniem:
+    // Jeśli używamy narzędzia Pan lub gestów (isPanningRef), nie robimy setViewport (stanu React),
+    // bo to by zabiło wydajność mobilną przez ciągłe re-rendery.
+    if (isPanningRef.current) {
+      // Tylko przerysowujemy Canvas "na żywo"
+      requestAnimationFrame(() => redrawCanvasRef.current());
+    } else {
+      // Jeśli to np. Zoom z przycisku, aktualizujemy stan normalnie
+      vp.setViewport(constrained);
+    }
+
+    // 4. Przywróć overlaye po zakończeniu ruchu (Debounce)
+    if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
+    viewportChangeTimerRef.current = setTimeout(() => {
+      viewportChangeTimerRef.current = null;
+      if (isPanningRef.current) return; 
+
+      // Dopiero po zatrzymaniu ruchu synchronizujemy stan Reacta
+      vp.setViewport(vp.viewportRef.current);
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+    }, 100);
+  }, [vp.setViewport, vp.viewportRef]); // Usunąłem 'sel' z zależności - funkcja jest teraz stabilna!
+
+
+
+useMultiTouchGestures({
     containerRef,
     viewportRef: vp.viewportRef,
-    onViewportChange: (newVp) => {
-      // Ustawiamy flagę "panningu", żeby zablokować inne narzędzia i ciężkie re-rendery
-      isPanningRef.current = true;
-      
-      // Wywołujemy naszą nową, szybką funkcję
-      handleViewportChange(newVp);
-
-      // Resetujemy flagę chwilę po zabraniu palców
-      if (viewportChangeTimerRef.current === null) {
-        setTimeout(() => { isPanningRef.current = false; }, 150);
-      }
+    onGestureStart: () => {
+      setIsGestureActive(true);      // Blokuje PenTool i inne narzędzia
+      isPanningRef.current = true;   // Flaga dla wydajności rysowania
+      // Ukrywamy ramkę zaznaczenia natychmiast, żeby nie "pływała"
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     },
+    onGestureEnd: () => {
+      setIsGestureActive(false);     // Odblokowuje narzędzia
+      isPanningRef.current = false;
+      // Synchronizujemy stan Reacta dopiero po zakończeniu gestu (eliminujemy skakanie)
+      vp.setViewport(vp.viewportRef.current);
+      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+    },
+    onViewportChange: handleViewportChange,
   });
 
   // ─── Broadcast viewport throttled ──────────────────────────────────────────
@@ -952,40 +992,6 @@ export default function WhiteboardCanvasNew({
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
   }, [vp.setViewport, vp.viewportRef]);
 
-const handleViewportChange = useCallback((newVp: ViewportTransform) => {
-    const constrained = constrainViewport(newVp);
-    
-    // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
-    vp.viewportRef.current = constrained;
-
-    // 2. Jeśli overlaye są widoczne, ukryj je TYLKO wizualnie (bez czyszczenia zaznaczenia!)
-    // Używamy CSS dla szybkości, by nie wymuszać ciężkiego re-renderu całego drzewa Reacta
-    if (htmlOverlaysRef.current && htmlOverlaysRef.current.style.visibility !== 'hidden') {
-      htmlOverlaysRef.current.style.visibility = 'hidden';
-    }
-
-    // 3. Zarządzanie renderowaniem:
-    // Jeśli używamy narzędzia Pan lub gestów (isPanningRef), nie robimy setViewport (stanu React),
-    // bo to by zabiło wydajność mobilną przez ciągłe re-rendery.
-    if (isPanningRef.current) {
-      // Tylko przerysowujemy Canvas "na żywo"
-      requestAnimationFrame(() => redrawCanvasRef.current());
-    } else {
-      // Jeśli to np. Zoom z przycisku, aktualizujemy stan normalnie
-      vp.setViewport(constrained);
-    }
-
-    // 4. Przywróć overlaye po zakończeniu ruchu (Debounce)
-    if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
-    viewportChangeTimerRef.current = setTimeout(() => {
-      viewportChangeTimerRef.current = null;
-      if (isPanningRef.current) return; 
-
-      // Dopiero po zatrzymaniu ruchu synchronizujemy stan Reacta
-      vp.setViewport(vp.viewportRef.current);
-      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-    }, 100);
-  }, [vp.setViewport, vp.viewportRef]); // Usunąłem 'sel' z zależności - funkcja jest teraz stabilna!
 
   /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
   const handleCenterViewAndSelectElements = useCallback((
@@ -1824,6 +1830,7 @@ const handleViewportChange = useCallback((newVp: ViewportTransform) => {
             lineWidth={lineWidth}
             onPathCreate={handlePathCreate}
             onViewportChange={handleViewportChange}
+            isGestureActive={isGestureActive}
           />
         )}
 
@@ -1840,6 +1847,7 @@ const handleViewportChange = useCallback((newVp: ViewportTransform) => {
             fillShape={fillShape}
             onShapeCreate={handleShapeCreate}
             onViewportChange={handleViewportChange}
+            isGestureActive={isGestureActive}
           />
         )}
 

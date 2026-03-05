@@ -1,14 +1,7 @@
-/**
- * ============================================================================
- * PLIK: src/_new/features/whiteboard/hooks/use-multi-touch-gestures.ts
- * ============================================================================
- */
-
 'use client';
 
 import { useRef, useEffect } from 'react';
 import { ViewportTransform } from '@/_new/features/whiteboard/types';
-import { constrainViewport } from '@/_new/features/whiteboard/navigation/viewport-math';
 
 interface TouchPointer {
   id: number;
@@ -20,12 +13,16 @@ interface UseMultiTouchGesturesProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   viewportRef: React.RefObject<ViewportTransform>;
   onViewportChange: (viewport: ViewportTransform) => void;
+  onGestureStart?: () => void;
+  onGestureEnd?: () => void;
 }
 
 export function useMultiTouchGestures({
   containerRef,
   viewportRef,
   onViewportChange,
+  onGestureStart,
+  onGestureEnd,
 }: UseMultiTouchGesturesProps) {
   const activePointersRef = useRef<Map<number, TouchPointer>>(new Map());
   const lastCenterRef = useRef<{ x: number; y: number } | null>(null);
@@ -61,19 +58,7 @@ export function useMultiTouchGestures({
       if (pointers.length >= 2) {
         if (!isGestureActiveRef.current) {
           isGestureActiveRef.current = true;
-          
-          // 🔥 MAGIA (Poprawka z glitchem Długopisu)
-          // Wysyłamy pointerup, by narzędzie naturalnie się "puściło"
-          // zanim przejmiemy sterowanie nad kamerą
-          const cancelEvent = new PointerEvent('pointerup', {
-            pointerId: pointers[0].id,
-            bubbles: true,
-            cancelable: true,
-            pointerType: 'touch',
-            clientX: pointers[0].x,
-            clientY: pointers[0].y,
-          });
-          e.target?.dispatchEvent(cancelEvent);
+          onGestureStart?.();
         }
 
         lastCenterRef.current = getCenter(pointers);
@@ -82,7 +67,6 @@ export function useMultiTouchGestures({
         }
         
         e.stopPropagation();
-        e.preventDefault();
       }
     };
 
@@ -106,82 +90,65 @@ export function useMultiTouchGestures({
         const viewport = viewportRef.current;
         if (!viewport) return;
 
-        if (lastCenterRef.current) {
-          const deltaX = newCenter.x - lastCenterRef.current.x;
-          const deltaY = newCenter.y - lastCenterRef.current.y;
-
-          let newScale = viewport.scale;
-
-          // 🔥 Pinch-to-Zoom (ZABRANO DŁAWIK /25!)
-          if (pointers.length === 2 && lastDistanceRef.current) {
-            const newDistance = getDistance(pointers[0], pointers[1]);
-            const distanceRatio = newDistance / lastDistanceRef.current;
-            
-            // Czysty stosunek odległości - idealna, naturalna prędkość
-            newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
-            lastDistanceRef.current = newDistance;
-          }
-
-          // 🔥 Pan & Zoom JEDNOCZEŚNIE! (Zabrano dławik 0.03!)
-          // 1 px ruchu palca = 1 px ruchu na ekranie
-          onViewportChange(constrainViewport({
-            ...viewport,
-            scale: newScale,
-            x: viewport.x - (deltaX / viewport.scale),
-            y: viewport.y - (deltaY / viewport.scale),
-          }));
+        if (lastCenterRef.current && lastDistanceRef.current) {
+          const newDistance = getDistance(pointers[0], pointers[1]);
+          const distanceRatio = newDistance / lastDistanceRef.current;
           
+          // 1. Obliczamy nową skalę
+          const newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
+          
+          // 2. Pobieramy wymiary kontenera
+          const rect = container.getBoundingClientRect();
+          
+          // 3. Obliczamy środek palców względem canvasa
+          const centerX = newCenter.x - rect.left;
+          const centerY = newCenter.y - rect.top;
+
+          // 4. Stała przelicznika (100px = 1 unit)
+          const scaleFull = viewport.scale * 100;
+
+          // 5. Znajdujemy punkt w świecie pod środkiem palców
+          const worldX = viewport.x + (centerX - rect.width / 2) / scaleFull;
+          const worldY = viewport.y + (centerY - rect.height / 2) / scaleFull;
+
+          // 6. Ruch palców (pan)
+          const dx = newCenter.x - lastCenterRef.current.x;
+          const dy = newCenter.y - lastCenterRef.current.y;
+
+          onViewportChange({
+            scale: newScale,
+            x: worldX - (centerX - rect.width / 2) / (newScale * 100) - (dx / (newScale * 100)),
+            y: worldY - (centerY - rect.height / 2) / (newScale * 100) - (dy / (newScale * 100)),
+          });
+          
+          lastDistanceRef.current = newDistance;
           lastCenterRef.current = newCenter;
         }
       }
     };
 
     const handlePointerUp = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-
-      if (isGestureActiveRef.current) {
-        e.stopPropagation();
-        e.preventDefault();
-      }
-
       activePointersRef.current.delete(e.pointerId);
       const pointers = Array.from(activePointersRef.current.values());
 
-      if (pointers.length < 2) {
+      if (pointers.length < 2 && isGestureActiveRef.current) {
         isGestureActiveRef.current = false;
-        lastCenterRef.current = null;
-        lastDistanceRef.current = null;
-      } else {
-        lastCenterRef.current = getCenter(pointers);
-        if (pointers.length === 2) {
-          lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
-        }
-      }
-    };
-
-    const handlePointerCancel = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-      activePointersRef.current.delete(e.pointerId);
-      const pointers = Array.from(activePointersRef.current.values());
-
-      if (pointers.length < 2) {
-        isGestureActiveRef.current = false;
+        onGestureEnd?.();
         lastCenterRef.current = null;
         lastDistanceRef.current = null;
       }
     };
 
-    // Faza CAPTURE
     container.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: false });
     window.addEventListener('pointermove', handlePointerMove, { capture: true, passive: false });
-    window.addEventListener('pointerup', handlePointerUp, { capture: true, passive: false });
-    window.addEventListener('pointercancel', handlePointerCancel, { capture: true, passive: false });
+    window.addEventListener('pointerup', handlePointerUp, { capture: true });
+    window.addEventListener('pointercancel', handlePointerUp, { capture: true });
 
     return () => {
       container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
       window.removeEventListener('pointermove', handlePointerMove, { capture: true });
       window.removeEventListener('pointerup', handlePointerUp, { capture: true });
-      window.removeEventListener('pointercancel', handlePointerCancel, { capture: true });
+      window.removeEventListener('pointercancel', handlePointerUp, { capture: true });
     };
-  }, [containerRef, onViewportChange, viewportRef]);
+  }, [containerRef, onViewportChange, viewportRef, onGestureStart, onGestureEnd]);
 }
