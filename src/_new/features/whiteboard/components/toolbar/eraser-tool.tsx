@@ -34,7 +34,6 @@ import {
   panViewportWithWheel,
   constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 
 interface EraserToolProps {
   viewport: ViewportTransform;
@@ -58,13 +57,6 @@ export function EraserTool({
   const [isDragging, setIsDragging] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const deletedDuringDrag = useRef<Set<string>>(new Set());
-
-  const gestures = useMultiTouchGestures({
-    viewport,
-    canvasWidth,
-    canvasHeight,
-    onViewportChange: onViewportChange || (() => {}),
-  });
 
   // Wheel events dla pan/zoom
   useEffect(() => {
@@ -256,8 +248,6 @@ export function EraserTool({
     (e: React.PointerEvent) => {
       // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
       if (e.button === 1 || e.button === 2) return;
-      gestures.handlePointerDown(e);
-      if (gestures.isGestureActive()) return;
 
       setIsDragging(true);
       deletedDuringDrag.current.clear();
@@ -269,24 +259,19 @@ export function EraserTool({
         setHoveredElementId(null);
       }
     },
-    [hoveredElementId, onElementDelete, gestures]
+    [hoveredElementId, onElementDelete]
   );
 
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      gestures.handlePointerUp(e);
-
       setIsDragging(false);
       deletedDuringDrag.current.clear();
     },
-    [gestures]
+    []
   );
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      gestures.handlePointerMove(e);
-      if (gestures.isGestureActive()) return;
-
       const screenPoint = { x: e.clientX, y: e.clientY };
       const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
       setCursorPosition(screenPoint); // ✅ Zapisz screen position dla kursora
@@ -302,7 +287,7 @@ export function EraserTool({
         setHoveredElementId(null);
       }
     },
-    [viewport, canvasWidth, canvasHeight, isDragging, elements, onElementDelete, gestures]
+    [viewport, canvasWidth, canvasHeight, isDragging, elements, onElementDelete, findElementAtPoint]
   );
 
   // Renderuj highlight dla hovered element
@@ -423,4 +408,3 @@ export function EraserTool({
     </>
   );
 }
-
