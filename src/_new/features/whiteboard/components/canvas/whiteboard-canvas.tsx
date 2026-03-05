@@ -104,7 +104,8 @@ import type { BoardSettings } from '@/_new/features/board/types';
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
-
+// ─── Gesty multi-touch (pan + zoom) ───────────────────────────────────────────────
+import { useMultiTouchGestures } from '../../hooks/use-multi-touch-gestures';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -345,6 +346,20 @@ export default function WhiteboardCanvasNew({
     onSelectElements: sel.selectElements,
     onLoadImage: el.loadImage,
     onPushUserAction: hist.pushUserAction,
+  });
+
+  // 🔥 DODANE: Globalny przechwytywacz gestów multitouch (Zoom/Pan palcami)
+  useMultiTouchGestures({
+    containerRef,
+    viewportRef: vp.viewportRef,
+    onViewportChange: (newVp) => {
+      // Aktualizujemy refa natychmiast (dla płynności canvas)
+      vp.viewportRef.current = newVp;
+      // Wywołujemy render ramki
+      requestAnimationFrame(() => redrawCanvasRef.current());
+      // Aktualizujemy stan Reacta (dla reszty UI)
+      vp.setViewport(newVp);
+    },
   });
 
   // ─── Broadcast viewport throttled ──────────────────────────────────────────
