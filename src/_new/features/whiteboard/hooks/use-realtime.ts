@@ -50,6 +50,7 @@ export interface UseRealtimeOptions {
   onLoadRemoteImage: (id: string, src: string) => void;
   /** Callback gdy zdalny viewport się zmienia (dla follow mode) */
   onRemoteViewport: (x: number, y: number, scale: number, fromUserId: number) => void;
+  onElementsUpdated?: (elements: DrawingElement[]) => void;
 }
 
 export interface UseRealtimeReturn {
@@ -81,6 +82,7 @@ export function useRealtime({
   onRemoteElementDeleted,
   onLoadRemoteImage,
   onRemoteViewport,
+  onElementsUpdated,
 }: UseRealtimeOptions): UseRealtimeReturn {
 
   const {
@@ -100,6 +102,7 @@ export function useRealtime({
     onRemoteElementCreated,
     onRemoteElementUpdated: registerRemoteUpdated,
     onRemoteElementDeleted: registerRemoteDeleted,
+    onRemoteElementsBatch: registerRemoteBatch,
   } = useBoardRealtime();
 
   const [typingUsers, setTypingUsers] = useState<TypingUser[]>([]);
@@ -120,7 +123,13 @@ export function useRealtime({
       onRemoteElementDeleted(elementId, userId, username);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (registerRemoteBatch && onElementsUpdated) {
+      registerRemoteBatch((elements, userId, username) => {
+        onElementsUpdated!(elements);
+      });
+    }
+
+}, []);
 
   // ─── Subskrypcja: typing indicator ──────────────────────────────────────
   useEffect(() => {

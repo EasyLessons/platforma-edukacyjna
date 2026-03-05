@@ -15,55 +15,78 @@ import type { ElementHandler, BoundingBox, RenderExtras } from './types';
 import { rotateAroundPivot, getRotatedAABB, getSimpleAABB } from './handler-utils';
 import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
 
-// ─── Pomocnicza – zawijanie tekstu na canvasie ────────────────────────────────
 
-function calculateRequiredTextLines(
+
+// ─── Pomocnicza – zawijanie tekstu na canvasie z CACHE ──────────────────────
+
+const textWrapCache = new Map<string, string[]>();
+
+function getWrappedLines(
   ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
-): number {
+  fontKey: string
+): string[] {
+  const cacheKey = `${text}_${maxWidth.toFixed(1)}_${fontKey}`;
+  if (textWrapCache.has(cacheKey)) return textWrapCache.get(cacheKey)!;
+
   const lines = text.split('\n');
-  let total = 0;
+  const result: string[] = [];
 
   for (const line of lines) {
     const words = line.split(' ');
     let current = '';
 
-    for (const word of words) {
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+      
+      // KROK 1: Jeśli pojedyncze słowo (lub ciąg "asdfasdf") jest szersze niż ramka
+      if (ctx.measureText(word).width > maxWidth) {
+        // Zrzucamy to co mieliśmy do tej pory
+        if (current) {
+          result.push(current);
+          current = '';
+        }
+        
+        // Łamiemy to gigantyczne słowo znak po znaku!
+        let remaining = word;
+        while (ctx.measureText(remaining).width > maxWidth) {
+          let fit = 0;
+          for (let j = 1; j <= remaining.length; j++) {
+            if (ctx.measureText(remaining.substring(0, j)).width <= maxWidth) {
+              fit = j;
+            } else {
+              break;
+            }
+          }
+          if (fit === 0) fit = 1; // Wymuszamy wejście chociaż 1 znaku
+          result.push(remaining.substring(0, fit));
+          remaining = remaining.substring(fit);
+        }
+        current = remaining; // Resztka uciętego słowa
+        continue;
+      }
+
+      // KROK 2: Normalne słowa (sprawdzamy czy zmieszczą się z resztą linii)
       const test = current + (current ? ' ' : '') + word;
       if (ctx.measureText(test).width > maxWidth && current) {
-        total++;
+        result.push(current);
         current = word;
-        while (ctx.measureText(current).width > maxWidth) {
-          let fit = 0;
-          for (let j = 1; j <= current.length; j++) {
-            if (ctx.measureText(current.substring(0, j)).width <= maxWidth) fit = j;
-            else break;
-          }
-          if (fit === 0) fit = 1;
-          total++;
-          current = current.substring(fit);
-        }
       } else {
         current = test;
       }
     }
-
-    while (current && ctx.measureText(current).width > maxWidth) {
-      let fit = 0;
-      for (let j = 1; j <= current.length; j++) {
-        if (ctx.measureText(current.substring(0, j)).width <= maxWidth) fit = j;
-        else break;
-      }
-      if (fit === 0) fit = 1;
-      total++;
-      current = current.substring(fit);
-    }
-    if (current) total++;
+    
+    if (current) result.push(current);
   }
 
-  return total;
+  if (textWrapCache.size > 1000) textWrapCache.clear();
+  textWrapCache.set(cacheKey, result);
+
+  return result;
 }
+
+
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
@@ -129,7 +152,7 @@ export const TextHandler: ElementHandler<TextElement> = {
     };
   },
 
-  render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
+render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
     const pos = transformPoint({ x: el.x, y: el.y }, viewport, canvasWidth, canvasHeight);
 
     if (el.rotation && el.rotation !== 0) {
@@ -169,74 +192,52 @@ export const TextHandler: ElementHandler<TextElement> = {
       else if (textAlign === 'right') textX = pos.x + paddingX + contentWidth;
     }
 
-    if (el.width) {
+if (el.width) {
       const boxWidth = el.width * viewport.scale * 100;
       const maxWidth = boxWidth - paddingX * 2;
 
-      if (extras?.debug) {
-        const requiredLines = calculateRequiredTextLines(ctx, el.text, maxWidth);
-        const reqPx = requiredLines * lineHeight + paddingY * 2;
-        const curPx = (el.height ?? 0) * viewport.scale * 100;
-        const needsExpand = reqPx > curPx;
+      // Tworzymy klucz czcionki dla Cache'a
+      const fontKey = ctx.font;
+      
+      const wrappedLines = getWrappedLines(ctx, el.text, maxWidth, fontKey);
 
+      // 🔥 AUTOMATYCZNE WYDŁUŻANIE RAMKI: Obliczamy ile miejsca w pionie zajmuje tekst
+      const requiredLines = wrappedLines.length;
+      const reqPx = requiredLines * lineHeight + paddingY * 2;
+      
+      if (extras?.onAutoExpand) {
+        const requiredHeight = reqPx / (viewport.scale * 100);
+        const currentHeight = el.height ?? 1;
+        
+        // Jeśli tekst potrzebuje więcej (lub mniej) miejsca niż ma ramka, aktualizujemy wysokość!
+        if (Math.abs(requiredHeight - currentHeight) > 0.05) {
+          extras.onAutoExpand(el.id, requiredHeight);
+        }
+      }
+
+      if (extras?.debug) {
+        const curPx = (el.height ?? 0) * viewport.scale * 100;
         ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
         ctx.lineWidth = 2;
         ctx.strokeRect(pos.x, pos.y, boxWidth, curPx);
-        ctx.strokeStyle = needsExpand ? 'rgba(255,0,0,0.8)' : 'rgba(0,255,0,0.8)';
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(pos.x, pos.y, boxWidth, reqPx);
-        ctx.setLineDash([]);
-
-        if (needsExpand && extras?.onAutoExpand) {
-          const newH = reqPx / (viewport.scale * 100);
-          extras.onAutoExpand(el.id, newH);
-        }
       }
 
+      // Rysowanie zoptymalizowanych linii
       let currentY = pos.y + paddingY;
-
-      for (const line of lines) {
-        const words = line.split(' ');
-        let current = '';
-
-        for (const word of words) {
-          const test = current + (current ? ' ' : '') + word;
-          if (ctx.measureText(test).width > maxWidth && current) {
-            ctx.fillText(current, textX, currentY);
-            current  = word;
-            currentY += lineHeight;
-
-            while (ctx.measureText(current).width > maxWidth) {
-              let fit = 0;
-              for (let j = 1; j <= current.length; j++) {
-                if (ctx.measureText(current.substring(0, j)).width <= maxWidth) fit = j;
-                else break;
-              }
-              if (fit === 0) fit = 1;
-              ctx.fillText(current.substring(0, fit), textX, currentY);
-              current  = current.substring(fit);
-              currentY += lineHeight;
-            }
-          } else {
-            current = test;
-          }
+      for (const line of wrappedLines) {
+        ctx.fillText(line, textX, currentY);
+        currentY += lineHeight;
+      }    
+} else {
+      if (extras?.onAutoExpand) {
+        const reqPx = lines.length * lineHeight + paddingY * 2;
+        const requiredHeight = reqPx / (viewport.scale * 100);
+        const currentHeight = el.height ?? 1;
+        if (Math.abs(requiredHeight - currentHeight) > 0.05) {
+          extras.onAutoExpand(el.id, requiredHeight);
         }
-
-        while (current && ctx.measureText(current).width > maxWidth) {
-          let fit = 0;
-          for (let j = 1; j <= current.length; j++) {
-            if (ctx.measureText(current.substring(0, j)).width <= maxWidth) fit = j;
-            else break;
-          }
-          if (fit === 0) fit = 1;
-          ctx.fillText(current.substring(0, fit), textX, currentY);
-          current  = current.substring(fit);
-          currentY += lineHeight;
-        }
-
-        if (current) { ctx.fillText(current, textX, currentY); currentY += lineHeight; }
       }
-    } else {
+
       lines.forEach((line, i) => {
         ctx.fillText(line, textX, pos.y + paddingY + i * lineHeight);
       });

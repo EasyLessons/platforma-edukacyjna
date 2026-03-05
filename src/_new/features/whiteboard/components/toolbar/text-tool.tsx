@@ -393,6 +393,10 @@ export function TextTool({
             editorRef.current = node;
             if (editorDivRef) (editorDivRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
           }}
+          data-world-x={draft.worldX}
+          data-world-y={draft.worldY}
+          data-world-w={draft.worldW}
+          data-world-h={draft.worldH}
           className="absolute pointer-events-auto z-50"
           style={{ left: edLeft, top: edTop, width: edWidth, height: edHeight, overflow: 'visible', boxShadow: '0 0 0 2px #3b82f6' }}
         >

@@ -60,6 +60,8 @@ export interface UseElementsReturn {
   /** Zaktualizuj element w tablicy */
   updateElement: (updated: DrawingElement) => void;
   /** Zapisz element do bazy danych bezpośrednio (dla undo/redo) */
+  /** Zaktualizuj wiele elementów naraz (Bulk Update) */
+  updateElements: (updates: DrawingElement[]) => void;
   saveElementDirectly: (boardIdNum: number, element: DrawingElement) => Promise<void>;
   /** Usuń element z bazy danych bezpośrednio (dla undo/redo) */
   deleteElementDirectly: (boardIdNum: number, elementId: string) => Promise<void>;
@@ -229,6 +231,17 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     );
   }, []);
 
+const updateElements = useCallback((updates: DrawingElement[]) => {
+    // 1. NATYCHMIASTOWA synchronizacja refa (Zabija lagi na płótnie!)
+    const updateMap = new Map(updates.map(u => [u.id, u]));
+    elementsRef.current = elementsRef.current.map((e) => 
+      updateMap.has(e.id) ? updateMap.get(e.id)! : e
+    );
+    
+    // 2. Aktualizacja Reacta w tle (dla paneli bocznych)
+    setElements([...elementsRef.current]);
+  }, []);
+
   const saveElementDirectly = useCallback(
     async (boardIdNum: number, element: DrawingElement) => {
       await saveBoardElementsBatch(boardIdNum, toSaveFormat([element]));
@@ -260,6 +273,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     addElements,
     removeElement,
     updateElement,
+    updateElements,
     saveElementDirectly,
     deleteElementDirectly,
     loadImage,

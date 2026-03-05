@@ -101,6 +101,11 @@ import type { Tool, ShapeType } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
 
+
+
+
+
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface WhiteboardCanvasNewProps {
@@ -282,6 +287,14 @@ export default function WhiteboardCanvasNew({
     },
     onLoadRemoteImage: el.loadImage,
     onRemoteViewport: vp.applyRemoteViewport,
+
+    onElementsUpdated: (elements) => {
+          if (el.updateElements) {
+            el.updateElements(elements);
+          } else {
+            elements.forEach(e => el.updateElement(e));
+          }
+        },
   });
 
   // Wypełnij broadcast refs gdy rt jest dostępne (bez ponownego renderowania)
@@ -309,6 +322,7 @@ export default function WhiteboardCanvasNew({
 
   // ─── Broadcast viewport throttled ──────────────────────────────────────────
   const lastVpBroadcastRef = useRef(0);
+  const lastGroupBroadcastRef = useRef(0);
   useEffect(() => {
     // Nie broadcastuj gdy kanał WebSocket nie jest gotowy
     if (!rt.isConnected) return;
@@ -354,16 +368,26 @@ export default function WhiteboardCanvasNew({
       // Pomiń rysowanie tekstu jeśli jest aktualnie edytowany (textarea go zastępuje)
       if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
       drawElement(
-        ctx,
-        element,
-        viewport,
-        width,
-        height,
-        el.loadedImages,
-        false,
-        undefined,
-        el.elementsRef.current
-      );
+              ctx,
+              element,
+              viewport,
+              width,
+              height,
+              el.loadedImages,
+              false,
+              // 🔥 POPRAWIONE: Type-guard dla TypeScripta ('height' in current)
+              (id: string, newHeight: number) => {
+                setTimeout(() => {
+                  const current = el.elementsRef.current.find((e) => e.id === id);
+                  if (current && 'height' in current) {
+                    if (Math.abs((current.height ?? 0) - newHeight) > 0.05) {
+                      handleElementUpdate(id, { height: newHeight });
+                    }
+                  }
+                }, 0);
+              },
+              el.elementsRef.current
+            );
     }
 
     // Aktualizuj transform HTML overlaysów synchronicznie z rysowaniem canvasa.
@@ -377,19 +401,21 @@ export default function WhiteboardCanvasNew({
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.transform = overlayTransform;
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.transform = overlayTransform;
 
-    // Imperatywny update edytora tekstu — ta sama ramka co canvas, zero lagu przy pan/zoom
+// Imperatywny update edytora tekstu — ta sama ramka co canvas, zero lagu przy pan/zoom
     if (editingTextIdRef.current && textEditorDivRef.current) {
-      const textEl = el.elementsRef.current.find((e) => e.id === editingTextIdRef.current);
-      if (textEl && textEl.type === 'text') {
-        const tl = transformPoint({ x: textEl.x, y: textEl.y }, viewport, width, height);
-        const elW = (textEl.width  || 3) * viewport.scale * 100;
-        const elH = (textEl.height || 1) * viewport.scale * 100;
-        const d = textEditorDivRef.current;
-        d.style.left   = `${tl.x}px`;
-        d.style.top    = `${tl.y}px`;
-        d.style.width  = `${elW}px`;
-        d.style.height = `${elH}px`;
-      }
+      const d = textEditorDivRef.current;
+      // Pobieramy absolutne pozycje świata ukryte w atrybutach HTML (omijając Reacta!)
+      const wx = parseFloat(d.getAttribute('data-world-x') || '0');
+      const wy = parseFloat(d.getAttribute('data-world-y') || '0');
+      const ww = parseFloat(d.getAttribute('data-world-w') || '0');
+      const wh = parseFloat(d.getAttribute('data-world-h') || '0');
+      
+      // Przeliczamy i nakładamy styl natychmiast (synchronicznie z Canvasem)
+      const tl = transformPoint({ x: wx, y: wy }, viewport, width, height);
+      d.style.left   = `${tl.x}px`;
+      d.style.top    = `${tl.y}px`;
+      d.style.width  = `${ww * viewport.scale * 100}px`;
+      d.style.height = `${wh * viewport.scale * 100}px`;
     }
 
     // Imperatywny update edytora komórki tabeli — ta sama ramka co canvas, zero lagu
@@ -543,13 +569,20 @@ export default function WhiteboardCanvasNew({
     return () => container.removeEventListener('wheel', handleWheel);
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
 
-  // ─── BROADCAST CURSOR (pointermove → world coords → WebSocket) ──────────
+// ─── BROADCAST CURSOR (pointermove → world coords → WebSocket) ──────────
+
+  const lastCursorBroadcastRef = useRef(0); // pamięć czasu
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handlePointerMove = (e: PointerEvent) => {
+      // 🔥 DODANE: THROTTLE (ogranicznik częstotliwości)
+      const now = Date.now();
+      if (now - lastCursorBroadcastRef.current < 40) return; 
+      lastCursorBroadcastRef.current = now;
+
       const rect = container.getBoundingClientRect();
       const worldPos = inverseTransformPoint(
         { x: e.clientX - rect.left, y: e.clientY - rect.top },
@@ -1250,23 +1283,43 @@ export default function WhiteboardCanvasNew({
     ]
   );
 
-  /** Batch update (SelectTool przesuwa wiele elementów naraz) */
+/** Batch update (SelectTool przesuwa wiele elementów naraz) */
   const handleElementsUpdate = useCallback(
     (updates: Map<string, Partial<DrawingElement>>) => {
       if (userRole === 'viewer') return;
-      const ids = Array.from(updates.keys());
-      ids.forEach((id) => {
+      
+      const updatedElements: DrawingElement[] = [];
+      updates.forEach((update, id) => {
         const current = el.elementsRef.current.find((e) => e.id === id);
-        if (!current) return;
-        const updated = { ...current, ...updates.get(id) } as DrawingElement;
-        el.updateElement(updated);
-        rt.broadcastElementUpdated(updated);
+        if (current) {
+          updatedElements.push({ ...current, ...update } as DrawingElement);
+        }
       });
-      el.markUnsaved(ids);
-    },
-    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
-  );
 
+      if (updatedElements.length === 0) return;
+
+      // 1. Zmiana LOKALNA grupowo (szybki update na Twoim ekranie)
+      if (el.updateElements) {
+         el.updateElements(updatedElements);
+      } else {
+         updatedElements.forEach(e => el.updateElement(e));
+      }
+      
+      el.markUnsaved(updatedElements.map(e => e.id));
+
+      // 2. WYSYŁKA DO INNYCH (Throttle + Batch)
+      // Dzięki 'rt.broadcastElementsBatch' leci 1 wiadomość, a nie 10 osobnych! Omija to Rate Limit Supabase.
+      const now = Date.now();
+      if (now - lastGroupBroadcastRef.current > 50) { 
+        lastGroupBroadcastRef.current = now;
+        if (rt.broadcastElementsBatch) {
+           rt.broadcastElementsBatch(updatedElements).catch(console.error);
+        }
+      }
+    },
+    [userRole, el, rt]
+  );
+  
   /** Wywoływane przez SelectTool po zakończeniu operacji (mouseup) */
   const handleSelectionFinish = useCallback(() => {
     if (userRole === 'viewer') return;
@@ -1480,6 +1533,65 @@ export default function WhiteboardCanvasNew({
     vp.handleStopFollowing();
   }, [vp.handleStopFollowing]);
 
+
+// ═══════════════════════════════════════════════════════════════════════════
+  // DRAG & DROP (Globalny nasłuchiwacz na całe okno)
+  // ═══════════════════════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (userRole === 'viewer') return;
+
+    const handleDragOver = (e: DragEvent) => {
+      e.preventDefault(); // 🔥 KRYTYCZNE: Blokuje otwieranie pliku w nowej karcie!
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+    };
+
+    const handleDrop = (e: DragEvent) => {
+      e.preventDefault();
+      
+      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0];
+        if (!file.type.startsWith('image/')) return;
+        
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const dataUrl = event.target?.result as string;
+          const img = new Image();
+          img.onload = () => {
+            const rect = containerRef.current?.getBoundingClientRect();
+            // Fallback na wypadek braku kontenera
+            const mouseX = e.clientX - (rect?.left || 0);
+            const mouseY = e.clientY - (rect?.top || 0);
+            const worldPos = inverseTransformPoint(
+              { x: mouseX, y: mouseY }, vp.viewportRef.current, canvasWidth, canvasHeight
+            );
+            
+            const aspectRatio = img.naturalHeight / Math.max(img.naturalWidth, 1);
+            const worldWidth = 3;
+            const worldHeight = worldWidth * aspectRatio;
+            
+            const newImage: ImageElement = {
+              id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+              type: 'image',
+              x: worldPos.x - worldWidth / 2,
+              y: worldPos.y - worldHeight / 2,
+              width: worldWidth, height: worldHeight, src: dataUrl, alt: file.name,
+            };
+            handleImageCreate(newImage);
+          };
+          img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    window.addEventListener('dragover', handleDragOver);
+    window.addEventListener('drop', handleDrop);
+    return () => {
+      window.removeEventListener('dragover', handleDragOver);
+      window.removeEventListener('drop', handleDrop);
+    };
+  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
@@ -1490,11 +1602,11 @@ export default function WhiteboardCanvasNew({
       {/* Loading overlay — zakrywa canvas aż elementy się załadują */}
       <LoadingOverlay isLoading={el.isLoading} progress={el.loadingProgress} />
 
-      {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
+    {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
       <div
         ref={containerRef}
         className="absolute inset-0 overflow-hidden touch-none overscroll-none"
-        onContextMenu={(e) => e.preventDefault()}
+        onContextMenu={(e) => e.preventDefault()}       
         style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
       >
 
@@ -1827,6 +1939,8 @@ export default function WhiteboardCanvasNew({
               })}
         </div>
 
+        
+
         {/* ═══════════════════════════════════════════════════════════════
             CANVAS — pointer-events: none
             Narzędzia mają własne pełnoekranowe overlaye powyżej canvasa.
@@ -1843,6 +1957,8 @@ export default function WhiteboardCanvasNew({
             pointerEvents: 'none',
           }}
         />
+
+          
 
         {/* ── EDYTOR KOMÓRKI TABELI ──────────────────────────── */}
         {editingTableCell && (() => {

@@ -49,7 +49,7 @@ interface SelectToolProps {
   onDuplicateSelected?: () => void;
 }
 
-type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | null;
+type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | 'e' | 'w' | null;
 
 interface BoundingBox {
   x: number;
@@ -196,6 +196,34 @@ export function SelectTool({
         let newBoxHeight = resizeOriginalBox.height;
 
         const MIN_SIZE = 0.1;
+
+        if (resizeHandle === 'e' || resizeHandle === 'w') {
+          let newWidth = resizeOriginalBox.width;
+          let newX = resizeOriginalBox.x;
+
+          if (resizeHandle === 'e') {
+            newWidth = Math.max(MIN_SIZE, currentWorldX - resizeOriginalBox.x);
+          } else if (resizeHandle === 'w') {
+            const originalRight = resizeOriginalBox.x + resizeOriginalBox.width;
+            newWidth = Math.max(MIN_SIZE, originalRight - currentWorldX);
+            newX = originalRight - newWidth; // Element rośnie "w lewo"
+          }
+
+const updates = new Map<string, Partial<DrawingElement>>();
+          resizeOriginalElements.forEach((originalEl, id) => {
+            // 🔥 ZABEZPIECZENIE: Zmieniamy szerokość ramki tylko dla odpowiednich typów!
+            // Ignorujemy path (gdzie width to grubość linii) i shape.
+            if (originalEl.type === 'text' || originalEl.type === 'markdown' || originalEl.type === 'image' || originalEl.type === 'table') {
+              updates.set(id, { x: newX, width: newWidth });
+            }
+          });
+
+          if (updates.size > 0) {
+            onElementsUpdate(updates);
+          }
+          return; 
+        }
+
         // Minimalne wymiary notatki markdown (~150×100px przy scale=1)
         const MARKDOWN_MIN_W = 1.5;
         const MARKDOWN_MIN_H = 1.0;
@@ -214,7 +242,7 @@ export function SelectTool({
         const horizontalGuides = validGuidelines.filter((g) => g.orientation === 'horizontal');
 
         const activeGuides: any[] = [];
-
+          
         if (resizeHandle === 'se') {
           // Prawy dolny róg - snapujemy right i bottom edge
           let targetRight = currentWorldX;
@@ -711,20 +739,48 @@ export function SelectTool({
       canvasWidth,
       canvasHeight
     );
+    
+    const rightCenter = transformPoint(
+      { x: box.x + box.width, y: box.y + box.height / 2 },
+       viewport,
+        canvasWidth,
+         canvasHeight
+        );
 
-    const isNear = (p1: Point, p2: Point) => {
-      const dx = p1.x - p2.x;
-      const dy = p1.y - p2.y;
-      return Math.sqrt(dx * dx + dy * dy) < handleSize;
+    const leftCenter = transformPoint(
+      { x: box.x, y: box.y + box.height / 2 }, 
+      viewport, 
+      canvasWidth, 
+      canvasHeight
+    );
+
+
+
+  const isNear = (p1: Point, p2: Point) => {
+        const dx = p1.x - p2.x;
+        const dy = p1.y - p2.y;
+        return Math.sqrt(dx * dx + dy * dy) < handleSize;
+      };
+
+      // Sprawdzamy, czy wszystkie zaznaczone elementy obsługują boczne uchwyty
+      const selectedElements = elements.filter(el => selectedIds.has(el.id));
+      const supportsSideResize = selectedElements.every(el => 
+        el.type === 'text' || el.type === 'markdown' || el.type === 'image' || el.type === 'table'
+      );
+
+      if (isNear(screenPoint, topLeft)) return 'nw';
+      if (isNear(screenPoint, topRight)) return 'ne';
+      if (isNear(screenPoint, bottomRight)) return 'se';
+      if (isNear(screenPoint, bottomLeft)) return 'sw';
+      
+      // Zwracamy 'e' i 'w' tylko jeśli element to wspiera!
+      if (supportsSideResize) {
+        if (isNear(screenPoint, rightCenter)) return 'e';
+        if (isNear(screenPoint, leftCenter)) return 'w';
+      }
+      
+      return null;
     };
-
-    if (isNear(screenPoint, topLeft)) return 'nw';
-    if (isNear(screenPoint, topRight)) return 'ne';
-    if (isNear(screenPoint, bottomRight)) return 'se';
-    if (isNear(screenPoint, bottomLeft)) return 'sw';
-
-    return null;
-  };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const screenPoint = { x: e.clientX, y: e.clientY };
@@ -1552,128 +1608,80 @@ export function SelectTool({
   };
 
   const renderSelectionBox = () => {
-    // 🆕 Nie renderuj selection box gdy overlay jest ukryty
-    if (!isOverlayVisible) return null;
-    
-    const bbox = getSelectionBoundingBox();
-    if (!bbox || selectedIds.size === 0) return null;
+      // 🆕 Nie renderuj selection box gdy overlay jest ukryty
+      if (!isOverlayVisible) return null;
+      
+      const bbox = getSelectionBoundingBox();
+      if (!bbox || selectedIds.size === 0) return null;
 
-    const topLeft = transformPoint({ x: bbox.x, y: bbox.y }, viewport, canvasWidth, canvasHeight);
-    const bottomRight = transformPoint(
-      { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
-      viewport,
-      canvasWidth,
-      canvasHeight
-    );
+      const topLeft = transformPoint({ x: bbox.x, y: bbox.y }, viewport, canvasWidth, canvasHeight);
+      const bottomRight = transformPoint(
+        { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+        viewport,
+        canvasWidth,
+        canvasHeight
+      );
 
-    const width = bottomRight.x - topLeft.x;
-    const height = bottomRight.y - topLeft.y;
-    const centerX = topLeft.x + width / 2;
-    const centerY = topLeft.y + height / 2;
+      const width = bottomRight.x - topLeft.x;
+      const height = bottomRight.y - topLeft.y;
+      const centerX = topLeft.x + width / 2;
+      const centerY = topLeft.y + height / 2;
 
-    const handleSize = 10;
+      const handleSize = 10;
 
-    // Rogi selection box (bez rotacji - bbox już uwzględnia obrócone elementy)
-    const corners = [
-      { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
-      { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
-      { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
-      { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
-    ];
+      // 🔥 ZABEZPIECZENIE: Sprawdzamy czy wszystkie zaznaczone elementy wspierają zmianę szerokości bez deformacji
+      const selectedElements = elements.filter(el => selectedIds.has(el.id));
+      const supportsSideResize = selectedElements.every(el => 
+        el.type === 'text' || el.type === 'markdown' || el.type === 'image' || el.type === 'table'
+      );
 
-    return (
-      <>
-        {/* Selection box - prosty prostokąt */}
-        {!isRotating && (
-          <div
-            className="absolute border border-blue-500 pointer-events-none z-40"
-            style={{
-              left: topLeft.x,
-              top: topLeft.y,
-              width: width,
-              height: height,
-              boxSizing: 'border-box',
-            }}
-          />
-        )}
+      // Rogi selection box (zawsze pokazujemy te 4 rogi do skalowania)
+      const corners = [
+        { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
+        { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
+        { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
+        { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
+      ];
 
-        {/* Resize handles w rogach */}
-        {!isRotating && corners.map(({ pos, x, y, cursor }) => (
-          <div
-            key={pos}
-            className="absolute bg-white z-50 border border-gray-400 rounded-full pointer-events-auto"
-            style={{
-              left: x - handleSize / 2,
-              top: y - handleSize / 2,
-              width: handleSize,
-              height: handleSize,
-              cursor: cursor,
-            }}
-            onMouseDown={(e) => {
-              e.stopPropagation(); // 🔥 KRYTYCZNE: zatrzymaj propagację do interactive overlay!
-              setIsResizing(true);
-              setResizeHandle(pos as ResizeHandle);
-              setResizeOriginalBox(bbox);
+      // 🔥 Dodajemy boczne uchwyty TYLKO jeśli zaznaczone elementy to wspierają!
+      if (supportsSideResize) {
+        corners.push({ pos: 'e', x: topLeft.x + width, y: topLeft.y + height / 2, cursor: 'ew-resize' });
+        corners.push({ pos: 'w', x: topLeft.x, y: topLeft.y + height / 2, cursor: 'ew-resize' });
+      }
 
-              const originalElements = new Map<string, DrawingElement>();
-              elements.forEach((el) => {
-                if (selectedIds.has(el.id)) {
-                  originalElements.set(el.id, { ...el });
-                }
-              });
-              setResizeOriginalElements(originalElements);
-            }}
-          />
-        ))}
-
-        {/* 🆕 Rotation handle - ukryj podczas rotacji */}
-        {!isRotating && (() => {
-          // Lewy górny róg
-          const nwCorner = corners.find((c) => c.pos === 'nw');
-          if (!nwCorner) return null;
-
-          // Wektor od środka do NW corner
-          const dx = nwCorner.x - centerX;
-          const dy = nwCorner.y - centerY;
-          const dist = Math.sqrt(dx * dx + dy * dy);
-          
-          // Wydłuż wektor o 50px
-          const extendedX = centerX + (dx / dist) * (dist + 50);
-          const extendedY = centerY + (dy / dist) * (dist + 50);
-
-          return (
+      return (
+        <>
+          {/* Selection box - prosty prostokąt */}
+          {!isRotating && (
             <div
-              className="absolute z-50 pointer-events-auto cursor-grab"
+              className="absolute border border-blue-500 pointer-events-none z-40"
               style={{
-                left: extendedX,
-                top: extendedY - 12,
-                width: 12,
-                height: 12,
+                left: topLeft.x,
+                top: topLeft.y,
+                width: width,
+                height: height,
+                boxSizing: 'border-box',
+              }}
+            />
+          )}
+
+          {/* Resize handles w rogach (i na bokach, jeśli dodane) */}
+          {!isRotating && corners.map(({ pos, x, y, cursor }) => (
+            <div
+              key={pos}
+              className="absolute bg-white z-50 border border-gray-400 rounded-full pointer-events-auto"
+              style={{
+                left: x - handleSize / 2,
+                top: y - handleSize / 2,
+                width: handleSize,
+                height: handleSize,
+                cursor: cursor,
               }}
               onMouseDown={(e) => {
-                e.stopPropagation();
-
-                // Oblicz pivot - środek zaznaczenia
-                const pivot = {
-                  x: bbox.x + bbox.width / 2,
-                  y: bbox.y + bbox.height / 2,
-                };
-
-                // Oblicz początkowy kąt
-                const screenPoint = { x: e.clientX, y: e.clientY };
-                const worldPoint = inverseTransformPoint(
-                  screenPoint,
-                  viewport,
-                  canvasWidth,
-                  canvasHeight
-                );
-                const dx = worldPoint.x - pivot.x;
-                const dy = worldPoint.y - pivot.y;
-                const startAngle = Math.atan2(dy, dx);
-
-                setIsRotating(true);
-                setRotationStartAngle(startAngle);
-                setRotationPivot(pivot);
+                e.stopPropagation(); // 🔥 KRYTYCZNE: zatrzymaj propagację do interactive overlay!
+                setIsResizing(true);
+                setResizeHandle(pos as ResizeHandle);
+                setResizeOriginalBox(bbox);
 
                 const originalElements = new Map<string, DrawingElement>();
                 elements.forEach((el) => {
@@ -1681,29 +1689,89 @@ export function SelectTool({
                     originalElements.set(el.id, { ...el });
                   }
                 });
-                setRotationOriginalElements(originalElements);
+                setResizeOriginalElements(originalElements);
               }}
-            >
-            <svg 
-              width="18"      // Zmień na swoją wartość
-              height="18"     // Zmień na swoją wartość
-              viewBox="0 0 24 24" 
-              fill="none" 
-              xmlns="http://www.w3.org/2000/svg" 
-              transform="matrix(-1, 0, 0, 1, 0, 0)"
-            >
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
-              <g id="SVGRepo_iconCarrier"> 
-                <path d="M4.06189 13C4.02104 12.6724 4 12.3387 4 12C4 7.58172 7.58172 4 12 4C14.5006 4 16.7332 5.14727 18.2002 6.94416M19.9381 11C19.979 11.3276 20 11.6613 20 12C20 16.4183 16.4183 20 12 20C9.61061 20 7.46589 18.9525 6 17.2916M9 17H6V17.2916M18.2002 4V6.94416M18.2002 6.94416V6.99993L15.2002 7M6 20V17.2916" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> 
-              </g>
-            </svg>            
-          </div>
-          );
-        })()}
-      </>
-    );
-  };
+            />
+          ))}
+
+          {/* 🆕 Rotation handle - ukryj podczas rotacji */}
+          {!isRotating && (() => {
+            // Lewy górny róg
+            const nwCorner = corners.find((c) => c.pos === 'nw');
+            if (!nwCorner) return null;
+
+            // Wektor od środka do NW corner
+            const dx = nwCorner.x - centerX;
+            const dy = nwCorner.y - centerY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            // Wydłuż wektor o 50px
+            const extendedX = centerX + (dx / dist) * (dist + 50);
+            const extendedY = centerY + (dy / dist) * (dist + 50);
+
+            return (
+              <div
+                className="absolute z-50 pointer-events-auto cursor-grab"
+                style={{
+                  left: extendedX,
+                  top: extendedY - 12,
+                  width: 12,
+                  height: 12,
+                }}
+                onMouseDown={(e) => {
+                  e.stopPropagation();
+
+                  // Oblicz pivot - środek zaznaczenia
+                  const pivot = {
+                    x: bbox.x + bbox.width / 2,
+                    y: bbox.y + bbox.height / 2,
+                  };
+
+                  // Oblicz początkowy kąt
+                  const screenPoint = { x: e.clientX, y: e.clientY };
+                  const worldPoint = inverseTransformPoint(
+                    screenPoint,
+                    viewport,
+                    canvasWidth,
+                    canvasHeight
+                  );
+                  const dx = worldPoint.x - pivot.x;
+                  const dy = worldPoint.y - pivot.y;
+                  const startAngle = Math.atan2(dy, dx);
+
+                  setIsRotating(true);
+                  setRotationStartAngle(startAngle);
+                  setRotationPivot(pivot);
+
+                  const originalElements = new Map<string, DrawingElement>();
+                  elements.forEach((el) => {
+                    if (selectedIds.has(el.id)) {
+                      originalElements.set(el.id, { ...el });
+                    }
+                  });
+                  setRotationOriginalElements(originalElements);
+                }}
+              >
+              <svg 
+                width="18"      // Zmień na swoją wartość
+                height="18"     // Zmień na swoją wartość
+                viewBox="0 0 24 24" 
+                fill="none" 
+                xmlns="http://www.w3.org/2000/svg" 
+                transform="matrix(-1, 0, 0, 1, 0, 0)"
+              >
+                <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
+                <g id="SVGRepo_iconCarrier"> 
+                  <path d="M4.06189 13C4.02104 12.6724 4 12.3387 4 12C4 7.58172 7.58172 4 12 4C14.5006 4 16.7332 5.14727 18.2002 6.94416M19.9381 11C19.979 11.3276 20 11.6613 20 12C20 16.4183 16.4183 20 12 20C9.61061 20 7.46589 18.9525 6 17.2916M9 17H6V17.2916M18.2002 4V6.94416M18.2002 6.94416V6.99993L15.2002 7M6 20V17.2916" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> 
+                </g>
+              </svg>            
+            </div>
+            );
+          })()}
+        </>
+      );
+    };
 
   // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek lub markdown
   const renderPropertiesPanel = () => {

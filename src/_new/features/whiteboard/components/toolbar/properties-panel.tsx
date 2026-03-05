@@ -164,7 +164,7 @@ export function SelectionPropertiesPanel({
       if (el.type === 'shape') {
         onElementUpdate(el.id, { strokeWidth: newWidth });
       } else if (el.type === 'path') {
-        onElementUpdate(el.id, { width: newWidth });
+        onElementUpdate(el.id, { width: newWidth, widths: undefined });
       }
     });
   };
