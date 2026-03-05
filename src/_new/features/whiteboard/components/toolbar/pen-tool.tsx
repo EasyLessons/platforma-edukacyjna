@@ -86,8 +86,9 @@ export function PenTool({
   const lastTimestampRef = useRef<number>(0); // 🆕 Timestamp ostatniego punktu
   const [, forceUpdate] = useState({});
 
-  // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
+  // 🆕 Pen Mode 
   const isPenModeRef = useRef(false);
+
 
   // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
   useEffect(() => {
@@ -160,20 +161,19 @@ export function PenTool({
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-    const overlayRect = overlayRef.current?.getBoundingClientRect();
-    const screenPoint = { x: e.clientX, y: e.clientY };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+        const overlayRect = overlayRef.current?.getBoundingClientRect();
+        const screenPoint = { x: e.clientX, y: e.clientY };
+        const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
-    pointsRef.current = [worldPoint];
-    
-    // 🆕 Variable width tylko dla pędzla, nie dla highlightera
-    const isHighlighter = lineWidth >= 20;
-    if (!isHighlighter) {
-      widthsRef.current = [lineWidth]; // 🆕 Pierwsza szerokość to bazowa szerokość
-      lastTimestampRef.current = performance.now(); // 🆕 Timestamp rozpoczęcia
-    } else {
-      widthsRef.current = []; // Highlighter nie używa variable width
-    }
+      pointsRef.current = [worldPoint];
+
+      const isHighlighter = lineWidth >= 20;
+          if (!isHighlighter) {
+            widthsRef.current = [lineWidth]; 
+            lastTimestampRef.current = performance.now(); 
+          } else {
+            widthsRef.current = []; 
+          }
 
     const newPath: DrawingPath = {
       id: Date.now().toString(),
@@ -206,6 +206,21 @@ export function PenTool({
     const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
     const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
+
+    if (e.shiftKey) {
+      const firstPoint = pointsRef.current[0];
+      
+      // Zostawiamy w tablicy tylko pierwszy i aktualny punkt = prosta linia
+      pointsRef.current = [firstPoint, worldPoint];
+      
+      const isHighlighter = lineWidth >= 20;
+      if (!isHighlighter) {
+         widthsRef.current = [lineWidth, lineWidth];
+      }
+      
+      forceUpdate({});
+      return; // Omijamy standardowe "wygładzanie" i krzywe rysowanie
+    }
 
     // Wygładzanie - dodaj punkt tylko jeśli jest wystarczająco daleko od poprzedniego
     const lastPoint = pointsRef.current[pointsRef.current.length - 1];
@@ -254,9 +269,7 @@ export function PenTool({
     forceUpdate({});
   };
 
-  // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
-  const handlePointerUp = (e: React.PointerEvent) => {
-
+const handlePointerUp = (e: React.PointerEvent) => {
     if (!isDrawingRef.current) return;
 
     // Zwolnij pointer capture
@@ -267,7 +280,7 @@ export function PenTool({
       const finalPath: DrawingPath = {
         ...currentPathRef.current,
         points: [...pointsRef.current],
-        widths: widthsRef.current.length > 0 ? [...widthsRef.current] : undefined, // 🆕 Dodaj widths jeśli są
+        widths: widthsRef.current.length > 0 ? [...widthsRef.current] : undefined,
       };
       onPathCreate(finalPath);
     }

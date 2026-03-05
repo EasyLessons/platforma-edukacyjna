@@ -53,6 +53,7 @@ interface FunctionToolProps {
   onColorChange: (color: string) => void;
   onLineWidthChange: (width: number) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function FunctionTool({
@@ -65,6 +66,7 @@ export function FunctionTool({
   onColorChange,
   onLineWidthChange,
   onViewportChange,
+  isGestureActive: _isGestureActive,
 }: FunctionToolProps) {
   const [expression, setExpression] = useState('');
   const [error, setError] = useState<string | null>(null);

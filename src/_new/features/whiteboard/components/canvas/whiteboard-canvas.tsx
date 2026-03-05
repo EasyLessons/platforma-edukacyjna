@@ -341,6 +341,7 @@ export default function WhiteboardCanvasNew({
     boardIdRef,
     onAddElements: el.addElements,
     onBroadcastCreated: rt.broadcastElementCreated,
+    onBroadcastBatch: rt.broadcastElementsBatch,
     onMarkUnsaved: el.markUnsaved,
     // markUnsaved już wywołuje debouncedSave wewnętrznie — no-op tu wystarczy
     onDebouncedSave: () => {},
@@ -1588,6 +1589,9 @@ useMultiTouchGestures({
 // ═══════════════════════════════════════════════════════════════════════════
   // DRAG & DROP (Globalny nasłuchiwacz na całe okno)
   // ═══════════════════════════════════════════════════════════════════════════
+ // ═══════════════════════════════════════════════════════════════════════════
+  // DRAG & DROP (Globalny nasłuchiwacz na całe okno)
+  // ═══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
     if (userRole === 'viewer') return;
 
@@ -1596,42 +1600,108 @@ useMultiTouchGestures({
       if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
     };
 
-    const handleDrop = (e: DragEvent) => {
+    const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
       
       if (e.dataTransfer && e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
-        if (!file.type.startsWith('image/')) return;
         
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const dataUrl = event.target?.result as string;
-          const img = new Image();
-          img.onload = () => {
-            const rect = containerRef.current?.getBoundingClientRect();
-            // Fallback na wypadek braku kontenera
-            const mouseX = e.clientX - (rect?.left || 0);
-            const mouseY = e.clientY - (rect?.top || 0);
-            const worldPos = inverseTransformPoint(
-              { x: mouseX, y: mouseY }, vp.viewportRef.current, canvasWidth, canvasHeight
-            );
+        const isImage = file.type.startsWith('image/');
+        const isPdf = file.type === 'application/pdf';
+
+        // Odrzucamy pliki, które nie są obrazkiem ani PDF-em
+        if (!isImage && !isPdf) return;
+        
+        const rect = containerRef.current?.getBoundingClientRect();
+        const mouseX = e.clientX - (rect?.left || 0);
+        const mouseY = e.clientY - (rect?.top || 0);
+        const worldPos = inverseTransformPoint(
+          { x: mouseX, y: mouseY }, vp.viewportRef.current, canvasWidth, canvasHeight
+        );
+
+        // 📄 OBSŁUGA PDF (Drag & Drop)
+        if (isPdf) {
+          try {
+            // Dynamiczny import - ładujemy bibliotekę dopiero gdy user wrzuci PDF
+            const pdfjs = await import('pdfjs-dist');
+            pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
             
-            const aspectRatio = img.naturalHeight / Math.max(img.naturalWidth, 1);
             const worldWidth = 3;
-            const worldHeight = worldWidth * aspectRatio;
-            
-            const newImage: ImageElement = {
-              id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
-              type: 'image',
-              x: worldPos.x - worldWidth / 2,
-              y: worldPos.y - worldHeight / 2,
-              width: worldWidth, height: worldHeight, src: dataUrl, alt: file.name,
+            const padding = 0.5; // Odstęp między wygenerowanymi stronami
+            let currentY = worldPos.y; // Zaczynamy dokładnie tam, gdzie upuszczono plik
+
+            // Konwertujemy każdą stronę PDF na obrazek
+            for (let i = 1; i <= pdf.numPages; i++) {
+              const page = await pdf.getPage(i);
+              const pdfViewport = page.getViewport({ scale: 2.0 }); // Skala 2x dla lepszej czytelności
+              const canvas = document.createElement('canvas');
+              const context = canvas.getContext('2d');
+              if (!context) continue;
+
+              canvas.width = pdfViewport.width;
+              canvas.height = pdfViewport.height;
+
+              await page.render({
+                canvasContext: context,
+                viewport: pdfViewport,
+                canvas: canvas,
+              }).promise;
+
+              const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+              const aspectRatio = pdfViewport.height / Math.max(pdfViewport.width, 1);
+              const worldHeight = worldWidth * aspectRatio;
+
+              const newImage: ImageElement = {
+                id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+                type: 'image',
+                x: worldPos.x - worldWidth / 2,
+                y: currentY,
+                width: worldWidth, 
+                height: worldHeight, 
+                src: dataUrl, 
+                alt: `${file.name} - strona ${i}`,
+              };
+              
+              handleImageCreate(newImage);
+              currentY += worldHeight + padding; // Przesuwamy wskaźnik Y dla następnej strony
+              
+              // Bardzo krótkie opóźnienie, aby state wyrobił przy dużych dokumentach i nie zgubił obrazków
+              await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+          } catch (error) {
+            console.error('Błąd podczas ładowania PDF:', error);
+          }
+        } 
+        // 🖼️ OBSŁUGA ZWYKŁYCH OBRAZKÓW (Drag & Drop)
+        else if (isImage) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const dataUrl = event.target?.result as string;
+            const img = new Image();
+            img.onload = () => {
+              const aspectRatio = img.naturalHeight / Math.max(img.naturalWidth, 1);
+              const worldWidth = 3;
+              const worldHeight = worldWidth * aspectRatio;
+              
+              const newImage: ImageElement = {
+                id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+                type: 'image',
+                x: worldPos.x - worldWidth / 2,
+                y: worldPos.y - worldHeight / 2,
+                width: worldWidth, 
+                height: worldHeight, 
+                src: dataUrl, 
+                alt: file.name,
+              };
+              handleImageCreate(newImage);
             };
-            handleImageCreate(newImage);
+            img.src = dataUrl;
           };
-          img.src = dataUrl;
-        };
-        reader.readAsDataURL(file);
+          reader.readAsDataURL(file);
+        }
       }
     };
 
@@ -1792,6 +1862,7 @@ useMultiTouchGestures({
             onEditingComplete={handleEditingComplete}
             onViewportChange={handleViewportChange}
             editorDivRef={textEditorDivRef}
+            isGestureActive={isGestureActive}
           />
         )}
 
@@ -1816,6 +1887,7 @@ useMultiTouchGestures({
               onDeleteSelected={deleteSelectedElements}
               onCopySelected={clip.handleCopy}
               onDuplicateSelected={clip.handleDuplicate}
+              isGestureActive={isGestureActive}
             />
           </div>
         )}
@@ -1874,6 +1946,7 @@ useMultiTouchGestures({
             onColorChange={setColor}
             onLineWidthChange={setLineWidth}
             onViewportChange={handleViewportChange}
+            isGestureActive={isGestureActive}
           />
         )}
 
@@ -1896,6 +1969,7 @@ useMultiTouchGestures({
             elements={el.elements}
             onElementDelete={handleElementDelete}
             onViewportChange={handleViewportChange}
+            isGestureActive={isGestureActive}
           />
         )}
 
@@ -1930,6 +2004,7 @@ useMultiTouchGestures({
             lineWidth={lineWidth}
             onArrowCreate={handleArrowCreate}
             onViewportChange={handleViewportChange}
+            isGestureActive={isGestureActive}
           />
         )}
 

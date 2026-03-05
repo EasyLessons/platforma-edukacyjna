@@ -42,6 +42,7 @@ interface EraserToolProps {
   elements: DrawingElement[];
   onElementDelete: (id: string) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function EraserTool({
@@ -51,6 +52,7 @@ export function EraserTool({
   elements,
   onElementDelete,
   onViewportChange,
+  isGestureActive = false,
 }: EraserToolProps) {
   const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
   const [cursorPosition, setCursorPosition] = useState<Point | null>(null);
@@ -100,6 +102,13 @@ export function EraserTool({
     overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
+
+  useEffect(() => {
+    if (isGestureActive) {
+      setIsDragging(false);
+      deletedDuringDrag.current.clear();
+    }
+  }, [isGestureActive]);
 
   // Sprawdza czy punkt jest w elemencie
   const isPointInElement = useCallback((worldPoint: Point, element: DrawingElement): boolean => {
@@ -246,6 +255,7 @@ export function EraserTool({
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
+      if (isGestureActive) return;
       // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
       if (e.button === 1 || e.button === 2) return;
 

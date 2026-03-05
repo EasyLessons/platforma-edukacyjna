@@ -34,6 +34,7 @@ interface SelectToolProps {
   elements: DrawingElement[];
   selectedIds: Set<string>;
   isOverlayVisible?: boolean; // 🆕 Czy overlay jest widoczny (nie renderuj properties panel gdy false)
+  isGestureActive?: boolean;
   onSelectionChange: (ids: Set<string>) => void;
   onElementUpdate: (id: string, updates: Partial<DrawingElement>) => void;
   onElementUpdateWithHistory?: (id: string, updates: Partial<DrawingElement>) => void;
@@ -64,6 +65,7 @@ export function SelectTool({
   elements,
   selectedIds,
   isOverlayVisible = true, // 🆕 Domyślnie widoczny
+  isGestureActive = false,
   onSelectionChange,
   onElementUpdate,
   onElementUpdateWithHistory,
@@ -158,6 +160,19 @@ export function SelectTool({
     overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
+
+  useEffect(() => {
+    if (isGestureActive) {
+      setIsDragging(false);
+      setIsSelecting(false);
+      setSelectionStart(null);
+      setSelectionEnd(null);
+      setIsResizing(false);
+      setIsRotating(false);
+      onOperationFinish?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGestureActive]);
 
 // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
   useEffect(() => {
@@ -781,6 +796,7 @@ export function SelectTool({
   };
 
 const handlePointerDown = (e: React.PointerEvent) => {
+    if (isGestureActive) return;
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 

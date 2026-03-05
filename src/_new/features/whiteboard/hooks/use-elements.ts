@@ -192,7 +192,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     load();
   }, [boardId]);
 
-  // ─── Debounced save ────────────────────────────────────────────────────
+// ─── Debounced save ────────────────────────────────────────────────────
   const debouncedSave = useCallback((boardIdStr: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
@@ -210,7 +210,12 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
         );
         if (toSave.length === 0) return;
 
-        await saveBoardElementsBatch(boardIdNum, toSaveFormat(toSave));
+        // 🔥 POPRAWKA: Chunkowanie elementów do zapisu (max 100 na request)
+        const BATCH_SIZE = 100;
+        for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+          const chunk = toSave.slice(i, i + BATCH_SIZE);
+          await saveBoardElementsBatch(boardIdNum, toSaveFormat(chunk));
+        }
 
         const savedIds = new Set(toSave.map((e) => e.id));
         setUnsavedElements((prev) => {
@@ -266,14 +271,47 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   }, []);
 
 const updateElements = useCallback((updates: DrawingElement[]) => {
-    // 1. NATYCHMIASTOWA synchronizacja refa (Zabija lagi na płótnie!)
     const updateMap = new Map(updates.map(u => [u.id, u]));
-    elementsRef.current = elementsRef.current.map((e) => 
-      updateMap.has(e.id) ? updateMap.get(e.id)! : e
-    );
-    
-    // 2. Aktualizacja Reacta w tle (dla paneli bocznych)
+    const newElements: DrawingElement[] = [];
+
+    // 1. Zaktualizuj istniejące (szybki Ref)
+    elementsRef.current = elementsRef.current.map((e) => {
+      if (updateMap.has(e.id)) {
+        const updated = updateMap.get(e.id)!;
+        updateMap.delete(e.id);
+        return updated;
+      }
+      return e;
+    });
+
+    // 2. Pozostałe w mapie to NOWE elementy (wklejone z paczki od innego użytkownika)
+    updateMap.forEach(newEl => newElements.push(newEl));
+    if (newElements.length > 0) {
+      elementsRef.current = [...elementsRef.current, ...newElements];
+    }
+
+    // 3. Zaktualizuj widok Canvasa
     setElements([...elementsRef.current]);
+
+    // 4. Aktualizacja panelu historii aktywności (zawsze — też przy zwykłym przesunięciu)
+    setElementsWithAuthor(prev => {
+      const authorUpdateMap = new Map(updates.map(u => [u.id, u]));
+      const updatedAuthors = prev.map(authorEl => {
+        if (authorUpdateMap.has(authorEl.element_id)) {
+          return { ...authorEl, data: authorUpdateMap.get(authorEl.element_id)! };
+        }
+        return authorEl;
+      });
+      const newAuthors = newElements.map(el => ({
+        element_id: el.id,
+        type: el.type,
+        data: el,
+        created_by_id: 0,
+        created_by_username: 'Ktoś inny',
+        created_at: new Date().toISOString(),
+      }));
+      return [...updatedAuthors, ...newAuthors];
+    });
   }, []);
 
   const saveElementDirectly = useCallback(

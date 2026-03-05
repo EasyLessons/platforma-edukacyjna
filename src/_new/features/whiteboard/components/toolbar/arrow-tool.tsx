@@ -24,6 +24,7 @@ interface ArrowToolProps {
   lineWidth: number;
   onArrowCreate: (arrow: ArrowElement) => void;
   onViewportChange: (newViewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function ArrowTool({
@@ -36,6 +37,7 @@ export function ArrowTool({
   lineWidth,
   onArrowCreate,
   onViewportChange,
+  isGestureActive = false,
 }: ArrowToolProps) {
   const viewportRef = useRef(viewport);
   useEffect(() => {
@@ -49,6 +51,18 @@ export function ArrowTool({
   const [endAttachment, setEndAttachment] = useState<AnchorPoint | null>(null);
   const [nearbyAnchors, setNearbyAnchors] = useState<AnchorPoint[]>([]);
   const [hoveredAnchor, setHoveredAnchor] = useState<AnchorPoint | null>(null);
+
+  useEffect(() => {
+    if (isGestureActive) {
+      setIsDrawing(false);
+      setStartPoint(null);
+      setCurrentPoint(null);
+      setStartAttachment(null);
+      setEndAttachment(null);
+      setNearbyAnchors([]);
+      setHoveredAnchor(null);
+    }
+  }, [isGestureActive]);
 
   // Oblicz anchor points dla elementu
   const getAnchorPointsForElement = useCallback((el: DrawingElement): AnchorPoint[] => {
@@ -161,6 +175,7 @@ export function ArrowTool({
   }, []);
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (isGestureActive) return;
     // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
     if (e.button === 1 || e.button === 2) return;
     const screenPoint = { x: e.clientX, y: e.clientY };

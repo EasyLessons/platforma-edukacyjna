@@ -34,6 +34,7 @@ interface TextToolProps {
   onEditingComplete?: () => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
   editorDivRef?: React.RefObject<HTMLDivElement | null>;
+  isGestureActive?: boolean;
 }
 
 interface Draft {
@@ -63,6 +64,7 @@ export function TextTool({
   onEditingComplete,
   onViewportChange,
   editorDivRef,
+  isGestureActive = false,
 }: TextToolProps) {
 
   const [phase, setPhase] = useState<'idle' | 'drawing' | 'editing'>('idle');
@@ -274,8 +276,18 @@ export function TextTool({
     return () => overlay.removeEventListener('wheel', onWheel);
   }, [canvasWidth, canvasHeight, onViewportChange, phase]);
 
+  useEffect(() => {
+    if (isGestureActive && phase === 'drawing') {
+      setPhase('idle');
+      setDrawPreview(null);
+      drawStartWorld.current = null;
+      drawCurrWorld.current = null;
+    }
+  }, [isGestureActive, phase]);
+
   // 5. RYSOWANIE NOWEJ RAMKI
   const handleOverlayDown = (e: React.MouseEvent) => {
+    if (isGestureActive) return;
     if (phase === 'editing' || e.button !== 0) return;
     const world = inverseTransformPoint({ x: e.clientX, y: e.clientY }, viewport, canvasWidth, canvasHeight);
     drawStartWorld.current = world;

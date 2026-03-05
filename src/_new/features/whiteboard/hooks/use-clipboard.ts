@@ -34,6 +34,7 @@ export interface UseClipboardOptions {
   boardIdRef: React.RefObject<string>;
   onAddElements: (newElements: DrawingElement[]) => void;
   onBroadcastCreated: (element: DrawingElement) => Promise<void>;
+  onBroadcastBatch?: (elements: DrawingElement[]) => Promise<void>;
   onMarkUnsaved: (ids: string[]) => void;
   onDebouncedSave: (boardId: string) => void;
   onSelectElements: (ids: string[]) => void;
@@ -111,6 +112,7 @@ export function useClipboard({
   boardIdRef,
   onAddElements,
   onBroadcastCreated,
+  onBroadcastBatch,
   onMarkUnsaved,
   onDebouncedSave,
   onSelectElements,
@@ -141,17 +143,33 @@ export function useClipboard({
 
     onAddElements(newElements);
     onMarkUnsaved(newElements.map((e) => e.id));
-    newElements.forEach((el) => {
-      onBroadcastCreated(el);
-      if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
-        onLoadImage(el.id, (el as ImageElement).src);
-      }
-    });
+    if (onBroadcastBatch && newElements.length > 1) {
+      const broadcastInChunks = async () => {
+        for (let i = 0; i < newElements.length; i += 50) {
+          const chunk = newElements.slice(i, i + 50);
+          await onBroadcastBatch(chunk);
+          await new Promise(r => setTimeout(r, 50));
+        }
+      };
+      broadcastInChunks();
+      newElements.forEach(el => {
+        if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
+          onLoadImage(el.id, (el as ImageElement).src);
+        }
+      });
+    } else {
+      newElements.forEach((el) => {
+        onBroadcastCreated(el);
+        if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
+          onLoadImage(el.id, (el as ImageElement).src);
+        }
+      });
+    }
     // Zarejestruj każdy nowy element w undo stack
     newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
+  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
 
   // ─── Paste ─────────────────────────────────────────────────────────────
   const handlePaste = useCallback(() => {
@@ -176,17 +194,33 @@ export function useClipboard({
 
     onAddElements(newElements);
     onMarkUnsaved(newElements.map((e) => e.id));
-    newElements.forEach((el) => {
-      onBroadcastCreated(el);
-      if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
-        onLoadImage(el.id, (el as ImageElement).src);
-      }
-    });
+    if (onBroadcastBatch && newElements.length > 1) {
+      const broadcastInChunks = async () => {
+        for (let i = 0; i < newElements.length; i += 50) {
+          const chunk = newElements.slice(i, i + 50);
+          await onBroadcastBatch(chunk);
+          await new Promise(r => setTimeout(r, 50));
+        }
+      };
+      broadcastInChunks();
+      newElements.forEach(el => {
+        if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
+          onLoadImage(el.id, (el as ImageElement).src);
+        }
+      });
+    } else {
+      newElements.forEach((el) => {
+        onBroadcastCreated(el);
+        if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
+          onLoadImage(el.id, (el as ImageElement).src);
+        }
+      });
+    }
     // Zarejestruj każdy nowy element w undo stack
     newElements.forEach((el) => onPushUserAction?.({ type: 'create', element: el }));
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
+  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
 
   return { copiedElements, handleCopy, handleDuplicate, handlePaste };
 }
