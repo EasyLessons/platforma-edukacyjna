@@ -4,22 +4,18 @@
  * ============================================================================
  *
  * PRZEZNACZENIE:
- * Hook do obsługi gestów multitouch (2+ palce) na iPadzie/telefonach.
+ * Globalny hook do obsługi gestów multitouch (2+ palce) na iPadzie/telefonach.
+ * Działa w fazie CAPTURE - przechwytuje zdarzenia ZANIM dotrą do narzędzi.
  *
  * GESTY:
  * - 2 palce: Pan (przesuwanie) + Pinch (zoom)
- * - 1 palec: Rysowanie (normalnie)
- *
- * WAŻNE:
- * - Działa TYLKO dla pointerType === 'touch' (palce na ekranie)
- * - Touchpad Windows (pointerType === 'mouse') jest całkowicie ignorowany
- * - Gdy gesty aktywne → blokuje rysowanie (isGestureActive = true)
+ * - 1 palec: Ignorowany (przepuszczany do aktywnego narzędzia)
  * ============================================================================
  */
 
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useRef, useEffect } from 'react';
 import { ViewportTransform } from '@/_new/features/whiteboard/types';
 import { constrainViewport } from '@/_new/features/whiteboard/navigation/viewport-math';
 
@@ -30,71 +26,39 @@ interface TouchPointer {
 }
 
 interface UseMultiTouchGesturesProps {
-  viewport: ViewportTransform;
-  canvasWidth: number;
-  canvasHeight: number;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  viewportRef: React.RefObject<ViewportTransform>;
   onViewportChange: (viewport: ViewportTransform) => void;
 }
 
 export function useMultiTouchGestures({
-  viewport,
-  canvasWidth,
-  canvasHeight,
+  containerRef,
+  viewportRef,
   onViewportChange,
 }: UseMultiTouchGesturesProps) {
-  // Map aktywnych touch pointerów (TYLKO touch, nie pen ani mouse)
   const activePointersRef = useRef<Map<number, TouchPointer>>(new Map());
   const lastCenterRef = useRef<{ x: number; y: number } | null>(null);
   const lastDistanceRef = useRef<number | null>(null);
-
-  // Czy gesty są aktywne (2+ palce)
   const isGestureActiveRef = useRef(false);
 
-  // Oblicz środek między palcami
   const getCenter = (pointers: TouchPointer[]): { x: number; y: number } => {
     const sum = pointers.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
     return { x: sum.x / pointers.length, y: sum.y / pointers.length };
   };
 
-  // Oblicz dystans między dwoma palcami (dla pinch)
   const getDistance = (p1: TouchPointer, p2: TouchPointer): number => {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     return Math.sqrt(dx * dx + dy * dy);
   };
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch (palce)
-    if (e.pointerType !== 'touch') return;
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
 
-    // Dodaj pointer do mapy
-    activePointersRef.current.set(e.pointerId, {
-      id: e.pointerId,
-      x: e.clientX,
-      y: e.clientY,
-    });
-
-    const pointers = Array.from(activePointersRef.current.values());
-
-    // Jeśli 2+ palce → tryb gestów
-    if (pointers.length >= 2) {
-      isGestureActiveRef.current = true;
-      lastCenterRef.current = getCenter(pointers);
-
-      // Dla pinch zoom - zapisz początkowy dystans
-      if (pointers.length === 2) {
-        lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
-      }
-    }
-  }, []);
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      // 🔥 IGNORUJ wszystko oprócz touch
+    const handlePointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
-      if (!activePointersRef.current.has(e.pointerId)) return;
 
-      // Aktualizuj pozycję pointera
       activePointersRef.current.set(e.pointerId, {
         id: e.pointerId,
         x: e.clientX,
@@ -103,116 +67,138 @@ export function useMultiTouchGestures({
 
       const pointers = Array.from(activePointersRef.current.values());
 
-      // Jeśli 2+ palce → obsługuj gesty
+      // Jeśli mamy 2+ palce - wchodzimy w tryb nawigacji!
+      if (pointers.length >= 2) {
+        if (!isGestureActiveRef.current) {
+          isGestureActiveRef.current = true;
+          
+          // 🔥 MAGIA: Wymuszamy anulowanie akcji dla pierwszego palca!
+          // Jeśli ktoś zaczął rysować ołówkiem i położył drugi palec,
+          // wysyłamy sztuczny event 'pointercancel', żeby ołówek przerwał rysowanie.
+          const cancelEvent = new PointerEvent('pointercancel', {
+            pointerId: pointers[0].id,
+            bubbles: true,
+            cancelable: true,
+            pointerType: 'touch',
+            clientX: pointers[0].x,
+            clientY: pointers[0].y,
+          });
+          e.target?.dispatchEvent(cancelEvent);
+        }
+
+        lastCenterRef.current = getCenter(pointers);
+        if (pointers.length === 2) {
+          lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
+        }
+        
+        // Blokujemy propagację do innych narzędzi (np. PenTool, SelectTool)
+        e.stopPropagation();
+        e.preventDefault();
+      }
+    };
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      if (!activePointersRef.current.has(e.pointerId)) return;
+
+      activePointersRef.current.set(e.pointerId, {
+        id: e.pointerId,
+        x: e.clientX,
+        y: e.clientY,
+      });
+
+      const pointers = Array.from(activePointersRef.current.values());
+
       if (pointers.length >= 2 && isGestureActiveRef.current) {
         e.preventDefault();
-        e.stopPropagation();
+        e.stopPropagation(); // Blokuj narzędzia przed widzeniem ruchu!
 
         const newCenter = getCenter(pointers);
+        const viewport = viewportRef.current;
+        if (!viewport) return;
 
         if (lastCenterRef.current) {
           const deltaX = newCenter.x - lastCenterRef.current.x;
           const deltaY = newCenter.y - lastCenterRef.current.y;
 
-          // PINCH ZOOM - sprawdź NAJPIERW czy to zoom (priorytet!)
           let isZooming = false;
 
+          // Pinch-to-Zoom
           if (pointers.length === 2 && lastDistanceRef.current) {
             const newDistance = getDistance(pointers[0], pointers[1]);
             const distanceChange = newDistance - lastDistanceRef.current;
 
-            // ✅ THRESHOLD dla zoom (10px - mniejszy próg żeby reagować szybciej)
             if (Math.abs(distanceChange) > 10) {
               isZooming = true;
-
               const distanceRatio = newDistance / lastDistanceRef.current;
-
-              // ✅ CZUŁOŚĆ ZOOM - dzielnik 25 (wolniejszy, płynniejszy zoom)
-              // Poprzednio /10 powodowało zbyt szybkie skoki
               const zoomFactor = 1 + (distanceRatio - 1) / 25;
               const newScale = Math.max(0.1, Math.min(5, viewport.scale * zoomFactor));
 
-              // ✅✅✅ POPRAWKA: Podczas zoom TYLKO scale się zmienia!
-              // NIE zmieniaj viewport.x i viewport.y - to eliminuje przesuwanie
-              const newViewport: ViewportTransform = {
-                ...viewport,
-                scale: newScale,
-                // x i y pozostają BEZ ZMIAN
-              };
-
-              onViewportChange(constrainViewport(newViewport));
-
-              // ✅ KLUCZOWA POPRAWKA: Aktualizuj lastDistance przy KAŻDYM ruchu!
-              // Poprzednio czekało na 200px co powodowało "kumulację" i skoki
+              onViewportChange(constrainViewport({ ...viewport, scale: newScale }));
               lastDistanceRef.current = newDistance;
             }
           }
 
-          // PAN - TYLKO jeśli NIE zoomujemy
+          // Pan (Przesuwanie)
           if (!isZooming) {
-            // ✅ PAN SENSITIVITY - spokojne przesuwanie
             const panSensitivity = 0.03;
-
-            const newViewport: ViewportTransform = {
+            onViewportChange(constrainViewport({
               ...viewport,
               x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
               y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
-            };
-
-            onViewportChange(constrainViewport(newViewport));
-
-            // ✅ Aktualizuj center TYLKO przy pan (nie przy zoom!)
+            }));
             lastCenterRef.current = newCenter;
           }
-          // ✅ WAŻNE: NIE aktualizuj lastCenterRef przy zoom!
         }
       }
-    },
-    [viewport, canvasWidth, canvasHeight, onViewportChange]
-  );
+    };
 
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch
-    if (e.pointerType !== 'touch') return;
+    const handlePointerUp = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
 
-    // Usuń pointer z mapy
-    activePointersRef.current.delete(e.pointerId);
-
-    const pointers = Array.from(activePointersRef.current.values());
-
-    // Jeśli zostało mniej niż 2 palce → wyłącz tryb gestów
-    if (pointers.length < 2) {
-      isGestureActiveRef.current = false;
-      lastCenterRef.current = null;
-      lastDistanceRef.current = null;
-    } else {
-      // Zaktualizuj centrum i dystans dla pozostałych palców
-      lastCenterRef.current = getCenter(pointers);
-      if (pointers.length === 2) {
-        lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
+      if (isGestureActiveRef.current) {
+        e.stopPropagation();
+        e.preventDefault();
       }
-    }
-  }, []);
 
-  const handlePointerCancel = useCallback((e: React.PointerEvent) => {
-    // 🔥 IGNORUJ wszystko oprócz touch
-    if (e.pointerType !== 'touch') return;
+      activePointersRef.current.delete(e.pointerId);
+      const pointers = Array.from(activePointersRef.current.values());
 
-    // Wyczyść wszystko
-    activePointersRef.current.clear();
-    isGestureActiveRef.current = false;
-    lastCenterRef.current = null;
-    lastDistanceRef.current = null;
-  }, []);
+      if (pointers.length < 2) {
+        isGestureActiveRef.current = false;
+        lastCenterRef.current = null;
+        lastDistanceRef.current = null;
+      } else {
+        lastCenterRef.current = getCenter(pointers);
+        if (pointers.length === 2) {
+          lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
+        }
+      }
+    };
 
-  // Zwróć czy gesty są aktywne (do blokowania rysowania)
-  const isGestureActive = () => isGestureActiveRef.current;
+    const handlePointerCancel = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return;
+      activePointersRef.current.delete(e.pointerId);
+      const pointers = Array.from(activePointersRef.current.values());
 
-  return {
-    handlePointerDown,
-    handlePointerMove,
-    handlePointerUp,
-    handlePointerCancel,
-    isGestureActive,
-  };
+      if (pointers.length < 2) {
+        isGestureActiveRef.current = false;
+        lastCenterRef.current = null;
+        lastDistanceRef.current = null;
+      }
+    };
+
+    // Podpinamy w fazie { capture: true }, aby złapać event ZANIM wpadnie w cokolwiek wewnątrz Reacta
+    container.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: false });
+    window.addEventListener('pointermove', handlePointerMove, { capture: true, passive: false });
+    window.addEventListener('pointerup', handlePointerUp, { capture: true, passive: false });
+    window.addEventListener('pointercancel', handlePointerCancel, { capture: true, passive: false });
+
+    return () => {
+      container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
+      window.removeEventListener('pointermove', handlePointerMove, { capture: true });
+      window.removeEventListener('pointerup', handlePointerUp, { capture: true });
+      window.removeEventListener('pointercancel', handlePointerCancel, { capture: true });
+    };
+  }, [containerRef, onViewportChange, viewportRef]);
 }

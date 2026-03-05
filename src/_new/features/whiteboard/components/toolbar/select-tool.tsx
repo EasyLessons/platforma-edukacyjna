@@ -25,7 +25,6 @@ import {
 import { TextMiniToolbar } from './text-mini-toolbar';
 import { SelectionPropertiesPanel } from './properties-panel';
 import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '@/_new/features/whiteboard/selection/snap-utils';
-import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
 
 interface SelectToolProps {
@@ -108,13 +107,6 @@ export function SelectTool({
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // 🆕 Multi-touch gestures
-  const gestures = useMultiTouchGestures({
-    viewport,
-    canvasWidth,
-    canvasHeight,
-    onViewportChange: onViewportChange || (() => {}),
-  });
 
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
@@ -167,17 +159,11 @@ export function SelectTool({
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
-  // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
+// 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
   useEffect(() => {
     if (!isResizing && !isDragging && !isRotating) return;
 
     const handleGlobalPointerMove = (e: PointerEvent) => {
-      // 🆕 Obsługa gestów multitouch - blokuj drag/resize podczas gestów
-      if (e.pointerType === 'touch') {
-        gestures.handlePointerMove(e as any);
-        if (gestures.isGestureActive()) return;
-      }
-
       const screenPoint = { x: e.clientX, y: e.clientY };
       const worldPoint = inverseTransformPoint(
         screenPoint,
@@ -209,7 +195,7 @@ export function SelectTool({
             newX = originalRight - newWidth; // Element rośnie "w lewo"
           }
 
-const updates = new Map<string, Partial<DrawingElement>>();
+          const updates = new Map<string, Partial<DrawingElement>>();
           resizeOriginalElements.forEach((originalEl, id) => {
             // 🔥 ZABEZPIECZENIE: Zmieniamy szerokość ramki tylko dla odpowiednich typów!
             // Ignorujemy path (gdzie width to grubość linii) i shape.
@@ -535,11 +521,6 @@ const updates = new Map<string, Partial<DrawingElement>>();
     };
 
     const handleGlobalPointerUp = (e: PointerEvent) => {
-      // 🆕 Obsługa gestów multitouch
-      if (e.pointerType === 'touch') {
-        gestures.handlePointerUp(e as any);
-      }
-
       if (isDragging && draggedElementsOriginal.size > 0) {
         onOperationFinish?.();
       }
@@ -601,10 +582,7 @@ const updates = new Map<string, Partial<DrawingElement>>();
     };
 
     const handleGlobalPointerCancel = (e: PointerEvent) => {
-      // 🆕 Obsługa gestów multitouch przy cancel
-      if (e.pointerType === 'touch') {
-        gestures.handlePointerCancel(e as any);
-      }
+      // Pusty handler (nic nie musimy tu czyścić z multitoucha)
     };
 
     window.addEventListener('pointermove', handleGlobalPointerMove);
@@ -802,13 +780,9 @@ const updates = new Map<string, Partial<DrawingElement>>();
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+const handlePointerDown = (e: React.PointerEvent) => {
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
-
-    // 🆕 Obsługa gestów multitouch
-    gestures.handlePointerDown(e);
-    if (gestures.isGestureActive()) return;
 
     const screenPoint = { x: e.clientX, y: e.clientY };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
@@ -906,10 +880,6 @@ const updates = new Map<string, Partial<DrawingElement>>();
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    // 🆕 Obsługa gestów multitouch
-    gestures.handlePointerMove(e);
-    if (gestures.isGestureActive()) return;
-
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
       const currentEnd = { x: e.clientX, y: e.clientY };
@@ -1146,11 +1116,6 @@ const updates = new Map<string, Partial<DrawingElement>>();
   };
 
   const handlePointerUp = (e?: React.PointerEvent) => {
-    // 🆕 Obsługa gestów multitouch
-    if (e) {
-      gestures.handlePointerUp(e);
-    }
-
     // Tylko dla zaznaczania obszaru - resize/drag mouseup obsługiwane przez global listener
     if (isSelecting && selectionStart && selectionEnd) {
       const worldStart = inverseTransformPoint(selectionStart, viewport, canvasWidth, canvasHeight);
@@ -1375,8 +1340,7 @@ const updates = new Map<string, Partial<DrawingElement>>();
   };
 
   const handlePointerCancel = (e: React.PointerEvent) => {
-    // 🆕 Obsługa gestów multitouch przy cancel
-    gestures.handlePointerCancel(e);
+    // Pusty handler po usunięciu gestures
   };
 
   const renderTextToolbar = () => {
