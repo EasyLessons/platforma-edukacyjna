@@ -2,15 +2,6 @@
  * ============================================================================
  * PLIK: src/_new/features/whiteboard/hooks/use-multi-touch-gestures.ts
  * ============================================================================
- *
- * PRZEZNACZENIE:
- * Globalny hook do obsługi gestów multitouch (2+ palce) na iPadzie/telefonach.
- * Działa w fazie CAPTURE - przechwytuje zdarzenia ZANIM dotrą do narzędzi.
- *
- * GESTY:
- * - 2 palce: Pan (przesuwanie) + Pinch (zoom)
- * - 1 palec: Ignorowany (przepuszczany do aktywnego narzędzia)
- * ============================================================================
  */
 
 'use client';
@@ -67,15 +58,14 @@ export function useMultiTouchGestures({
 
       const pointers = Array.from(activePointersRef.current.values());
 
-      // Jeśli mamy 2+ palce - wchodzimy w tryb nawigacji!
       if (pointers.length >= 2) {
         if (!isGestureActiveRef.current) {
           isGestureActiveRef.current = true;
           
-          // 🔥 MAGIA: Wymuszamy anulowanie akcji dla pierwszego palca!
-          // Jeśli ktoś zaczął rysować ołówkiem i położył drugi palec,
-          // wysyłamy sztuczny event 'pointercancel', żeby ołówek przerwał rysowanie.
-          const cancelEvent = new PointerEvent('pointercancel', {
+          // 🔥 MAGIA (Poprawka z glitchem Długopisu)
+          // Wysyłamy pointerup, by narzędzie naturalnie się "puściło"
+          // zanim przejmiemy sterowanie nad kamerą
+          const cancelEvent = new PointerEvent('pointerup', {
             pointerId: pointers[0].id,
             bubbles: true,
             cancelable: true,
@@ -91,7 +81,6 @@ export function useMultiTouchGestures({
           lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
         }
         
-        // Blokujemy propagację do innych narzędzi (np. PenTool, SelectTool)
         e.stopPropagation();
         e.preventDefault();
       }
@@ -111,7 +100,7 @@ export function useMultiTouchGestures({
 
       if (pointers.length >= 2 && isGestureActiveRef.current) {
         e.preventDefault();
-        e.stopPropagation(); // Blokuj narzędzia przed widzeniem ruchu!
+        e.stopPropagation();
 
         const newCenter = getCenter(pointers);
         const viewport = viewportRef.current;
@@ -121,34 +110,28 @@ export function useMultiTouchGestures({
           const deltaX = newCenter.x - lastCenterRef.current.x;
           const deltaY = newCenter.y - lastCenterRef.current.y;
 
-          let isZooming = false;
+          let newScale = viewport.scale;
 
-          // Pinch-to-Zoom
+          // 🔥 Pinch-to-Zoom (ZABRANO DŁAWIK /25!)
           if (pointers.length === 2 && lastDistanceRef.current) {
             const newDistance = getDistance(pointers[0], pointers[1]);
-            const distanceChange = newDistance - lastDistanceRef.current;
-
-            if (Math.abs(distanceChange) > 10) {
-              isZooming = true;
-              const distanceRatio = newDistance / lastDistanceRef.current;
-              const zoomFactor = 1 + (distanceRatio - 1) / 25;
-              const newScale = Math.max(0.1, Math.min(5, viewport.scale * zoomFactor));
-
-              onViewportChange(constrainViewport({ ...viewport, scale: newScale }));
-              lastDistanceRef.current = newDistance;
-            }
+            const distanceRatio = newDistance / lastDistanceRef.current;
+            
+            // Czysty stosunek odległości - idealna, naturalna prędkość
+            newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
+            lastDistanceRef.current = newDistance;
           }
 
-          // Pan (Przesuwanie)
-          if (!isZooming) {
-            const panSensitivity = 0.03;
-            onViewportChange(constrainViewport({
-              ...viewport,
-              x: viewport.x - (deltaX / viewport.scale) * panSensitivity,
-              y: viewport.y - (deltaY / viewport.scale) * panSensitivity,
-            }));
-            lastCenterRef.current = newCenter;
-          }
+          // 🔥 Pan & Zoom JEDNOCZEŚNIE! (Zabrano dławik 0.03!)
+          // 1 px ruchu palca = 1 px ruchu na ekranie
+          onViewportChange(constrainViewport({
+            ...viewport,
+            scale: newScale,
+            x: viewport.x - (deltaX / viewport.scale),
+            y: viewport.y - (deltaY / viewport.scale),
+          }));
+          
+          lastCenterRef.current = newCenter;
         }
       }
     };
@@ -188,7 +171,7 @@ export function useMultiTouchGestures({
       }
     };
 
-    // Podpinamy w fazie { capture: true }, aby złapać event ZANIM wpadnie w cokolwiek wewnątrz Reacta
+    // Faza CAPTURE
     container.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: false });
     window.addEventListener('pointermove', handlePointerMove, { capture: true, passive: false });
     window.addEventListener('pointerup', handlePointerUp, { capture: true, passive: false });
