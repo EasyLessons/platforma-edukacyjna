@@ -348,17 +348,21 @@ export default function WhiteboardCanvasNew({
     onPushUserAction: hist.pushUserAction,
   });
 
-  // 🔥 DODANE: Globalny przechwytywacz gestów multitouch (Zoom/Pan palcami)
+// 🔥 POPRAWIONE: Globalny przechwytywacz gestów multitouch
   useMultiTouchGestures({
     containerRef,
     viewportRef: vp.viewportRef,
     onViewportChange: (newVp) => {
-      // Aktualizujemy refa natychmiast (dla płynności canvas)
-      vp.viewportRef.current = newVp;
-      // Wywołujemy render ramki
-      requestAnimationFrame(() => redrawCanvasRef.current());
-      // Aktualizujemy stan Reacta (dla reszty UI)
-      vp.setViewport(newVp);
+      // Ustawiamy flagę "panningu", żeby zablokować inne narzędzia i ciężkie re-rendery
+      isPanningRef.current = true;
+      
+      // Wywołujemy naszą nową, szybką funkcję
+      handleViewportChange(newVp);
+
+      // Resetujemy flagę chwilę po zabraniu palców
+      if (viewportChangeTimerRef.current === null) {
+        setTimeout(() => { isPanningRef.current = false; }, 150);
+      }
     },
   });
 
@@ -948,48 +952,40 @@ export default function WhiteboardCanvasNew({
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
   }, [vp.setViewport, vp.viewportRef]);
 
-  const handleViewportChange = useCallback((newVp: ViewportTransform) => {
+const handleViewportChange = useCallback((newVp: ViewportTransform) => {
     const constrained = constrainViewport(newVp);
     
-    // 🆕 Ukryj overlaye i wyczyść selection PRZED zmianą viewport
-    // (zapobiega renderowaniu properties panel z nowym viewport ale starym selection)
-    // CSS ukrycie - natychmiastowe
-    if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
-    // Markdown i kursory nie potrzebują ukrywania — CSS transform zawsze aktualny
-    
-    // State + selection - SYNCHRONICZNIE przez flushSync
-    if (!isPanningRef.current && sel.selectedElementIds.size > 0) {
-      flushSync(() => {
-        setOverlaysVisible(false); // 🆕 SYNCHRONICZNIE - wymusza natychmiastowy re-render
-        sel.clearSelection();
-      });
-    } else {
-      // Jeśli pan gesture w toku, tylko state bez selection
-      flushSync(() => {
-        setOverlaysVisible(false);
-      });
-    }
-    
+    // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
     vp.viewportRef.current = constrained;
 
-    // Podczas aktywnego pana gestu — tylko ref + redraw canvas, bez setViewport (brak re-renderów React)
-    if (isPanningRef.current) {
-      requestAnimationFrame(() => redrawCanvasRef.current());
-      return;
+    // 2. Jeśli overlaye są widoczne, ukryj je TYLKO wizualnie (bez czyszczenia zaznaczenia!)
+    // Używamy CSS dla szybkości, by nie wymuszać ciężkiego re-renderu całego drzewa Reacta
+    if (htmlOverlaysRef.current && htmlOverlaysRef.current.style.visibility !== 'hidden') {
+      htmlOverlaysRef.current.style.visibility = 'hidden';
     }
 
-    vp.setViewport(constrained);
+    // 3. Zarządzanie renderowaniem:
+    // Jeśli używamy narzędzia Pan lub gestów (isPanningRef), nie robimy setViewport (stanu React),
+    // bo to by zabiło wydajność mobilną przez ciągłe re-rendery.
+    if (isPanningRef.current) {
+      // Tylko przerysowujemy Canvas "na żywo"
+      requestAnimationFrame(() => redrawCanvasRef.current());
+    } else {
+      // Jeśli to np. Zoom z przycisku, aktualizujemy stan normalnie
+      vp.setViewport(constrained);
+    }
 
-    // Przywróć overlaye po 80ms ciszy — panel pojawi się w dobrym miejscu
+    // 4. Przywróć overlaye po zakończeniu ruchu (Debounce)
     if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
     viewportChangeTimerRef.current = setTimeout(() => {
       viewportChangeTimerRef.current = null;
-      if (isPanningRef.current) return; // gest wciąż trwa — poczekaj na restoreOverlaysAfterPan
-      // Nie używamy flushSync tutaj - to już post-timeout, nie hot path
-      setOverlaysVisible(true);
+      if (isPanningRef.current) return; 
+
+      // Dopiero po zatrzymaniu ruchu synchronizujemy stan Reacta
+      vp.setViewport(vp.viewportRef.current);
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-    }, 80);
-  }, [vp.setViewport, vp.viewportRef, sel]);
+    }, 100);
+  }, [vp.setViewport, vp.viewportRef]); // Usunąłem 'sel' z zależności - funkcja jest teraz stabilna!
 
   /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
   const handleCenterViewAndSelectElements = useCallback((
