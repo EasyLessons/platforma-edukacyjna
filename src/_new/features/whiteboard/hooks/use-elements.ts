@@ -109,16 +109,50 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
         setIsLoading(true);
         setLoadingProgress(10);
 
-        const rawElements = await apiLoadElements(boardIdNum);
+ const rawElements = await apiLoadElements(boardIdNum);
         setLoadingProgress(50);
 
-        const loaded = rawElements.map((e: BoardElementWithAuthor) => e.data);
-        setElements(loaded);
-        setElementsWithAuthor(rawElements);
+        const dbElements = rawElements.map((e: BoardElementWithAuthor) => e.data);
+
+        // 🔥 INTELIGENTNE ŁĄCZENIE ELEMENTÓW
+        setElements((prev) => {
+          const currentRamMap = new Map(prev.map(e => [e.id, e]));
+          
+          // Krok 1: Wersja RAM > Wersja DB. Jeśli element jest już w pamięci z WebSocket, ignoruj bazę!
+          const merged = dbElements.map(dbEl => 
+            currentRamMap.has(dbEl.id) ? currentRamMap.get(dbEl.id)! : dbEl
+          );
+
+          // Krok 2: Kreski z RAM, których baza jeszcze w ogóle nie zna
+          const dbMap = new Map(dbElements.map(e => [e.id, e]));
+          prev.forEach(ramEl => {
+            if (!dbMap.has(ramEl.id)) merged.push(ramEl);
+          });
+          
+          elementsRef.current = merged; // Natychmiastowa synchronizacja refa
+          return merged;
+        });
+
+        // 🔥 INTELIGENTNE ŁĄCZENIE AUTORÓW (żeby panele boczne nie wariowały)
+        setElementsWithAuthor((prev) => {
+          const currentRamMap = new Map(prev.map(e => [e.element_id, e]));
+          
+          const merged = rawElements.map(dbEl => 
+            currentRamMap.has(dbEl.element_id) ? currentRamMap.get(dbEl.element_id)! : dbEl
+          );
+
+          const dbMap = new Map(rawElements.map(e => [e.element_id, e]));
+          prev.forEach(ramEl => {
+            if (!dbMap.has(ramEl.element_id)) merged.push(ramEl);
+          });
+          
+          return merged;
+        });
+
         setLoadingProgress(70);
 
         // Załaduj wszystkie obrazy
-        const imageEls = loaded.filter((el: DrawingElement) => el.type === 'image');
+        const imageEls = dbElements.filter((el: DrawingElement) => el.type === 'image');
         if (imageEls.length === 0) {
           setLoadingProgress(100);
           setTimeout(() => setIsLoading(false), 300);

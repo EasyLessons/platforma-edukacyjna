@@ -102,7 +102,7 @@ import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
 
 
-
+import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
 
 
@@ -136,7 +136,7 @@ export default function WhiteboardCanvasNew({
   boardSettings: boardSettingsProp,
   className = '',
 }: WhiteboardCanvasNewProps) {
-
+  const boardRt = useBoardRealtime();
   // Zmerguj props z domyślnymi — używamy ref żeby nie powiązać przez state
   const settings = boardSettingsProp ?? DEFAULT_BOARD_SETTINGS;
   // Ref do settings — unika stale closure w useCallback renderowania
@@ -295,7 +295,34 @@ export default function WhiteboardCanvasNew({
             elements.forEach(e => el.updateElement(e));
           }
         },
-  });
+        
+// 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
+    onSyncRequest: (requestingUserId) => {
+      // ⚠️ UŻYWAMY boardRt ZAMIAST rt!
+      if (el.elementsRef.current.length > 0 && boardRt.broadcastSyncResponse) {
+        boardRt.broadcastSyncResponse(el.elementsRef.current, requestingUserId).catch(console.error);
+      }
+    },
+    
+    // 🔥 DODANE [SYNC] To my weszliśmy i ktoś nam przysłał najświeższe dane - łatajmy dziury!
+    onSyncResponse: (incomingElements) => {
+      const currentMap = new Map(el.elementsRef.current.map(e => [e.id, e]));
+      const toAdd: DrawingElement[] = [];
+      const toUpdate: DrawingElement[] = [];
+
+      incomingElements.forEach(incoming => {
+        if (currentMap.has(incoming.id)) {
+          toUpdate.push(incoming); // Mamy to, ale aktualizujemy z pamięci drugiego gracza
+        } else {
+          toAdd.push(incoming); // Nie mamy tego (baza jeszcze nie zapisała) - dodajemy!
+        }
+      });
+
+      if (toAdd.length > 0) el.addElements(toAdd);
+      if (toUpdate.length > 0 && el.updateElements) el.updateElements(toUpdate);
+    },
+ 
+      });
 
   // Wypełnij broadcast refs gdy rt jest dostępne (bez ponownego renderowania)
   useEffect(() => {
@@ -333,6 +360,13 @@ export default function WhiteboardCanvasNew({
     lastVpBroadcastRef.current = now;
     rt.broadcastViewportChange(vp.viewport.x, vp.viewport.y, vp.viewport.scale);
   }, [vp.viewport, vp.followingUserId, rt.broadcastViewportChange, rt.isConnected]);
+
+// 📡 [SYNC] Gdy kanał WebSocket się połączy, poproś innych graczy o niezapisany stan
+  useEffect(() => {
+    if (rt.isConnected && rt.broadcastSyncRequest) {
+      rt.broadcastSyncRequest().catch(console.error);
+    }
+  }, [rt.isConnected, rt.broadcastSyncRequest]);
 
   // ─── RENDEROWANIE CANVAS ────────────────────────────────────────────────────
 

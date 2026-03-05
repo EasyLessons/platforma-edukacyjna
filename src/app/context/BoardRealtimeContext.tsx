@@ -154,9 +154,15 @@ interface BoardRealtimeContextType {
   onRemoteElementsBatch: (
     handler: (elements: DrawingElement[], userId: number, username: string) => void
   ) => void;
-  onRemoteCursorMove: (
+onRemoteCursorMove: (
     handler: (x: number, y: number, userId: number, username: string) => void
   ) => void;
+  
+  // 🔥 DODANE [SYNC]
+  broadcastSyncRequest: () => Promise<void>;
+  broadcastSyncResponse: (elements: DrawingElement[], targetUserId: number) => Promise<void>;
+  onRemoteSyncRequest: (handler: (userId: number, username: string) => void) => void;
+  onRemoteSyncResponse: (handler: (elements: DrawingElement[], userId: number, username: string) => void) => void;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -293,7 +299,9 @@ export function BoardRealtimeProvider({
   const cursorMoveHandlerRef = useRef<
     ((x: number, y: number, userId: number, username: string) => void) | null
   >(null);
-
+// 🔥 DODANE [SYNC] - Pamięć dla handlerów
+  const syncRequestHandlerRef = useRef<((userId: number, username: string) => void) | null>(null);
+  const syncResponseHandlerRef = useRef<((elements: DrawingElement[], userId: number, username: string) => void) | null>(null);
   // ───────────────────────────────────────────────────────────────────────
   // POŁĄCZENIE Z SUPABASE
   // ───────────────────────────────────────────────────────────────────────
@@ -552,6 +560,20 @@ export function BoardRealtimeProvider({
         }
 
         notifyViewportSubscribers();
+      })
+      // 🔥 DODANE [SYNC] - Nasłuchiwanie
+      .on('broadcast', { event: 'sync-request' }, ({ payload }) => {
+        const { userId, username } = payload as any;
+        if (userId === user.id) return;
+        console.log(`📡 [SYNC] Gracz ${username} dołączył i prosi o najświeższy stan tablicy`);
+        if (syncRequestHandlerRef.current) syncRequestHandlerRef.current(userId, username);
+      })
+      .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
+        const { elements, targetUserId, userId, username } = payload as any;
+        // KRYTYCZNE: Odrzucamy odpowiedź, jeśli to nie my o nią prosiliśmy!
+        if (targetUserId !== user.id) return; 
+        console.log(`📥 [SYNC] Otrzymano świeżą pamięć podręczną od gracza ${username}`);
+        if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(elements, userId, username);
       });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -881,6 +903,28 @@ export function BoardRealtimeProvider({
     []
   );
 
+  // ───────────────────────────────────────────────────────────────────────
+  // 🔥 DODANE: SYNC REQUEST FUNCTIONS (Wywoływanie najświeższych danych)
+  // ───────────────────────────────────────────────────────────────────────
+
+  const broadcastSyncRequest = useCallback(async () => {
+    if (!user) return;
+    await safeBroadcast('sync-request', { userId: user.id, username: user.username });
+  }, [user, safeBroadcast]);
+
+  const broadcastSyncResponse = useCallback(async (elements: DrawingElement[], targetUserId: number) => {
+    if (!user) return;
+    await safeBroadcast('sync-response', { elements, targetUserId, userId: user.id, username: user.username });
+  }, [user, safeBroadcast]);
+
+  const onRemoteSyncRequest = useCallback((handler: (userId: number, username: string) => void) => {
+    syncRequestHandlerRef.current = handler;
+  }, []);
+
+  const onRemoteSyncResponse = useCallback((handler: (elements: DrawingElement[], userId: number, username: string) => void) => {
+    syncResponseHandlerRef.current = handler;
+  }, []);
+
   // 🆕 SUBSKRYPCJA KURSORÓW - nie powoduje re-renderów context!
   const subscribeCursors = useCallback((callback: (cursors: RemoteCursor[]) => void) => {
     // Dodaj subscriber
@@ -1005,6 +1049,10 @@ export function BoardRealtimeProvider({
         onRemoteElementDeleted,
         onRemoteElementsBatch,
         onRemoteCursorMove,
+        broadcastSyncRequest,
+        broadcastSyncResponse,
+        onRemoteSyncRequest,
+        onRemoteSyncResponse,
       }}
     >
       {children}
