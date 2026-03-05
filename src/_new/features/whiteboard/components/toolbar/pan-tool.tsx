@@ -15,8 +15,6 @@ import {
   panViewportWithWheel,
   constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
-
 interface PanToolProps {
   viewport: ViewportTransform;
   /** Stabilna referencja do aktualnego viewportu (z whiteboard-canvas) — używana w event handlerach */
@@ -40,13 +38,6 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
 
   /** Zawsze używaj najbardziej aktualnego viewportu (bez opóźnienia debounce) */
   const getViewport = () => canvasViewportRef?.current ?? viewport;
-
-  const gestures = useMultiTouchGestures({
-    viewport,
-    canvasWidth,
-    canvasHeight,
-    onViewportChange,
-  });
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -101,7 +92,6 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
   // button 0 = LPM, button 1 = scroll (kółko), button 2 = PPM
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
-      gestures.handlePointerDown(e);
       if (e.button === 0 || e.button === 1 || e.button === 2) {
         e.preventDefault();
         e.currentTarget.setPointerCapture(e.pointerId);
@@ -111,15 +101,12 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
         onPanStart?.();
       }
     },
-    [gestures, onPanStart]
+    [onPanStart]
   );
 
   // Pointer move - kontynuuj panning
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      gestures.handlePointerMove(e);
-      if (gestures.isGestureActive()) return; // Gesty mają priorytet
-
       if (!isPanningRef.current || !lastMousePosRef.current) return;
 
       const dx = e.clientX - lastMousePosRef.current.x;
@@ -132,13 +119,12 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
       // Aktualizuj ref natychmiast (bez setState — brak re-renderu)
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
     },
-    [gestures, onViewportChange]
+    [ onViewportChange]
   );
 
   // Pointer up - zakończ panning
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
-      gestures.handlePointerUp(e);
       if (isPanningRef.current) {
 
         if (e.currentTarget.hasPointerCapture(e.pointerId)) {
@@ -150,7 +136,7 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
       lastMousePosRef.current = null;
       setIsPanningVisual(false);
     },
-    [gestures, onPanEnd]
+    [onPanEnd]
   );
 
   return (

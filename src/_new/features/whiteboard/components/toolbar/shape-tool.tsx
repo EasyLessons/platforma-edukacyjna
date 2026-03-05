@@ -79,12 +79,6 @@ export function ShapeTool({
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  const gestures = useMultiTouchGestures({
-    viewport,
-    canvasWidth,
-    canvasHeight,
-    onViewportChange: onViewportChange || (() => {}),
-  });
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -140,9 +134,6 @@ export function ShapeTool({
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 
-    gestures.handlePointerDown(e);
-    if (gestures.isGestureActive()) return;
-
     const screenPoint = { x: e.clientX, y: e.clientY };
     // Użyj canvasViewportRef — brak opóźnienia debounce 80ms
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
@@ -167,8 +158,6 @@ export function ShapeTool({
 
   // Pointer move - kontynuuj rysowanie kształtu
   const handlePointerMove = (e: React.PointerEvent) => {
-    gestures.handlePointerMove(e);
-    if (gestures.isGestureActive()) return;
 
     if (!isDrawing || !currentShape) return;
 
@@ -184,8 +173,6 @@ export function ShapeTool({
 
   // Pointer up - zakończ rysowanie kształtu
   const handlePointerUp = (e: React.PointerEvent) => {
-    gestures.handlePointerUp(e);
-
     if (isDrawing && currentShape) {
       onShapeCreate(currentShape);
     }

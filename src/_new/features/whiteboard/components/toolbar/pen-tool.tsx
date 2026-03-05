@@ -78,14 +78,6 @@ export function PenTool({
   // 🆕 Pen Mode - jak w Excalidraw: blokuj touch gdy używamy pióra
   const isPenModeRef = useRef(false);
 
-  // 🆕 Multi-touch gestures (2+ palce = pan/zoom)
-  const gestures = useMultiTouchGestures({
-    viewport,
-    canvasWidth,
-    canvasHeight,
-    onViewportChange: onViewportChange || (() => {}),
-  });
-
   // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
   useEffect(() => {
     const overlay = overlayRef.current;
@@ -147,12 +139,6 @@ export function PenTool({
       return;
     }
 
-    // 🆕 Najpierw przekaż do gesture handler
-    gestures.handlePointerDown(e);
-
-    // 🆕 Jeśli gesty aktywne (2+ palce touch) → blokuj rysowanie
-    if (gestures.isGestureActive()) return;
-
     // Tylko lewy przycisk myszy (button === 0) lub pen/touch (button === 0 lub -1)
     if (e.button !== 0 && e.button !== -1) return;
 
@@ -199,11 +185,6 @@ export function PenTool({
       return;
     }
 
-    // 🆕 Najpierw przekaż do gesture handler
-    gestures.handlePointerMove(e);
-
-    // 🆕 Jeśli gesty aktywne → nie rysuj
-    if (gestures.isGestureActive()) return;
 
     if (!isDrawingRef.current || !currentPathRef.current) return;
 
@@ -263,8 +244,6 @@ export function PenTool({
 
   // Pointer up - zakończ rysowanie (obsługuje mysz, tablet, touch)
   const handlePointerUp = (e: React.PointerEvent) => {
-    // 🆕 Przekaż do gesture handler
-    gestures.handlePointerUp(e);
 
     if (!isDrawingRef.current) return;
 
@@ -296,8 +275,6 @@ export function PenTool({
 
   // Pointer cancel - anuluj rysowanie
   const handlePointerCancel = (e: React.PointerEvent) => {
-    // 🆕 Przekaż do gesture handler
-    gestures.handlePointerCancel(e);
 
     if (!isDrawingRef.current) return;
 
