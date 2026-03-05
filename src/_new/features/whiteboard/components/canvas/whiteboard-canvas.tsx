@@ -1481,7 +1481,7 @@ useMultiTouchGestures({
     if (userRole === 'viewer') return;
     const current = el.elementsRef.current.find((e) => e.id === id);
     el.removeElement(id);
-    if (el.loadedImages && el.loadedImages[id]) delete el.loadedImages[id];
+    if (el.loadedImages && el.loadedImages.get(id)) el.loadedImages.delete(id);
     rt.broadcastElementDeleted(id);
     const boardIdNum = parseInt(boardIdRef.current);
     if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
@@ -1583,7 +1583,7 @@ useMultiTouchGestures({
     // 1. Natychmiastowe usunięcie lokalne
     idsArray.forEach((id) => {
       el.removeElement(id);
-      if (el.loadedImages && el.loadedImages[id]) delete el.loadedImages[id];
+      if (el.loadedImages && el.loadedImages.get(id)) el.loadedImages.delete(id);
     });
     sel.clearSelection();
 
@@ -1662,7 +1662,7 @@ useMultiTouchGestures({
     // 1. Natychmiastowe usunięcie lokalne
     snapshot.forEach((e) => {
       el.removeElement(e.id);
-      if (el.loadedImages && el.loadedImages[e.id]) delete el.loadedImages[e.id];
+      if (el.loadedImages && el.loadedImages.get(e.id)) el.loadedImages.delete(e.id);
     });
     sel.clearSelection();
 
