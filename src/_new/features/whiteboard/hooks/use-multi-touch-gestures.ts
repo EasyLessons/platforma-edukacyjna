@@ -29,6 +29,10 @@ export function useMultiTouchGestures({
   const lastDistanceRef = useRef<number | null>(null);
   const isGestureActiveRef = useRef(false);
 
+  // --- PARAMETRY STABILIZACJI ---
+  const ZOOM_DEADZONE_PX = 8;    // Ignoruj zmianę odległości mniejszą niż 8 pikseli (kluczowe dla Panu)
+  const ZOOM_SENSITIVITY = 0.8;  // Zmniejsz czułość zoomu (0.8 = wolniejszy, stabilniejszy)
+
   const getCenter = (pointers: TouchPointer[]): { x: number; y: number } => {
     const sum = pointers.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
     return { x: sum.x / pointers.length, y: sum.y / pointers.length };
@@ -43,6 +47,60 @@ export function useMultiTouchGestures({
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !activePointersRef.current.has(e.pointerId)) return;
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
+
+      const pointers = Array.from(activePointersRef.current.values());
+      if (pointers.length >= 2 && isGestureActiveRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const newCenter = getCenter(pointers);
+        const viewport = viewportRef.current;
+        if (!viewport || !lastCenterRef.current || !lastDistanceRef.current) return;
+
+        // 1. OBLICZANIE ZOOMU Z PROGIEM (Deadzone)
+        const newDistance = getDistance(pointers[0], pointers[1]);
+        const distanceDiff = newDistance - lastDistanceRef.current;
+        
+        let targetScale = viewport.scale;
+
+        // Reagujemy na zoom tylko, gdy palce faktycznie się zbliżyły/oddaliły o więcej niż próg
+        if (Math.abs(distanceDiff) > ZOOM_DEADZONE_PX) {
+          const ratio = newDistance / lastDistanceRef.current;
+          // Zastosowanie czułości, by zoom nie był zbyt gwałtowny
+          const adjustedRatio = 1 + (ratio - 1) * ZOOM_SENSITIVITY;
+          targetScale = Math.max(0.1, Math.min(5, viewport.scale * adjustedRatio));
+          
+          // Aktualizujemy bazę odległości dopiero po przekroczeniu progu, 
+          // żeby uniknąć "pływania" skali przy Panu
+          lastDistanceRef.current = newDistance;
+        }
+
+        // 2. OBLICZANIE PAN (Zawsze płynne)
+        const deltaX = newCenter.x - lastCenterRef.current.x;
+        const deltaY = newCenter.y - lastCenterRef.current.y;
+
+        // 3. MATEMATYKA PIVOTU
+        const rect = container.getBoundingClientRect();
+        const centerX = newCenter.x - rect.left;
+        const centerY = newCenter.y - rect.top;
+        const currentScaleFactor = viewport.scale * 100;
+
+        const worldX = viewport.x + (centerX - rect.width / 2) / currentScaleFactor;
+        const worldY = viewport.y + (centerY - rect.height / 2) / currentScaleFactor;
+
+        onViewportChange({
+          scale: targetScale,
+          x: worldX - (centerX - rect.width / 2) / (targetScale * 100) - (deltaX / (targetScale * 100)),
+          y: worldY - (centerY - rect.height / 2) / (targetScale * 100) - (deltaY / (targetScale * 100)),
+        });
+
+        lastCenterRef.current = newCenter;
+      }
+    };
 
     const handlePointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
@@ -60,56 +118,6 @@ export function useMultiTouchGestures({
       }
     };
 
-    const handlePointerMove = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch' || !activePointersRef.current.has(e.pointerId)) return;
-      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
-
-      const pointers = Array.from(activePointersRef.current.values());
-      if (pointers.length >= 2 && isGestureActiveRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
-
-        const newCenter = getCenter(pointers);
-        const viewport = viewportRef.current;
-        if (!viewport || !lastCenterRef.current || !lastDistanceRef.current) return;
-
-        // 1. OBLICZANIE SKALI (Zoom)
-        const newDistance = getDistance(pointers[0], pointers[1]);
-        // Unikamy dzielenia przez zero i zbyt gwałtownych skoków
-        const distanceRatio = lastDistanceRef.current > 0 ? newDistance / lastDistanceRef.current : 1;
-        
-        // WYGŁADZANIE: Jeśli zmiana jest minimalna, traktuj jako brak zmiany (zapobiega drganiu przy Panu)
-        const smoothedRatio = Math.abs(distanceRatio - 1) < 0.005 ? 1 : distanceRatio;
-        const newScale = Math.max(0.1, Math.min(5, viewport.scale * smoothedRatio));
-
-        // 2. OBLICZANIE PAN (Przesunięcie środka)
-        const deltaX = newCenter.x - lastCenterRef.current.x;
-        const deltaY = newCenter.y - lastCenterRef.current.y;
-
-        // 3. MATEMATYKA PIVOTU (Środek ekranu jako punkt odniesienia)
-        const rect = container.getBoundingClientRect();
-        const centerX = newCenter.x - rect.left;
-        const centerY = newCenter.y - rect.top;
-
-        // Przeliczenie na "world coordinates"
-        const currentScaleFactor = viewport.scale * 100;
-        const worldX = viewport.x + (centerX - rect.width / 2) / currentScaleFactor;
-        const worldY = viewport.y + (centerY - rect.height / 2) / currentScaleFactor;
-
-        // 4. APLIKACJA ZMIAN
-        onViewportChange({
-          scale: newScale,
-          // Nowa pozycja x/y musi uwzględniać nową skalę, żeby środek palców został w tym samym miejscu
-          x: worldX - (centerX - rect.width / 2) / (newScale * 100) - (deltaX / (newScale * 100)),
-          y: worldY - (centerY - rect.height / 2) / (newScale * 100) - (deltaY / (newScale * 100)),
-        });
-
-        // KRYTYCZNE: Aktualizujemy referencje CO KLATKĘ, żeby nie było skoków
-        lastCenterRef.current = newCenter;
-        lastDistanceRef.current = newDistance;
-      }
-    };
-
     const handlePointerUp = (e: PointerEvent) => {
       activePointersRef.current.delete(e.pointerId);
       const pointers = Array.from(activePointersRef.current.values());
@@ -120,7 +128,6 @@ export function useMultiTouchGestures({
         lastCenterRef.current = null;
         lastDistanceRef.current = null;
       } else if (pointers.length >= 2) {
-        // Jeśli nadal są 2 palce (np. puściłeś trzeci), zresetuj bazę
         lastCenterRef.current = getCenter(pointers);
         lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
       }
