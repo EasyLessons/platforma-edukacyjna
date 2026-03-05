@@ -17,9 +17,6 @@ interface UseMultiTouchGesturesProps {
   onGestureEnd?: () => void;
 }
 
-// Progi czułości, by "pan" nie wywoływał "zoomu" przypadkiem
-const PINCH_THRESHOLD = 3; // Ignoruj zmiany odległości mniejsze niż 3px
-
 export function useMultiTouchGestures({
   containerRef,
   viewportRef,
@@ -49,83 +46,67 @@ export function useMultiTouchGestures({
 
     const handlePointerDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch') return;
-
-      activePointersRef.current.set(e.pointerId, {
-        id: e.pointerId,
-        x: e.clientX,
-        y: e.clientY,
-      });
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
 
       const pointers = Array.from(activePointersRef.current.values());
-
       if (pointers.length >= 2) {
         if (!isGestureActiveRef.current) {
           isGestureActiveRef.current = true;
           onGestureStart?.();
         }
-
         lastCenterRef.current = getCenter(pointers);
-        if (pointers.length === 2) {
-          lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
-        }
+        lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
         e.stopPropagation();
       }
     };
 
     const handlePointerMove = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-      if (!activePointersRef.current.has(e.pointerId)) return;
-
-      activePointersRef.current.set(e.pointerId, {
-        id: e.pointerId,
-        x: e.clientX,
-        y: e.clientY,
-      });
+      if (e.pointerType !== 'touch' || !activePointersRef.current.has(e.pointerId)) return;
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
 
       const pointers = Array.from(activePointersRef.current.values());
-
       if (pointers.length >= 2 && isGestureActiveRef.current) {
         e.preventDefault();
         e.stopPropagation();
 
         const newCenter = getCenter(pointers);
         const viewport = viewportRef.current;
-        if (!viewport || !lastCenterRef.current) return;
+        if (!viewport || !lastCenterRef.current || !lastDistanceRef.current) return;
 
-        // 1. OBLICZANIE PAN (Przesuwanie)
+        // 1. OBLICZANIE SKALI (Zoom)
+        const newDistance = getDistance(pointers[0], pointers[1]);
+        // Unikamy dzielenia przez zero i zbyt gwałtownych skoków
+        const distanceRatio = lastDistanceRef.current > 0 ? newDistance / lastDistanceRef.current : 1;
+        
+        // WYGŁADZANIE: Jeśli zmiana jest minimalna, traktuj jako brak zmiany (zapobiega drganiu przy Panu)
+        const smoothedRatio = Math.abs(distanceRatio - 1) < 0.005 ? 1 : distanceRatio;
+        const newScale = Math.max(0.1, Math.min(5, viewport.scale * smoothedRatio));
+
+        // 2. OBLICZANIE PAN (Przesunięcie środka)
         const deltaX = newCenter.x - lastCenterRef.current.x;
         const deltaY = newCenter.y - lastCenterRef.current.y;
 
-        // 2. OBLICZANIE ZOOM (Pinch)
-        let newScale = viewport.scale;
-        if (pointers.length === 2 && lastDistanceRef.current !== null) {
-          const newDistance = getDistance(pointers[0], pointers[1]);
-          const distanceDiff = Math.abs(newDistance - lastDistanceRef.current);
-
-          // 🔥 POPRAWKA: Reaguj na zoom tylko jeśli zmiana odległości jest wyraźna
-          if (distanceDiff > PINCH_THRESHOLD) {
-            const distanceRatio = newDistance / lastDistanceRef.current;
-            newScale = Math.max(0.1, Math.min(5, viewport.scale * distanceRatio));
-            lastDistanceRef.current = newDistance;
-          }
-        }
-
-        // 3. MATEMATYKA PIVOTU (Zoom względem środka palców)
+        // 3. MATEMATYKA PIVOTU (Środek ekranu jako punkt odniesienia)
         const rect = container.getBoundingClientRect();
         const centerX = newCenter.x - rect.left;
         const centerY = newCenter.y - rect.top;
-        const scaleFull = viewport.scale * 100;
 
-        const worldX = viewport.x + (centerX - rect.width / 2) / scaleFull;
-        const worldY = viewport.y + (centerY - rect.height / 2) / scaleFull;
+        // Przeliczenie na "world coordinates"
+        const currentScaleFactor = viewport.scale * 100;
+        const worldX = viewport.x + (centerX - rect.width / 2) / currentScaleFactor;
+        const worldY = viewport.y + (centerY - rect.height / 2) / currentScaleFactor;
 
+        // 4. APLIKACJA ZMIAN
         onViewportChange({
           scale: newScale,
+          // Nowa pozycja x/y musi uwzględniać nową skalę, żeby środek palców został w tym samym miejscu
           x: worldX - (centerX - rect.width / 2) / (newScale * 100) - (deltaX / (newScale * 100)),
           y: worldY - (centerY - rect.height / 2) / (newScale * 100) - (deltaY / (newScale * 100)),
         });
-        
+
+        // KRYTYCZNE: Aktualizujemy referencje CO KLATKĘ, żeby nie było skoków
         lastCenterRef.current = newCenter;
+        lastDistanceRef.current = newDistance;
       }
     };
 
@@ -138,6 +119,10 @@ export function useMultiTouchGestures({
         onGestureEnd?.();
         lastCenterRef.current = null;
         lastDistanceRef.current = null;
+      } else if (pointers.length >= 2) {
+        // Jeśli nadal są 2 palce (np. puściłeś trzeci), zresetuj bazę
+        lastCenterRef.current = getCenter(pointers);
+        lastDistanceRef.current = getDistance(pointers[0], pointers[1]);
       }
     };
 
