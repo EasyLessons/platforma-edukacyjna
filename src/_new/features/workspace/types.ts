@@ -73,3 +73,24 @@ export interface WorkspaceMembersResponse {
   members: WorkspaceMember[];
   total: number;
 }
+
+// WORKSPACE CARD TYPES
+export interface WorkspaceCardActions {
+  edit: (workspace: Workspace) => void;
+  members: (workspace: Workspace) => void;
+  delete: (workspace: Workspace) => void;
+  leave: (workspace: Workspace) => void;
+}
+
+export interface WorkspaceDragState {
+  draggedId: number | null;
+  dragOverId: number | null;
+}
+
+export interface WorkspaceDragHandlers {
+  onDragStart: (e: React.DragEvent, id: number) => void;
+  onDragEnd: (e: React.DragEvent) => void;
+  onDragOver: (e: React.DragEvent, id: number) => void;
+  onDragLeave: () => void;
+  onDrop: (e: React.DragEvent, targetId: number) => void;
+}

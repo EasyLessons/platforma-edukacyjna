@@ -4,24 +4,29 @@
  * Orkiestrator sekcji tablic na dashboardzie.
  *
  * Odpowiada za:
+ * - useBoards — jeden stan dla całej sekcji
  * - Header z przyciskiem tworzenia
+ * - Filtry i sortowanie (UI + stan)
  * - Nagłówki kolumn (desktop)
- * - Filtry i sortowanie
- * - Modal tworzenia tablicy
- * - Przekazanie stanu do BoardList
- *
- * NIE odpowiada za:
- * - Pobieranie danych (useBoards w BoardList)
- * - Renderowanie kart (BoardCard)
+ * - Modals: tworzenie, edycja, potwierdzenie usunięcia
+ * - Nawigację do tablicy
+ * - Przekazanie danych i onAction do BoardList
  *
  */
 
-import { useState } from 'react';
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { Plus, Filter, ChevronDown } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { BoardList } from '@/_new/features/board/components/board-list';
-import { BoardFormModal } from '@/_new/features/board/components/board-form-modal';
+import { BoardCreateModal } from '@/_new/features/board/components/board-create-modal';
+import { BoardEditModal } from '@/_new/features/board/components/board-edit-modal';
+import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
+import { useBoards } from '@/_new/features/board/hooks/use-boards';
 import { useAuth } from '@/app/context/AuthContext';
+import type { Board, BoardCardActions } from '@/_new/features/board/types';
 import type { SortBy, FilterOwner } from '@/_new/features/board/utils/helpers';
 
 interface BoardsSectionProps {
@@ -30,19 +35,57 @@ interface BoardsSectionProps {
 }
 
 export default function BoardsSection({ workspaceId, workspaceName }: BoardsSectionProps) {
-  // STATE
-  // ================================
-
+  const router = useRouter();
   const { user } = useAuth();
   const currentUsername = user?.username ?? '';
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // STATE
+  // ================================
+  const {
+    boards,
+    loading,
+    error,
+    createBoard,
+    updateBoard,
+    deleteBoard,
+    toggleFavourite,
+  } = useBoards({ workspaceId });
+
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [filterOwner, setFilterOwner] = useState<FilterOwner>('all');
 
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null);
+  const [deletingBoard, setDeletingBoard] = useState<Board | null>(null);
+
+  // Obiekt akcji przekazywany do kart przez BoardList
+  const cardActions: BoardCardActions = useMemo(
+    () => ({
+      edit: setEditingBoard,
+      delete: setDeletingBoard,
+    }),
+    []
+  );
+
+  // HANDLERS
+  // ================================
+  const handleSelect = (boardId: number) => {
+    router.push(`/tablica?boardId=${boardId}`);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingBoard) return;
+    try {
+      await deleteBoard(deletingBoard.id);
+      setDeletingBoard(null);
+    } catch (err) {
+      console.error('Error deleting board:', err);
+      alert('Nie udało się usunąć tablicy. Spróbuj ponownie.');
+    }
+  };
+
   // RENDER
   // ================================
-
   return (
     <>
       {/* Header */}
@@ -67,7 +110,6 @@ export default function BoardsSection({ workspaceId, workspaceName }: BoardsSect
           </div>
 
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-1 sm:justify-end">
-            {/* Owner Filter */}
             <div className="relative">
               <select
                 value={filterOwner}
@@ -83,7 +125,6 @@ export default function BoardsSection({ workspaceId, workspaceName }: BoardsSect
               />
             </div>
 
-            {/* Sorting */}
             <div className="relative">
               <select
                 value={sortBy}
@@ -114,19 +155,56 @@ export default function BoardsSection({ workspaceId, workspaceName }: BoardsSect
 
       {/* Lista tablic */}
       <BoardList
-        workspaceId={workspaceId}
+        boards={boards}
+        loading={loading}
+        error={error}
         sortBy={sortBy}
         filterOwner={filterOwner}
         currentUsername={currentUsername}
+        onlineUsersEnabled
+        onAction={cardActions}
+        onSelect={handleSelect}
+        onToggleFavourite={toggleFavourite}
       />
 
-      {/* Modal tworzenia */}
-      <BoardFormModal
+      {/* MODALS */}
+
+      <BoardCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        mode="create"
-        board={null}
         workspaceId={workspaceId}
+        onSubmit={async (data) => {
+          await createBoard(data);
+          setShowCreateModal(false);
+        }}
+      />
+
+      {editingBoard && (
+        <BoardEditModal
+          isOpen={!!editingBoard}
+          onClose={() => setEditingBoard(null)}
+          board={editingBoard}
+          onSubmit={async (data) => {
+            await updateBoard(editingBoard.id, data);
+            setEditingBoard(null);
+          }}
+        />
+      )}
+
+      <ConfirmationModal
+        isOpen={!!deletingBoard}
+        onClose={() => setDeletingBoard(null)}
+        onConfirm={handleDeleteConfirm}
+        title="Usuń tablicę?"
+        message={
+          <>
+            Czy na pewno chcesz usunąć <strong>"{deletingBoard?.name}"</strong>?
+            <br />
+            <span className="text-red-600 font-semibold">Ta akcja jest nieodwracalna.</span>
+          </>
+        }
+        confirmText="Usuń tablicę"
+        confirmVariant="destructive"
       />
     </>
   );

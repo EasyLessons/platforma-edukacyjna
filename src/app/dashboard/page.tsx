@@ -1,56 +1,41 @@
 'use client';
 
 import { useState } from 'react';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
 import DashboardHeader from './Header/DashboardHeader';
-import WorkspaceSidebarNew from './components_new/workspace-sidebar';
-import BoardsSection from './components_new/boards-section';
-import WorkspaceSidebar from './Components/WorkspaceSidebar';
+import WorkspaceSidebar from './Components/workspace-sidebar';
+import BoardsSection from './Components/boards-section';
 import WelcomeSection from './Components/WelcomeSection';
 import TemplatesSection from './Components/TemplateSection';
-import LastBoards from './Components/LastBoards';
 
 export default function Dashboard() {
-  const {
-    workspaces,
-    loading,
-    error,
-    createWorkspace,
-    updateWorkspace,
-    deleteWorkspace,
-    leaveWorkspace,
-    toggleFavourite,
-  } = useWorkspaces();
-
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+  const [activeWorkspaceName, setActiveWorkspaceName] = useState<string | undefined>(undefined);
+  const handleWorkspaceSelect = (id: number, name: string) => {
+    setActiveWorkspaceId(id);
+    setActiveWorkspaceName(name);
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <DashboardHeader />
 
       <div className="flex flex-1">
-        {/* <WorkspaceSidebarNew
-          workspaces={workspaces}
-          loading={loading}
-          error={error}
+        <WorkspaceSidebar
           activeWorkspaceId={activeWorkspaceId}
-          onWorkspaceSelect={setActiveWorkspaceId}
-          onCreateWorkspace={createWorkspace}
-          onUpdateWorkspace={updateWorkspace}
-          onDeleteWorkspace={deleteWorkspace}
-          onLeaveWorkspace={leaveWorkspace}
-          onToggleFavourite={toggleFavourite}
-         /> */}
-
-         <WorkspaceSidebar />
+          onWorkspaceSelect={handleWorkspaceSelect}
+        />
 
         <div className="flex-1 overflow-auto">
           <div className="w-full mx-auto p-8">
             <WelcomeSection />
 
             <TemplatesSection />
-
-            <LastBoards />
+            {activeWorkspaceId && (
+              <BoardsSection
+                workspaceId={activeWorkspaceId}
+                workspaceName={activeWorkspaceName}
+              />
+            )}
           </div>
         </div>
       </div>

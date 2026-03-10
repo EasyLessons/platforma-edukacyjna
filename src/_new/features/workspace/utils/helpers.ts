@@ -57,15 +57,16 @@ export const sortWorkspacesByCustomOrder = (
   if (!customOrder.length) return workspaces;
 
   return [...workspaces].sort((a, b) => {
-    const indexA = customOrder.indexOf(a.id);
-    const indexB = customOrder.indexOf(b.id);
+    // Poziom 1: ulubione zawsze na górze
+    if (a.is_favourite && !b.is_favourite) return -1;
+    if (!a.is_favourite && b.is_favourite) return 1;
 
-    // Jeśli workspace nie ma pozycji w customOrder, idzie na koniec
-    if (indexA === -1 && indexB === -1) return 0;
-    if (indexA === -1) return 1;
-    if (indexB === -1) return -1;
+    // Poziom 2: kolejność z localStorage w ramach grupy
+    const aIndex = customOrder.indexOf(a.id);
+    const bIndex = customOrder.indexOf(b.id);
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
 
-    return indexA - indexB;
+    return 0;
   });
 };
 

@@ -9,31 +9,69 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Loader2, Layout } from 'lucide-react';
 import { BoardCard } from './board-card';
-import { useBoards } from '../hooks/use-boards';
+import { fetchBoardOnlineUsers } from '../api/board-api';
 import { sortBoards, filterBoards } from '../utils/helpers';
+import type { Board, BoardCardActions } from '../types';
 import type { SortBy, FilterOwner } from '../utils/helpers';
+import type { OnlineUser } from '@/_new/shared/types/user';
 
 interface BoardListProps {
-  workspaceId: number;
+  boards: Board[];
+  loading: boolean;
+  error: string | null;
   sortBy: SortBy;
   filterOwner: FilterOwner;
   currentUsername: string;
+  onSelect: (boardId: number) => void;
+  onAction: BoardCardActions;
+  onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
+  onlineUsersEnabled?: boolean;
 }
 
-export function BoardList({ workspaceId, sortBy, filterOwner, currentUsername }: BoardListProps) {
+export function BoardList({
+  boards,
+  loading,
+  error,
+  sortBy,
+  filterOwner,
+  currentUsername,
+  onAction,
+  onSelect,
+  onToggleFavourite,
+  onlineUsersEnabled = true,
+}: BoardListProps) {
   // DATA
   // ================================
 
-  const { boards, loading, error } = useBoards({ workspaceId });
+  // Online Users - pobierane zbiorczo dla wszystkich tablic
+  const [onlineUsersMap, setOnlineUsersMap] = useState<Record<number, OnlineUser[]>>({});
+  useEffect(() => {
+    if (!onlineUsersEnabled || boards.length === 0) return;
+
+    const fetchAll = async () => {
+      const results = await Promise.allSettled(
+        boards.map((b) => fetchBoardOnlineUsers(b.id).then((users) => ({ boardId: b.id, users })))
+      );
+
+      const map: Record<number, OnlineUser[]> = {};
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          map[result.value.boardId] = result.value.users;
+        }
+      }
+      setOnlineUsersMap(map);
+    };
+
+    fetchAll();
+  }, [boards, onlineUsersEnabled]);
 
   // Computed - sortowanie i filtrowanie
   const processedBoards = useMemo(() => {
     const filtered = filterBoards(boards, filterOwner, currentUsername);
-    const sorted = sortBoards(filtered, sortBy);
-    return sorted;
+    return sortBoards(filtered, sortBy);
   }, [boards, sortBy, filterOwner, currentUsername]);
 
   // RENDERS
@@ -94,7 +132,14 @@ export function BoardList({ workspaceId, sortBy, filterOwner, currentUsername }:
   return (
     <div className="flex flex-col gap-2">
       {processedBoards.map((board) => (
-        <BoardCard key={board.id} board={board} workspaceId={workspaceId} />
+        <BoardCard
+          key={board.id}
+          board={board}
+          onlineUsers={onlineUsersMap[board.id] ?? []}
+          onAction={onAction}
+          onToggleFavourite={onToggleFavourite}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );

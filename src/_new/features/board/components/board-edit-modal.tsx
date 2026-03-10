@@ -1,105 +1,41 @@
 /**
- * BOARD FORM MODAL
+ * BOARD EDIT MODAL
  *
- * Modal z formularzem tablicy.
- * Działa zarówno dla TWORZENIA nowej jak i EDYCJI istniejącej.
- *
+ * Modal z formularzem edycji tablicy.
  */
 
 'use client';
 
 import { useRef } from 'react';
-import { X, Check } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { Button } from '@/_new/shared/ui/button';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { useBoardForm } from '../hooks/use-board-form';
-import { useBoards } from '../hooks/use-boards';
-import { getGradientClass, getIconComponent } from '../utils/helpers';
-import { BoardColorPicker } from './board-color-picker';
 import { BoardIconPicker } from './board-icon-picker';
-import type { Board } from '../types';
+import { BoardColorPicker } from './board-color-picker';
+import { useEditBoardForm } from '../hooks/use-edit-board-form';
+import { getGradientClass, getIconComponent } from '../utils/helpers';
+import type { Board, BoardUpdateRequest } from '../types';
 
-interface BoardFormModalProps {
+interface BoardEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  mode: 'create' | 'edit';
-  board: Board | null;
-  workspaceId: number;
+  board: Board;
+  onSubmit: (data: BoardUpdateRequest) => Promise<void>;
 }
 
-export function BoardFormModal({ isOpen, onClose, mode, board, workspaceId }: BoardFormModalProps) {
-  // STATE & DATA
+export function BoardEditModal({ isOpen, onClose, board, onSubmit }: BoardEditModalProps) {
+  // STATE
   // ================================
 
-  const { createBoard, updateBoard } = useBoards({ workspaceId, autoLoad: false });
-
-  const {
-    formData,
-    errors,
-    isSubmitting,
-    isDirty,
-    setIsSubmitting,
-    validateForm,
-    handleChange,
-    resetForm,
-  } = useBoardForm({
-    initialData: mode === 'edit' ? board : undefined,
-  });
+  const { formData, errors, isSubmitting, isDirty, handleChange, handleClose, handleSubmit } =
+    useEditBoardForm({ board, onSubmit, onClose });
 
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  const isCreateMode = mode === 'create';
-  const isEditMode = mode === 'edit';
-
-  const title = isCreateMode ? 'Nowa tablica' : 'Ustawienia tablicy';
-  const buttonText = isCreateMode ? 'Utwórz tablicę' : 'Zapisz zmiany';
-  const loadingText = isCreateMode ? 'Tworzenie...' : 'Zapisywanie...';
-
   const PreviewIcon = getIconComponent(formData.icon);
   const previewGradient = getGradientClass(formData.bg_color);
-
-  // HANDLERS
-  // ================================
-
-  const handleClose = () => {
-    resetForm();
-    onClose();
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) return;
-    setIsSubmitting(true);
-
-    try {
-      if (isCreateMode) {
-        await createBoard({
-          name: formData.name.trim(),
-          icon: formData.icon,
-          bg_color: formData.bg_color,
-          workspace_id: workspaceId,
-        });
-      } else {
-        if (!board) throw new Error('Board is required');
-        await updateBoard(board.id, {
-          name: formData.name.trim(),
-          icon: formData.icon,
-          bg_color: formData.bg_color,
-        });
-      }
-      handleClose();
-    } catch (err) {
-      console.error(`Error ${isCreateMode ? 'creating' : 'updating'} board:`, err);
-      alert(
-        `Nie udało się ${isCreateMode ? 'utworzyć' : 'zaktualizować'} tablicy. Spróbuj ponownie.`
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   // MODAL BEHAVIOR
   // ================================
@@ -117,11 +53,6 @@ export function BoardFormModal({ isOpen, onClose, mode, board, workspaceId }: Bo
 
   if (!isOpen) return null;
 
-  if (isEditMode && !board) {
-    console.error('BoardFormModal: board is required in edit mode');
-    return null;
-  }
-
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div
@@ -131,8 +62,8 @@ export function BoardFormModal({ isOpen, onClose, mode, board, workspaceId }: Bo
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{title}</h2>
-            {isEditMode && board && <p className="text-sm text-gray-500 mt-1">{board.name}</p>}
+            <h2 className="text-xl font-bold text-gray-900">Ustawienia tablicy</h2>
+            <p className="text-sm text-gray-500 mt-1">{board.name}</p>
           </div>
           <Button
             variant="destructive"
@@ -163,11 +94,11 @@ export function BoardFormModal({ isOpen, onClose, mode, board, workspaceId }: Bo
               type="text"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder={isCreateMode ? 'np. Projekt X, Sprint 1...' : 'Nazwa tablicy'}
-              error={errors.name}
-              disabled={isSubmitting}
+              placeholder="Nazwa tablicy"
               label="Nazwa tablicy"
+              error={errors.name}
               maxLength={50}
+              disabled={isSubmitting}
             />
             <div className="text-right text-xs text-gray-400 mt-1">{formData.name.length}/50</div>
           </div>
@@ -197,9 +128,9 @@ export function BoardFormModal({ isOpen, onClose, mode, board, workspaceId }: Bo
             type="submit"
             onClick={handleSubmit}
             loading={isSubmitting}
-            disabled={isSubmitting || (isCreateMode ? !formData.name.trim() : !isDirty)}
+            disabled={isSubmitting || !isDirty}
           >
-            {isSubmitting ? loadingText : buttonText}
+            {isSubmitting ? 'Zapisywanie...' : 'Zapisz zmiany'}
           </Button>
         </div>
       </div>

@@ -2,14 +2,16 @@
  * WORKSPACE SIDEBAR
  *
  * Dashboard-specific layout dla workspace'ów.
- * Wszystkie akcje na workspace zarządza WorkspaceCard.
- * Sidebar zarządza tylko CREATE (globalna akcja).
+ * Zarządza: UI state (collapsed, search, modals).
+ * Dane i callbacki otrzymuje z page.tsx przez propsy.
  *
+ * Pytania:
+ * - Czy jest sens przechowywać customOrder w localStorage?
  */
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
@@ -18,55 +20,136 @@ import { WorkspaceCreateModal } from '@/_new/features/workspace/components/works
 import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspace-edit-modal';
 import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspace-members-modal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
-import { Workspace } from '@/workspace_api/api';
-import { WorkspaceCreateRequest, WorkspaceUpdateRequest } from '@/_new/features/workspace/types';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
+import {
+  Workspace,
+  WorkspaceCardActions,
+  WorkspaceDragState,
+  WorkspaceDragHandlers,
+} from '@/_new/features/workspace/types';
+
+const STORAGE_KEY = 'workspace_order';
 
 interface WorkspaceSidebarProps {
-  workspaces: Workspace[];
-  loading: boolean;
-  error: string | null;
   activeWorkspaceId: number | null;
-  onWorkspaceSelect: (workspaceId: number) => void;
-  onCreateWorkspace: (data: WorkspaceCreateRequest) => Promise<Workspace>;
-  onUpdateWorkspace: (id: number, data: WorkspaceUpdateRequest) => Promise<Workspace>;
-  onDeleteWorkspace: (id: number) => Promise<void>;
-  onLeaveWorkspace: (id: number) => Promise<void>;
-  onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
+  onWorkspaceSelect: (workspaceId: number, workspaceName: string) => void;
 }
 
-export default function WorkspaceSidebarNew({
-  workspaces,
-  loading,
-  error,
+export default function WorkspaceSidebar({
   activeWorkspaceId,
   onWorkspaceSelect,
-  onCreateWorkspace,
-  onUpdateWorkspace,
-  onDeleteWorkspace,
-  onLeaveWorkspace,
-  onToggleFavourite,
 }: WorkspaceSidebarProps) {
-  // UI STATE
+  // STATE
   // ================================
+  const {
+    workspaces,
+    loading,
+    error,
+    createWorkspace,
+    updateWorkspace,
+    deleteWorkspace,
+    leaveWorkspace,
+    toggleFavourite,
+  } = useWorkspaces();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // MODAL STATE
-  // ================================
+  const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+  const [customOrder, setCustomOrder] = useState<number[]>([]);
+  const dragState: WorkspaceDragState = { draggedId, dragOverId };
+
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [membersWorkspace, setMembersWorkspace] = useState<Workspace | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null);
   const [leavingWorkspace, setLeavingWorkspace] = useState<Workspace | null>(null);
 
+  const cardActions: WorkspaceCardActions = useMemo(
+    () => ({
+      edit: setEditingWorkspace,
+      members: setMembersWorkspace,
+      delete: setDeletingWorkspace,
+      leave: setLeavingWorkspace,
+    }),
+    []
+  );
+
+  // EFFECTS
+  // ================================
+
+  // Wczytaj kolejność z localStorage przy starcie komponentu
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (saved) setCustomOrder(JSON.parse(saved));
+    } catch (e) {
+      console.error('Błąd wczytywania kolejności workspace:', e);
+    }
+  }, []);
+
+  // Synchronizuj kolejność przy zmianie listy Workspace'ów
+  useEffect(() => {
+    if (workspaces.length === 0) return;
+    setCustomOrder((prev) => {
+      const ids = workspaces.map((w) => w.id);
+      const newIds = ids.filter((id) => !prev.includes(id));
+      const filtered = prev.filter((id) => ids.includes(id));
+      return [...filtered, ...newIds];
+    });
+  }, [workspaces]);
+
+  // Zapisz kolejność do localStorage przy zmianie customOrder
+  useEffect(() => {
+    if (customOrder.length > 0) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customOrder));
+    }
+  }, [customOrder]);
+
   // HANDLERS
   // ================================
+  const dragHandlers: WorkspaceDragHandlers = useMemo(
+    () => ({
+      onDragStart: (e, id) => {
+        setDraggedId(id);
+        e.dataTransfer.effectAllowed = 'move';
+      },
+      onDragEnd: () => {
+        setDraggedId(null);
+        setDragOverId(null);
+      },
+      onDragOver: (e, id) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        if (draggedId && draggedId !== id) setDragOverId(id);
+      },
+      onDragLeave: () => setDragOverId(null),
+      onDrop: (e, targetId) => {
+        e.preventDefault();
+        if (!draggedId || draggedId === targetId) {
+          setDragOverId(null);
+          return;
+        }
+        setCustomOrder((prev) => {
+          const next = [...prev];
+          const from = next.indexOf(draggedId);
+          const to = next.indexOf(targetId);
+          if (from === -1 || to === -1) return prev;
+          next.splice(from, 1);
+          next.splice(to, 0, draggedId);
+          return next;
+        });
+        setDragOverId(null);
+      },
+    }),
+    [draggedId]
+  );
 
   const handleDeleteConfirm = async () => {
     if (!deletingWorkspace) return;
     try {
-      await onDeleteWorkspace(deletingWorkspace.id);
+      await deleteWorkspace(deletingWorkspace.id);
       setDeletingWorkspace(null);
     } catch (err) {
       console.error('Error deleting workspace:', err);
@@ -77,7 +160,7 @@ export default function WorkspaceSidebarNew({
   const handleLeaveConfirm = async () => {
     if (!leavingWorkspace) return;
     try {
-      await onLeaveWorkspace(leavingWorkspace.id);
+      await leaveWorkspace(leavingWorkspace.id);
       setLeavingWorkspace(null);
     } catch (err) {
       console.error('Error leaving workspace:', err);
@@ -96,8 +179,7 @@ export default function WorkspaceSidebarNew({
         } h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}
       >
         {/* HEADER */}
-
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-gray-200 bg-gray-50">
           <div className="flex items-center justify-between mb-3">
             {!isCollapsed && (
               <div className="flex items-center gap-2">
@@ -109,7 +191,6 @@ export default function WorkspaceSidebarNew({
                 </span>
               </div>
             )}
-
             <Button
               variant="secondary"
               size="icon"
@@ -121,13 +202,12 @@ export default function WorkspaceSidebarNew({
             </Button>
           </div>
 
-          {/* Search Input */}
           {!isCollapsed && (
             <Input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Szukaj przestrzeni..."
+              placeholder="Wyszukaj przestrzenie..."
               leftIcon={<Search size={16} />}
             />
           )}
@@ -144,41 +224,36 @@ export default function WorkspaceSidebarNew({
           )}
         </div>
 
-        {/* WORKSPACE LIST */}
-
-        <div className="flex-1 overflow-y-auto">
-          <WorkspaceList
-            workspaces={workspaces}
-            loading={loading}
-            error={error}
-            searchQuery={searchQuery}
-            activeWorkspaceId={activeWorkspaceId}
-            onWorkspaceSelect={onWorkspaceSelect}
-            onToggleFavourite={onToggleFavourite}
-            onEditClick={setEditingWorkspace}
-            onMembersClick={setMembersWorkspace}
-            onDeleteClick={setDeletingWorkspace}
-            onLeaveClick={setLeavingWorkspace}
-            variant={isCollapsed ? 'compact' : 'default'}
-            showStats={!isCollapsed}
-          />
-        </div>
+        {/* LISTA */}
+        <WorkspaceList
+          workspaces={workspaces}
+          loading={loading}
+          error={error}
+          searchQuery={searchQuery}
+          activeWorkspaceId={activeWorkspaceId}
+          isCollapsed={isCollapsed}
+          customOrder={customOrder}
+          onWorkspaceSelect={onWorkspaceSelect}
+          onToggleFavourite={toggleFavourite}
+          onAction={cardActions}
+          dragState={dragState}
+          dragHandlers={dragHandlers}
+        />
 
         {/* FOOTER */}
-        <div className="py-5 bg-gray-50 flex justify-center">
+        <div className="border-t border-gray-200 p-4 bg-gray-50">
           {isCollapsed ? (
-            <Button size="icon" onClick={() => setShowCreateModal(true)} title="Dodaj przestrzeń">
-              <Plus size={20} />
-            </Button>
+            <div className="flex justify-center">
+              <Button size="icon" onClick={() => setShowCreateModal(true)} title="Dodaj przestrzeń">
+                <Plus size={20} />
+              </Button>
+            </div>
           ) : (
-            <div className="w-3/4">
-              {/* Stats */}
-              <div className="border-t border-gray-200 bg-gray-50 px-4 py-3 text-center text-sm text-gray-500">
+            <>
+              <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
                 <span>Ulubione: {workspaces.filter((w) => w.is_favourite).length}</span>
-                <span className="mx-3">•</span>
                 <span>Wszystkie: {workspaces.length}</span>
               </div>
-
               <Button
                 leftIcon={<Plus size={20} />}
                 onClick={() => setShowCreateModal(true)}
@@ -186,18 +261,18 @@ export default function WorkspaceSidebarNew({
               >
                 Dodaj przestrzeń
               </Button>
-            </div>
+            </>
           )}
         </div>
       </div>
 
-      {/* MODALS — jeden zestaw dla całego sidebara */}
-
+      {/* MODALS */}
       <WorkspaceCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={async (data) => {
-          await onCreateWorkspace(data);
+          await createWorkspace(data);
+          setShowCreateModal(false);
         }}
       />
 
@@ -207,7 +282,8 @@ export default function WorkspaceSidebarNew({
           onClose={() => setEditingWorkspace(null)}
           workspace={editingWorkspace}
           onSubmit={async (data) => {
-            await onUpdateWorkspace(editingWorkspace.id, data);
+            await updateWorkspace(editingWorkspace.id, data);
+            setEditingWorkspace(null);
           }}
         />
       )}

@@ -99,3 +99,9 @@ export interface BoardToggleFavouriteResponse {
   is_favourite: boolean;
   message: string;
 }
+
+// BOARD CARD TYPES
+export interface BoardCardActions {
+  edit: (board: Board) => void;
+  delete: (board: Board) => void;
+}
