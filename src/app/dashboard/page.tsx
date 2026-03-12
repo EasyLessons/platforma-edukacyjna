@@ -29,12 +29,9 @@ export default function Dashboard() {
           <div className="w-full mx-auto p-8">
             <WelcomeSection />
 
-            <TemplatesSection />
+            <TemplatesSection workspaceId={activeWorkspaceId} />
             {activeWorkspaceId && (
-              <BoardsSection
-                workspaceId={activeWorkspaceId}
-                workspaceName={activeWorkspaceName}
-              />
+              <BoardsSection workspaceId={activeWorkspaceId} workspaceName={activeWorkspaceName} />
             )}
           </div>
         </div>

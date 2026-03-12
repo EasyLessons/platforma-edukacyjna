@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { createBoard } from '@/boards_api/api';
 import { useState, useRef, useEffect } from 'react';
 import {
@@ -208,9 +207,12 @@ const examCategories: ExamCategory[] = [
   },
 ];
 
-export default function TemplatesSection() {
+interface TemplatesSectionProps {
+  workspaceId: number | null;
+}
+
+export default function TemplatesSection({ workspaceId }: TemplatesSectionProps) {
   const router = useRouter();
-  const { activeWorkspace } = useWorkspaces();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // Stan dla rozwiniętych kategorii i lat
@@ -298,7 +300,7 @@ export default function TemplatesSection() {
   }, [expandedCategory, expandedYears]);
 
   const handleSessionClick = async (session: ExamSession, categoryName: string, year: number) => {
-    if (!activeWorkspace) {
+    if (!workspaceId) {
       console.error('Brak aktywnego workspace');
       return;
     }
@@ -309,7 +311,7 @@ export default function TemplatesSection() {
       // 1. Utwórz nową tablicę w bazie danych
       const newBoard = await createBoard({
         name: boardName,
-        workspace_id: activeWorkspace.id,
+        workspace_id: workspaceId,
         icon: 'FileText',
         bg_color: 'green-500',
       });

@@ -9,7 +9,6 @@ import {
   Bell,
   Gift,
   Crown,
-  UserPlus,
   Menu,
   X,
   LogOut,
@@ -26,7 +25,6 @@ import GiftPopup from './popups/GiftPopup';
 import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
 
-import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { Button } from '@/_new/shared/ui/button';
 
 // Rozszerzony typ User z dodatkowymi polami dla UI
@@ -41,7 +39,6 @@ export default function DashboardHeader() {
   const { logout } = useAuth();
 
   // State dla popupów
-  const [showInvitePopup, setShowInvitePopup] = useState(false);
   const [showGiftPopup, setShowGiftPopup] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -51,9 +48,6 @@ export default function DashboardHeader() {
   // State dla danych użytkownika
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
-
-  const [currentWorkspace, setCurrentWorkspace] = useState<any>(null);
-  const { activeWorkspace } = useWorkspaces();
 
   // Pobieranie danych użytkownika
   useEffect(() => {
@@ -114,13 +108,6 @@ export default function DashboardHeader() {
     const interval = setInterval(loadInviteCount, 30000);
     return () => clearInterval(interval);
   }, []);
-
-  // Ustawienie crurrentWorkspace
-  useEffect(() => {
-    if (activeWorkspace) {
-      setCurrentWorkspace(activeWorkspace);
-    }
-  }, [activeWorkspace]);
 
   // Loading state
   if (loading) {
