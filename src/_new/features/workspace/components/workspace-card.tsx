@@ -14,7 +14,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, GripVertical, Settings } from 'lucide-react';
+import { Star, GripVertical, UserPlus } from 'lucide-react';
 import { WorkspaceDropdownMenu } from './workspace-dropdown-menu';
 import { getIconComponent, getColorClass } from '../utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
@@ -189,6 +189,16 @@ export function WorkspaceCard({
                   workspace.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'
                 }
               />
+            </Button>
+
+            <Button
+              variant="secondary"
+              size="iconSm"
+              onClick={() => onAction.invite(workspace)}
+              title="Zaproś członków"
+              aria-label="Zaproś członków"
+            >
+              <UserPlus className="w-4 h-4 text-gray-600" />
             </Button>
 
             <WorkspaceDropdownMenu

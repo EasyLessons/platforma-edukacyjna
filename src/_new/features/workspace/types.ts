@@ -80,6 +80,7 @@ export interface WorkspaceCardActions {
   members: (workspace: Workspace) => void;
   delete: (workspace: Workspace) => void;
   leave: (workspace: Workspace) => void;
+  invite: (workspace: Workspace) => void;
 }
 
 export interface WorkspaceDragState {
