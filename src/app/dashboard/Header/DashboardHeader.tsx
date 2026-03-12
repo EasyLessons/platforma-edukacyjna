@@ -10,7 +10,6 @@ import {
   Gift,
   Crown,
   UserPlus,
-  ChevronDown,
   Menu,
   X,
   LogOut,
@@ -23,7 +22,6 @@ import { fetchPendingInvites } from '@/workspace_api/api';
 import { useAuth } from '@/app/context/AuthContext';
 
 // Import popupów
-import InvitePopup from './popups/InvitePopup';
 import GiftPopup from './popups/GiftPopup';
 import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
@@ -124,9 +122,6 @@ export default function DashboardHeader() {
     }
   }, [activeWorkspace]);
 
-  // Nazwa aktualnej przestrzeni (później dynamicznie)
-  const currentSpace = 'Klasa 5A';
-
   // Loading state
   if (loading) {
     return (
@@ -222,22 +217,6 @@ export default function DashboardHeader() {
 
             {/* PRAWA STRONA - Przyciski i ikony */}
             <div className="flex items-center justify-end gap-2">
-              {/* Zaproś uczestników */}
-              <Button
-                variant="secondary"
-                leftIcon={<UserPlus size={16} />}
-                onClick={() => {
-                  if (currentWorkspace) {
-                    setShowInvitePopup(true);
-                  } else {
-                    alert('Najpierw wybierz workspace');
-                  }
-                }}
-                className="border-2 border-gray-200"
-              >
-                Zaproś uczestników
-              </Button>
-
               {/* Premium Button */}
               {user && !user.isPremium && (
                 <Link href="/#pricing">
@@ -348,22 +327,6 @@ export default function DashboardHeader() {
 
                   {/* Menu Items Mobile */}
                   <div className="space-y-2">
-                    <Button
-                      variant="secondary"
-                      leftIcon={<UserPlus size={20} />}
-                      onClick={() => {
-                        if (currentWorkspace) {
-                          setShowInvitePopup(true);
-                          setShowMobileMenu(false);
-                        } else {
-                          alert('Najpierw wybierz workspace');
-                        }
-                      }}
-                      className="w-full justify-start py-8"
-                    >
-                      Zaproś uczestników
-                    </Button>
-
                     {/* Premium Mobile */}
                     {user && !user.isPremium && (
                       <Link href="/#pricing">
@@ -440,15 +403,6 @@ export default function DashboardHeader() {
           )}
         </div>
       </header>
-
-      {/* POPUPY */}
-      {showInvitePopup && currentWorkspace && (
-        <InvitePopup
-          onClose={() => setShowInvitePopup(false)}
-          workspaceId={currentWorkspace.id}
-          workspaceName={currentWorkspace.name}
-        />
-      )}
 
       {showGiftPopup && <GiftPopup onClose={() => setShowGiftPopup(false)} />}
 

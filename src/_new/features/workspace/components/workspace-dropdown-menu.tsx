@@ -83,8 +83,8 @@ export function WorkspaceDropdownMenu({
         variant="secondary"
         size="iconSm"
         onClick={handleToggle}
-        title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
-        aria-label={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+        title="Menu"
+        aria-label="Menu"
       >
         <MoreVertical className="w-4 h-4 text-gray-600" />
       </Button>

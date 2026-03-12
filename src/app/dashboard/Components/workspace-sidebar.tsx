@@ -19,6 +19,7 @@ import { WorkspaceList } from '@/_new/features/workspace/components/workspace-li
 import { WorkspaceCreateModal } from '@/_new/features/workspace/components/workspace-create-modal';
 import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspace-edit-modal';
 import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspace-members-modal';
+import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspace-invite-modal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
 import {
@@ -65,6 +66,7 @@ export default function WorkspaceSidebar({
   const [membersWorkspace, setMembersWorkspace] = useState<Workspace | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null);
   const [leavingWorkspace, setLeavingWorkspace] = useState<Workspace | null>(null);
+  const [invitingWorkspace, setInvitingWorkspace] = useState<Workspace | null>(null);
 
   const cardActions: WorkspaceCardActions = useMemo(
     () => ({
@@ -72,6 +74,7 @@ export default function WorkspaceSidebar({
       members: setMembersWorkspace,
       delete: setDeletingWorkspace,
       leave: setLeavingWorkspace,
+      invite: setInvitingWorkspace,
     }),
     []
   );
@@ -285,6 +288,14 @@ export default function WorkspaceSidebar({
             await updateWorkspace(editingWorkspace.id, data);
             setEditingWorkspace(null);
           }}
+        />
+      )}
+
+      {invitingWorkspace && (
+        <WorkspaceInviteModal
+          isOpen={!!invitingWorkspace}
+          onClose={() => setInvitingWorkspace(null)}
+          workspace={invitingWorkspace}
         />
       )}
 

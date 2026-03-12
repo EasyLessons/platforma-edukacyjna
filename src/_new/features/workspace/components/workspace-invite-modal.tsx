@@ -1,15 +1,25 @@
+/**
+ * WORKSPACE INVITE MODAL
+ *
+ * Modal do zapraszania użytkowników do workspace'a.
+ * Wyszukuje użytkowników po nazwie/emailu i wysyła zaproszenia.
+ */
+
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
 import { createInvite } from '@/workspace_api/api';
-import { checkUserInviteStatus, UserSearchResult, getToken, searchUsers } from '@/auth_api/api';
+import { checkUserInviteStatus, UserSearchResult, searchUsers } from '@/auth_api/api';
 import { Button } from '@/_new/shared/ui/button';
+import { Input } from '@/_new/shared/ui/input';
+import { useModal } from '@/_new/shared/hooks/use-modal';
+import { Workspace } from '../types';
 
-interface InvitePopupProps {
+interface WorkspaceInviteModalProps {
+  isOpen: boolean;
   onClose: () => void;
-  workspaceId: number;
-  workspaceName: string;
+  workspace: Workspace;
 }
 
 interface UserWithStatus extends UserSearchResult {
@@ -19,7 +29,13 @@ interface UserWithStatus extends UserSearchResult {
   status_checked?: boolean;
 }
 
-export default function InvitePopup({ onClose, workspaceId, workspaceName }: InvitePopupProps) {
+export function WorkspaceInviteModal({
+  isOpen,
+  onClose,
+  workspace,
+}: WorkspaceInviteModalProps) {
+  // STATE
+  // ================================
   const [searchQuery, setSearchQuery] = useState('');
   const [users, setUsers] = useState<UserWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
@@ -27,6 +43,33 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
   const [invitedUsers, setInvitedUsers] = useState<number[]>([]);
   const [error, setError] = useState<string>('');
 
+  // REFS
+  // ================================
+  const modalRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // MODAL BEHAVIOR
+  // ================================
+  useModal({
+    isOpen,
+    onClose,
+    modalRef,
+    focusRef: inputRef,
+    preventCloseWhen: () => !!inviting,
+  });
+
+  // Reset stanu przy zamknięciu
+  useEffect(() => {
+    if (!isOpen) {
+      setSearchQuery('');
+      setUsers([]);
+      setError('');
+      setInvitedUsers([]);
+    }
+  }, [isOpen]);
+
+  // EFFECTS
+  // ================================
   useEffect(() => {
     if (searchQuery.length < 2) {
       setUsers([]);
@@ -45,7 +88,7 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
         const usersWithStatus = await Promise.all(
           results.map(async (user: any) => {
             try {
-              const status = await checkUserInviteStatus(workspaceId, user.id);
+              const status = await checkUserInviteStatus(workspace.id, user.id);
               return { ...user, ...status, status_checked: true };
             } catch (err) {
               console.warn('⚠️ Status check failed for user:', user.id, err);
@@ -65,14 +108,14 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
 
     const debounce = setTimeout(searchUsersDebounced, 300);
     return () => clearTimeout(debounce);
-  }, [searchQuery, workspaceId]);
+  }, [searchQuery, workspace.id]);
 
   const handleInvite = async (userId: number) => {
     try {
       setInviting(userId);
       setError('');
 
-      await createInvite(workspaceId, userId);
+      await createInvite(workspace.id, userId);
 
       setInvitedUsers((prev) => [...prev, userId]);
 
@@ -93,6 +136,8 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
     }
   };
 
+  // HELPERS
+  // ================================
   const getUserStatusBadge = (user: UserWithStatus) => {
     if (!user.status_checked) return null;
     if (user.is_member)
@@ -112,6 +157,10 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
     return null;
   };
 
+  // RENDER
+  // ================================
+  if (!isOpen || !workspace) return null;
+
   return (
     <div
       className="fixed inset-0 bg-black/15 backdrop-blur-sm flex items-center justify-center z-[100] px-4"
@@ -126,7 +175,7 @@ export default function InvitePopup({ onClose, workspaceId, workspaceName }: Inv
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Zaproś użytkowników</h2>
             <p className="text-sm text-gray-500 mt-1">
-              do workspace'a: <span className="font-medium text-gray-700">{workspaceName}</span>
+              do workspace'a: <span className="font-medium text-gray-700">{workspace.name}</span>
             </p>
           </div>
           <Button variant="secondary" size="icon" onClick={onClose}>
