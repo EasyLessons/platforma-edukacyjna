@@ -8,6 +8,7 @@ type DashboardButtonVariant = 'primary' | 'secondary';
 interface DashboardButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: DashboardButtonVariant;
   leftIcon?: React.ReactNode;
+  rightIcon?: React.ReactNode;
 }
 
 const BASE =
@@ -22,6 +23,7 @@ export function DashboardButton({
   variant = 'secondary',
   className,
   leftIcon,
+  rightIcon,
   children,
   ...props
 }: DashboardButtonProps) {
@@ -29,6 +31,7 @@ export function DashboardButton({
     <button className={cn(BASE, VARIANTS[variant], className)} {...props}>
       {leftIcon ? <span className="shrink-0">{leftIcon}</span> : null}
       {children ? <span>{children}</span> : null}
+      {rightIcon ? <span className="shrink-0">{rightIcon}</span> : null}
     </button>
   );
 }
