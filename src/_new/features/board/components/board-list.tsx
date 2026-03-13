@@ -135,6 +135,7 @@ export function BoardList({
         <BoardCard
           key={board.id}
           board={board}
+          canRename={board.owner_username === currentUsername}
           onlineUsers={onlineUsersMap[board.id] ?? []}
           onAction={onAction}
           onToggleFavourite={onToggleFavourite}

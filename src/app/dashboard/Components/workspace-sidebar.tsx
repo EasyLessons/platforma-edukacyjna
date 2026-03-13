@@ -1,19 +1,9 @@
-/**
- * WORKSPACE SIDEBAR
- *
- * Dashboard-specific layout dla workspace'ów.
- * Zarządza: UI state (collapsed, search, modals).
- * Dane i callbacki otrzymuje z page.tsx przez propsy.
- *
- * Pytania:
- * - Czy jest sens przechowywać customOrder w localStorage?
- */
-
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from './DashboardButton';
 import { Input } from '@/_new/shared/ui/input';
 import { WorkspaceList } from '@/_new/features/workspace/components/workspace-list';
 import { WorkspaceCreateModal } from '@/_new/features/workspace/components/workspace-create-modal';
@@ -21,9 +11,10 @@ import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspa
 import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspace-members-modal';
 import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspace-invite-modal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
 import {
   Workspace,
+  WorkspaceCreateRequest,
+  WorkspaceUpdateRequest,
   WorkspaceCardActions,
   WorkspaceDragState,
   WorkspaceDragHandlers,
@@ -34,27 +25,31 @@ const STORAGE_KEY = 'workspace_order';
 interface WorkspaceSidebarProps {
   activeWorkspaceId: number | null;
   onWorkspaceSelect: (workspaceId: number, workspaceName: string) => void;
+  workspaces: Workspace[];
+  loading: boolean;
+  error: string | null;
+  createWorkspace: (data: WorkspaceCreateRequest) => Promise<Workspace>;
+  updateWorkspace: (id: number, data: WorkspaceUpdateRequest) => Promise<Workspace>;
+  deleteWorkspace: (id: number) => Promise<void>;
+  leaveWorkspace: (id: number) => Promise<void>;
+  toggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
 }
 
 export default function WorkspaceSidebar({
   activeWorkspaceId,
   onWorkspaceSelect,
+  workspaces,
+  loading,
+  error,
+  createWorkspace,
+  updateWorkspace,
+  deleteWorkspace,
+  leaveWorkspace,
+  toggleFavourite,
 }: WorkspaceSidebarProps) {
-  // STATE
-  // ================================
-  const {
-    workspaces,
-    loading,
-    error,
-    createWorkspace,
-    updateWorkspace,
-    deleteWorkspace,
-    leaveWorkspace,
-    toggleFavourite,
-  } = useWorkspaces();
-
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
@@ -79,20 +74,15 @@ export default function WorkspaceSidebar({
     []
   );
 
-  // EFFECTS
-  // ================================
-
-  // Wczytaj kolejność z localStorage przy starcie komponentu
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) setCustomOrder(JSON.parse(saved));
     } catch (e) {
-      console.error('Błąd wczytywania kolejności workspace:', e);
+      console.error('Blad wczytywania kolejnosci workspace:', e);
     }
   }, []);
 
-  // Synchronizuj kolejność przy zmianie listy Workspace'ów
   useEffect(() => {
     if (workspaces.length === 0) return;
     setCustomOrder((prev) => {
@@ -103,15 +93,20 @@ export default function WorkspaceSidebar({
     });
   }, [workspaces]);
 
-  // Zapisz kolejność do localStorage przy zmianie customOrder
   useEffect(() => {
     if (customOrder.length > 0) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(customOrder));
     }
   }, [customOrder]);
 
-  // HANDLERS
-  // ================================
+  useEffect(() => {
+    if (!isCollapsed) {
+      requestAnimationFrame(() => {
+        searchInputRef.current?.focus();
+      });
+    }
+  }, [isCollapsed]);
+
   const dragHandlers: WorkspaceDragHandlers = useMemo(
     () => ({
       onDragStart: (e, id) => {
@@ -156,7 +151,7 @@ export default function WorkspaceSidebar({
       setDeletingWorkspace(null);
     } catch (err) {
       console.error('Error deleting workspace:', err);
-      alert('Nie udało się usunąć przestrzeni');
+      alert('Nie udalo sie usunac przestrzeni');
     }
   };
 
@@ -167,29 +162,25 @@ export default function WorkspaceSidebar({
       setLeavingWorkspace(null);
     } catch (err) {
       console.error('Error leaving workspace:', err);
-      alert('Nie udało się opuścić przestrzeni');
+      alert('Nie udalo sie opuscic przestrzeni');
     }
   };
-
-  // RENDER
-  // ================================
 
   return (
     <>
       <div
         className={`${
-          isCollapsed ? 'w-[72px]' : 'w-[350px]'
-        } h-[calc(100vh-64px)] bg-gray-50 border-r border-gray-200 flex flex-col sticky top-[64px] transition-all duration-300`}
+          isCollapsed ? 'w-[72px]' : 'w-[344px]'
+        } h-[calc(100vh-64px)] bg-[var(--dash-panel)] border-r border-[var(--dash-border)] flex flex-col sticky top-[64px] transition-all duration-300`}
       >
-        {/* HEADER */}
-        <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="p-4 bg-[var(--dash-panel)]">
           <div className="flex items-center justify-between mb-3">
             {!isCollapsed && (
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">
+                <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Przestrzenie
                 </h2>
-                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full font-semibold">
+                <span className="text-xs text-gray-500 bg-[var(--dash-hover)] px-2 py-0.5 rounded-full font-medium">
                   {workspaces.length}
                 </span>
               </div>
@@ -198,8 +189,8 @@ export default function WorkspaceSidebar({
               variant="secondary"
               size="icon"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="border border-gray-200 shadow-sm"
-              title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
+              className="bg-transparent"
+              title={isCollapsed ? 'Rozwin sidebar' : 'Zwin sidebar'}
             >
               {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
             </Button>
@@ -207,6 +198,7 @@ export default function WorkspaceSidebar({
 
           {!isCollapsed && (
             <Input
+              ref={searchInputRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -218,16 +210,20 @@ export default function WorkspaceSidebar({
             <Button
               variant="secondary"
               size="icon"
-              onClick={() => setIsCollapsed(false)}
-              className="border border-gray-200 shadow-sm"
-              title="Rozwiń aby wyszukać"
+              onClick={() => {
+                setIsCollapsed(false);
+                requestAnimationFrame(() => {
+                  searchInputRef.current?.focus();
+                });
+              }}
+              className="bg-transparent"
+              title="Rozwin aby wyszukac"
             >
               <Search size={18} />
             </Button>
           )}
         </div>
 
-        {/* LISTA */}
         <WorkspaceList
           workspaces={workspaces}
           loading={loading}
@@ -243,13 +239,17 @@ export default function WorkspaceSidebar({
           dragHandlers={dragHandlers}
         />
 
-        {/* FOOTER */}
-        <div className="border-t border-gray-200 p-4 bg-gray-50">
+        <div className="p-4 bg-[var(--dash-panel)]">
           {isCollapsed ? (
             <div className="flex justify-center">
-              <Button size="icon" onClick={() => setShowCreateModal(true)} title="Dodaj przestrzeń">
+              <DashboardButton
+                variant="primary"
+                onClick={() => setShowCreateModal(true)}
+                title="Dodaj przestrzen"
+                className="h-10 w-10 rounded-full p-0"
+              >
                 <Plus size={20} />
-              </Button>
+              </DashboardButton>
             </div>
           ) : (
             <>
@@ -257,19 +257,19 @@ export default function WorkspaceSidebar({
                 <span>Ulubione: {workspaces.filter((w) => w.is_favourite).length}</span>
                 <span>Wszystkie: {workspaces.length}</span>
               </div>
-              <Button
-                leftIcon={<Plus size={20} />}
+              <DashboardButton
+                variant="primary"
+                leftIcon={<Plus size={18} />}
                 onClick={() => setShowCreateModal(true)}
-                className="w-full"
+                className="w-full justify-center"
               >
                 Dodaj przestrzeń
-              </Button>
+              </DashboardButton>
             </>
           )}
         </div>
       </div>
 
-      {/* MODALS */}
       <WorkspaceCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
@@ -309,18 +309,18 @@ export default function WorkspaceSidebar({
         isOpen={!!deletingWorkspace}
         onClose={() => setDeletingWorkspace(null)}
         onConfirm={handleDeleteConfirm}
-        title="Usuń przestrzeń?"
+        title="Usun przestrzen?"
         message={
           <>
-            Czy na pewno chcesz usunąć <strong>"{deletingWorkspace?.name}"</strong>?
+            Czy na pewno chcesz usunac <strong>"{deletingWorkspace?.name}"</strong>?
             <br />
             <br />
             <span className="text-red-600 font-semibold">
-              Wszystkie tablice zostaną trwale usunięte!
+              Wszystkie tablice zostana trwale usuniete!
             </span>
           </>
         }
-        confirmText="Usuń przestrzeń"
+        confirmText="Usun przestrzen"
         confirmVariant="destructive"
       />
 
@@ -328,17 +328,17 @@ export default function WorkspaceSidebar({
         isOpen={!!leavingWorkspace}
         onClose={() => setLeavingWorkspace(null)}
         onConfirm={handleLeaveConfirm}
-        title="Opuść przestrzeń?"
+        title="Opusc przestrzen?"
         message={
           <>
-            Czy na pewno chcesz opuścić <strong>"{leavingWorkspace?.name}"</strong>?
+            Czy na pewno chcesz opuscic <strong>"{leavingWorkspace?.name}"</strong>?
             <br />
             <br />
-            Stracisz dostęp do wszystkich tablic w tej przestrzeni.
+            Stracisz dostep do wszystkich tablic w tej przestrzeni.
           </>
         }
-        confirmText="Opuść przestrzeń"
-        cancelText="Zostań"
+        confirmText="Opusc przestrzen"
+        cancelText="Zostan"
         confirmVariant="destructive"
       />
     </>

@@ -5,10 +5,10 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import {
-  Search,
   Bell,
   Gift,
   Crown,
+  Settings,
   Menu,
   X,
   LogOut,
@@ -26,17 +26,19 @@ import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
 
 import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from '../Components/DashboardButton';
+import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 // Rozszerzony typ User z dodatkowymi polami dla UI
 interface ExtendedUser extends User {
   name: string;
-  avatar: string;
   isPremium: boolean;
 }
 
 export default function DashboardHeader() {
   const router = useRouter();
   const { logout } = useAuth();
+  const { getAvatarColorClass, getInitials } = useUserAvatar();
 
   // State dla popupów
   const [showGiftPopup, setShowGiftPopup] = useState(false);
@@ -71,7 +73,6 @@ export default function DashboardHeader() {
         setUser({
           ...userData,
           name: userData.full_name || userData.username,
-          avatar: userData.username?.charAt(0).toUpperCase() || 'U',
           isPremium: false, // Tutaj później sprawdzisz czy ma premium
         });
       } catch (error) {
@@ -112,10 +113,10 @@ export default function DashboardHeader() {
   // Loading state
   if (loading) {
     return (
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
           {/* DESKTOP LOADING */}
-          <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
+          <div className="hidden min-[1550px]:flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
                 <Image
@@ -127,9 +128,6 @@ export default function DashboardHeader() {
                   priority
                 />
               </Link>
-            </div>
-            <div className="flex justify-center">
-              <div className="w-full max-w-md h-10 bg-gray-100 animate-pulse rounded-xl"></div>
             </div>
             <div className="flex items-center justify-end gap-2">
               <div className="w-8 h-8 bg-gray-200 animate-pulse rounded-lg"></div>
@@ -157,10 +155,10 @@ export default function DashboardHeader() {
 
   return (
     <>
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
           {/* DESKTOP VERSION */}
-          <div className="hidden min-[1550px]:grid grid-cols-3 gap-4 items-center">
+          <div className="hidden min-[1550px]:flex items-center justify-between gap-4">
             {/* LEWA STRONA - Logo + Badge */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
@@ -176,30 +174,10 @@ export default function DashboardHeader() {
 
               {/* Badge Free */}
               {user && !user.isPremium && (
-                <div className="px-2.5 py-1 bg-gray-100 border border-gray-200 text-gray-600 text-xs font-semibold rounded-lg">
+                <div className="dashboard-btn-secondary rounded-full border border-[var(--dash-border)] px-3 py-1.5 text-xs font-semibold text-gray-700">
                   FREE PLAN
                 </div>
               )}
-            </div>
-
-            {/* ŚRODEK - SMART SEARCH */}
-            <div className="flex justify-center">
-              <button className="w-full max-w-md px-4 py-2.5 bg-white border-2 border-gray-200 hover:border-green-400 rounded-xl transition-all duration-200 flex items-center gap-3 group cursor-pointer hover:shadow-md">
-                <Search
-                  size={18}
-                  className="text-gray-400 group-hover:text-green-600 transition-colors"
-                />
-
-                <span className="flex-1 text-left text-sm text-gray-500 group-hover:text-gray-700 font-medium">
-                  Wyszukaj wszystko...
-                </span>
-
-                <div className="flex items-center gap-1 opacity-60">
-                  <kbd className="px-1.5 py-0.5 bg-gray-100 border border-gray-200 rounded text-xs text-gray-500 font-mono">
-                    ⌘K
-                  </kbd>
-                </div>
-              </button>
             </div>
 
             {/* PRAWA STRONA - Przyciski i ikony */}
@@ -207,9 +185,9 @@ export default function DashboardHeader() {
               {/* Premium Button */}
               {user && !user.isPremium && (
                 <Link href="/#pricing">
-                  <Button variant="primary" leftIcon={<Crown size={16} />}>
+                  <DashboardButton variant="secondary" leftIcon={<Crown size={16} />}>
                     Premium
-                  </Button>
+                  </DashboardButton>
                 </Link>
               )}
 
@@ -220,19 +198,23 @@ export default function DashboardHeader() {
 
               <Button
                 variant="secondary"
+                size="iconSm"
                 onClick={() => setShowGiftPopup(true)}
                 title="Dostań 10% zniżki"
+                className="dashboard-btn-secondary rounded-full"
               >
-                <Gift size={20} />
+                <Gift size={16} />
               </Button>
 
               {/* Dzwonek */}
               <div className="relative">
                 <Button
                   variant="secondary"
+                  size="iconSm"
                   onClick={() => setShowNotifications(!showNotifications)}
+                  className="dashboard-btn-secondary rounded-full"
                 >
-                  <Bell size={20} />
+                  <Bell size={16} />
                 </Button>
                 {inviteCount > 0 && (
                   <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
@@ -244,17 +226,41 @@ export default function DashboardHeader() {
               {/* Avatar */}
               {user && (
                 <div className="relative">
-                  <Button
-                    variant="primary"
-                    size="icon"
-                    onClick={() => setShowUserMenu(!showUserMenu)}
-                  >
-                    <span>{user.avatar}</span>
-                  </Button>
+                  <div className="dashboard-btn-secondary flex min-h-[40px] items-center rounded-full px-2.5 py-1 pr-3">
+                    <span
+                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColorClass(user.id)}`}
+                    >
+                      {getInitials(user.name)}
+                    </span>
+                    <span className="ml-2 flex flex-col items-start leading-none">
+                      <span className="max-w-[120px] truncate text-xs font-medium text-gray-800">
+                        {user.name}
+                      </span>
+                      <span className="max-w-[120px] truncate text-[11px] text-gray-500">
+                        {user.email}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      className="ml-3 -mr-2 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--dash-border)] bg-white/80 text-gray-600 transition-colors hover:cursor-pointer hover:bg-white hover:text-gray-800"
+                      title="Ustawienia konta"
+                      aria-label="Ustawienia konta"
+                    >
+                      <Settings size={14} />
+                    </button>
+                  </div>
 
                   {/* User Menu Popup */}
                   {showUserMenu && (
-                    <UserMenuPopup onClose={() => setShowUserMenu(false)} user={user} />
+                    <UserMenuPopup
+                      onClose={() => setShowUserMenu(false)}
+                      user={{
+                        ...user,
+                        avatar: getInitials(user.name),
+                        avatarColorClass: getAvatarColorClass(user.id),
+                      }}
+                    />
                   )}
                 </div>
               )}
@@ -302,8 +308,10 @@ export default function DashboardHeader() {
                   {/* User Info Mobile */}
                   {user && (
                     <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                      <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center shadow-sm">
-                        <span className="text-white font-semibold text-base">{user.avatar}</span>
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
+                      >
+                        <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
                       </div>
                       <div className="flex-1">
                         <div className="font-medium text-gray-900">{user.name}</div>
@@ -317,14 +325,14 @@ export default function DashboardHeader() {
                     {/* Premium Mobile */}
                     {user && !user.isPremium && (
                       <Link href="/#pricing">
-                        <Button
+                        <DashboardButton
                           variant="secondary"
                           leftIcon={<Crown size={20} />}
                           onClick={() => setShowMobileMenu(false)}
-                          className="w-full justify-start bg-green-50 text-green-700 py-8"
+                          className="w-full justify-start py-8"
                         >
                           Przejdź na Premium
-                        </Button>
+                        </DashboardButton>
                       </Link>
                     )}
 

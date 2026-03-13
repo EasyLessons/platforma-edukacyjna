@@ -19,7 +19,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Filter, ChevronDown } from 'lucide-react';
-import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from './DashboardButton';
 import { BoardList } from '@/_new/features/board/components/board-list';
 import { BoardCreateModal } from '@/_new/features/board/components/board-create-modal';
 import { BoardEditModal } from '@/_new/features/board/components/board-edit-modal';
@@ -89,18 +89,23 @@ export default function BoardsSection({ workspaceId, workspaceName }: BoardsSect
   return (
     <>
       {/* Header */}
-      <div className="flex items-center justify-between mb-4 md:mb-6 px-1">
+      <div className="flex items-center justify-between mb-4 md:mb-6">
         <h2 className="text-lg md:text-2xl font-bold text-gray-900">
           {workspaceName ? `Tablice — ${workspaceName}` : 'Tablice'}
         </h2>
-        <Button leftIcon={<Plus size={16} />} onClick={() => setShowCreateModal(true)} size="sm">
+        <DashboardButton
+          variant="primary"
+          leftIcon={<Plus size={16} />}
+          onClick={() => setShowCreateModal(true)}
+          className="h-8"
+        >
           <span className="hidden sm:inline">Nowa tablica</span>
           <span className="sm:hidden">Nowa</span>
-        </Button>
+        </DashboardButton>
       </div>
 
       {/* Filters */}
-      <div className="bg-gray-50 rounded-xl p-3 md:p-4 mb-4 md:mb-6 mx-1">
+      <div className="rounded-xl p-3 md:p-4 mb-4 md:mb-6 mx-1">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 md:gap-6 text-sm">
           <div className="flex items-center gap-2">
             <Filter size={14} className="text-gray-600" />

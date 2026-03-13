@@ -14,7 +14,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Star, GripVertical, UserPlus } from 'lucide-react';
+import { Star, GripVertical, UserPlus, Pencil } from 'lucide-react';
 import { WorkspaceDropdownMenu } from './workspace-dropdown-menu';
 import { getIconComponent, getColorClass } from '../utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
@@ -81,21 +81,21 @@ export function WorkspaceCard({
         className={`
           relative w-full flex justify-center p-2 rounded-lg
           transition-all duration-200 cursor-pointer
-          ${isActive ? 'bg-green-100' : isHovered ? 'bg-gray-200/50' : ''}
+          ${isActive ? 'bg-[#ececef]' : isHovered ? 'bg-[#f0f0f2]' : ''}
         `}
       >
         {/* Pasek aktywności */}
         <div
           className={`
             absolute left-0 top-1/2 -translate-y-1/2
-            bg-green-600 rounded-r-full transition-all duration-200
+            bg-black rounded-r-full transition-all duration-200
             ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
           `}
         />
         <div
-          className={`w-10 h-10 ${colorClass} rounded-xl flex items-center justify-center shadow-sm`}
+          className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center`}
         >
-          <Icon size={20} className="text-white" />
+          <Icon size={16} className="text-white" />
         </div>
       </button>
     );
@@ -104,7 +104,7 @@ export function WorkspaceCard({
   // Default version
   return (
     <div
-      className="relative mb-1"
+      className={`relative mb-1 ${isHovered ? 'z-30' : 'z-0'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -112,7 +112,7 @@ export function WorkspaceCard({
       <div
         className={`
           absolute left-0 top-1/2 -translate-y-1/2
-          bg-green-600 rounded-r-full transition-all duration-200
+          bg-black rounded-r-full transition-all duration-200
           ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
         `}
       />
@@ -132,15 +132,15 @@ export function WorkspaceCard({
         onClick={() => onSelect?.(workspace.id, workspace.name)}
         aria-label={`Workspace: ${workspace.name}`}
         className={`
-          flex items-center gap-3 px-3 py-2.5 ml-2 rounded-lg
+          relative flex items-center gap-2 px-2.5 py-2 ml-2 rounded-lg
           transition-all duration-200 cursor-pointer group
           ${
             isActive
-              ? 'bg-green-100 border-2 border-green-300'
+              ? 'bg-[#ececef]'
               : isHovered
-                ? 'bg-gray-200/50'
+                ? 'bg-[#f0f0f2]'
                 : workspace.is_favourite
-                  ? 'bg-yellow-50'
+                  ? 'bg-[#f3f3f5]'
                   : ''
           }
           ${isDragging ? 'opacity-50' : ''}
@@ -148,38 +148,50 @@ export function WorkspaceCard({
       >
         {/* Ikona */}
         <div
-          className={`w-10 h-10 ${colorClass} rounded-xl flex items-center justify-center flex-shrink-0 shadow-sm`}
+          className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center flex-shrink-0`}
         >
-          <Icon size={20} className="text-white" />
+          <Icon size={16} className="text-white" />
         </div>
 
         {/* Grip przy hover — tylko gdy D&D aktywne */}
-        {isHovered && dragHandlers && (
-          <div className="flex items-center text-gray-400 cursor-move">
+        {dragHandlers && (
+          <div
+            className={`flex w-4 items-center text-gray-400 transition-opacity ${
+              isHovered ? ' opacity-100 cursor-move' : ' opacity-0'
+            }`}
+          >
             <GripVertical size={16} />
           </div>
         )}
 
         {/* Nazwa */}
         <span
-          className={`text-sm font-medium flex-1 truncate ${
-            isActive ? 'text-green-700' : 'text-gray-700 group-hover:text-gray-900'
+          className={`text-sm font-medium flex-1 min-w-0 transition-all duration-150 ${
+            isHovered
+              ? 'truncate pr-[148px]'
+              : 'overflow-hidden whitespace-nowrap text-clip pr-1'
+          } ${
+            isActive ? 'text-black font-semibold' : 'text-gray-700 group-hover:text-gray-900'
           }`}
         >
           {workspace.name}
         </span>
 
-        {/* Akcje przy hover */}
-        {isHovered && (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        {/* Akcje */}
+        <div
+          className={`absolute right-2 top-1/2 z-40 flex -translate-y-1/2 items-center gap-1 transition-opacity duration-150 ${
+            isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={(e) => e.stopPropagation()}
+        >
             <Button
               variant="secondary"
               size="iconSm"
               onClick={handleToggleFavourite}
               className={
                 workspace.is_favourite
-                  ? 'bg-yellow-100 hover:bg-yellow-200'
-                  : 'bg-gray-200 hover:bg-gray-300'
+                  ? 'dashboard-btn-secondary bg-yellow-100 hover:bg-yellow-200'
+                  : 'dashboard-btn-secondary'
               }
               title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
             >
@@ -195,11 +207,25 @@ export function WorkspaceCard({
               variant="secondary"
               size="iconSm"
               onClick={() => onAction.invite(workspace)}
+              className="dashboard-btn-secondary"
               title="Zaproś członków"
               aria-label="Zaproś członków"
             >
               <UserPlus className="w-4 h-4 text-gray-600" />
             </Button>
+
+            {workspace.is_owner && (
+              <Button
+                variant="secondary"
+                size="iconSm"
+                onClick={() => onAction.edit(workspace)}
+                className="dashboard-btn-secondary"
+                title="Zmień nazwę"
+                aria-label="Zmień nazwę"
+              >
+                <Pencil className="w-4 h-4 text-gray-600" />
+              </Button>
+            )}
 
             <WorkspaceDropdownMenu
               workspace={workspace}
@@ -208,8 +234,7 @@ export function WorkspaceCard({
               onDelete={() => onAction.delete(workspace)}
               onLeave={() => onAction.leave(workspace)}
             />
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );

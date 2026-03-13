@@ -1,508 +1,312 @@
 'use client';
 
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBoard } from '@/boards_api/api';
-import { useState, useRef, useEffect } from 'react';
-import {
-  Target,
-  BookOpen,
-  Rocket,
-  ArrowRight,
-  ChevronLeft,
-  ChevronRight,
-  ChevronDown,
-  FileText,
-  Calendar,
-} from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
-// Typy dla struktury egzaminów
-interface ExamSession {
+type Subject = 'Matematyka' | 'Angielski' | 'Chemia' | 'Fizyka' | 'Biologia';
+
+interface TemplateCard {
   id: string;
-  name: string;
-  folder: string; // ścieżka do folderu z arkuszami
-}
-
-interface ExamYear {
+  subject: Subject;
   year: number;
-  sessions: ExamSession[];
+  title: string;
+  subtitle: string;
+  thumbnail: string;
+  folder?: string;
 }
-
-interface ExamCategory {
-  id: string;
-  name: string;
-  description: string;
-  icon: any;
-  color: string;
-  years: ExamYear[];
-}
-
-// Dane egzaminów z latami i sesjami
-const examCategories: ExamCategory[] = [
-  {
-    id: 'matura-podstawowa',
-    name: 'Matura podstawowa',
-    description: 'Przygotowanie do matury',
-    icon: Target,
-    color: 'bg-green-500',
-    years: [
-      {
-        year: 2025,
-        sessions: [
-          {
-            id: '2025-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-podstawowa/2025/glowna',
-          },
-          {
-            id: '2025-dodatkowa',
-            name: 'Matura dodatkowa (czerwiec)',
-            folder: '/arkusze/matura-podstawowa/2025/dodatkowa',
-          },
-          {
-            id: '2025-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-podstawowa/2025/poprawkowa',
-          },
-        ],
-      },
-      {
-        year: 2024,
-        sessions: [
-          {
-            id: '2024-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-podstawowa/2024/glowna',
-          },
-          {
-            id: '2024-dodatkowa',
-            name: 'Matura dodatkowa (czerwiec)',
-            folder: '/arkusze/matura-podstawowa/2024/dodatkowa',
-          },
-          {
-            id: '2024-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-podstawowa/2024/poprawkowa',
-          },
-        ],
-      },
-      {
-        year: 2023,
-        sessions: [
-          {
-            id: '2023-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-podstawowa/2023/glowna',
-          },
-          {
-            id: '2023-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-podstawowa/2023/poprawkowa',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'matura-rozszerzona',
-    name: 'Matura rozszerzona',
-    description: 'Poziom rozszerzony',
-    icon: Rocket,
-    color: 'bg-purple-500',
-    years: [
-      {
-        year: 2025,
-        sessions: [
-          {
-            id: '2025-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-rozszerzona/2025/glowna',
-          },
-          {
-            id: '2025-dodatkowa',
-            name: 'Matura dodatkowa (czerwiec)',
-            folder: '/arkusze/matura-rozszerzona/2025/dodatkowa',
-          },
-          {
-            id: '2025-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-rozszerzona/2025/poprawkowa',
-          },
-        ],
-      },
-      {
-        year: 2024,
-        sessions: [
-          {
-            id: '2024-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-rozszerzona/2024/glowna',
-          },
-          {
-            id: '2024-dodatkowa',
-            name: 'Matura dodatkowa (czerwiec)',
-            folder: '/arkusze/matura-rozszerzona/2024/dodatkowa',
-          },
-          {
-            id: '2024-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-rozszerzona/2024/poprawkowa',
-          },
-        ],
-      },
-      {
-        year: 2023,
-        sessions: [
-          {
-            id: '2023-main',
-            name: 'Matura główna (maj)',
-            folder: '/arkusze/matura-rozszerzona/2023/glowna',
-          },
-          {
-            id: '2023-poprawkowa',
-            name: 'Matura poprawkowa (sierpień)',
-            folder: '/arkusze/matura-rozszerzona/2023/poprawkowa',
-          },
-        ],
-      },
-    ],
-  },
-  {
-    id: 'egzamin-8-klasisty',
-    name: 'Egzamin 8-klasisty',
-    description: 'Matematyka podstawówka',
-    icon: BookOpen,
-    color: 'bg-orange-500',
-    years: [
-      {
-        year: 2025,
-        sessions: [
-          {
-            id: '2025-main',
-            name: 'Egzamin główny (maj)',
-            folder: '/arkusze/egzamin-8/2025/glowny',
-          },
-        ],
-      },
-      {
-        year: 2024,
-        sessions: [
-          {
-            id: '2024-main',
-            name: 'Egzamin główny (maj)',
-            folder: '/arkusze/egzamin-8/2024/glowny',
-          },
-        ],
-      },
-      {
-        year: 2023,
-        sessions: [
-          {
-            id: '2023-main',
-            name: 'Egzamin główny (maj)',
-            folder: '/arkusze/egzamin-8/2023/glowny',
-          },
-        ],
-      },
-    ],
-  },
-];
 
 interface TemplatesSectionProps {
   workspaceId: number | null;
 }
 
+const SUBJECTS: Subject[] = ['Matematyka', 'Angielski', 'Chemia', 'Fizyka', 'Biologia'];
+const THUMBNAIL_PLACEHOLDER =
+  'https://cdn.galleries.smcloud.net/t/galleries/gf-7PXx-FHuo-BEQW_matura-2024-arkusz-cke-z-matematyki-pp-nowa-formula-1248x1040.jpg';
+
+const THUMBNAILS = {
+  mp2025: '/arkusze/matura-podstawowa/2025/glowna/2025MP.webp',
+  mp2024: '/arkusze/matura-podstawowa/2024/glowna/2024MP.webp',
+  mr2025: '/arkusze/matura-rozszerzona/2025/glowna/2025MR.webp',
+  mr2024: '/arkusze/matura-rozszerzona/2024/glowna/2024MR.webp',
+  e82025: '/arkusze/egzamin-8/2025/glowny/2025E8.webp',
+  e82024: '/arkusze/egzamin-8/2024/glowny/2024E8.webp',
+  whiteboard: '/arkusze/pustyWhiteboardTemplate/whiteboard.webp',
+} as const;
+
+const TEMPLATE_CARDS: TemplateCard[] = [
+  {
+    id: 'mpp-2025-main',
+    subject: 'Matematyka',
+    year: 2025,
+    title: 'Matura podstawowa 2025',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: THUMBNAILS.mp2025,
+    folder: '/arkusze/matura-podstawowa/2025/glowna',
+  },
+  {
+    id: 'mpp-2025-extra',
+    subject: 'Matematyka',
+    year: 2025,
+    title: 'Matura podstawowa 2025',
+    subtitle: 'Matura dodatkowa (czerwiec)',
+    thumbnail: THUMBNAILS.mp2025,
+    folder: '/arkusze/matura-podstawowa/2025/dodatkowa',
+  },
+  {
+    id: 'mpp-2024-main',
+    subject: 'Matematyka',
+    year: 2024,
+    title: 'Matura podstawowa 2024',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: THUMBNAILS.mp2024,
+    folder: '/arkusze/matura-podstawowa/2024/glowna',
+  },
+  {
+    id: 'mpr-2025-main',
+    subject: 'Matematyka',
+    year: 2025,
+    title: 'Matura rozszerzona 2025',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: THUMBNAILS.mr2025,
+    folder: '/arkusze/matura-rozszerzona/2025/glowna',
+  },
+  {
+    id: 'mpr-2024-main',
+    subject: 'Matematyka',
+    year: 2024,
+    title: 'Matura rozszerzona 2024',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: THUMBNAILS.mr2024,
+    folder: '/arkusze/matura-rozszerzona/2024/glowna',
+  },
+  {
+    id: 'egz8-2025-main',
+    subject: 'Matematyka',
+    year: 2025,
+    title: 'Egzamin 8-klasisty 2025',
+    subtitle: 'Arkusz glowny',
+    thumbnail: THUMBNAILS.e82025,
+    folder: '/arkusze/egzamin-8/2025/glowny',
+  },
+  {
+    id: 'egz8-2024-main',
+    subject: 'Matematyka',
+    year: 2024,
+    title: 'Egzamin 8-klasisty 2024',
+    subtitle: 'Arkusz glowny',
+    thumbnail: THUMBNAILS.e82024,
+    folder: '/arkusze/egzamin-8/2024/glowny',
+  },
+];
+
 export default function TemplatesSection({ workspaceId }: TemplatesSectionProps) {
   const router = useRouter();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const subjectDropdownRef = useRef<HTMLDivElement>(null);
+  const yearDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Stan dla rozwiniętych kategorii i lat
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-  const [expandedYears, setExpandedYears] = useState<Set<string>>(new Set());
+  const [subjectOpen, setSubjectOpen] = useState(false);
+  const [subject, setSubject] = useState<Subject>('Matematyka');
+  const [yearOpen, setYearOpen] = useState(false);
 
-  // Refs dla animacji wysokości
-  const categoryContentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
-  const yearContentRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
+  const yearsForSubject = useMemo(() => {
+    const years = TEMPLATE_CARDS.filter((item) => item.subject === subject)
+      .map((item) => item.year)
+      .filter((year, idx, arr) => arr.indexOf(year) === idx)
+      .sort((a, b) => b - a);
 
-  // Stany dla rzeczywistych wysokości (do animacji)
-  const [categoryHeights, setCategoryHeights] = useState<{ [key: string]: number }>({});
-  const [yearHeights, setYearHeights] = useState<{ [key: string]: number }>({});
+    return years;
+  }, [subject]);
 
-  const scrollLeft = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' });
-    }
+  const [selectedYear, setSelectedYear] = useState<number | null>(null);
+
+  const effectiveYear = selectedYear ?? yearsForSubject[0] ?? null;
+
+  const templates = useMemo(() => {
+    return TEMPLATE_CARDS.filter(
+      (item) => item.subject === subject && (effectiveYear ? item.year === effectiveYear : true)
+    );
+  }, [subject, effectiveYear]);
+
+  const scrollByCards = (direction: 'left' | 'right') => {
+    if (!scrollContainerRef.current) return;
+    const amount = direction === 'left' ? -320 : 320;
+    scrollContainerRef.current.scrollBy({ left: amount, behavior: 'smooth' });
   };
 
-  const scrollRight = () => {
-    if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' });
-    }
-  };
-
-  const toggleCategory = (categoryId: string) => {
-    setExpandedCategory((prev) => (prev === categoryId ? null : categoryId));
-    // Reset expanded years when closing category
-    if (expandedCategory === categoryId) {
-      setExpandedYears(new Set());
-    }
-  };
-
-  const toggleYear = (categoryId: string, year: number) => {
-    const key = `${categoryId}-${year}`;
-    setExpandedYears((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(key)) {
-        newSet.delete(key);
-      } else {
-        newSet.add(key);
-      }
-      return newSet;
-    });
-  };
-
-  // Aktualizuj wysokości po zmianie stanu (dla płynnych animacji)
-  useEffect(() => {
-    const updateHeights = () => {
-      const newCategoryHeights: { [key: string]: number } = {};
-      const newYearHeights: { [key: string]: number } = {};
-
-      // Najpierw zmierz wysokości lat (zagnieżdżone)
-      Object.keys(yearContentRefs.current).forEach((yearKey) => {
-        const element = yearContentRefs.current[yearKey];
-        if (element) {
-          // Tymczasowo ustaw wysokość na auto żeby zmierzyć
-          const originalHeight = element.style.height;
-          element.style.height = 'auto';
-          newYearHeights[yearKey] = element.scrollHeight;
-          element.style.height = originalHeight;
-        }
-      });
-
-      // Potem zmierz wysokości kategorii (zawierają lata)
-      Object.keys(categoryContentRefs.current).forEach((categoryId) => {
-        const element = categoryContentRefs.current[categoryId];
-        if (element) {
-          // Tymczasowo ustaw wysokość na auto żeby zmierzyć
-          const originalHeight = element.style.height;
-          element.style.height = 'auto';
-          newCategoryHeights[categoryId] = element.scrollHeight;
-          element.style.height = originalHeight;
-        }
-      });
-
-      setCategoryHeights(newCategoryHeights);
-      setYearHeights(newYearHeights);
-    };
-
-    // Małe opóźnienie żeby DOM się zaktualizował
-    const timer = setTimeout(updateHeights, 50);
-    return () => clearTimeout(timer);
-  }, [expandedCategory, expandedYears]);
-
-  const handleSessionClick = async (session: ExamSession, categoryName: string, year: number) => {
-    if (!workspaceId) {
-      console.error('Brak aktywnego workspace');
-      return;
-    }
+  const createAndOpenBoard = async (name: string, folder?: string) => {
+    if (!workspaceId) return;
 
     try {
-      const boardName = `${categoryName} ${year} - ${session.name}`;
-
-      // 1. Utwórz nową tablicę w bazie danych
       const newBoard = await createBoard({
-        name: boardName,
+        name,
         workspace_id: workspaceId,
         icon: 'FileText',
         bg_color: 'green-500',
       });
 
-      console.log(`✅ Utworzono tablicę: ${newBoard.id}`);
+      const route = folder
+        ? `/tablica?boardId=${newBoard.id}&arkusz=${encodeURIComponent(folder)}`
+        : `/tablica?boardId=${newBoard.id}`;
 
-      // 2. Przekieruj do tablicy z boardId i folderem arkusza
-      const fullRoute = `/tablica?boardId=${newBoard.id}&arkusz=${encodeURIComponent(session.folder)}`;
-
-      router.push(fullRoute);
-    } catch (err) {
-      console.error('❌ Błąd tworzenia tablicy:', err);
+      router.push(route);
+    } catch (error) {
+      console.error('Blad tworzenia tablicy:', error);
     }
   };
 
-  return (
-    <div className="mb-6 md:mb-12">
-      {/* Nagłówek sekcji */}
-      <div className="flex items-center justify-between mb-3 md:mb-6">
-        <div>
-          <h2 className="text-base md:text-2xl font-bold text-gray-900">Arkusze egzaminacyjne</h2>
-          <p className="hidden md:block text-sm text-gray-600">
-            Wybierz egzamin i rok, aby rozpocząć rozwiązywanie
-          </p>
-        </div>
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as Node;
 
-        <div className="flex items-center gap-3">
-          {/* Strzałki na desktop */}
-          <div className="hidden md:flex items-center gap-1">
+      if (subjectDropdownRef.current && !subjectDropdownRef.current.contains(target)) {
+        setSubjectOpen(false);
+      }
+
+      if (yearDropdownRef.current && !yearDropdownRef.current.contains(target)) {
+        setYearOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, []);
+
+  return (
+    <section className="mb-8 rounded-2xl bg-[#f9f8f7] p-4 sm:p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg md:text-2xl font-bold text-gray-900">Szablony</h2>
+      </div>
+
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="relative" ref={subjectDropdownRef}>
             <button
-              onClick={scrollLeft}
-              className="bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-1.5 shadow-sm transition-all hover:shadow-md"
+              onClick={() => {
+                setSubjectOpen((prev) => !prev);
+                setYearOpen(false);
+              }}
+              className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
             >
-              <ChevronLeft size={14} className="text-gray-600" />
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Zestaw szablonow:</span>
+              <span className="font-medium text-gray-900">{subject}</span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
+              />
             </button>
-            <button
-              onClick={scrollRight}
-              className="bg-white hover:bg-gray-50 border border-gray-200 rounded-full p-1.5 shadow-sm transition-all hover:shadow-md"
-            >
-              <ChevronRight size={14} className="text-gray-600" />
-            </button>
+
+            {subjectOpen && (
+              <div className="absolute left-0 top-full z-20 mt-1 min-w-[220px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                {SUBJECTS.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => {
+                      setSubject(item);
+                      setSubjectOpen(false);
+                      setSelectedYear(null);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                      item === subject ? 'text-black font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
-          <button className="text-xs md:text-sm font-medium text-green-600 hover:text-green-700 flex items-center gap-1 cursor-pointer transition-colors">
-            Zobacz wszystkie
-            <ArrowRight size={14} className="md:w-4 md:h-4" />
+          <div className="relative" ref={yearDropdownRef}>
+            <button
+              onClick={() => {
+                setYearOpen((prev) => !prev);
+                setSubjectOpen(false);
+              }}
+              className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Rok:</span>
+              <span className="font-medium text-gray-900">{effectiveYear ?? 'Wszystkie'}</span>
+              <ChevronDown size={14} className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`} />
+            </button>
+
+            {yearOpen && (
+              <div className="absolute left-0 top-full z-20 mt-1 min-w-[130px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                {yearsForSubject.map((year) => (
+                  <button
+                    key={year}
+                    onClick={() => {
+                      setSelectedYear(year);
+                      setYearOpen(false);
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                      year === effectiveYear ? 'text-black font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    {year}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="hidden items-center gap-1 md:flex">
+          <button
+            onClick={() => scrollByCards('left')}
+            className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <button
+            onClick={() => scrollByCards('right')}
+            className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
+          >
+            <ChevronRight size={14} />
           </button>
         </div>
       </div>
 
-      {/* Karty egzaminów */}
-      <div
-        ref={scrollContainerRef}
-        className="flex items-start gap-3 md:gap-4 overflow-x-auto pb-2 md:pb-4 scrollbar-hide"
-      >
-        <style jsx>{`
-          .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-          }
-          .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-        `}</style>
+      <div ref={scrollContainerRef} className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <button
+          onClick={() => createAndOpenBoard('Czysta tablica')}
+          className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
+        >
+          <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
+            <img src={THUMBNAILS.whiteboard} alt="Czysta tablica" className="h-full w-full object-cover" />
+            <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
+                <Plus size={18} />
+              </div>
+            </div>
+          </div>
+          <p className="text-sm font-medium text-gray-900">Czysta tablica</p>
+          <p className="text-xs text-gray-500">Nowa pusta przestrzen robocza</p>
+        </button>
 
-        {examCategories.map((category) => {
-          const IconComponent = category.icon;
-          const isExpanded = expandedCategory === category.id;
-
-          return (
-            <div
-              key={category.id}
-              className={`relative bg-white rounded-lg md:rounded-2xl border-2 transition-all duration-300 flex-shrink-0 self-start ${
-                isExpanded
-                  ? 'border-green-300 shadow-lg min-w-[280px] md:min-w-[320px]'
-                  : 'border-gray-200 hover:border-gray-300 hover:shadow-md min-w-[160px] md:min-w-[220px]'
-              }`}
-            >
-              {/* Nagłówek karty - kliknięcie rozwija/zwija */}
-              <button
-                onClick={() => toggleCategory(category.id)}
-                className="w-full p-3 md:p-5 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 md:w-12 md:h-12 flex-shrink-0 rounded-xl ${category.color} flex items-center justify-center shadow-md`}
-                  >
-                    <IconComponent size={20} className="text-white md:w-6 md:h-6" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm md:text-base truncate">
-                      {category.name}
-                    </h3>
-                    <p className="text-xs text-gray-500 hidden md:block">{category.description}</p>
-                  </div>
-                  <ChevronDown
-                    size={18}
-                    className={`text-gray-400 transition-transform duration-200 flex-shrink-0 ${isExpanded ? 'rotate-180' : ''}`}
-                  />
-                </div>
-              </button>
-
-              {/* Rozwijana lista lat - z animacją */}
-              <div
-                className="overflow-hidden transition-all duration-300 ease-in-out border-t border-gray-100"
-                style={{
-                  maxHeight: isExpanded
-                    ? categoryHeights[category.id]
-                      ? `${categoryHeights[category.id]}px`
-                      : 'none'
-                    : '0px',
-                }}
-              >
-                <div
-                  ref={(el) => {
-                    categoryContentRefs.current[category.id] = el;
-                  }}
-                  className="px-3 pb-3 md:px-4 md:pb-4"
-                >
-                  {category.years.map((yearData) => {
-                    const yearKey = `${category.id}-${yearData.year}`;
-                    const isYearExpanded = expandedYears.has(yearKey);
-
-                    return (
-                      <div key={yearData.year} className="mt-2">
-                        {/* Przycisk roku */}
-                        <button
-                          onClick={() => toggleYear(category.id, yearData.year)}
-                          className="w-full flex items-center justify-between p-2 md:p-2.5 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Calendar size={14} className="text-gray-500" />
-                            <span className="font-medium text-gray-700 text-sm">
-                              {yearData.year}
-                            </span>
-                          </div>
-                          <ChevronDown
-                            size={14}
-                            className={`text-gray-400 transition-transform duration-200 ${isYearExpanded ? 'rotate-180' : ''}`}
-                          />
-                        </button>
-
-                        {/* Lista sesji egzaminacyjnych - z animacją */}
-                        <div
-                          className="overflow-hidden transition-all duration-300 ease-in-out"
-                          style={{
-                            maxHeight: isYearExpanded
-                              ? yearHeights[yearKey]
-                                ? `${yearHeights[yearKey]}px`
-                                : 'none'
-                              : '0px',
-                          }}
-                        >
-                          <div
-                            ref={(el) => {
-                              yearContentRefs.current[yearKey] = el;
-                            }}
-                            className="mt-1 ml-2 space-y-1"
-                          >
-                            {yearData.sessions.map((session) => (
-                              <button
-                                key={session.id}
-                                onClick={() =>
-                                  handleSessionClick(session, category.name, yearData.year)
-                                }
-                                className="w-full flex items-center gap-2 p-2 hover:bg-green-50 rounded-lg transition-colors group text-left"
-                              >
-                                <FileText
-                                  size={14}
-                                  className="text-gray-400 group-hover:text-green-500 flex-shrink-0"
-                                />
-                                <span className="text-xs md:text-sm text-gray-600 group-hover:text-green-700 truncate">
-                                  {session.name}
-                                </span>
-                                <ArrowRight
-                                  size={12}
-                                  className="text-gray-300 group-hover:text-green-500 ml-auto opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                                />
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+        {templates.map((template) => (
+          <button
+            key={template.id}
+            onClick={() => createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)}
+            className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
+          >
+            <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
+              <img src={template.thumbnail} alt={template.title} className="h-full w-full object-cover" />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
+                  <Plus size={18} />
                 </div>
               </div>
             </div>
-          );
-        })}
+            <p className="text-sm font-semibold text-gray-900">{template.title}</p>
+            <p className="mt-1 text-xs text-gray-500">
+              {template.subtitle} {template.year ? `• ${template.year}` : ''}
+            </p>
+          </button>
+        ))}
       </div>
-    </div>
+    </section>
   );
 }

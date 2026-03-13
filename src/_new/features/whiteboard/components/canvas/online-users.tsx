@@ -24,31 +24,7 @@ import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeCon
 import { useAuth } from '@/app/context/AuthContext';
 import { Plus, Check, Eye, EyeOff } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 🎨 KOLORY AWATARÓW (losowane na podstawie user_id)
-// ═══════════════════════════════════════════════════════════════════════════
-
-const AVATAR_COLORS = [
-  'bg-blue-500',
-  'bg-green-500',
-  'bg-yellow-500',
-  'bg-red-500',
-  'bg-purple-500',
-  'bg-pink-500',
-  'bg-indigo-500',
-  'bg-teal-500',
-  'bg-orange-500',
-  'bg-cyan-500',
-];
-
-const getAvatarColor = (userId: number) => {
-  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
-};
-
-const getInitials = (username: string) => {
-  return username.slice(0, 2).toUpperCase();
-};
+import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🧩 KOMPONENT
@@ -69,6 +45,7 @@ interface OnlineUsersProps {
 export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, userRole }: OnlineUsersProps) {
   const { onlineUsers, isConnected, subscribeViewports } = useBoardRealtime();
   const { user: currentUser } = useAuth();
+  const { getAvatarColorClass, getInitials } = useUserAvatar();
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Trzymaj aktualny snapshot viewportów innych użytkowników
@@ -127,7 +104,7 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
           {onlineUsers.map((onlineUser, index) => {
             const isCurrentUser = onlineUser.user_id === currentUser?.id;
             const isBeingFollowed = followingUserId === onlineUser.user_id;
-            const color = getAvatarColor(onlineUser.user_id);
+            const avatarColorClass = getAvatarColorClass(onlineUser.user_id);
             const initials = getInitials(onlineUser.username);
 
             // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
@@ -163,7 +140,7 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
                 onClick={handleClick}
                 className={`
                   relative group w-10 h-10 rounded-full 
-                  ${color} 
+                  ${avatarColorClass} 
                   flex items-center justify-center 
                   text-white text-sm font-bold
                   transition-transform hover:scale-110 hover:z-10

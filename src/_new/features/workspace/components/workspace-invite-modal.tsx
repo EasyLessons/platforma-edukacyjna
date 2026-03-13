@@ -14,6 +14,7 @@ import { checkUserInviteStatus, UserSearchResult, searchUsers } from '@/auth_api
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 import { Workspace } from '../types';
 
 interface WorkspaceInviteModalProps {
@@ -163,42 +164,37 @@ export function WorkspaceInviteModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/15 backdrop-blur-sm flex items-center justify-center z-[100] px-4"
+      className="dashboard-modal-overlay"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-gray-200 max-h-[90vh] flex flex-col"
+        className="dashboard-modal-surface max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between flex-shrink-0">
+        <div className="dashboard-modal-header flex-shrink-0">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Zaproś użytkowników</h2>
+            <h2 className="text-xl font-bold text-gray-900">Zaproś użytkowników</h2>
             <p className="text-sm text-gray-500 mt-1">
               do workspace'a: <span className="font-medium text-gray-700">{workspace.name}</span>
             </p>
           </div>
-          <Button variant="secondary" size="icon" onClick={onClose}>
+          <DashboardButton variant="secondary" onClick={onClose} className="h-9 w-9 rounded-full p-0">
             <X size={20} />
-          </Button>
+          </DashboardButton>
         </div>
 
         {/* Search */}
-        <div className="p-6 border-b border-gray-200 flex-shrink-0">
-          <div className="relative">
-            <Search
-              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
-              size={20}
-            />
-            <input
-              type="text"
-              placeholder="Wyszukaj po nazwie użytkownika lub emailu..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:border-green-400 focus:outline-none text-black"
-              autoFocus
-            />
-          </div>
+        <div className="flex-shrink-0 border-b border-[var(--dash-border)] p-6">
+          <Input
+            ref={inputRef}
+            type="text"
+            placeholder="Wyszukaj po nazwie użytkownika lub emailu..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            leftIcon={<Search size={18} />}
+            className="text-black"
+          />
           {searchQuery.length > 0 && searchQuery.length < 2 && (
             <p className="text-sm text-gray-500 mt-2">Wpisz minimum 2 znaki...</p>
           )}
@@ -216,10 +212,10 @@ export function WorkspaceInviteModal({
         <div className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+              <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-700"></div>
             </div>
           ) : users.length > 0 ? (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-[var(--dash-border)]">
               {users.map((user) => {
                 const canInvite = user.can_invite !== false;
                 const isInviting = inviting === user.id;
@@ -228,11 +224,11 @@ export function WorkspaceInviteModal({
                 return (
                   <div
                     key={user.id}
-                    className="px-6 py-4 hover:bg-gray-50 transition-colors flex items-center justify-between"
+                    className="flex items-center justify-between px-6 py-4 transition-colors hover:bg-[var(--dash-panel)]"
                   >
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-green-700 font-semibold">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-[var(--dash-hover)]">
+                        <span className="font-semibold text-gray-800">
                           {user.username[0].toUpperCase()}
                         </span>
                       </div>
@@ -248,13 +244,14 @@ export function WorkspaceInviteModal({
                       </div>
                     </div>
 
-                    <Button
-                      variant={!canInvite || justInvited ? 'secondary' : 'primary'}
+                    <DashboardButton
+                      variant={justInvited ? 'secondary' : 'primary'}
                       onClick={() => handleInvite(user.id)}
                       disabled={isInviting || justInvited || !canInvite}
-                      loading={isInviting}
                       className={`flex-shrink-0 ml-3 ${
-                        justInvited ? 'bg-green-100 text-green-700 hover:bg-green-200' : ''
+                        !justInvited && canInvite ? 'h-10 min-w-[128px] px-4 text-sm font-medium' : ''
+                      } ${
+                        justInvited ? 'bg-[var(--dash-hover)] text-gray-800 hover:bg-[var(--dash-hover)]' : ''
                       }`}
                     >
                       {justInvited ? (
@@ -268,7 +265,7 @@ export function WorkspaceInviteModal({
                           <span>Zaproś</span>
                         </>
                       )}
-                    </Button>
+                    </DashboardButton>
                   </div>
                 );
               })}
@@ -291,9 +288,9 @@ export function WorkspaceInviteModal({
         </div>
 
         {/* Info */}
-        <div className="px-6 py-4 bg-blue-50 border-t border-blue-100 flex-shrink-0">
-          <p className="text-sm text-blue-800">
-            💡 Zaproszeni użytkownicy otrzymają email z linkiem do akceptacji oraz powiadomienie w
+        <div className="flex-shrink-0 border-t border-[var(--dash-border)] bg-[var(--dash-panel)] px-6 py-4">
+          <p className="text-sm text-gray-700">
+            Zaproszeni użytkownicy otrzymają email z linkiem do akceptacji oraz powiadomienie w
             panelu
           </p>
         </div>

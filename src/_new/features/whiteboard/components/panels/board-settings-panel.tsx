@@ -19,6 +19,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Settings, Users, Bot, Grid3X3, Search, PanelLeft, Crown, Shield, User, Eye, ChevronDown, Check, Loader2 } from 'lucide-react';
 import type { BoardSettings, BoardMember } from '@/_new/features/board/types';
 import { fetchBoardMembers, updateBoardSettings, updateBoardMemberRole } from '@/_new/features/board/api/board-api';
+import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 // ─── TYPY ───────────────────────────────────────────────────────────────────
 
@@ -80,7 +81,7 @@ function ToggleRow({ icon, label, description, value, disabled, onChange }: Togg
         opacity: disabled ? 0.5 : 1,
       }}
     >
-      <div style={{ color: value ? '#059669' : '#9ca3af', flexShrink: 0 }}>{icon}</div>
+      <div style={{ color: value ? '#212224' : '#9ca3af', flexShrink: 0 }}>{icon}</div>
       <div style={{ flex: 1 }}>
         <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827' }}>{label}</div>
         <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>{description}</div>
@@ -91,7 +92,7 @@ function ToggleRow({ icon, label, description, value, disabled, onChange }: Togg
         style={{
           width: '44px', height: '24px', borderRadius: '99px', border: 'none',
           cursor: disabled ? 'default' : 'pointer',
-          backgroundColor: value ? '#059669' : '#d1d5db',
+          backgroundColor: value ? '#212224' : '#d1d5db',
           position: 'relative', transition: 'background-color 0.2s',
           flexShrink: 0,
         }}
@@ -177,7 +178,7 @@ function RoleSelect({ currentRole, userId, boardId, onRoleChange, saving }: Role
               onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = role === currentRole ? '#f9fafb' : 'white'; }}
             >
               <RoleBadge role={role} />
-              {role === currentRole && <Check size={12} style={{ color: '#059669' }} />}
+              {role === currentRole && <Check size={12} style={{ color: '#212224' }} />}
             </button>
           ))}
         </div>
@@ -195,6 +196,7 @@ export function BoardSettingsPanel({
   onSettingsChange,
   onClose,
 }: BoardSettingsPanelProps) {
+  const { getAvatarColorClass, getInitials } = useUserAvatar();
   const [tab, setTab] = useState<'settings' | 'members'>('settings');
   const [members, setMembers] = useState<BoardMember[]>([]);
   const [membersLoading, setMembersLoading] = useState(false);
@@ -323,8 +325,8 @@ export function BoardSettingsPanel({
               style={{
                 padding: '12px 16px', border: 'none', backgroundColor: 'transparent',
                 cursor: 'pointer', fontSize: '14px', fontWeight: tab === key ? 600 : 400,
-                color: tab === key ? '#059669' : '#6b7280',
-                borderBottom: tab === key ? '2px solid #059669' : '2px solid transparent',
+                color: tab === key ? '#212224' : '#6b7280',
+                borderBottom: tab === key ? '2px solid #212224' : '2px solid transparent',
                 display: 'flex', alignItems: 'center', gap: '6px',
                 transition: 'color 0.15s',
               }}
@@ -345,12 +347,12 @@ export function BoardSettingsPanel({
                 <div
                   style={{
                     padding: '10px 14px', marginBottom: '16px',
-                    backgroundColor: '#fff7ed', border: '1px solid #fed7aa',
-                    borderRadius: '8px', fontSize: '13px', color: '#92400e',
+                    backgroundColor: '#f3f4f6', border: '1px solid #d1d5db',
+                    borderRadius: '8px', fontSize: '13px', color: '#374151',
                     display: 'flex', alignItems: 'center', gap: '8px',
                   }}
                 >
-                  <Crown size={14} style={{ color: '#f59e0b', flexShrink: 0 }} />
+                  <Crown size={14} style={{ color: '#4b5563', flexShrink: 0 }} />
                   Tylko właściciel tablicy może zmieniać ustawienia.
                 </div>
               )}
@@ -421,14 +423,10 @@ export function BoardSettingsPanel({
                       >
                         {/* Avatar */}
                         <div
-                          style={{
-                            width: '36px', height: '36px', borderRadius: '50%',
-                            backgroundColor: '#e5e7eb', display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', flexShrink: 0,
-                            fontSize: '14px', fontWeight: 700, color: '#374151',
-                          }}
+                          className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white ${getAvatarColorClass(m.user_id)}`}
+                          style={{ flexShrink: 0 }}
                         >
-                          {m.username.charAt(0).toUpperCase()}
+                          {getInitials(m.username)}
                         </div>
 
                         {/* Info */}

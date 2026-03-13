@@ -9,7 +9,7 @@
  *
  */
 
-import { getAvatarColor, getInitials } from '../utils/helpers';
+import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import type { OnlineUser } from '@/_new/shared/types/user';
 
 interface BoardOnlineUsersProps {
@@ -19,6 +19,8 @@ interface BoardOnlineUsersProps {
 const MAX_VISIBLE = 3;
 
 export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
+  const { getAvatarColorClass, getInitials } = useUserAvatar();
+
   if (users.length === 0) {
     return <span className="text-gray-400 text-xs font-medium">—</span>;
   }
@@ -36,7 +38,7 @@ export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
             text-white text-xs font-semibold
             border-2 border-white shadow-sm
             hover:scale-110 transition-transform cursor-default
-            ${getAvatarColor(user.user_id)}
+            ${getAvatarColorClass(user.user_id)}
           `}
           style={{ zIndex: MAX_VISIBLE - index }}
           title={user.username}

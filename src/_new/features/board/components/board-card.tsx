@@ -9,7 +9,7 @@
 
 'use client';
 
-import { Star, MoreVertical, Clock, User } from 'lucide-react';
+import { Star, MoreVertical, Clock, User, Pencil } from 'lucide-react';
 import { BoardOnlineUsers } from './board-online-users';
 import { getIconComponent, getGradientClass, formatDate } from '../utils/helpers';
 import type { Board, BoardCardActions } from '../types';
@@ -17,6 +17,7 @@ import type { OnlineUser } from '@/_new/shared/types/user';
 
 interface BoardCardProps {
   board: Board;
+  canRename: boolean;
   onlineUsers: OnlineUser[];
   onAction: BoardCardActions;
   onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
@@ -25,6 +26,7 @@ interface BoardCardProps {
 
 export function BoardCard({
   board,
+  canRename,
   onlineUsers,
   onAction,
   onToggleFavourite,
@@ -59,19 +61,19 @@ export function BoardCard({
   return (
     <div
       onClick={() => onSelect(board.id)}
-      className="group relative bg-white rounded-xl border border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-200 cursor-pointer px-4 py-3"
+      className="dashboard-hover-surface group relative cursor-pointer px-3 py-1.5"
     >
       {/* MOBILE LAYOUT */}
       <div className="flex lg:hidden items-center gap-3">
         <div
-          className={`w-10 h-10 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md`}
+          className={`w-7 h-7 flex-shrink-0 rounded-md bg-gradient-to-br ${gradient} flex items-center justify-center`}
         >
-          <Icon size={20} className="text-white drop-shadow-sm" />
+          <Icon size={14} className="text-white" />
         </div>
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-gray-900 truncate text-sm">{board.name}</h3>
+            <h3 className="font-medium text-gray-900 truncate text-sm">{board.name}</h3>
             {board.is_favourite && (
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
             )}
@@ -85,6 +87,15 @@ export function BoardCard({
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {canRename && (
+            <button
+              onClick={handleDropdownEdit}
+              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              title="Zmień nazwę"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
           <button
             onClick={handleToggleFavourite}
             className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-gray-100 transition-colors"
@@ -94,7 +105,7 @@ export function BoardCard({
               className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400 text-yellow-400' : ''}`}
             />
           </button>
-          <BoardDropdownMenu onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          <BoardDropdownMenu canRename={canRename} onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
         </div>
       </div>
 
@@ -103,18 +114,18 @@ export function BoardCard({
         {/* Nazwa + ikona — col 4 */}
         <div className="col-span-4 flex items-center gap-3">
           <div
-            className={`w-12 h-12 flex-shrink-0 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-md group-hover:scale-105 transition-transform duration-200`}
+            className={`w-7 h-7 flex-shrink-0 rounded-md bg-gradient-to-br ${gradient} flex items-center justify-center`}
           >
-            <Icon size={24} className="text-white drop-shadow-sm" />
+            <Icon size={14} className="text-white" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-semibold text-gray-900 text-base truncate">{board.name}</h3>
+              <h3 className="font-medium text-gray-900 text-sm truncate">{board.name}</h3>
               {board.is_favourite && (
                 <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
               )}
             </div>
-            <p className="text-sm text-gray-500 mt-0.5 truncate">
+            <p className="text-xs text-gray-500 mt-0.5 truncate">
               {formatDate(board.last_modified)} przez{' '}
               <span className="text-green-700 font-medium">
                 {board.last_modified_by || board.owner_username}
@@ -149,6 +160,16 @@ export function BoardCard({
           className="col-span-2 flex items-center justify-end gap-1"
           onClick={(e) => e.stopPropagation()}
         >
+          {canRename && (
+            <button
+              onClick={handleDropdownEdit}
+              className="p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              title="Zmień nazwę"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             onClick={handleToggleFavourite}
             className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-gray-100 ${
@@ -161,7 +182,7 @@ export function BoardCard({
             <Star className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400' : ''}`} />
           </button>
 
-          <BoardDropdownMenu onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          <BoardDropdownMenu canRename={canRename} onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
         </div>
       </div>
     </div>
@@ -175,11 +196,12 @@ import { Settings, Trash2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface BoardDropdownMenuProps {
+  canRename: boolean;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }
 
-function BoardDropdownMenu({ onEdit, onDelete }: BoardDropdownMenuProps) {
+function BoardDropdownMenu({ canRename, onEdit, onDelete }: BoardDropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -207,17 +229,33 @@ function BoardDropdownMenu({ onEdit, onDelete }: BoardDropdownMenuProps) {
 
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[180px]">
-          <button
-            onClick={(e) => {
-              onEdit(e);
-              setOpen(false);
-            }}
-            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-          >
-            <Settings size={16} className="text-gray-500" />
-            <span>Ustawienia</span>
-          </button>
-          <div className="border-t border-gray-100 my-1" />
+          {canRename && (
+            <>
+              <button
+                onClick={(e) => {
+                  onEdit(e);
+                  setOpen(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+              >
+                <Pencil size={16} className="text-gray-500" />
+                <span>Zmień nazwę</span>
+              </button>
+
+              <button
+                onClick={(e) => {
+                  onEdit(e);
+                  setOpen(false);
+                }}
+                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+              >
+                <Settings size={16} className="text-gray-500" />
+                <span>Ustawienia</span>
+              </button>
+              <div className="border-t border-gray-100 my-1" />
+            </>
+          )}
+
           <button
             onClick={(e) => {
               onDelete(e);

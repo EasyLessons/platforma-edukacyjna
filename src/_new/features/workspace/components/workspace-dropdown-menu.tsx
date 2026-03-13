@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MoreVertical, Settings, Users, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Settings, Users, Trash2 } from 'lucide-react';
 import type { Workspace } from '../types';
 import { Button } from '@/_new/shared/ui/button';
 
@@ -77,7 +77,7 @@ export function WorkspaceDropdownMenu({
   // ================================
 
   return (
-    <div ref={menuRef} className="relative">
+    <div ref={menuRef} className={`relative ${isOpen ? 'z-50' : 'z-10'}`}>
       {/* Trigger Button */}
       <Button
         variant="secondary"
@@ -85,6 +85,7 @@ export function WorkspaceDropdownMenu({
         onClick={handleToggle}
         title="Menu"
         aria-label="Menu"
+        className="dashboard-btn-secondary"
       >
         <MoreVertical className="w-4 h-4 text-gray-600" />
       </Button>
@@ -92,13 +93,22 @@ export function WorkspaceDropdownMenu({
       {/* Dropdown Menu */}
       {isOpen && (
         <div
-          className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-20 min-w-[160px] animate-in fade-in slide-in-from-top-2 duration-150"
+          className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150"
           role="menu"
           aria-orientation="vertical"
         >
           {workspace.is_owner ? (
             // Owner menu
             <>
+              <button
+                onClick={handleAction(onEdit)}
+                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
+                role="menuitem"
+              >
+                <Pencil size={14} />
+                <span>Zmień nazwę</span>
+              </button>
+
               <button
                 onClick={handleAction(onEdit)}
                 className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"

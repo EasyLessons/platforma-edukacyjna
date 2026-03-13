@@ -10,8 +10,8 @@
 import { useRef } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
-import { Button } from '@/_new/shared/ui/button';
 import { useModal } from '@/_new/shared/hooks/use-modal';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 import { WorkspaceIconPicker } from './workspace-icon-picker';
 import { WorkspaceColorPicker } from './workspace-color-picker';
 import { useCreateWorkspaceForm } from '../hooks/use-create-workspace-form';
@@ -50,24 +50,24 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="dashboard-modal-overlay">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+        className="dashboard-modal-surface max-w-lg"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="dashboard-modal-header">
           <h2 className="text-xl font-bold text-gray-900">Stwórz nową przestrzeń</h2>
 
-          <Button
-            variant="destructive"
-            size="icon"
+          <DashboardButton
+            variant="secondary"
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label="Zamknij"
+            className="h-9 w-9 rounded-full p-0"
           >
             <X size={20} />
-          </Button>
+          </DashboardButton>
         </div>
 
         {/* Form */}
@@ -100,9 +100,14 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
           />
 
           {/* Submit */}
-          <Button type="submit" className="w-full" disabled={isSubmitting || !isReady}>
+          <DashboardButton
+            variant="primary"
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting || !isReady}
+          >
             {isSubmitting ? 'Tworzenie...' : 'Utwórz przestrzeń'}
-          </Button>
+          </DashboardButton>
         </form>
       </div>
     </div>

@@ -5,8 +5,9 @@
  *
  */
 
-import { BOARD_ICONS, COLOR_MAP, GRADIENT_MAP, DEFAULT_BOARD_ICON, AVATAR_COLORS } from './constants';
+import { BOARD_ICONS, COLOR_MAP, GRADIENT_MAP, DEFAULT_BOARD_ICON } from './constants';
 import type { Board } from '../types';
+import { getUserAvatarColorClass, getUserInitials } from '@/_new/shared/hooks/use-user-avatar';
 
 // ICONS
 // ================================
@@ -38,12 +39,12 @@ export const normalizeColor = (color: string): string => {
 // getAvatarColor - Zwraca kolor awatara dla użytkownika online.
 // Deterministyczny — ten sam user zawsze dostaje ten sam kolor.
 export const getAvatarColor = (userId: number): string => {
-  return AVATAR_COLORS[userId % AVATAR_COLORS.length];
+  return getUserAvatarColorClass(userId);
 };
 
 // getInitials - Zwraca inicjały z nazwy użytkownika (pierwsze 2 znaki).
 export const getInitials = (username: string): string => {
-  return username.slice(0, 2).toUpperCase();
+  return getUserInitials(username);
 };
 
 // DATES

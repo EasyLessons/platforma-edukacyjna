@@ -10,8 +10,8 @@
 import { useRef } from 'react';
 import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
-import { Button } from '@/_new/shared/ui/button';
 import { useModal } from '@/_new/shared/hooks/use-modal';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 import { WorkspaceIconPicker } from './workspace-icon-picker';
 import { WorkspaceColorPicker } from './workspace-color-picker';
 import { useEditWorkspaceForm } from '../hooks/use-edit-workspace-form';
@@ -56,27 +56,27 @@ export function WorkspaceEditModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="dashboard-modal-overlay">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col"
+        className="dashboard-modal-surface max-w-lg"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="dashboard-modal-header">
           <div>
             <h2 className="text-xl font-bold text-gray-900">Ustawienia przestrzeni</h2>
             <p className="text-sm text-gray-500 mt-1">{workspace.name}</p>
           </div>
 
-          <Button
-            variant="destructive"
-            size="icon"
+          <DashboardButton
+            variant="secondary"
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label="Zamknij"
+            className="h-9 w-9 rounded-full p-0"
           >
             <X size={20} />
-          </Button>
+          </DashboardButton>
         </div>
 
         {/* Form */}
@@ -109,9 +109,14 @@ export function WorkspaceEditModal({
           />
 
           {/* Submit */}
-          <Button type="submit" className="w-full" disabled={isSubmitting || !isDirty}>
+          <DashboardButton
+            variant="primary"
+            type="submit"
+            className="w-full"
+            disabled={isSubmitting || !isDirty}
+          >
             {isSubmitting ? 'Zapisywanie...' : 'Zapisz zmiany'}
-          </Button>
+          </DashboardButton>
         </form>
       </div>
     </div>

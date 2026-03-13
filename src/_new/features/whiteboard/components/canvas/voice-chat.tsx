@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { useVoiceChat, VoiceParticipant } from '@/app/context/VoiceChatContext';
 import VoiceChatSettings from './voice-chat-settings';
+import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 interface VoiceChatProps {
   className?: string;
@@ -28,6 +29,7 @@ interface VoiceChatProps {
 
 export default function VoiceChat({ className = '' }: VoiceChatProps) {
   const voiceChat = useVoiceChat();
+  const { getAvatarColorClass, getInitials } = useUserAvatar();
 
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -48,12 +50,6 @@ export default function VoiceChat({ className = '' }: VoiceChatProps) {
     toggleMute,
     settings,
   } = voiceChat;
-
-  // Kolory dla uczestników
-  const getParticipantColor = (index: number) => {
-    const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
-    return colors[index % colors.length];
-  };
 
   return (
     <>
@@ -116,11 +112,12 @@ export default function VoiceChat({ className = '' }: VoiceChatProps) {
                 </div>
               ) : (
                 <ul className="divide-y divide-gray-100">
-                  {participants.map((participant, index) => (
+                  {participants.map((participant) => (
                     <ParticipantItem
                       key={participant.odUserId}
                       participant={participant}
-                      color={getParticipantColor(index)}
+                      avatarColorClass={getAvatarColorClass(participant.odUserId)}
+                      initials={getInitials(participant.username)}
                       isCurrentUser={participant.username === 'Ty'}
                     />
                   ))}
@@ -213,21 +210,22 @@ export default function VoiceChat({ className = '' }: VoiceChatProps) {
 
 function ParticipantItem({
   participant,
-  color,
+  avatarColorClass,
+  initials,
   isCurrentUser,
 }: {
   participant: VoiceParticipant;
-  color: string;
+  avatarColorClass: string;
+  initials: string;
   isCurrentUser: boolean;
 }) {
   return (
     <li className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors">
       {/* Avatar */}
       <div
-        className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm"
-        style={{ backgroundColor: color }}
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-sm ${avatarColorClass}`}
       >
-        {participant.username.charAt(0).toUpperCase()}
+        {initials}
       </div>
 
       {/* Info */}

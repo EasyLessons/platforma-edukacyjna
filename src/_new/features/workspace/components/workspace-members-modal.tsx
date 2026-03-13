@@ -11,6 +11,7 @@
 import { useRef } from 'react';
 import { X, Crown, Users as UsersIcon, Loader2, Trash2, Eye, Edit3 } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { useWorkspaceMembers } from '../hooks/use-workspace-members';
 import { ROLE_LABELS, ROLE_COLORS } from '../utils/constants';
@@ -108,16 +109,16 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
   if (!isOpen || !workspace) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="dashboard-modal-overlay">
       <div
         ref={modalRef}
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col"
+        className="dashboard-modal-surface max-w-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="dashboard-modal-header">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <UsersIcon size={20} className="text-green-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--dash-hover)]">
+              <UsersIcon size={20} className="text-gray-700" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-gray-900">Członkowie</h2>
@@ -125,9 +126,9 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             </div>
           </div>
 
-          <Button variant="destructive" size="icon" onClick={handleClose} aria-label="Zamknij">
+          <DashboardButton variant="secondary" onClick={handleClose} aria-label="Zamknij" className="h-9 w-9 rounded-full p-0">
             <X size={20} />
-          </Button>
+          </DashboardButton>
         </div>
 
         {/* Content */}
@@ -136,7 +137,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 animate-spin text-green-600" />
+                <Loader2 className="w-8 h-8 animate-spin text-gray-700" />
                 <p className="text-sm text-gray-500">Ładowanie członków...</p>
               </div>
             </div>
@@ -187,7 +188,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
                         className={`
                           px-3 py-1.5 rounded-lg text-sm text-black font-medium
                           border border-gray-300 bg-white
-                          focus:outline-none focus:ring-2 focus:ring-green-500
+                          focus:outline-none focus:ring-2 focus:ring-gray-400
                           disabled:opacity-50 disabled:cursor-not-allowed
                         `}
                       >
@@ -239,8 +240,8 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+        <div className="dashboard-modal-footer !justify-between">
+          <div className="text-sm text-gray-500">
             <span>
               Łącznie:{' '}
               <span className="font-medium text-gray-900">
@@ -249,9 +250,9 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             </span>
           </div>
 
-          <Button variant="secondary" onClick={handleClose} className="w-full">
+          <DashboardButton variant="secondary" onClick={handleClose} className="w-full max-w-[160px]">
             Zamknij
-          </Button>
+          </DashboardButton>
         </div>
       </div>
     </div>

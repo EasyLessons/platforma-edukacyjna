@@ -1,0 +1,130 @@
+:root {
+  --dash-bg: #ffffff;
+  --dash-panel: #f9f8f7;
+  --dash-panel-strong: #e4e0d7;
+  --dash-hover: #dfdbd2;
+  --dash-border: #d8d3ca;
+  --dash-text: #111111;
+  --dash-muted: #6b7280;
+}
+
+.dashboard-shell {
+  background: var(--dash-bg);
+}
+
+.dashboard-main {
+  background: var(--dash-bg);
+}
+
+.dashboard-title-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-muted);
+  font-weight: 600;
+}
+
+.dashboard-soft-panel {
+  background: var(--dash-panel);
+  border: 1px solid var(--dash-border);
+  border-radius: 12px;
+}
+
+.dashboard-soft-panel-no-border {
+  background: var(--dash-panel);
+  border: 0;
+  border-radius: 12px;
+}
+
+.dashboard-card-flat {
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  transition: background-color 160ms ease;
+}
+
+.dashboard-card-flat:hover {
+  background: var(--dash-hover);
+}
+
+.dashboard-hover-surface {
+  border-radius: 12px;
+  background: transparent;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.dashboard-hover-surface:hover {
+  background: #ececef;
+}
+
+.dashboard-btn-primary {
+  background: #212224;
+  color: #f9fafb;
+  cursor: pointer;
+}
+
+.dashboard-btn-primary:hover {
+  background: #37393c;
+}
+
+.dashboard-btn-secondary {
+  background: #e6e7ea;
+  color: #111111;
+  cursor: pointer;
+}
+
+.dashboard-btn-secondary:hover {
+  background: #d8dae0;
+}
+
+.dashboard-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 15, 16, 0.35);
+  backdrop-filter: blur(4px);
+}
+
+.dashboard-modal-surface {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  border: 1px solid var(--dash-border);
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(19, 20, 22, 0.22);
+}
+
+.dashboard-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.25rem 1.5rem 1rem;
+  border-bottom: 1px solid var(--dash-border);
+  background: linear-gradient(180deg, #fbfbfb 0%, #f5f5f6 100%);
+}
+
+.dashboard-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--dash-border);
+  background: #f7f7f8;
+}
+
+.dashboard-popup-surface {
+  background: #ffffff;
+  border: 1px solid var(--dash-border);
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(17, 18, 21, 0.18);
+}

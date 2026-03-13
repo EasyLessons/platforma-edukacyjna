@@ -2,11 +2,9 @@
 
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { User, Settings, Crown, LogOut } from 'lucide-react';
-// 🔥 DODAJ TEN IMPORT - 3 poziomy w górę do app/, potem context/
 import { useAuth } from '../../../context/AuthContext';
-import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 
 interface UserMenuPopupProps {
   onClose: () => void;
@@ -14,13 +12,13 @@ interface UserMenuPopupProps {
     name: string;
     email: string;
     avatar: string;
+    avatarColorClass?: string;
     isPremium: boolean;
   };
 }
 
 export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   const router = useRouter();
-  // 🔥 DODAJ TO - pobierz funkcję logout z contextu
   const { logout } = useAuth();
   const popupRef = useRef<HTMLDivElement>(null);
 
@@ -43,27 +41,26 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
     onClose();
   };
 
-  // 🔥 POPRAWIONY LOGOUT - tak jak w AuthHeader
   const handleLogout = () => {
-    console.log('🚪 Wylogowywanie...');
-    logout(); // ✅ Używa prawdziwego logout z AuthContext
-    console.log('✅ Wylogowano!');
-    onClose(); // Zamknij popup
-    router.push('/'); // Przekieruj na stronę główną
+    logout();
+    onClose();
+    router.push('/');
   };
 
   return (
     <div
       ref={popupRef}
-      className="absolute right-0 mt-2 w-60 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50"
+      className="dashboard-popup-surface absolute right-0 z-50 mt-2 w-64 overflow-hidden"
     >
       {/* Info użytkownika */}
-      <div className="px-4 py-4 border-b border-gray-100 bg-gray-50">
+      <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-11 h-11 bg-green-600 rounded-xl flex items-center justify-center shadow-sm">
+          <div
+            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${user.avatarColorClass || 'bg-gray-700'}`}
+          >
             <span className="text-white font-semibold text-base">{user.avatar}</span>
           </div>
-          <div className="flex-1 min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
             <div className="text-xs text-gray-500 truncate">{user.email}</div>
           </div>
@@ -72,50 +69,51 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
         {/* Badge Premium lub Free */}
         <div className="mt-3">
           {user.isPremium ? (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-lg">
+            <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--dash-border)] bg-white px-2.5 py-1">
               <Crown size={14} className="text-yellow-600" />
               <span className="text-xs font-semibold text-yellow-700">Premium</span>
             </div>
           ) : (
-            <div className="inline-flex items-center px-2.5 py-1 bg-gray-100 border border-gray-200 rounded-lg">
-              <span className="text-xs font-semibold text-gray-600">FREE</span>
+            <div className="inline-flex items-center rounded-lg border border-[var(--dash-border)] bg-white px-2.5 py-1">
+              <span className="text-xs font-semibold text-gray-700">FREE</span>
             </div>
           )}
         </div>
       </div>
 
       {/* Menu opcje */}
-      <div className="py-2">
-        <Button
+      <div className="space-y-1.5 p-2">
+        <DashboardButton
           variant="secondary"
           leftIcon={<User size={16} />}
           onClick={() => handleNavigation('/clientPanel')}
-          className="w-full justify-start rounded-sm"
+          className="w-full justify-start"
         >
           Profil
-        </Button>
+        </DashboardButton>
 
         {!user.isPremium && (
-              <Button
-                variant="secondary"
-                leftIcon={<Crown size={16} />}
-                onClick={() => handleNavigation('/#pricing')}
-                className="w-full justify-start bg-yellow-100 py-7 hover:bg-yellow-200 text-yellow-800 rounded-sm"
-              >
-              Przejdź na Premium
-              </Button>
+          <DashboardButton
+            variant="secondary"
+            leftIcon={<Crown size={16} />}
+            onClick={() => handleNavigation('/#pricing')}
+            className="w-full justify-start"
+          >
+            Przejdź na Premium
+          </DashboardButton>
         )}
 
-        <div className="my-2 border-t border-gray-100"></div>
+        <div className="my-2 border-t border-[var(--dash-border)]"></div>
 
         {/* Wyloguj */}
-        <Button
-          variant="destructive"
+        <DashboardButton
+          variant="primary"
           leftIcon={<LogOut size={16} />}
           onClick={handleLogout}
-          className="w-full justify-center rounded-sm">
+          className="w-full justify-center"
+        >
           Wyloguj się
-        </Button>
+        </DashboardButton>
       </div>
     </div>
   );

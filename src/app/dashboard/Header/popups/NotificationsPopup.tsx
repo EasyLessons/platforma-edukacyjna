@@ -11,6 +11,7 @@ import {
 import { useWorkspaces } from '@/app/context/WorkspaceContext';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/_new/shared/ui/button';
+import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
 
 interface NotificationsPopupProps {
   onClose: () => void;
@@ -108,10 +109,10 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
       <div className="fixed inset-0 bg-black/15 backdrop-blur-sm z-[100]" onClick={onClose} />
 
       <div
-        className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-[101] overflow-hidden flex flex-col animate-slide-in"
+        className="fixed top-0 right-0 z-[101] flex h-full w-full max-w-md flex-col overflow-hidden border-l border-[var(--dash-border)] bg-white shadow-2xl animate-slide-in"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div className="flex items-center justify-between border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-6 py-4">
           <div>
             <h2 className="text-xl font-bold text-gray-800">Powiadomienia</h2>
             {invites.length > 0 && (
@@ -120,9 +121,9 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
               </p>
             )}
           </div>
-          <Button variant="secondary" size="icon" onClick={onClose}>
+          <DashboardButton variant="secondary" onClick={onClose} className="h-9 w-9 rounded-full p-0">
             <X size={20} />
-          </Button>
+          </DashboardButton>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -133,7 +134,7 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
           ) : invites.length > 0 ? (
             <div className="divide-y divide-gray-100">
               {invites.map((invite) => (
-                <div key={invite.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                <div key={invite.id} className="px-6 py-4 transition-colors hover:bg-[var(--dash-panel)]">
                   <div className="flex gap-3">
                     <div
                       className={`flex-shrink-0 w-12 h-12 ${invite.workspace_bg_color} rounded-lg flex items-center justify-center text-white`}
@@ -161,24 +162,22 @@ export default function NotificationsPopup({ onClose }: NotificationsPopupProps)
                       </div>
 
                       <div className="flex gap-2">
-                        <Button
+                        <DashboardButton
                           variant="primary"
-                          size="sm"
                           onClick={() => handleAccept(invite)}
-                          loading={processingInvite === invite.id}
+                          disabled={processingInvite === invite.id}
                           className="flex-1"
                         >
                           {processingInvite === invite.id ? 'Akceptuję...' : 'Akceptuj'}
-                        </Button>
-                        <Button
+                        </DashboardButton>
+                        <DashboardButton
                           variant="secondary"
-                          size="sm"
                           onClick={() => handleReject(invite)}
                           disabled={processingInvite === invite.id}
                           className="flex-1"
                         >
                           Odrzuć
-                        </Button>
+                        </DashboardButton>
                       </div>
                     </div>
                   </div>
