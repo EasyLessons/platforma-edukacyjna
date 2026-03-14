@@ -178,7 +178,8 @@ export function ArrowTool({
     if (isGestureActive) return;
     // Ignoruj MMB (1) i PPM (2) — zarezerwowane dla pan viewportu
     if (e.button === 1 || e.button === 2) return;
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     // Znajdź nearby anchors
@@ -201,7 +202,8 @@ export function ArrowTool({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     if (isDrawing && startPoint) {

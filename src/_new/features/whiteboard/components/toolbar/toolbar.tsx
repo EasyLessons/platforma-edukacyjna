@@ -76,6 +76,8 @@ interface ToolbarProps {
   onCalculatorToggle?: () => void;
   // 🔒 Read-only mode
   isReadOnly?: boolean;
+  /** Offset od lewej krawędzi (px) — przesuwa toolbar gdy sidebar jest otwarty */
+  leftOffset?: number;
 }
 
 function Toolbar({
@@ -109,12 +111,16 @@ function Toolbar({
   isCalculatorOpen,
   onCalculatorToggle,
   isReadOnly = false,
+  leftOffset = 0,
 }: ToolbarProps) {
-  // 🔴 USUNIĘTE - handleGenerateFunction i functionExpression nie są już potrzebne
-  // FunctionTool sam tworzy funkcje i ma własny input
-
   return (
-    <div className="absolute top-1/2 -translate-y-1/2 left-4 z-50 pointer-events-none flex flex-row items-start gap-2">
+    <div
+      className="absolute top-1/2 -translate-y-1/2 z-50 pointer-events-none flex flex-row items-start gap-2"
+      style={{
+        left: `${leftOffset + 16}px`,
+        transition: 'left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+      }}
+    >
       <ToolbarUI
         tool={tool}
         selectedShape={selectedShape}

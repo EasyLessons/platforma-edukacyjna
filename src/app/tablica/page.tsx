@@ -32,8 +32,9 @@ import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
 import { getMyRoleInWorkspace } from '@/workspace_api/api';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
-import { HomeButton } from '@/_new/features/whiteboard/components/layout/home-button';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
+import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
+import { useWhiteboardSidebar, SIDEBAR_WIDTH } from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
 import type { BoardSettings } from '@/_new/features/board/types';
 
 // Helper do odczytania user_id z JWT (payload.sub)
@@ -67,6 +68,8 @@ export function TablicaContent() {
   const [boardId, setBoardId] = useState<string | null>(null);
   const [arkuszPath, setArkuszPath] = useState<string | null>(null);
   const [boardName, setBoardName] = useState<string>('Moja tablica');
+  const [boardIcon, setBoardIcon] = useState<string>('PenTool');
+  const [boardBgColor, setBoardBgColor] = useState<string>('gray-500');
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
@@ -75,6 +78,9 @@ export function TablicaContent() {
   const [isOwner, setIsOwner] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
   const [boardOwnerId, setBoardOwnerId] = useState<number | null>(null);
+
+  // Sidebar tablicy
+  const sidebar = useWhiteboardSidebar();
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
@@ -95,6 +101,8 @@ export function TablicaContent() {
         const board = await fetchBoardById(id);
         if (board) {
           setBoardName(board.name);
+          setBoardIcon(board.icon || 'PenTool');
+          setBoardBgColor(board.bg_color || 'gray-500');
           setWorkspaceId(board.workspace_id);
           setBoardOwnerId(board.owner_id);
           // Sprawdz czy biezacy uzytkownik jest wlascicielem tablicy
@@ -270,53 +278,78 @@ export function TablicaContent() {
         </div>
       )}
 
-      {/* Home Button - pojawia się gdy BoardHeader jest ukryty (poniżej 1550px) */}
-      <HomeButton />
-
-      {/* Panel ustawień tablicy */}
-      {showBoardSettings && boardId && boardId !== 'demo-board' && (
-        <BoardSettingsPanel
-          boardId={parseInt(boardId, 10)}
-          isOwner={userRole === 'owner'}
-          settings={boardSettings}
-          onSettingsChange={setBoardSettings}
-          onClose={() => setShowBoardSettings(false)}
+      {/* Cienki pasek z ikonami workspace'ów po lewej */}
+      {/* Sidebar z listą tablic bieżącego workspace'u */}
+      {workspaceId && (
+        <WhiteboardBoardSidebar
+          workspaceId={workspaceId}
+          activeBoardId={boardId}
+          isOpen={sidebar.isOpen}
+          onSettingsClick={
+            boardId !== 'demo-board'
+              ? () => setShowBoardSettings(true)
+              : undefined
+          }
+          onClose={sidebar.close}
+          onHoverLeave={sidebar.closeFromHoverLeave}
         />
       )}
 
-      {/* Nagłówek z logo, nazwą tablicy i przyciskiem Premium */}
-      <BoardHeader
-        boardName={boardName}
-        boardId={boardId}
-        onSettingsClick={isOwner && boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
-      />
-
-      {/* 🆕 REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
-      <BoardRealtimeProvider boardId={boardId}>
-        {/* 🆕 VOICE CHAT PROVIDER - P2P audio */}
-        <VoiceChatProvider boardId={boardId}>
-          <WhiteboardCanvas
-            boardId={boardId}
-            arkuszPath={arkuszPath}
-            userRole={userRole || 'editor'}
-            boardSettings={boardSettings}
+      {/* Obszar roboczy — przesuwa się gdy sidebar otwarty */}
+      <div
+        style={{
+          position: 'absolute',
+          top: 0,
+          bottom: 0,
+          right: 0,
+          left: sidebar.isOpen ? `${SIDEBAR_WIDTH}px` : '0px',
+          transition: 'left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Panel ustawień tablicy */}
+        {showBoardSettings && boardId && boardId !== 'demo-board' && (
+          <BoardSettingsPanel
+            boardId={parseInt(boardId, 10)}
+            isOwner={userRole === 'owner'}
+            settings={boardSettings}
+            onSettingsChange={setBoardSettings}
+            onClose={() => setShowBoardSettings(false)}
           />
-        </VoiceChatProvider>
-      </BoardRealtimeProvider>
+        )}
 
-      {/* Style dla animacji */}
-      <style jsx>{`
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateX(-50%) translateY(0px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(-50%) translateY(0);
-          }
-        }
-      `}</style>
+        {/* Nagłówek z logo, togglem i ustawieniami (ukryty przy otwartym sidebarze) */}
+        {!sidebar.isOpen && (
+          <BoardHeader
+            boardName={boardName}
+            boardIcon={boardIcon}
+            boardBgColor={boardBgColor}
+            boardId={boardId ?? ''}
+            isSidebarOpen={sidebar.isOpen}
+            onSidebarToggle={sidebar.toggle}
+            onSettingsClick={
+              boardId !== 'demo-board'
+                ? () => setShowBoardSettings(true)
+                : undefined
+            }
+          />
+        )}
+
+        {/* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
+        <BoardRealtimeProvider boardId={boardId ?? ''}>
+          {/* VOICE CHAT PROVIDER - P2P audio */}
+          <VoiceChatProvider boardId={boardId ?? ''}>
+            <WhiteboardCanvas
+              boardId={boardId ?? ''}
+              arkuszPath={arkuszPath}
+              userRole={userRole || 'editor'}
+              boardSettings={boardSettings}
+              toolbarLeftOffset={0}
+              isSidebarOpen={sidebar.isOpen}
+            />
+          </VoiceChatProvider>
+        </BoardRealtimeProvider>
+      </div>
     </div>
   );
 }

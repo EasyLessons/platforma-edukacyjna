@@ -95,7 +95,7 @@ export default function HeroSection() {
             {/* Biały przycisk - Zaloguj */}
             <Link href="/login">
               <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-700 hover:text-black bg-white hover:bg-white transition-colors text-sm font-medium rounded-md">
-                Stwórz tablicę
+                Zaloguj się
               </button>
             </Link>
 

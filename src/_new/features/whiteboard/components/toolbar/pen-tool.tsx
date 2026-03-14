@@ -161,8 +161,8 @@ export function PenTool({
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-        const overlayRect = overlayRef.current?.getBoundingClientRect();
-        const screenPoint = { x: e.clientX, y: e.clientY };
+        const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
         const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
       pointsRef.current = [worldPoint];

@@ -32,6 +32,7 @@ import {
   CardResource,
   CalculationResult,
 } from './types';
+import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
@@ -40,6 +41,7 @@ interface SmartSearchBarProps {
   onBrowseAll?: () => void;
   onActiveChange?: (isActive: boolean) => void; // Callback gdy search się otwiera/zamyka
   userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
+  browseButtonPlacement?: 'inside' | 'outside-right';
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -57,6 +59,7 @@ export function SmartSearchBar({
   onBrowseAll,
   onActiveChange,
   userRole,
+  browseButtonPlacement = 'inside',
 }: SmartSearchBarProps) {
   // 🔒 Viewer nie ma dostępu do wyszukiwarki
   if (userRole === 'viewer') {
@@ -71,21 +74,14 @@ export function SmartSearchBar({
   const [isLoading, setIsLoading] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [isAnimatingSelection, setIsAnimatingSelection] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(0);
   const [copiedCalculation, setCopiedCalculation] = useState(false); // 🆕 Stan kopiowania
 
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const resultsContainerRef = useRef<HTMLDivElement>(null);
   const selectedItemRef = useRef<HTMLLIElement>(null);
-
-  // Monitor window width
-  useEffect(() => {
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  const metrics = useWhiteboardUiMetrics();
+  const { windowWidth, isMobile, showFullHeader, isCompactHeader, smartSearch } = metrics;
 
   // Ctrl+K skrót klawiszowy
   useEffect(() => {
@@ -278,6 +274,12 @@ export function SmartSearchBar({
     return manifest?.resourceTypes[type]?.label || type;
   };
 
+  const openCardsBrowse = () => {
+    setIsOpen(true);
+    setQuery('karty wzorów');
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
   return (
     <>
       {/* CSS Animacje */}
@@ -326,11 +328,11 @@ export function SmartSearchBar({
 
         @keyframes expandSearchMobile {
           from {
-            width: 56px;
+            width: 52px;
             opacity: 0.8;
           }
           to {
-            width: 90vw;
+            width: 100%;
             opacity: 1;
           }
         }
@@ -348,11 +350,11 @@ export function SmartSearchBar({
 
         @keyframes shrinkSearchMobile {
           from {
-            width: 90vw;
+            width: 100%;
             opacity: 1;
           }
           to {
-            width: 56px;
+            width: 52px;
             opacity: 0.8;
           }
         }
@@ -456,18 +458,22 @@ export function SmartSearchBar({
         {/* Search Button / Input */}
         {!isOpen ? (
           <>
+            <div
+              className={`flex items-center gap-2 ${showFullHeader ? 'mx-auto' : ''}`}
+              style={{ width: isMobile ? `${smartSearch.collapsedWidth}px` : '100%' }}
+            >
             <button
               onClick={() => {
                 setIsOpen(true);
                 setTimeout(() => inputRef.current?.focus(), 50);
               }}
-              className={`flex items-center gap-3 backdrop-blur-xl bg-white/70 rounded-3xl border border-gray-200/50 hover:border-blue-400/50 hover:bg-gradient-to-r hover:from-blue-50/80 hover:to-purple-50/80 shadow-lg hover:shadow-blue-200/50 hover:scale-[1.02] hover:cursor-pointer relative ${windowWidth > 1550 ? 'mx-auto' : ''}`}
+              className="flex items-center gap-3 backdrop-blur-xl bg-white/85 rounded-3xl border border-gray-300/80 hover:border-gray-300 hover:bg-gradient-to-r hover:from-blue-50/70 hover:to-purple-50/70 shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_14px_rgba(0,0,0,0.12)] hover:scale-[1.02] hover:cursor-pointer relative"
               style={{
-                width: windowWidth <= 760 ? '56px' : '100%',
-                maxWidth: windowWidth <= 760 ? '56px' : '1000px',
-                height: '64px',
-                padding: windowWidth <= 760 ? '0' : '16px 24px',
-                justifyContent: windowWidth <= 760 ? 'center' : 'flex-start',
+                width: isMobile ? `${smartSearch.collapsedWidth}px` : '100%',
+                maxWidth: isMobile ? `${smartSearch.collapsedWidth}px` : '1000px',
+                height: '56px',
+                padding: isMobile ? '0' : '16px 24px',
+                justifyContent: isMobile ? 'center' : 'flex-start',
                 transition: 'all 0.3s ease-out',
               }}
               title="Szukaj wzorów (Ctrl+K)"
@@ -475,7 +481,7 @@ export function SmartSearchBar({
               <Search className="w-5 h-5 text-gray-400" />
 
               {/* Tekst i przyciski ukrywane przy 760px */}
-              {windowWidth > 760 && (
+              {!isMobile && (
                 <>
                   <span className="text-base text-gray-500 flex-1 text-left">
                     Szukaj wzorów matematycznych...
@@ -486,44 +492,67 @@ export function SmartSearchBar({
                     Ctrl+K
                   </kbd>
 
-                  {/* Separator - WEWNĄTRZ buttona */}
-                  <div className="w-px h-8 bg-gray-200/50 mx-2" />
+                  {browseButtonPlacement !== 'outside-right' && (
+                    <>
+                      {/* Separator - WEWNĄTRZ buttona */}
+                      <div className="w-px h-8 bg-gray-200/50 mx-2" />
 
-                  {/* Ikonka wzorów - WEWNĄTRZ głównego buttona */}
-                  <div
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsOpen(true);
-                      setQuery('karty wzorów');
-                      setTimeout(() => inputRef.current?.focus(), 50);
-                    }}
-                    className="p-2 bg-blue-100/80 hover:bg-blue-100/99 rounded-xl transition-all duration-200 hover:scale-110 group relative"
-                    title="Przeglądaj karty wzorów"
-                  >
-                    <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
+                      {/* Ikonka wzorów - WEWNĄTRZ głównego buttona */}
+                      <div
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCardsBrowse();
+                        }}
+                        className="p-2 bg-blue-100/80 hover:bg-blue-100/99 rounded-xl transition-all duration-200 hover:scale-110 group relative"
+                        title="Przeglądaj karty wzorów CKE"
+                      >
+                        <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
 
-                    {/* Tooltip */}
-                    <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                      <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                        Przeglądaj karty wzorów
-                        <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
+                        {/* Tooltip */}
+                        <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                          <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                            Przeglądaj karty wzorów CKE
+                            <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </>
               )}
             </button>
+
+            {smartSearch.showOutsideBrowseButton && browseButtonPlacement === 'outside-right' && (
+              <div className="group relative">
+                <button
+                  onClick={openCardsBrowse}
+                  className="hover-shine hover:cursor-pointer flex items-center justify-center text-gray-500 hover:text-gray-700 bg-white/90 hover:bg-white transition-colors rounded-3xl border border-gray-300/80 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+                  style={{ height: '56px', width: '56px' }}
+                  title="Przeglądaj karty wzorów CKE"
+                >
+                  <Library className="w-4 h-4" />
+                </button>
+
+                <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
+                  <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
+                    Przeglądaj karty wzorów CKE
+                    <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
+                  </div>
+                </div>
+              </div>
+            )}
+            </div>
           </>
         ) : (
           <div
-            className={`flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-lg px-6 ${windowWidth > 1550 ? 'mx-auto' : ''}`}
+            className={`flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-lg px-6 ${showFullHeader ? 'mx-auto' : ''}`}
             style={{
-              height: '64px',
-              width: windowWidth <= 760 ? '90vw' : '100%',
+              height: '56px',
+              width: isMobile ? smartSearch.mobileExpandedWidth : '100%',
               maxWidth:
-                windowWidth <= 760
-                  ? '500px'
-                  : windowWidth <= 1550
+                isMobile
+                  ? '100%'
+                  : isCompactHeader
                     ? '100%'
                     : windowWidth <= 1580
                       ? '500px'
@@ -534,13 +563,13 @@ export function SmartSearchBar({
                           : '1000px',
               position: 'relative',
               animation:
-                windowWidth > 760 && windowWidth <= 1550
+                smartSearch.disableExpandAnimation
                   ? 'none'
                   : isClosing
-                    ? windowWidth <= 760
+                    ? isMobile
                       ? 'shrinkSearchMobile 0.3s ease-out forwards'
                       : 'shrinkSearch 0.3s ease-out forwards'
-                    : windowWidth <= 760
+                    : isMobile
                       ? 'expandSearchMobile 0.3s ease-out forwards'
                       : 'expandSearch 0.3s ease-out forwards',
             }}
@@ -573,11 +602,11 @@ export function SmartSearchBar({
             className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-[60] results-scroll overflow-y-auto"
             style={{
               animation: 'slideIn 0.3s ease-out',
-              width: windowWidth <= 760 ? '90vw' : 'auto',
-              maxWidth: windowWidth <= 760 ? '500px' : 'none',
-              left: windowWidth <= 760 ? '50%' : '0',
-              right: windowWidth <= 760 ? 'auto' : '0',
-              transform: windowWidth <= 760 ? 'translateX(-50%)' : 'none',
+              width: isMobile ? smartSearch.mobileExpandedWidth : 'auto',
+              maxWidth: isMobile ? '100%' : 'none',
+              left: isMobile ? '50%' : '0',
+              right: isMobile ? 'auto' : '0',
+              transform: isMobile ? 'translateX(-50%)' : 'none',
             }}
           >
             {isLoading ? (

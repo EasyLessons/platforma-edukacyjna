@@ -70,11 +70,12 @@ export function EraserTool({
       e.stopPropagation();
 
       if (e.ctrlKey) {
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const newViewport = zoomViewport(
           viewport,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          e.clientX - rect.left,
+          e.clientY - rect.top,
           canvasWidth,
           canvasHeight
         );
@@ -282,9 +283,10 @@ export function EraserTool({
 
   const handlePointerMove = useCallback(
     (e: React.PointerEvent) => {
-      const screenPoint = { x: e.clientX, y: e.clientY };
+      const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
       const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-      setCursorPosition(screenPoint); // ✅ Zapisz screen position dla kursora
+      setCursorPosition(screenPoint); // ✅ Zapisz canvas-local position dla kursora
 
       // Znajdź element pod kursorem
       const element = findElementAtPoint(worldPoint);

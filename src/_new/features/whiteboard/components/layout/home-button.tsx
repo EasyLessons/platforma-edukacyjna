@@ -27,7 +27,7 @@ export function HomeButton() {
   }, []);
 
   // Pokazuj tylko gdy BoardHeader jest ukryty (poniżej 1550px)
-  if (windowWidth > 1550) return null;
+  if (windowWidth > 1640) return null;
 
   return (
     <div

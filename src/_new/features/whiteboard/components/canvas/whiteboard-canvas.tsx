@@ -118,6 +118,10 @@ export interface WhiteboardCanvasNewProps {
   userRole?: 'owner' | 'editor' | 'viewer';
   /** Ustawienia tablicy z backendu (JSONB) */
   boardSettings?: BoardSettings;
+  /** Offset px od lewej krawędzi dla toolbara (sidebar strip = zawsze 48, + sidebar gdy otwarty) */
+  toolbarLeftOffset?: number;
+  /** Czy sidebar tablicy jest aktualnie otwarty */
+  isSidebarOpen?: boolean;
   className?: string;
 }
 
@@ -135,6 +139,8 @@ export default function WhiteboardCanvasNew({
   arkuszPath: _arkuszPath,
   userRole = 'editor',
   boardSettings: boardSettingsProp,
+  toolbarLeftOffset = 0,
+  isSidebarOpen = false,
   className = '',
 }: WhiteboardCanvasNewProps) {
   const boardRt = useBoardRealtime();
@@ -185,6 +191,9 @@ export default function WhiteboardCanvasNew({
   const [isCardViewerActive, setIsCardViewerActive] = useState(false);
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
+  const [windowHeight, setWindowHeight] = useState(0);
+  const [bottomToastState, setBottomToastState] = useState<{ id: number; message: string } | null>(null);
+  const [isBottomToastExiting, setIsBottomToastExiting] = useState(false);
 
   // ─── Stan MathChatbot ───────────────────────────────────────────────────────
   const [chatMessages, setChatMessages] = useState<
@@ -235,11 +244,29 @@ export default function WhiteboardCanvasNew({
 
   // ─── windowWidth dla responsywnego pozycjonowania SmartSearch ──────────────
   useEffect(() => {
-    setWindowWidth(window.innerWidth);
-    const handleResize = () => setWindowWidth(window.innerWidth);
+    const handleResize = () => {
+      setWindowWidth(window.innerWidth);
+      setWindowHeight(window.innerHeight);
+    };
+    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (!bottomToastState) return;
+
+    const exitTimer = window.setTimeout(() => setIsBottomToastExiting(true), 2600);
+    const hideTimer = window.setTimeout(() => {
+      setBottomToastState(null);
+      setIsBottomToastExiting(false);
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(exitTimer);
+      window.clearTimeout(hideTimer);
+    };
+  }, [bottomToastState]);
 
   // ─── Broadcast refs — rozwiązanie problemu "kółkowej zależności" ────────────
   // hist potrzebuje rt.broadcastElementCreated, ale rt inicjalizujemy po hist.
@@ -1143,6 +1170,11 @@ useMultiTouchGestures({
         alt: formula.title,
       };
       handleImageCreate(newImage);
+      setIsBottomToastExiting(false);
+      setBottomToastState({
+        id: Date.now() + Math.floor(Math.random() * 1000),
+        message: `Dodano: ${formula.title}`,
+      });
     };
   }, [canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
 
@@ -1220,6 +1252,15 @@ useMultiTouchGestures({
           rt.broadcastElementCreated(imageEl);
           hist.pushUserAction({ type: 'create', element: imageEl });
           el.loadImage(imageEl.id, imageEl.src!);
+        });
+        const toastMessage =
+          loaded.length === 1
+            ? `Dodano: ${loaded[0].formula.title}`
+            : `Dodano: ${loaded.length} elementow z karty`;
+        setIsBottomToastExiting(false);
+        setBottomToastState({
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          message: toastMessage,
         });
         setActiveCard(null);
       })
@@ -1895,20 +1936,47 @@ useMultiTouchGestures({
         )}
 
         {/* ── SMARTSEARCH BAR ───────────────────────────────────────────── */}
-        {userRole !== 'viewer' && settings.smartsearch_visible && (
+        {userRole !== 'viewer' && settings.smartsearch_visible && !(isSidebarOpen && windowWidth <= 1140) && (
           <div
-            className="absolute top-4 z-50 pointer-events-auto"
+            className="absolute z-50 pointer-events-auto"
             style={{
-              left: windowWidth <= 760 ? '90px' : windowWidth <= 1550 ? '90px' : '50%',
-              transform:
-                windowWidth <= 760 ? 'none' : windowWidth <= 1550 ? 'none' : 'translateX(-50%)',
-              right: windowWidth <= 760 ? '16px' : windowWidth <= 1550 ? '330px' : 'auto',
-              maxWidth:
+              top: '16px',
+              left:
                 windowWidth <= 760
-                  ? 'calc(100vw - 90px - 16px)'
-                  : windowWidth <= 1550
-                  ? 'calc(100vw - 90px - 330px)'
-                  : '900px',
+                  ? '82px'
+                  : windowWidth <= 1299
+                    ? '90px'
+                    : windowWidth <= 1640
+                      ? '350px'
+                      : '50%',
+              transform:
+                windowWidth <= 760
+                  ? 'none'
+                  : windowWidth <= 1299
+                    ? 'none'
+                    : windowWidth <= 1640
+                      ? 'none'
+                      : 'translateX(-50%)',
+              right:
+                windowWidth <= 600
+                  ? '50px'
+                  : windowWidth <= 760
+                    ? '350px'
+                  : windowWidth <= 1299
+                    ? '380px'
+                    : windowWidth <= 1640
+                      ? '470px'
+                      : 'auto',
+              maxWidth:
+                windowWidth <= 600
+                  ? 'calc(100vw - 82px - 50px)'
+                  : windowWidth <= 760
+                    ? 'calc(100vw - 82px - 350px)'
+                  : windowWidth <= 1300
+                    ? 'calc(100vw - 90px - 380px)'
+                    : windowWidth <= 1640
+                      ? 'calc(100vw - 300px - 420px)'
+                      : '900px',
             }}
           >
             <SmartSearchBar
@@ -1916,6 +1984,7 @@ useMultiTouchGestures({
               onCardSelect={handleCardSelect}
               onActiveChange={setIsSearchActive}
               userRole={userRole}
+              browseButtonPlacement="outside-right"
             />
           </div>
         )}
@@ -1976,6 +2045,7 @@ useMultiTouchGestures({
             isCalculatorOpen={isCalculatorOpen}
             onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
             isReadOnly={userRole === 'viewer'}
+            leftOffset={toolbarLeftOffset}
           />
         )}
 
@@ -2339,6 +2409,25 @@ useMultiTouchGestures({
             onActiveChange={setIsCardViewerActive}
             userRole={userRole}
           />
+        )}
+
+        {bottomToastState && (
+          <div className="fixed inset-x-0 bottom-8 z-[1200] pointer-events-none flex justify-center px-4">
+            <div className={`whiteboard-toast-base ${isBottomToastExiting ? 'whiteboard-toast-exit' : 'whiteboard-toast-enter'}`}>
+              {bottomToastState.message}
+            </div>
+          </div>
+        )}
+
+        {windowWidth > 0 && (windowWidth <= 320 || windowHeight <= 600) && (
+          <div className="absolute inset-0 z-[1300] flex items-center justify-center px-6 text-center bg-[#FEF2F2]/95 backdrop-blur-[1px]">
+            <div className="max-w-sm rounded-2xl border border-gray-300 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.12)] px-5 py-6">
+              <p className="text-sm font-semibold text-gray-900 mb-2">Zbyt mały obszar roboczy</p>
+              <p className="text-sm text-gray-600">
+                Aby korzystać z aplikacji, zwiększ okno przeglądarki.
+              </p>
+            </div>
+          </div>
         )}
 
       </div>

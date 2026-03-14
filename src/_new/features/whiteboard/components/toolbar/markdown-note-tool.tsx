@@ -61,11 +61,12 @@ export function MarkdownNoteTool({
       const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const newViewport = zoomViewport(
           currentViewport,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          e.clientX - rect.left,
+          e.clientY - rect.top,
           canvasWidth,
           canvasHeight
         );
@@ -81,7 +82,8 @@ export function MarkdownNoteTool({
   }, [canvasWidth, canvasHeight, onViewportChange]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     setIsCreating(true);
@@ -92,7 +94,8 @@ export function MarkdownNoteTool({
   const handleMouseMove = (e: React.MouseEvent) => {
     if (!isCreating) return;
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
     setCurrentPoint(worldPoint);
   };

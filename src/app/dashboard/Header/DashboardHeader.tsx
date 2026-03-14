@@ -116,7 +116,7 @@ export default function DashboardHeader() {
       <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
           {/* DESKTOP LOADING */}
-          <div className="hidden min-[1550px]:flex items-center justify-between gap-4">
+          <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
                 <Image
@@ -135,7 +135,7 @@ export default function DashboardHeader() {
           </div>
 
           {/* MOBILE LOADING */}
-          <div className="min-[1550px]:hidden flex items-center justify-between">
+          <div className="min-[1640px]:hidden flex items-center justify-between">
             <Link href="/" className="flex items-center cursor-pointer">
               <Image
                 src="/resources/LogoEasyLesson.webp"
@@ -158,7 +158,7 @@ export default function DashboardHeader() {
       <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
           {/* DESKTOP VERSION */}
-          <div className="hidden min-[1550px]:flex items-center justify-between gap-4">
+          <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
             {/* LEWA STRONA - Logo + Badge */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
@@ -268,7 +268,7 @@ export default function DashboardHeader() {
           </div>
 
           {/* MOBILE VERSION */}
-          <div className="min-[1550px]:hidden flex items-center justify-between">
+          <div className="min-[1640px]:hidden flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center cursor-pointer">
               <Image

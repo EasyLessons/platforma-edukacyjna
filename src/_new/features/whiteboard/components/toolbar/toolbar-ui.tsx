@@ -234,6 +234,7 @@ export function ToolbarUI({
   // Mobile: < 768px (md breakpoint) - pełny modal
   const isMediumHeight = viewportHeight < 815 && viewportHeight >= 768;
   const isMobile = viewportHeight < 768;
+  const isCompactHeight = viewportHeight <= 814;
 
   const getShapeIcon = () => {
     switch (selectedShape) {
@@ -263,7 +264,7 @@ export function ToolbarUI({
     <>
       {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
-        <div className="flex flex-col items-center gap-1.5 p-2">
+        <div className={`flex flex-col items-center ${isCompactHeight ? 'gap-1 p-1.5' : 'gap-1.5 p-2'}`}>
           {/* Main Tools */}
           {!isReadOnly && (
             <ToolButton
@@ -355,12 +356,14 @@ export function ToolbarUI({
             </>
           )}
 
-          <ToolButton
-            icon={Calculator}
-            active={isCalculatorOpen ?? false}
-            onClick={() => onCalculatorToggle?.()}
-            title="Kalkulator (zawsze dostępny)"
-          />
+          {!isCompactHeight && (
+            <ToolButton
+              icon={Calculator}
+              active={isCalculatorOpen ?? false}
+              onClick={() => onCalculatorToggle?.()}
+              title="Kalkulator (zawsze dostępny)"
+            />
+          )}
 
           <Divider />
 
@@ -433,13 +436,15 @@ export function ToolbarUI({
           )}
 
           {/* Clear */}
-          <ToolButton
-            icon={Trash2}
-            active={false}
-            onClick={onClear}
-            title="Wyczyść wszystko"
-            disabled={isReadOnly}
-          />
+          {!isCompactHeight && (
+            <ToolButton
+              icon={Trash2}
+              active={false}
+              onClick={onClear}
+              title="Wyczyść wszystko"
+              disabled={isReadOnly}
+            />
+          )}
         </div>
       </div>
 
@@ -497,6 +502,30 @@ export function ToolbarUI({
                 disabled={isReadOnly}
               />
             )}
+
+            <Divider />
+
+            <ToolButton
+              icon={Calculator}
+              active={isCalculatorOpen ?? false}
+              onClick={() => {
+                onCalculatorToggle?.();
+                setIsMoreMenuOpen(false);
+              }}
+              title="Kalkulator"
+              disabled={isReadOnly}
+            />
+
+            <ToolButton
+              icon={Trash2}
+              active={false}
+              onClick={() => {
+                onClear();
+                setIsMoreMenuOpen(false);
+              }}
+              title="Wyczyść wszystko"
+              disabled={isReadOnly}
+            />
           </div>
         </div>
       )}

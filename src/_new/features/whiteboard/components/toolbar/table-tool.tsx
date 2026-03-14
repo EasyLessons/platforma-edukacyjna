@@ -65,11 +65,12 @@ export function TableTool({
       const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const newViewport = zoomViewport(
           currentViewport,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          e.clientX - rect.left,
+          e.clientY - rect.top,
           canvasWidth,
           canvasHeight
         );
@@ -90,7 +91,8 @@ export function TableTool({
       return;
     }
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     setConfigPosition(screenPoint);
     setShowConfig(true);
   };

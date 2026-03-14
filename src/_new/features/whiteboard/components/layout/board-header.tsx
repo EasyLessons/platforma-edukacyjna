@@ -1,81 +1,68 @@
 /**
  * ============================================================================
- * PLIK: src/app/tablica/components/BoardHeader.tsx
+ * PLIK: board-header.tsx
  * ============================================================================
  *
  * PRZEZNACZENIE:
  * Nagłówek tablicy z:
- * - Logo EasyLesson (po lewej)
- * - Przyciskiem "Zobacz plan Premium" (po prawej)
+ * - Przyciskiem toggle sidebaru (skrajnie po lewej)
+ * - Logo EasyLesson (link powrotu do dashboardu)
+ * - Opcjonalnym przyciskiem ustawień tablicy
  * ============================================================================
  */
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { PanelLeftOpen, PanelLeftClose, MoreVertical } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-
-// Komponent pomocniczy dla wiersza porównania
-function ComparisonRow({ feature, free, premium }: { feature: string; free: string; premium: string }) {
-  return (
-    <tr>
-      <td style={{ padding: '8px 12px', fontSize: '13px', color: '#374151' }}>
-        {feature}
-      </td>
-      <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', color: '#6b7280' }}>
-        {free}
-      </td>
-      <td style={{ padding: '8px 12px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#059669' }}>
-        {premium}
-      </td>
-    </tr>
-  );
-}
+import {
+  getIconComponent as getBoardIconComponent,
+  getGradientClass,
+} from '@/_new/features/board/utils/helpers';
+import { Button } from '@/_new/shared/ui/button';
+import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 
 interface BoardHeaderProps {
   boardName: string;
+  boardIcon?: string;
+  boardBgColor?: string;
   boardId: string;
+  isSidebarOpen?: boolean;
+  onSidebarToggle?: () => void;
   onSettingsClick?: () => void;
 }
 
-export function BoardHeader({ boardName, boardId, onSettingsClick }: BoardHeaderProps) {
-  const [showComparison, setShowComparison] = useState(false);
+export function BoardHeader({
+  boardName,
+  boardIcon = 'PenTool',
+  boardBgColor = 'gray-500',
+  boardId,
+  isSidebarOpen = false,
+  onSidebarToggle,
+  onSettingsClick,
+}: BoardHeaderProps) {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [windowWidth, setWindowWidth] = useState(0);
-  const [windowHeight, setWindowHeight] = useState(0);
-  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const router = useRouter();
+  const metrics = useWhiteboardUiMetrics();
 
-  // Monitoruj szerokość i wysokość okna
-  useEffect(() => {
-    const handleResize = () => {
-      setWindowWidth(window.innerWidth);
-      setWindowHeight(window.innerHeight);
-    };
-    handleResize(); // Inicjalne ustawienie
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const showLogo = windowWidth > 1550;
-
-  const handlePremiumClick = () => {
-    router.push('/#pricing');
-    setShowComparison(false);
-  };
+  const showFullHeader = metrics.showFullHeader;
+  const showCompactHeader = metrics.showCompactHeader;
+  const showSettingsInFallback = showCompactHeader;
+  const showUpgradeButton = metrics.windowWidth >= 1874;
+  const BoardIcon = getBoardIconComponent(boardIcon);
+  const boardGradient = getGradientClass(boardBgColor);
 
   return (
     <>
-      {/* Główny nagłówek - cały ukrywany poniżej 1550px */}
-      {showLogo && (
+      {/* Główny nagłówek — widoczny tylko przy szerokości >= 1640px */}
+      {showFullHeader && (
         <div
           style={{
             position: 'absolute',
-            top: '16px',
-            left: '16px',
-            right: '16px',
+            top: `${metrics.spacing.top}px`,
+            left: `${metrics.spacing.side}px`,
             zIndex: 100,
             display: 'flex',
             alignItems: 'center',
@@ -83,109 +70,147 @@ export function BoardHeader({ boardName, boardId, onSettingsClick }: BoardHeader
             pointerEvents: 'none',
           }}
         >
-          {/* Biały box z logo + przyciskiem premium */}
+          {/* Biały box: [Logo] + [Sidebar toggle] + [Settings?] */}
           <div
             style={{
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'space-between',
               gap: '0px',
-              padding: '8px 12px 8px 12px',
+              padding: '0 12px',
+              height: '56px',
               backgroundColor: 'white',
               border: '2px solid #e0e0e0',
               borderRadius: '16px',
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              minWidth: '400px',
               pointerEvents: 'auto',
             }}
           >
-            {/* Logo z przyciskiem powrotu - ukrywane poniżej 1550px */}
-            {showLogo && (
-              <button
-                onClick={() => (window.location.href = '/dashboard')}
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
-                style={{
-                  padding: '4px 1px 4px 4px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  position: 'relative',
-                  borderRadius: '8px',
-                }}
-                onMouseOver={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6';
-                }}
-                onMouseOut={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
-                }}
-              >
-                <Image
-                  src="/resources/LogoEasyLesson.webp"
-                  alt="EasyLesson Logo"
-                  width={160}
-                  height={50}
-                  className="h-9 w-auto"
-                  priority
-                />
+            {/* Logo — link powrotu do dashboardu */}
+            <button
+              onClick={() => router.push('/dashboard')}
+              onMouseEnter={(e) => {
+                setShowTooltip(true);
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                setShowTooltip(false);
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              style={{
+                padding: '4px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                position: 'relative',
+                borderRadius: '8px',
+              }}
+            >
+              <Image
+                src="/resources/LogoEasyLesson.webp"
+                alt="EasyLesson Logo"
+                width={160}
+                height={50}
+                className="h-9 w-auto"
+                priority
+              />
 
-                {/* Tooltip */}
-                {showTooltip && (
+              {/* Tooltip */}
+              {showTooltip && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px',
+                    backgroundColor: '#1f2937',
+                    color: 'white',
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    pointerEvents: 'none',
+                    zIndex: 101,
+                  }}
+                >
+                  Wróć do panelu
                   <div
                     style={{
                       position: 'absolute',
-                      top: '100%',
+                      top: '-6px',
                       left: '50%',
                       transform: 'translateX(-50%)',
-                      marginTop: '8px',
-                      backgroundColor: '#1f2937',
-                      color: 'white',
-                      padding: '8px 14px',
-                      borderRadius: '6px',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      whiteSpace: 'nowrap',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                      pointerEvents: 'none',
-                      zIndex: 101,
+                      width: 0,
+                      height: 0,
+                      borderLeft: '6px solid transparent',
+                      borderRight: '6px solid transparent',
+                      borderBottom: '6px solid #1f2937',
                     }}
-                  >
-                    Wróć do panelu
-                    <div
-                      style={{
-                        position: 'absolute',
-                        top: '-6px',
-                        left: '50%',
-                        transform: 'translateX(-50%)',
-                        width: 0,
-                        height: 0,
-                        borderLeft: '6px solid transparent',
-                        borderRight: '6px solid transparent',
-                        borderBottom: '6px solid #1f2937',
-                      }}
-                    />
-                  </div>
-                )}
-              </button>
-            )}
+                  />
+                </div>
+              )}
+            </button>
 
-            {/* Separator - ukrywany poniżej 1550px */}
-            {showLogo && (
+            {/* Separator przed togglem */}
+            {onSidebarToggle && (
               <div
                 style={{
                   marginLeft: '8px',
                   marginRight: '8px',
                   width: '1px',
-                  height: '32px',
+                  height: '28px',
                   backgroundColor: '#e5e7eb',
                 }}
               />
             )}
 
-            {/* Przycisk ustawień tablicy — widoczny gdy onSettingsClick jest przekazane */}
+            {/* Sidebar toggle (po prawej stronie logo) */}
+            {onSidebarToggle && (
+              <button
+                onClick={onSidebarToggle}
+                title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
+                style={{
+                  padding: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#374151',
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+              </button>
+            )}
+
+            {/* Separator przed ustawieniami */}
+            {onSettingsClick && (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  width: '1px',
+                  height: '28px',
+                  backgroundColor: '#e5e7eb',
+                }}
+              />
+            )}
+
+            {/* Przycisk ustawień tablicy */}
             {onSettingsClick && (
               <button
                 onClick={onSettingsClick}
@@ -199,328 +224,341 @@ export function BoardHeader({ boardName, boardId, onSettingsClick }: BoardHeader
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: '4px',
                   transition: 'background 0.15s',
                 }}
-                onMouseOver={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6';
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
                 }}
-                onMouseOut={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-                  <circle cx="12" cy="12" r="3"/>
-                </svg>
+                <MoreVertical size={18} color="#6b7280" />
               </button>
             )}
 
-            {/* Przycisk Premium */}
-            <div style={{ position: 'relative' }}>
-              <button
-                onMouseEnter={() => {
-                  // Anuluj zamykanie
-                  if (closeTimeoutRef.current) {
-                    clearTimeout(closeTimeoutRef.current);
-                  }
-                  setShowComparison(true);
-                }}
-                onMouseLeave={() => {
-                  // Zamknij po 200ms (czas na wjechanie na okienko)
-                  closeTimeoutRef.current = setTimeout(() => {
-                    setShowComparison(false);
-                  }, 200);
-                }}
-                onClick={handlePremiumClick}
+            {/* Separator przed nazwą tablicy */}
+            <div
+              style={{
+                marginLeft: '8px',
+                marginRight: '8px',
+                width: '1px',
+                height: '28px',
+                backgroundColor: '#e5e7eb',
+              }}
+            />
+
+            {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
+            <div
+              title={boardName}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                maxWidth: '260px',
+                minWidth: 0,
+                color: '#374151',
+              }}
+            >
+              <div
+                className={`w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
+              >
+                <BoardIcon size={13} color="white" />
+              </div>
+              <span
                 style={{
-                  padding: '8px 20px',
-                  background: 'linear-gradient(135deg, #e0e0e0ff  0%, #e0e0e0ff  100%)',
-                  border: 'none',
-                  borderRadius: '10px',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  boxShadow: '0 4px 12px rgba(174, 174, 174, 0.25)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}
-                onMouseOver={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    '0 6px 16px rgba(192, 192, 192, 0.35)';
-                }}
-                onMouseOut={(e) => {
-                  (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
-                  (e.currentTarget as HTMLButtonElement).style.boxShadow =
-                    '0 4px 12px rgba(192, 192, 192, 0.25)';
+                  display: 'block',
+                  minWidth: 0,
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
                 }}
               >
-                <Sparkles className="w-5 h-5 text-gray-600 font-bold" />
-                <span
-                  style={{
-                    fontSize: '14px',
-                    fontWeight: '400',
-                    color: 'black',
-                  }}
-                >
-                  Zobacz plan Premium
-                </span>
-              </button>
-
-              {/* Tabela porównawcza - pojawia się na hover */}
-              {showComparison && (
-                <div
-                  onMouseEnter={() => {
-                    // Jak wjedziemy na okienko - anuluj zamykanie
-                    if (closeTimeoutRef.current) {
-                      clearTimeout(closeTimeoutRef.current);
-                    }
-                  }}
-                  onMouseLeave={() => {
-                    // Jak zjedziemy - zamknij od razu
-                    setShowComparison(false);
-                  }}
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    right: '1',
-                    marginTop: '12px',
-                    backgroundColor: 'white',
-                    border: '2px solid #e5e7eb',
-                    borderRadius: '16px',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.15)',
-                    padding: '20px',
-                    minWidth: '420px',
-                    maxHeight: windowHeight > 0 ? `${windowHeight - 120}px` : 'none',
-                    overflowY: 'auto',
-                    zIndex: 101,
-                  }}
-                >
-                  {/* Strzałka wskazująca na przycisk */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-10px',
-                      right: '24px',
-                      width: '0',
-                      height: '0',
-                      borderLeft: '10px solid transparent',
-                      borderRight: '10px solid transparent',
-                      borderBottom: '10px solid #e5e7eb',
-                    }}
-                  />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-8px',
-                      right: '25px',
-                      width: '0',
-                      height: '0',
-                      borderLeft: '9px solid transparent',
-                      borderRight: '9px solid transparent',
-                      borderBottom: '9px solid white',
-                    }}
-                  />
-
-                  <h3
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#1f2937',
-                      marginBottom: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                    }}
-                  >
-                    <Sparkles className="w-5 h-5 text-green-600" />
-                    Dlaczego Premium?
-                  </h3>
-
-                  {/* Placeholder na filmik YouTube */}
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '200px',
-                      backgroundColor: '#f3f4f6',
-                      borderRadius: '12px',
-                      marginBottom: '16px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '2px dashed #d1d5db',
-                      position: 'relative',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        textAlign: 'center',
-                        color: '#6b7280',
-                      }}
-                    >
-                      <svg
-                        style={{ width: '48px', height: '48px', margin: '0 auto 8px' }}
-                        fill="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                      </svg>
-                      <div style={{ fontSize: '14px', fontWeight: '500' }}>Filmik YouTube</div>
-                      <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                        Link do wideo zostanie dodany wkrótce
-                      </div>
-                    </div>
-                  </div>
-
-                  <table
-                    style={{
-                      width: '100%',
-                      borderCollapse: 'separate',
-                      borderSpacing: '0 8px',
-                    }}
-                  >
-                    <thead>
-                      <tr>
-                        <th
-                          style={{
-                            textAlign: 'left',
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            color: '#6b7280',
-                          }}
-                        >
-                          Funkcja
-                        </th>
-                        <th
-                          style={{
-                            textAlign: 'center',
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            color: '#6b7280',
-                          }}
-                        >
-                          Free
-                        </th>
-                        <th
-                          style={{
-                            textAlign: 'center',
-                            padding: '8px 12px',
-                            fontSize: '13px',
-                            fontWeight: '600',
-                            color: '#059669',
-                            background: 'linear-gradient(135deg, #f3f4f6 0%, #d1fae5 100%)',
-                            borderRadius: '8px',
-                          }}
-                        >
-                          Premium
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <ComparisonRow
-                        feature="Liczba workspace'ów"
-                        free="3"
-                        premium="Nielimitowane"
-                      />
-                      <ComparisonRow feature="Liczba tablic" free="3" premium="Nielimitowane" />
-                      <ComparisonRow
-                        feature="Współpraca realtime"
-                        free="2 osoby"
-                        premium="Do 50 osób"
-                      />
-                      <ComparisonRow
-                        feature="Ilość elementów na tablicy"
-                        free="500 elementów"
-                        premium="Nielimitowane"
-                      />
-                      <ComparisonRow
-                        feature="Chat na tablicy"
-                        free="5 wiadomości"
-                        premium="Nielimitowane"
-                      />
-                      <ComparisonRow
-                        feature="Zaawansowane narzędzia (rysowanie funkcji, kalulator itp.)"
-                        free="✗"
-                        premium="✓"
-                      />
-                    </tbody>
-                  </table>
-
-                  <button
-                    onClick={handlePremiumClick}
-                    style={{
-                      width: '100%',
-                      marginTop: '16px',
-                      padding: '12px',
-                      background: 'linear-gradient(135deg, #00ca4aff   0%, #00ca4aff   100%)',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '10px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      boxShadow: '0 4px 12px rgba(205, 205, 205, 0.3)',
-                    }}
-                    onMouseOver={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1.02)';
-                    }}
-                    onMouseOut={(e) => {
-                      (e.currentTarget as HTMLButtonElement).style.transform = 'scale(1)';
-                    }}
-                  >
-                    Zobacz plan Premium →
-                  </button>
-                </div>
-              )}
+                {boardName || 'Tablica'}
+              </span>
             </div>
+
+            {showUpgradeButton && (
+              <>
+                {/* Separator przed przyciskiem zmiany wersji */}
+                <div
+                  style={{
+                    marginLeft: '8px',
+                    marginRight: '8px',
+                    width: '1px',
+                    height: '28px',
+                    backgroundColor: '#e5e7eb',
+                  }}
+                />
+
+                <Button
+                  onClick={() => router.push('/#pricing')}
+                  variant="secondary"
+                  size="sm"
+                  title="Przejdź do sekcji pricing"
+                  className="ml-1 hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700 px-3 whitespace-nowrap transition-all duration-300 ease-in-out"
+                >
+                  Zmień wersję
+                </Button>
+              </>
+            )}
+
+          
           </div>
         </div>
       )}
 
-      {/* Fallback przycisk ustawień — pojawia się gdy BoardHeader jest ukryty (< 1550px) */}
-      {!showLogo && onSettingsClick && (
+      {showCompactHeader && !showFullHeader && (
         <div
           style={{
             position: 'absolute',
-            top: '16px',
-            left: '80px',
+            top: `${metrics.spacing.top}px`,
+            left: `${metrics.spacing.side}px`,
             zIndex: 100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            pointerEvents: 'none',
           }}
         >
-          <button
-            onClick={onSettingsClick}
-            title="Ustawienia tablicy"
+          <div
             style={{
-              padding: '10px',
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '12px',
-              cursor: 'pointer',
-              transition: 'all 0.2s',
-              boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
-            }}
-            onMouseOver={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f9fafb';
-            }}
-            onMouseOut={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-              (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'white';
+              gap: '0px',
+              padding: '0 12px',
+              height: '56px',
+              backgroundColor: 'white',
+              border: '2px solid #e0e0e0',
+              borderRadius: '16px',
+              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              pointerEvents: 'auto',
             }}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b7280" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg>
-          </button>
+            <button
+              onClick={() => router.push('/dashboard')}
+              onMouseEnter={(e) => {
+                setShowTooltip(true);
+                e.currentTarget.style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseLeave={(e) => {
+                setShowTooltip(false);
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
+              style={{
+                padding: '4px',
+                backgroundColor: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'background-color 0.15s',
+                display: 'flex',
+                alignItems: 'center',
+                position: 'relative',
+                borderRadius: '8px',
+              }}
+            >
+              <Image
+                src="/resources/LogoEasyLesson.webp"
+                alt="EasyLesson Logo"
+                width={160}
+                height={50}
+                className="h-9 w-auto"
+                priority
+              />
+
+              {showTooltip && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    marginTop: '8px',
+                    backgroundColor: '#1f2937',
+                    color: 'white',
+                    padding: '8px 14px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    whiteSpace: 'nowrap',
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+                    pointerEvents: 'none',
+                    zIndex: 101,
+                  }}
+                >
+                  Wróć do panelu
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
+                      width: 0,
+                      height: 0,
+                      borderLeft: '6px solid transparent',
+                      borderRight: '6px solid transparent',
+                      borderBottom: '6px solid #1f2937',
+                    }}
+                  />
+                </div>
+              )}
+            </button>
+
+            {onSidebarToggle && (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  width: '1px',
+                  height: '28px',
+                  backgroundColor: '#e5e7eb',
+                }}
+              />
+            )}
+
+            {onSidebarToggle && (
+              <button
+                onClick={onSidebarToggle}
+                title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
+                style={{
+                  padding: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#374151',
+                  transition: 'background-color 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+              </button>
+            )}
+
+            {onSettingsClick && (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  width: '1px',
+                  height: '28px',
+                  backgroundColor: '#e5e7eb',
+                }}
+              />
+            )}
+
+            {onSettingsClick && (
+              <button
+                onClick={onSettingsClick}
+                title="Ustawienia tablicy"
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <MoreVertical size={18} color="#6b7280" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fallback — wąskie ekrany (< 1550px): sidebar toggle + ustawienia */}
+      {!showFullHeader && !showCompactHeader && (
+        <div
+          style={{
+            position: 'absolute',
+            top: `${metrics.spacing.top}px`,
+            left: `${metrics.spacing.side}px`,
+            zIndex: 100,
+            display: 'flex',
+            flexDirection: metrics.boardHeader.fallbackStackVertical ? 'column' : 'row',
+            gap: `${metrics.spacing.gap}px`,
+          }}
+        >
+          {onSidebarToggle && (
+            <button
+              onClick={onSidebarToggle}
+              title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
+              style={{
+                width: `${metrics.boardHeader.fallbackButtonSize}px`,
+                height: `${metrics.boardHeader.fallbackButtonSize}px`,
+                backgroundColor: 'white',
+                border: '2px solid #e0e0e0',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: '#374151',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+              }}
+            >
+              {isSidebarOpen ? (
+                <PanelLeftClose size={metrics.boardHeader.fallbackIconSize} />
+              ) : (
+                <PanelLeftOpen size={metrics.boardHeader.fallbackIconSize} />
+              )}
+            </button>
+          )}
+
+          {showSettingsInFallback && onSettingsClick && (
+            <button
+              onClick={onSettingsClick}
+              title="Ustawienia tablicy"
+              style={{
+                width: `${metrics.boardHeader.fallbackButtonSize}px`,
+                height: `${metrics.boardHeader.fallbackButtonSize}px`,
+                backgroundColor: 'white',
+                border: '2px solid #e0e0e0',
+                borderRadius: '12px',
+                cursor: 'pointer',
+                transition: 'box-shadow 0.15s',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+              }}
+            >
+              <MoreVertical size={metrics.boardHeader.fallbackIconSize} color="#6b7280" />
+            </button>
+          )}
         </div>
       )}
     </>

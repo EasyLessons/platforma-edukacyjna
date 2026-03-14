@@ -143,7 +143,8 @@ useEffect(() => {
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     // Użyj canvasViewportRef — brak opóźnienia debounce 80ms
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
@@ -170,7 +171,8 @@ useEffect(() => {
 
     if (!isDrawing || !currentShape) return;
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, getViewport(), canvasWidth, canvasHeight);
 
     setCurrentShape({

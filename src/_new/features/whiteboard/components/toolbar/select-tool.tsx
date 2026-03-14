@@ -128,11 +128,12 @@ export function SelectTool({
       const currentViewport = viewportRef.current;
 
       if (e.ctrlKey) {
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const newViewport = zoomViewport(
           currentViewport,
           e.deltaY,
-          e.clientX,
-          e.clientY,
+          e.clientX - rect.left,
+          e.clientY - rect.top,
           canvasWidth,
           canvasHeight
         );
@@ -179,7 +180,8 @@ export function SelectTool({
     if (!isResizing && !isDragging && !isRotating) return;
 
     const handleGlobalPointerMove = (e: PointerEvent) => {
-      const screenPoint = { x: e.clientX, y: e.clientY };
+      const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
       const worldPoint = inverseTransformPoint(
         screenPoint,
         viewportRef.current,
@@ -462,7 +464,7 @@ export function SelectTool({
         }
       } else if (isRotating && rotationPivot && rotationOriginalElements.size > 0) {
         // 🆕 ROTATION - obracanie zaznaczonych elementów wokół pivota
-        const screenPoint = { x: e.clientX, y: e.clientY };
+        // rect is already computed at the top of this handler
         const worldPoint = inverseTransformPoint(
           screenPoint,
           viewportRef.current,
@@ -776,7 +778,8 @@ export function SelectTool({
     };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     for (let i = elements.length - 1; i >= 0; i--) {
@@ -800,7 +803,8 @@ const handlePointerDown = (e: React.PointerEvent) => {
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 
-    const screenPoint = { x: e.clientX, y: e.clientY };
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
     const bbox = getSelectionBoundingBox();
@@ -898,7 +902,8 @@ const handlePointerDown = (e: React.PointerEvent) => {
   const handlePointerMove = (e: React.PointerEvent) => {
     // Tylko dla zaznaczania obszaru - resize/drag obsługiwane przez global listener
     if (isSelecting && selectionStart) {
-      const currentEnd = { x: e.clientX, y: e.clientY };
+      const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+      const currentEnd = { x: e.clientX - rect.left, y: e.clientY - rect.top };
       setSelectionEnd(currentEnd);
 
       // 🆕 Live preview - oblicz które elementy będą zaznaczone
@@ -1708,7 +1713,8 @@ const handlePointerDown = (e: React.PointerEvent) => {
                   };
 
                   // Oblicz początkowy kąt
-                  const screenPoint = { x: e.clientX, y: e.clientY };
+                  const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+                  const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
                   const worldPoint = inverseTransformPoint(
                     screenPoint,
                     viewport,

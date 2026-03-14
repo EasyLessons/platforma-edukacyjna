@@ -128,8 +128,9 @@ export function TextTool({
       const handle = resizeHandleRef.current;
       if (!snap) return;
 
+      const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
       const worldCursor = inverseTransformPoint(
-        { x: e.clientX, y: e.clientY },
+        { x: e.clientX - rect.left, y: e.clientY - rect.top },
         viewportRef.current,
         canvasWidth,
         canvasHeight
@@ -269,7 +270,10 @@ export function TextTool({
       if (phase === 'editing') return; 
       e.preventDefault(); e.stopPropagation();
       const vp = viewportRef.current;
-      if (e.ctrlKey) onViewportChange(constrainViewport(zoomViewport(vp, e.deltaY, e.clientX, e.clientY, canvasWidth, canvasHeight)));
+      if (e.ctrlKey) {
+        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        onViewportChange(constrainViewport(zoomViewport(vp, e.deltaY, e.clientX - rect.left, e.clientY - rect.top, canvasWidth, canvasHeight)));
+      }
       else           onViewportChange(constrainViewport(panViewportWithWheel(vp, e.deltaX, e.deltaY)));
     };
     overlay.addEventListener('wheel', onWheel, { passive: false });
@@ -289,7 +293,8 @@ export function TextTool({
   const handleOverlayDown = (e: React.MouseEvent) => {
     if (isGestureActive) return;
     if (phase === 'editing' || e.button !== 0) return;
-    const world = inverseTransformPoint({ x: e.clientX, y: e.clientY }, viewport, canvasWidth, canvasHeight);
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const world = inverseTransformPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, viewport, canvasWidth, canvasHeight);
     drawStartWorld.current = world;
     drawCurrWorld.current  = world;
     setPhase('drawing');
@@ -298,7 +303,8 @@ export function TextTool({
 
   const handleOverlayMove = (e: React.MouseEvent) => {
     if (phase !== 'drawing' || !drawStartWorld.current) return;
-    const world = inverseTransformPoint({ x: e.clientX, y: e.clientY }, viewport, canvasWidth, canvasHeight);
+    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const world = inverseTransformPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, viewport, canvasWidth, canvasHeight);
     drawCurrWorld.current = world;
     setDrawPreview({
       x: Math.min(drawStartWorld.current.x, world.x),

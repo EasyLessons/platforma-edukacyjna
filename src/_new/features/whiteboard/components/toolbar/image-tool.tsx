@@ -75,11 +75,12 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
         e.stopPropagation();
 
         if (e.ctrlKey) {
+          const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
           const newViewport = zoomViewport(
             viewport,
             e.deltaY,
-            e.clientX,
-            e.clientY,
+            e.clientX - rect.left,
+            e.clientY - rect.top,
             canvasWidth,
             canvasHeight
           );
