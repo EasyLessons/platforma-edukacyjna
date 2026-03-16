@@ -4,26 +4,16 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import {
-  Bell,
-  Gift,
-  Crown,
-  Settings,
-  Menu,
-  X,
-  LogOut,
-  User as UserIcon,
-} from 'lucide-react';
+import { Bell, Gift, Crown, Settings, Menu, X, LogOut, User as UserIcon } from 'lucide-react';
 
-// Import funkcji API
 import { getUser, isAuthenticated, type User } from '@/auth_api/api';
-import { fetchPendingInvites } from '@/workspace_api/api';
 import { useAuth } from '@/app/context/AuthContext';
+import { useNotifications } from '@/_new/features/notifications/hooks/use-notifications';
 
-// Import popupów
 import GiftPopup from './popups/GiftPopup';
-import NotificationsPopup from './popups/NotificationsPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
+import { NotificationBell } from '@/_new/features/notifications/components/notification-bell';
+import { NotificationPanel } from '@/_new/features/notifications/components/notification-panel';
 
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from '../Components/DashboardButton';
@@ -35,10 +25,24 @@ interface ExtendedUser extends User {
   isPremium: boolean;
 }
 
-export default function DashboardHeader() {
+interface DashboardHeaderProps {
+  refreshWorkspaces: () => Promise<void>;
+}
+
+export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderProps) {
   const router = useRouter();
   const { logout } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
+
+  // Hook do powiadomień
+  const {
+    notifications,
+    unreadCount,
+    loading: notificationsLoading,
+    markAllAsRead,
+    handleAcceptInvite,
+    handleRejectInvite,
+  } = useNotifications();
 
   // State dla popupów
   const [showGiftPopup, setShowGiftPopup] = useState(false);
@@ -86,36 +90,11 @@ export default function DashboardHeader() {
     fetchUser();
   }, [router]);
 
-  // Pobieranie liczby zaproszeń co 30 sekund
-  useEffect(() => {
-    const loadInviteCount = async () => {
-      try {
-        console.log('🔍 DashboardHeader: Pobieram zaproszenia...');
-        const token = localStorage.getItem('access_token');
-        console.log('🔍 DashboardHeader: Token w localStorage:', token ? '✅ Jest' : '❌ Brak');
-        
-        const invites = await fetchPendingInvites();
-        setInviteCount(invites.length);
-        console.log('✅ DashboardHeader: Zaproszenia pobrane:', invites.length);
-      } catch (error) {
-        console.error('❌ DashboardHeader: Błąd pobierania zaproszeń:', error);
-        // Nie pokazuj błędu użytkownikowi - może być niezalogowany podczas przekierowania
-      }
-    };
-
-    // Opóźnienie 500ms przed pierwszym request (daj czas na załadowanie tokenu)
-    setTimeout(loadInviteCount, 500);
-    
-    const interval = setInterval(loadInviteCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   // Loading state
   if (loading) {
     return (
       <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
-          {/* DESKTOP LOADING */}
           <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
@@ -130,11 +109,9 @@ export default function DashboardHeader() {
               </Link>
             </div>
             <div className="flex items-center justify-end gap-2">
-              <div className="w-8 h-8 bg-gray-200 animate-pulse rounded-lg"></div>
+              <div className="w-8 h-8 bg-gray-200 animate-pulse rounded-lg" />
             </div>
           </div>
-
-          {/* MOBILE LOADING */}
           <div className="min-[1640px]:hidden flex items-center justify-between">
             <Link href="/" className="flex items-center cursor-pointer">
               <Image
@@ -146,7 +123,7 @@ export default function DashboardHeader() {
                 priority
               />
             </Link>
-            <div className="w-6 h-6 bg-gray-200 animate-pulse rounded"></div>
+            <div className="w-6 h-6 bg-gray-200 animate-pulse rounded" />
           </div>
         </div>
       </header>
@@ -157,9 +134,11 @@ export default function DashboardHeader() {
     <>
       <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
-          {/* DESKTOP VERSION */}
+ 
+          {/* DESKTOP */}
           <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
-            {/* LEWA STRONA - Logo + Badge */}
+ 
+            {/* LEWA STRONA */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
                 <Image
@@ -171,18 +150,15 @@ export default function DashboardHeader() {
                   priority
                 />
               </Link>
-
-              {/* Badge Free */}
               {user && !user.isPremium && (
                 <div className="dashboard-btn-secondary rounded-full border border-[var(--dash-border)] px-3 py-1.5 text-xs font-semibold text-gray-700">
                   FREE PLAN
                 </div>
               )}
             </div>
-
-            {/* PRAWA STRONA - Przyciski i ikony */}
+ 
+            {/* PRAWA STRONA */}
             <div className="flex items-center justify-end gap-2">
-              {/* Premium Button */}
               {user && !user.isPremium && (
                 <Link href="/#pricing">
                   <DashboardButton variant="secondary" leftIcon={<Crown size={16} />}>
@@ -190,12 +166,9 @@ export default function DashboardHeader() {
                   </DashboardButton>
                 </Link>
               )}
-
-              {/* Separator */}
-              <div className="w-px h-6 bg-gray-200 mx-1"></div>
-
-              {/* Ikonka Prezentu */}
-
+ 
+              <div className="w-px h-6 bg-gray-200 mx-1" />
+ 
               <Button
                 variant="secondary"
                 size="iconSm"
@@ -205,25 +178,12 @@ export default function DashboardHeader() {
               >
                 <Gift size={16} />
               </Button>
-
-              {/* Dzwonek */}
-              <div className="relative">
-                <Button
-                  variant="secondary"
-                  size="iconSm"
-                  onClick={() => setShowNotifications(!showNotifications)}
-                  className="dashboard-btn-secondary rounded-full"
-                >
-                  <Bell size={16} />
-                </Button>
-                {inviteCount > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {inviteCount > 9 ? '9+' : inviteCount}
-                  </span>
-                )}
-              </div>
-
-              {/* Avatar */}
+ 
+              <NotificationBell
+                unreadCount={unreadCount}
+                onClick={() => setShowNotifications(!showNotifications)}
+              />
+ 
               {user && (
                 <div className="relative">
                   <div className="dashboard-btn-secondary flex min-h-[40px] items-center rounded-full px-2.5 py-1 pr-3">
@@ -250,8 +210,6 @@ export default function DashboardHeader() {
                       <Settings size={14} />
                     </button>
                   </div>
-
-                  {/* User Menu Popup */}
                   {showUserMenu && (
                     <UserMenuPopup
                       onClose={() => setShowUserMenu(false)}
@@ -266,10 +224,9 @@ export default function DashboardHeader() {
               )}
             </div>
           </div>
-
-          {/* MOBILE VERSION */}
+ 
+          {/* MOBILE */}
           <div className="min-[1640px]:hidden flex items-center justify-between">
-            {/* Logo */}
             <Link href="/" className="flex items-center cursor-pointer">
               <Image
                 src="/resources/LogoEasyLesson.webp"
@@ -280,8 +237,6 @@ export default function DashboardHeader() {
                 priority
               />
             </Link>
-
-            {/* Hamburger Menu */}
             <Button
               variant="secondary"
               size="icon"
@@ -290,118 +245,120 @@ export default function DashboardHeader() {
               <Menu size={24} />
             </Button>
           </div>
-
+ 
           {/* MOBILE MENU DRAWER */}
           {showMobileMenu && (
-            <>
-              {/* Drawer */}
-              <div className="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-200">
-                {/* Header drawera */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
-                  <span className="font-semibold text-gray-800">Menu</span>
-                  <Button variant="secondary" size="icon" onClick={() => setShowMobileMenu(false)}>
-                    <X size={20} />
+            <div className="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-200">
+              <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
+                <span className="font-semibold text-gray-800">Menu</span>
+                <Button variant="secondary" size="icon" onClick={() => setShowMobileMenu(false)}>
+                  <X size={20} />
+                </Button>
+              </div>
+ 
+              <div className="p-4 space-y-3">
+                {user && (
+                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
+                    <div
+                      className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
+                    >
+                      <span className="text-white font-semibold text-base">
+                        {getInitials(user.name)}
+                      </span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">{user.name}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </div>
+                  </div>
+                )}
+ 
+                <div className="space-y-2">
+                  {user && !user.isPremium && (
+                    <Link href="/#pricing">
+                      <DashboardButton
+                        variant="secondary"
+                        leftIcon={<Crown size={20} />}
+                        onClick={() => setShowMobileMenu(false)}
+                        className="w-full justify-start py-8"
+                      >
+                        Przejdź na Premium
+                      </DashboardButton>
+                    </Link>
+                  )}
+ 
+                  <Button
+                    variant="secondary"
+                    leftIcon={<Bell size={20} />}
+                    onClick={() => {
+                      setShowNotifications(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full justify-start py-8"
+                  >
+                    <span>Powiadomienia</span>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+ 
+                  <Button
+                    variant="secondary"
+                    leftIcon={<UserIcon size={20} />}
+                    onClick={() => {
+                      router.push('/clientPanel');
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full justify-start py-8"
+                  >
+                    Profil
+                  </Button>
+ 
+                  <div className="border-t border-gray-200 my-2" />
+ 
+                  <Button
+                    variant="destructive"
+                    leftIcon={<LogOut size={20} />}
+                    onClick={() => {
+                      logout();
+                      setShowMobileMenu(false);
+                      router.push('/');
+                    }}
+                    className="w-full py-8"
+                  >
+                    Wyloguj się
                   </Button>
                 </div>
-
-                <div className="p-4 space-y-3">
-                  {/* User Info Mobile */}
-                  {user && (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
-                      >
-                        <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{user.name}</div>
-                        <div className="text-sm text-gray-500">{user.email}</div>
-                      </div>
+ 
+                {user && !user.isPremium && (
+                  <div className="mt-4 px-4">
+                    <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
+                      FREE PLAN
                     </div>
-                  )}
-
-                  {/* Menu Items Mobile */}
-                  <div className="space-y-2">
-                    {/* Premium Mobile */}
-                    {user && !user.isPremium && (
-                      <Link href="/#pricing">
-                        <DashboardButton
-                          variant="secondary"
-                          leftIcon={<Crown size={20} />}
-                          onClick={() => setShowMobileMenu(false)}
-                          className="w-full justify-start py-8"
-                        >
-                          Przejdź na Premium
-                        </DashboardButton>
-                      </Link>
-                    )}
-
-                    {/* Powiadomienia */}
-                    <Button
-                      variant="secondary"
-                      leftIcon={<Bell size={20} />}
-                      onClick={() => {
-                        setShowNotifications(true);
-                        setShowMobileMenu(false);
-                      }}
-                      className="w-full justify-start py-8"
-                    >
-                      <span>Powiadomienia</span>
-                      {inviteCount > 0 && (
-                        <span className="absolute top-2 right-2 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                          {inviteCount > 9 ? '9+' : inviteCount}
-                        </span>
-                      )}
-                    </Button>
-
-                    <Button
-                      variant="secondary"
-                      leftIcon={<UserIcon size={20} />}
-                      onClick={() => {
-                        router.push('/clientPanel');
-                        setShowMobileMenu(false);
-                      }}
-                      className="w-full justify-start py-8"
-                    >
-                      Profil
-                    </Button>
-
-                    {/* Separator */}
-                    <div className="border-t border-gray-200 my-2"></div>
-
-                    {/* Wyloguj */}
-                    <Button
-                      variant="destructive"
-                      leftIcon={<LogOut size={20} />}
-                      onClick={() => {
-                        logout();
-                        setShowMobileMenu(false);
-                        router.push('/');
-                      }}
-                      className="w-full py-8"
-                    >
-                      Wyloguj się
-                    </Button>
                   </div>
-
-                  {/* Badge Free Mobile */}
-                  {user && !user.isPremium && (
-                    <div className="mt-4 px-4">
-                      <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
-                        FREE PLAN
-                      </div>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-            </>
+            </div>
           )}
         </div>
       </header>
-
+ 
       {showGiftPopup && <GiftPopup onClose={() => setShowGiftPopup(false)} />}
-
-      {showNotifications && <NotificationsPopup onClose={() => setShowNotifications(false)} />}
+ 
+      {showNotifications && (
+        <NotificationPanel
+          notifications={notifications}
+          unreadCount={unreadCount}
+          loading={notificationsLoading}
+          onClose={() => setShowNotifications(false)}
+          onMarkAllAsRead={markAllAsRead}
+          onAccept={handleAcceptInvite}
+          onReject={handleRejectInvite}
+          onWorkspacesRefresh={refreshWorkspaces}
+        />
+      )}
     </>
   );
 }

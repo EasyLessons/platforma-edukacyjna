@@ -88,6 +88,8 @@ class Settings(BaseSettings):
     database_url: str  # WYMAGANE (brak domyślnej wartości)
     # Connection string do PostgreSQL
     # Format: postgresql://username:password@host:port/database_name
+    supabase_url: str  # WYMAGANE - URL Twojego projektu Supabase
+    supabase_service_role_key: str  # WYMAGANE - Service Role Key z Supabase
     
     # === JWT TOKENY ===
     secret_key: str  # WYMAGANE - klucz do podpisywania tokenów

@@ -8,7 +8,6 @@ import Footer from './layout/Footer';
 import AuthHeader from './layout/AuthHeader';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { usePathname } from 'next/navigation';
-import { WorkspaceProvider } from './context/WorkspaceContext';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -77,18 +76,21 @@ export default function RootLayout({
   return (
     <html lang="pl">
       <head>
-        <meta name="google-site-verification" content="VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y" />
+        <meta
+          name="google-site-verification"
+          content="VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y"
+        />
         <title>EasyLesson - Korepetycje online z AI</title>
         <meta
           name="description"
           content="Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online"
         />
       </head>
-      <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}>
+      <body
+        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
+      >
         <AuthProvider>
-          <WorkspaceProvider>
-            <LayoutContent>{children}</LayoutContent>
-          </WorkspaceProvider>
+          <LayoutContent>{children}</LayoutContent>
         </AuthProvider>
       </body>
     </html>

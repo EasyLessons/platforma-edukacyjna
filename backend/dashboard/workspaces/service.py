@@ -35,7 +35,7 @@ from core.config import get_settings
 from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, InviteCreate, InviteResponse, PendingInviteResponse, WorkspaceMemberResponse, WorkspaceMembersListResponse, UpdateMemberRoleRequest
 
 from dashboard.workspaces.utils import send_workspace_invite_email
-
+from .realtime import broadcast_notification
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 📋 POBIERANIE WORKSPACE'ÓW UŻYTKOWNIKA
@@ -925,11 +925,51 @@ def create_invite(
         expires_at=datetime.utcnow() + timedelta(days=expires_in_days),
         is_used=False,
         created_at=datetime.utcnow()
-    )
+        )
         
         db.add(new_invite)
         db.commit()
         db.refresh(new_invite)
+        
+        # Broadcast realtime — powiadom zapraszanego usera natychmiast
+        try:
+            asyncio.create_task(
+                broadcast_notification(
+                    user_id=invited_user_id,
+                    event="new_invite",
+                    payload={
+                        "id": new_invite.id,
+                        "workspace_id": new_invite.workspace_id,
+                        "workspace_name": workspace.name,
+                        "workspace_icon": workspace.icon,
+                        "workspace_bg_color": workspace.bg_color,
+                        "inviter_name": inviter.username if inviter else "Nieznany",
+                        "invite_token": new_invite.invite_token,
+                        "expires_at": new_invite.expires_at.isoformat(),
+                        "created_at": new_invite.created_at.isoformat(),
+                    },
+                )
+            )
+        except RuntimeError:
+            # Jeśli nie ma event loop (np. w testach) — wywołaj synchronicznie
+            import asyncio as _asyncio
+            _asyncio.run(
+                broadcast_notification(
+                    user_id=invited_user_id,
+                    event="new_invite",
+                    payload={
+                        "id": new_invite.id,
+                        "workspace_id": new_invite.workspace_id,
+                        "workspace_name": workspace.name,
+                        "workspace_icon": workspace.icon,
+                        "workspace_bg_color": workspace.bg_color,
+                        "inviter_name": inviter.username if inviter else "Nieznany",
+                        "invite_token": new_invite.invite_token,
+                        "expires_at": new_invite.expires_at.isoformat(),
+                        "created_at": new_invite.created_at.isoformat(),
+                    },
+                )
+            )
 
         # Wyślij email jeśli send_email=True
         if send_email:

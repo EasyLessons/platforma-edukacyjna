@@ -19,6 +19,7 @@ export default function Dashboard() {
     deleteWorkspace,
     leaveWorkspace,
     toggleFavourite,
+    refreshWorkspaces,
   } = useWorkspaces();
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
@@ -51,7 +52,9 @@ export default function Dashboard() {
 
   return (
     <div className="dashboard-shell min-h-screen flex flex-col">
-      <DashboardHeader />
+      <DashboardHeader 
+        refreshWorkspaces={refreshWorkspaces}
+      />
 
       <div className="flex flex-1">
         <WorkspaceSidebar
