@@ -43,6 +43,7 @@ class User(Base):
         foreign_keys="[Board.last_modified_by]"
     )
     board_users = relationship("BoardUsers", back_populates="user")
+    notification = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -158,3 +159,31 @@ class BoardElement(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False, index=True)
+
+class Notification(Base):
+    """
+    Powiadomienia użytkownika.
+ 
+    Tabela przechowuje wszystkie zdarzenia które powinien zobaczyć user —
+    zaproszenia do workspace, komentarze, alerty systemowe itp.
+ 
+    Relacja z User: każde powiadomienie należy do jednego usera.
+    Przy usunięciu usera wszystkie jego powiadomienia są kaskadowo usuwane.
+ 
+    Kolumna `payload` (JSONB) przechowuje dane specyficzne dla typu:
+      - type='invite':  { workspace_id, workspace_name, workspace_icon,
+                          workspace_bg_color, inviter_name, invite_token,
+                          expires_at, created_at }
+    """
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(50), nullable=False)
+    payload = Column(JSONB, nullable=False, default=dict)
+    is_read = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    read_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="notifications")
+    

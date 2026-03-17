@@ -36,6 +36,7 @@ from .schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, Invite
 
 from dashboard.workspaces.utils import send_workspace_invite_email
 from .realtime import broadcast_notification
+from notifications.service import create_notification
 
 # ═══════════════════════════════════════════════════════════════════════════
 # 📋 POBIERANIE WORKSPACE'ÓW UŻYTKOWNIKA
@@ -915,6 +916,10 @@ def create_invite(
     if not invite_token:
         raise HTTPException(status_code=500, detail="Błąd generowania tokenu")
     
+    # Pobierz zapraszającego
+    inviter = db.query(User).filter(User.id == user_id).first()
+    inviter_name = inviter.username if inviter else "Nieznany"
+
     # Utwórz zaproszenie
     try:
         new_invite = WorkspaceInvite(
@@ -930,6 +935,26 @@ def create_invite(
         db.add(new_invite)
         db.commit()
         db.refresh(new_invite)
+
+        notification_payload = {
+            "id": new_invite.id,
+            "workspace_id": workspace.id,
+            "workspace_name": workspace.name,
+            "workspace_icon": workspace.icon,
+            "workspace_bg_color": workspace.bg_color,
+            "inviter_name": inviter_name,
+            "invite_token": new_invite.invite_token,
+            "expires_at": new_invite.expires_at.isoformat(),
+            "created_at": new_invite.created_at.isoformat(),
+        }
+
+        # Utwórz powiadomienie dla zapraszanego usera
+        create_notification(
+            db=db,
+            user_id=invited_user_id,
+            type='invite',
+            payload=notification_payload,
+        )
         
         # Broadcast realtime — powiadom zapraszanego usera natychmiast
         try:
@@ -937,17 +962,7 @@ def create_invite(
                 broadcast_notification(
                     user_id=invited_user_id,
                     event="new_invite",
-                    payload={
-                        "id": new_invite.id,
-                        "workspace_id": new_invite.workspace_id,
-                        "workspace_name": workspace.name,
-                        "workspace_icon": workspace.icon,
-                        "workspace_bg_color": workspace.bg_color,
-                        "inviter_name": inviter.username if inviter else "Nieznany",
-                        "invite_token": new_invite.invite_token,
-                        "expires_at": new_invite.expires_at.isoformat(),
-                        "created_at": new_invite.created_at.isoformat(),
-                    },
+                    payload=notification_payload,
                 )
             )
         except RuntimeError:
@@ -957,17 +972,7 @@ def create_invite(
                 broadcast_notification(
                     user_id=invited_user_id,
                     event="new_invite",
-                    payload={
-                        "id": new_invite.id,
-                        "workspace_id": new_invite.workspace_id,
-                        "workspace_name": workspace.name,
-                        "workspace_icon": workspace.icon,
-                        "workspace_bg_color": workspace.bg_color,
-                        "inviter_name": inviter.username if inviter else "Nieznany",
-                        "invite_token": new_invite.invite_token,
-                        "expires_at": new_invite.expires_at.isoformat(),
-                        "created_at": new_invite.created_at.isoformat(),
-                    },
+                    payload=notification_payload,
                 )
             )
 
@@ -976,17 +981,7 @@ def create_invite(
             try:
                 settings = get_settings()
                 
-                # Pobierz dane zapraszającego
-                inviter = db.query(User).filter(User.id == user_id).first()
-                
-                # Pobierz dane zaproszonego
-                invited_user = db.query(User).filter(User.id == invited_user_id).first()
-                
-                # Pobierz workspace
-                workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-                
                 if settings.resend_api_key and settings.resend_api_key != "SKIP":
-                    # Wywołaj asynchronicznie
                     asyncio.create_task(
                         send_workspace_invite_email(
                             invited_email=invited_user.email,
@@ -1004,9 +999,7 @@ def create_invite(
                     print(f"⚠️ Email NIE wysłany (RESEND_API_KEY=SKIP)")
                     
             except Exception as email_error:
-                # Email nie powiódł się, ale zaproszenie już stworzone
                 print(f"❌ Błąd wysyłania emaila: {email_error}")
-                # Nie rzucamy błędu - zaproszenie działa mimo braku emaila
         
         return InviteResponse(
             id=new_invite.id,
@@ -1178,25 +1171,3 @@ def reject_invite(db: Session, invite_token: str, user_id: int) -> dict:
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Błąd: {str(e)}")
-
-"""
-═══════════════════════════════════════════════════════════════════════════
-📚 PODSUMOWANIE FUNKCJI
-═══════════════════════════════════════════════════════════════════════════
-
-FUNKCJE POBIERAJĄCE:
-✅ get_user_workspaces() - lista workspace'ów użytkownika
-✅ get_workspace_by_id() - jeden workspace (z sprawdzeniem dostępu)
-
-FUNKCJE MODYFIKUJĄCE:
-✅ create_workspace() - nowy workspace
-✅ update_workspace() - edycja workspace'a (tylko owner)
-✅ delete_workspace() - usunięcie workspace'a (tylko owner)
-
-BEZPIECZEŃSTWO:
-✅ Sprawdzanie dostępu w każdej funkcji
-✅ Tylko owner może edytować/usuwać
-✅ Automatyczne dodawanie twórcy jako członka
-
-═══════════════════════════════════════════════════════════════════════════
-"""
