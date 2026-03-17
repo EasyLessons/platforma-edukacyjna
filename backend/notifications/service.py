@@ -7,6 +7,7 @@ Główne funkcje:
   get_user_notifications()    — pobiera listę powiadomień usera
   mark_as_read()              — oznacza jedno powiadomienie jako przeczytane
   mark_all_as_read()          — oznacza wszystkie powiadomienia usera jako przeczytane
+  delete_notification()       — usuwa powiadomienie
 """
 
 from datetime import datetime
@@ -142,3 +143,29 @@ def mark_all_as_read(
     )
     db.commit()
     return updated
+
+def delete_notification(
+    db: Session,
+    notification_id: int,
+    user_id: int,
+) -> bool:
+    """
+    Usuwa powiadomienie.
+ 
+    Sprawdza, czy powiadomienie należy do usera (security).
+    Zwraca True jeśli usunięto, False jeśli nie znaleziono.
+    """
+    notification = (
+        db.query(Notification)
+        .filter(
+            Notification.id == notification_id, 
+            Notification.user_id == user_id
+        )
+        .first()
+    )
+    if not notification:
+        return False
+    
+    db.delete(notification)
+    db.commit()
+    return True

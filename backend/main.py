@@ -11,6 +11,7 @@ from core.logging import setup_logging
 from auth.routes import router as auth_router
 from dashboard.workspaces.routes import router as workspaces_router
 from dashboard.boards.routes import router as boards_router
+from notifications.routes import router as notifications_router
 from fastapi import HTTPException
 from datetime import datetime
 
@@ -93,6 +94,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(workspaces_router)
 app.include_router(boards_router)
+app.include_router(notifications_router)
 
 @app.get("/health")
 @app.head("/health")

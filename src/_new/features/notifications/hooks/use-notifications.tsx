@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * use-notifications.ts
  *
@@ -11,52 +9,19 @@
  *
  */
 
+'use client';
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/context/AuthContext';
+import { acceptInvite, rejectInvite } from '@/workspace_api/api';
 import {
-  fetchPendingInvites,
-  acceptInvite,
-  rejectInvite,
-  PendingInvite,
-} from '@/workspace_api/api';
+  fetchNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  deleteNotification,
+} from '../api/notification-api';
 import type { Notification, InvitePayload, InviteNotification } from '../types';
-
-// HELPERS
-// ================================
-
-function pendingInviteToNotification(invite: PendingInvite): InviteNotification {
-  return {
-    id: `invite-${invite.id}`,
-    type: 'invite',
-    payload: {
-      id: invite.id,
-      workspace_id: invite.workspace_id,
-      workspace_name: invite.workspace_name,
-      workspace_icon: invite.workspace_icon,
-      workspace_bg_color: invite.workspace_bg_color,
-      inviter_name: invite.inviter_name,
-      invite_token: invite.invite_token,
-      expires_at: invite.expires_at,
-      created_at: invite.created_at,
-    },
-    read: false,
-    received_at: invite.created_at,
-  };
-}
-
-function broadcastPayloadToNotification(payload: InvitePayload): InviteNotification {
-  return {
-    id: `invite-${payload.id}`,
-    type: 'invite',
-    payload,
-    read: false,
-    received_at: new Date().toISOString(),
-  };
-}
-
-// HOOK
-// ================================
 
 export function useNotifications() {
   // STATE
@@ -65,7 +30,7 @@ export function useNotifications() {
   const [loading, setLoading] = useState(true);
 
   // Zapobiega duplikatom gdy Broadcast i initial fetch dostarczą ten sam rekord
-  const seenIds = useRef<Set<string>>(new Set());
+  const seenIds = useRef<Set<number>>(new Set());
 
   // INITIAL FETCH
   const loadInitialNotifications = useCallback(async () => {
@@ -75,10 +40,9 @@ export function useNotifications() {
     }
     try {
       setLoading(true);
-      const invites = await fetchPendingInvites();
-      const converted = invites.map(pendingInviteToNotification);
-      converted.forEach((n) => seenIds.current.add(n.id));
-      setNotifications(converted);
+      const { notifications } = await fetchNotifications();
+      notifications.forEach((n) => seenIds.current.add(n.id));
+      setNotifications(notifications);
     } catch (error) {
       console.error('useNotifications: błąd initial fetch:', error);
     } finally {
@@ -99,10 +63,19 @@ export function useNotifications() {
     const channel = supabase
       .channel(channelName)
       .on('broadcast', { event: 'new_invite' }, ({ payload }) => {
-        const notification = broadcastPayloadToNotification(payload as InvitePayload);
+        const p = payload as InvitePayload;
 
-        if (seenIds.current.has(notification.id)) return;
-        seenIds.current.add(notification.id);
+        if (seenIds.current.has(p.id)) return;
+        seenIds.current.add(p.id);
+
+        const notification: InviteNotification = {
+          id: p.id,
+          type: 'invite',
+          payload: p,
+          is_read: false,
+          created_at: new Date().toISOString(),
+          read_at: null,
+        };
 
         setNotifications((prev) => [notification, ...prev]);
       })
@@ -114,30 +87,39 @@ export function useNotifications() {
   }, [isLoggedIn, user?.id]);
 
   // HANDLERS
-  const dismiss = useCallback((id: string) => {
+  const dismiss = useCallback((id: number) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
     seenIds.current.delete(id);
   }, []);
 
-  const markAsRead = useCallback((id: string) => {
+  const markAsRead = useCallback(async (id: number) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    await markNotificationAsRead(id).catch((e) =>
+      console.error('useNotifications: błąd markAsRead:', e)
+    );
   }, []);
 
-  const markAllAsRead = useCallback(() => {
+  const markAllAsRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    await markAllNotificationsAsRead().catch((e) =>
+      console.error('useNotifications: błąd markAllAsRead:', e)
+    );
   }, []);
 
-  const handleAcceptInvite = useCallback(
-    async (notification: InviteNotification) => {
-      await acceptInvite(notification.payload.invite_token);
-      dismiss(notification.id);
-    },
-    [dismiss]
-  );
+  const handleAcceptInvite = useCallback(async (notification: InviteNotification) => {
+    await acceptInvite(notification.payload.invite_token);
+    await deleteNotification(notification.id).catch((e) =>
+      console.error('useNotifications: błąd deleteNotification:', e)
+    );
+    dismiss(notification.id);
+  }, [dismiss]);
 
   const handleRejectInvite = useCallback(
     async (notification: InviteNotification) => {
       await rejectInvite(notification.payload.invite_token);
+      await deleteNotification(notification.id).catch((e) =>
+        console.error('useNotifications: błąd deleteNotification:', e)
+      );
       dismiss(notification.id);
     },
     [dismiss]
@@ -146,7 +128,7 @@ export function useNotifications() {
   // RETURN
   return {
     notifications,
-    unreadCount: notifications.filter((n) => !n.read).length,
+    unreadCount: notifications.filter((n) => !n.is_read).length,
     loading,
     markAsRead,
     markAllAsRead,

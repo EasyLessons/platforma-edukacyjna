@@ -43,7 +43,7 @@ class User(Base):
         foreign_keys="[Board.last_modified_by]"
     )
     board_users = relationship("BoardUsers", back_populates="user")
-    notification = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
 
 class Workspace(Base):
     __tablename__ = "workspaces"

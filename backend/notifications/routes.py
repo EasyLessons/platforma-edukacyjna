@@ -4,6 +4,7 @@ Endpointy systemu powiadomień.
 GET  /api/notifications              — pobierz listę powiadomień zalogowanego usera
 PATCH /api/notifications/{id}/read   — oznacz jedno jako przeczytane
 PATCH /api/notifications/read-all    — oznacz wszystkie jako przeczytane
+DELETE /api/notifications/{id}       — usuń powiadomienie
 """
 
 from fastapi import APIRouter, Depends, status, HTTPException
@@ -18,6 +19,7 @@ from .service import (
     get_user_notifications,
     mark_as_read,
     mark_all_as_read,
+    delete_notification,
 )
 router = APIRouter(
     prefix="/api/notifications",
@@ -57,3 +59,18 @@ async def read_notification(
         )
     
     return notification
+
+@router.delete('/{notification_id}', status_code=status.HTTP_204_NO_CONTENT)
+async def remove_notification(
+    notification_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Usuwa powiadomienie."""
+    deleted = delete_notification(db, notification_id, current_user.id)
+    
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Powiadomienie nie istnieje"
+)
