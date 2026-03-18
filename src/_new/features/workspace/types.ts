@@ -74,6 +74,22 @@ export interface WorkspaceMembersResponse {
   total: number;
 }
 
+export interface InviteResponse {
+  id:           number;
+  workspace_id: number;
+  invited_by:   number;
+  invited_id:   number;
+  invite_token: string;
+  expires_at:   string;
+  created_at:   string;
+}
+
+export interface InviteStatusResponse {
+  is_member:          boolean;
+  has_pending_invite: boolean;
+  can_invite:         boolean;
+}
+
 // WORKSPACE CARD TYPES
 export interface WorkspaceCardActions {
   edit: (workspace: Workspace) => void;

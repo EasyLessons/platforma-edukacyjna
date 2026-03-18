@@ -41,6 +41,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dependency-cruiser": "^17.3.9",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
     "prettier": "^3.8.1",

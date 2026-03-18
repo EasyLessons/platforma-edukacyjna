@@ -9,8 +9,8 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
-import { createInvite } from '@/workspace_api/api';
-import { checkUserInviteStatus, UserSearchResult, searchUsers } from '@/auth_api/api';
+import { createInvite, checkUserInviteStatus } from '../api/invite_api';
+import { UserSearchResult, searchUsers } from '@/auth_api/api';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';

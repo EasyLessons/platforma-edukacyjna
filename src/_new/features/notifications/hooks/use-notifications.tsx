@@ -14,7 +14,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/app/context/AuthContext';
-import { acceptInvite, rejectInvite } from '@/workspace_api/api';
+import { acceptInvite, rejectInvite } from '../../workspace/api/invite_api';
 import {
   fetchNotifications,
   markNotificationAsRead,

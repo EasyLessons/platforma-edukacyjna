@@ -30,7 +30,7 @@ import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/white
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
-import { getMyRoleInWorkspace } from '@/workspace_api/api';
+import { getMyRole } from '@/_new/features/workspace/api/workspace-api'; 
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
@@ -185,7 +185,7 @@ export function TablicaContent() {
     const fetchUserRole = async () => {
       if (workspaceId && workspaceId > 0) {
         try {
-          const roleData = await getMyRoleInWorkspace(workspaceId);
+          const roleData = await getMyRole(workspaceId);
           setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
           console.log('👤 Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
         } catch (error) {
@@ -222,7 +222,7 @@ export function TablicaContent() {
 
           // Odśwież rolę (API zwraca tylko rolę dla aktualnego użytkownika)
           try {
-            const roleData = await getMyRoleInWorkspace(workspaceId);
+            const roleData = await getMyRole(workspaceId);
             const oldRole = userRole;
             setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
             console.log('✅ Zaktualizowano rolę z', oldRole, '→', roleData.role);

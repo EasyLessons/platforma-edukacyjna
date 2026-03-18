@@ -278,3 +278,24 @@ export const updateMemberRole = async (
 
   return handleResponse(response);
 };
+
+// getMyRole - zwraca rolę aktualnego użytkownika
+export const getMyRole = async (
+  workspaceId: number
+): Promise<{ role: string; is_owner: boolean; workspace_id: number }> => {
+  const token = getToken();
+
+  if (!token) {
+    throw new Error('Musisz być zalogowany');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/workspaces/${workspaceId}/my-role`, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+  });
+
+  return handleResponse(response);
+};
