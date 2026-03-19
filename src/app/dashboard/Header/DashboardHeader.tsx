@@ -132,7 +132,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
 
   return (
     <>
-      <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
+      <header className="bg-[var(--dash-panel)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
  
           {/* DESKTOP */}
@@ -158,7 +158,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
             </div>
  
             {/* PRAWA STRONA */}
-            <div className="flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 font-bold">
               {user && !user.isPremium && (
                 <Link href="/#pricing">
                   <DashboardButton variant="secondary" leftIcon={<Crown size={16} />}>
@@ -186,7 +186,19 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
  
               {user && (
                 <div className="relative">
-                  <div className="dashboard-btn-secondary flex min-h-[40px] items-center rounded-full px-2.5 py-1 pr-3">
+                  <div
+                    className="dashboard-btn-secondary flex min-h-[40px] cursor-pointer items-center rounded-full px-2.5 py-1 pr-3"
+                    onClick={() => setShowUserMenu(!showUserMenu)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setShowUserMenu(!showUserMenu);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Otwórz ustawienia konta"
+                  >
                     <span
                       className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColorClass(user.id)}`}
                     >
@@ -202,7 +214,10 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                     </span>
                     <button
                       type="button"
-                      onClick={() => setShowUserMenu(!showUserMenu)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setShowUserMenu(!showUserMenu);
+                      }}
                       className="ml-3 -mr-2 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--dash-border)] bg-white/80 text-gray-600 transition-colors hover:cursor-pointer hover:bg-white hover:text-gray-800"
                       title="Ustawienia konta"
                       aria-label="Ustawienia konta"

@@ -13,7 +13,8 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Star, GripVertical, UserPlus, Pencil } from 'lucide-react';
 import { WorkspaceDropdownMenu } from './workspace-dropdown-menu';
 import { getIconComponent, getColorClass } from '../utils/helpers';
@@ -49,6 +50,10 @@ export function WorkspaceCard({
   // STATE
   // ================================
   const [isHovered, setIsHovered] = useState(false);
+  const [tooltipPosition, setTooltipPosition] = useState<{ top: number; left: number } | null>(
+    null
+  );
+  const collapsedButtonRef = useRef<HTMLButtonElement | null>(null);
 
   // DERIVED
   // ================================
@@ -66,38 +71,91 @@ export function WorkspaceCard({
     await onToggleFavourite(workspace.id, !workspace.is_favourite);
   };
 
+  const updateTooltipPosition = useCallback(() => {
+    if (!collapsedButtonRef.current) return;
+
+    const rect = collapsedButtonRef.current.getBoundingClientRect();
+    setTooltipPosition({
+      top: rect.top + rect.height / 2,
+      left: rect.right + 12,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isCollapsed || !isHovered) return;
+
+    updateTooltipPosition();
+
+    const handleViewportChange = () => updateTooltipPosition();
+
+    window.addEventListener('scroll', handleViewportChange, true);
+    window.addEventListener('resize', handleViewportChange);
+
+    return () => {
+      window.removeEventListener('scroll', handleViewportChange, true);
+      window.removeEventListener('resize', handleViewportChange);
+    };
+  }, [isCollapsed, isHovered, updateTooltipPosition]);
+
   // RENDERS
   // ================================
 
   // Compact version
   if (isCollapsed) {
     return (
-      <button
-        onClick={() => onSelect?.(workspace.id, workspace.name)}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        title={workspace.name}
-        aria-label={workspace.name}
-        className={`
-          relative w-full flex justify-center p-2 rounded-lg
-          transition-all duration-200 cursor-pointer
-          ${isActive ? 'bg-[#ececef]' : isHovered ? 'bg-[#f0f0f2]' : ''}
-        `}
-      >
-        {/* Pasek aktywności */}
-        <div
+      <>
+        <button
+          ref={collapsedButtonRef}
+          onClick={() => onSelect?.(workspace.id, workspace.name)}
+          onMouseEnter={() => {
+            setIsHovered(true);
+            updateTooltipPosition();
+          }}
+          onMouseLeave={() => setIsHovered(false)}
+          onFocus={() => {
+            setIsHovered(true);
+            updateTooltipPosition();
+          }}
+          onBlur={() => setIsHovered(false)}
+          aria-label={workspace.name}
           className={`
-            absolute left-0 top-1/2 -translate-y-1/2
-            bg-black rounded-r-full transition-all duration-200
-            ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
+            relative w-full flex justify-center p-2 rounded-lg
+            transition-all duration-200 cursor-pointer
+            ${isActive ? 'bg-[#ececef]' : isHovered ? 'bg-[#f0f0f2]' : ''}
           `}
-        />
-        <div
-          className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center`}
         >
-          <Icon size={16} className="text-white" />
-        </div>
-      </button>
+          {/* Pasek aktywności */}
+          <div
+            className={`
+              absolute left-0 top-1/2 -translate-y-1/2
+              bg-black rounded-r-full transition-all duration-200
+              ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
+            `}
+          />
+          <div
+            className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center`}
+          >
+            <Icon size={16} className="text-white" />
+          </div>
+        </button>
+
+        {isHovered &&
+          tooltipPosition &&
+          createPortal(
+            <div
+              className="pointer-events-none fixed z-[1200] whitespace-nowrap rounded-md bg-black px-3 py-1.5 text-[11px] font-bold text-white shadow-xl"
+              style={{
+                top: tooltipPosition.top,
+                left: tooltipPosition.left,
+                transform: 'translateY(-50%)',
+              }}
+            >
+              {workspace.name}
+              <div className="absolute top-1/2 -left-1 -translate-y-1/2 border-y-[5px] border-y-transparent border-r-[5px] border-r-black" />
+            </div>,
+            document.body
+          )}
+      </>
     );
   }
 
