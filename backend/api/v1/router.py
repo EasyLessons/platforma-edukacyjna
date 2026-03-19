@@ -5,6 +5,7 @@ from fastapi import APIRouter
 from core.responses import ApiResponse
 
 from .auth.router import router as auth_router
+from .notifications.router import router as notifications_router
 
 def get_v1_router():
     """Funkcja tworząca v1 router"""
@@ -24,5 +25,6 @@ def get_v1_router():
 
     # === INCLUDE FEATURE ROUTERS ===
     router.include_router(auth_router, prefix="/auth")
+    router.include_router(notifications_router, prefix="/notifications")
 
     return router
