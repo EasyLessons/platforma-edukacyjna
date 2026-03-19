@@ -1,118 +1,245 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
+import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 
-const backgroundImages = [
-  '/resources/hero-bg-1.webp',
-  '/resources/hero-bg-1.webp',
-  '/resources/hero-bg-1.webp',
-  '/resources/hero-bg-1.webp',
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700', '800'],
+  display: 'swap',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700'],
+  style: ['italic'],
+  display: 'swap',
+});
+
+const testAvatars = [
+  'https://i.pravatar.cc/150?img=32',
+  'https://i.pravatar.cc/150?img=47',
+  'https://i.pravatar.cc/150?img=12',
+  'https://i.pravatar.cc/150?img=25',
 ];
 
 export default function HeroSection() {
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentImageIndex((prev) => (prev + 1) % backgroundImages.length);
-        setIsTransitioning(false);
-      }, 800);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   return (
-    <section className="relative bg-white overflow-hidden h-[800px] flex items-end">
-      {/* Tło z rotującymi się zdjęciami */}
-      <div className="absolute inset-0">
-        {backgroundImages.map((img, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-500 ${
-              index === currentImageIndex && !isTransitioning ? 'opacity-100' : 'opacity-0'
-            }`}
-          >
-            <Image
-              src={img}
-              alt={`Background ${index + 1}`}
-              fill
-              className="object-cover"
-              priority={index === 0}
-            />
-          </div>
-        ))}
-        {/* Gradient overlay dla lepszej czytelności - czarny przy dolnej granicy */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-      </div>
+    <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pt-4 pb-8`}>
 
-      {/* Główna zawartość - wyrównana do lewego dolnego rogu */}
-      <div className="relative z-10 max-w-7xl w-full mx-auto px-8 sm:px-12 lg:px-16 pb-20">
-        <div className="max-w-4xl">
-          {/* Mały czerwony znacznik z tekstem */}
-          <div className="flex items-center gap-2 mb-6">
-<div 
-  className="w-0 h-0 border-l-[6px] border-l-transparent border-r-[6px] border-r-transparent border-b-[10px] rotate-90" 
-  style={{ borderBottomColor: '#b91717' }}
-/>          
-            <span 
-              className="text-white text-xs font-bold tracking-widest uppercase"
-              style={{ 
-                textShadow: '0 4px 12px rgba(0, 0, 0, 0.2), 0 1px 4px rgba(0, 0, 0, 0.2)'
+      <section
+        className="relative w-full overflow-hidden"
+        style={{
+          borderRadius: '24px',
+          height: '88vh',
+          minHeight: '560px',
+        }}
+      >
+
+        <video
+          ref={videoRef}
+          className="absolute inset-0 w-full h-full object-cover"
+          src="/HeroFilm/EasylessonHeroFilm.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+        />
+
+        {/* Overlay - bardziej błękitny */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: `linear-gradient(
+  160deg,
+  rgba(0, 61, 167, 0.87) 0%,
+  rgba(0, 115, 255, 0.87) 50%,
+  rgba(0, 98, 184, 0.82) 100%
+)`,
+          }}
+        />
+
+        {/* Gradient od dołu - lżejszy */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 28%, transparent 50%)',
+          }}
+        />
+
+        {/* Środkowa treść */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-10">
+
+          <div className="flex items-center gap-2 mb-5">
+            <div
+              className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[9px] rotate-90"
+              style={{ borderBottomColor: '#2bcc82' }}
+            />
+            <span
+              className="text-white font-semibold tracking-widest uppercase"
+              style={{
+                fontSize: 'clamp(0.6rem, 0.85vw, 0.75rem)',
+                letterSpacing: '0.14em',
               }}
             >
-              EASYLESSON BOARD - STWORZONY DLA UCZNIÓW, KOREPETYTORÓW I NAUCZYCIELI
+              STWORZONY DLA UCZNIÓW, KOREPETYTORÓW I NAUCZYCIELI
             </span>
           </div>
 
-          {/* Główny nagłówek - dwie linie */}
-          <div className="mb-8">
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light leading-tight
-                 bg-gradient-to-tr from-gray-300 via-white to-white 
-                 bg-clip-text text-transparent">
-    <span className="inline-block px-2 py-1">
-      Ucz się efektywniej na 
-      <span style={{ 
-        fontFamily: 'Prata, serif', 
-        fontStyle: 'italic', 
-        fontWeight: '600', 
-        fontSize: '1.15em'
-      }}>{" "}Easylesson</span>,              
-    </span>
-    <br />
-    <span className="inline-block px-2">
-      współpracując z innymi
-    </span>
-  </h1>
-          </div>
+          <h1
+            className="font-bold leading-tight text-white mb-5"
+            style={{
+              fontSize: 'clamp(4rem, 5.5vw, 5.2rem)',
+              maxWidth: '1100px',
+              lineHeight: '1',
+            }}
+          >
+            Jeden board.{' '}
+            <span style={{ color: '#4bffab' }}>
+              Milion<br/ > możliwości
+            </span>
+            {' '}nauki.
+          </h1>
 
-          {/* Przyciski CTA - jak w headerze */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Biały przycisk - Zaloguj */}
-            <Link href="/login">
-              <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-700 hover:text-black bg-white hover:bg-white transition-colors text-sm font-medium rounded-md">
-                Zaloguj się
-              </button>
-            </Link>
+          <p
+            className="font-light leading-relaxed mb-10"
+            style={{
+              fontSize: 'clamp(1rem, 1.5vw, 1.3rem)',
+              color: 'rgba(255,255,255,0.82)',
+              maxWidth: '640px',
+            }}
+          >
+            Interaktywne tablice, notatki, AI-tutor i wspólna nauka w jednym miejscu.{' '}
+<span style={{ fontWeight: 700, color: '#fff' }}>Zacznij już dziś — bezpłatnie.</span>
+          </p>
 
-            {/* Czarny przycisk - Zarejestruj */}
+          <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/rejestracja">
-              <button 
-                className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-100 hover:text-white transition-colors text-sm font-medium rounded-md"
-                style={{ backgroundColor: '#212224' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#48494d'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#37393c'}
-              >
-                Obejrzyj poradnik
-              </button>
+              <button className="hero-btn-primary">Zaloguj się</button>
+            </Link>
+            <Link href="/poradnik">
+              <button className="hero-btn-secondary">Obejrzyj poradnik</button>
             </Link>
           </div>
         </div>
-      </div>
-    </section>
+
+        {/* Dolny pasek */}
+        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-end justify-between px-8 sm:px-10 pb-7">
+
+          <div className="flex flex-col gap-2">
+            <p
+              className="text-white font-semibold"
+              style={{ fontSize: 'clamp(0.7rem, 1vw, 0.85rem)', opacity: 0.9 }}
+            >
+              Easylesson wybierają najlepsi korepetytorzy 
+            </p>
+            <div className="flex items-center gap-1">
+              {testAvatars.map((src, index) => (
+                <img
+                  key={index}
+                  src={src}
+                  alt=""
+                  className="rounded-full border-2 border-white object-cover"
+                  style={{
+                    width: '34px',
+                    height: '34px',
+                    marginLeft: index === 0 ? '0' : '-8px',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
+                  }}
+                />
+              ))}
+              <span
+                className="text-white font-semibold ml-2"
+                style={{ fontSize: '0.78rem', opacity: 0.85 }}
+              >
+                +40 użytkowników
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Instagram ↗</a>
+            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Facebook ↗</a>
+            <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">TikTok ↗</a>
+          </div>
+
+        </div>
+
+        <style jsx>{`
+
+          .hero-btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 13px 34px;
+            border-radius: 100px;
+            border: none;
+            cursor: pointer;
+            font-size: clamp(14px, 1.1vw, 16px);
+            font-weight: 700;
+            color: #032515;
+            background: #4bffab;
+            box-shadow: 0 2px 14px rgba(43, 204, 130, 0.40);
+            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
+            user-select: none;
+          }
+
+          .hero-btn-primary:hover {
+            transform: scale(1.03);
+            background: rgb(6, 250, 144);
+            box-shadow: 0 4px 22px rgba(43, 204, 130, 0.60);
+          }
+
+          .hero-btn-primary:active {
+            transform: scale(0.98);
+          }
+
+          .hero-btn-secondary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 13px 34px;
+            border-radius: 100px;
+            border: none;
+            cursor: pointer;
+            font-size: clamp(14px, 1.1vw, 16px);
+            font-weight: 700;
+            color: #432f00;
+            background: #ffce22;
+            box-shadow: 0 2px 14px rgba(255, 206, 34, 0.35);
+            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
+            user-select: none;
+          }
+
+          .hero-btn-secondary:hover {
+            transform: scale(1.03);
+            background: #ffd84a;
+            box-shadow: 0 4px 20px rgba(255, 206, 34, 0.55);
+          }
+
+          .hero-btn-secondary:active {
+            transform: scale(0.98);
+          }
+
+          .hero-social-link {
+            color: rgba(255, 255, 255, 0.75);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-decoration: none;
+            letter-spacing: 0.03em;
+            transition: color 0.15s ease;
+          }
+
+          .hero-social-link:hover {
+            color: rgba(255, 255, 255, 1);
+          }
+
+        `}</style>
+
+      </section>
+    </div>
   );
 }
