@@ -21,7 +21,10 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const handleResponse = async (response: Response) => {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    throw new Error(data.detail || 'Wystąpił błąd');
+
+    const errorMessage = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail || 'Wystąpił błąd');
+
+    throw new Error(errorMessage);
   }
   return data;
 };
@@ -45,7 +48,10 @@ export const createInvite = async (
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ invited_user_id: invitedUserId }),
+      body: JSON.stringify({ 
+        invited_user_id: invitedUserId, 
+        workspace_id: workspaceId,
+      }),
     },
   );
  
