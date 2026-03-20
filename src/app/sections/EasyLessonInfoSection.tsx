@@ -1,144 +1,198 @@
 'use client';
 
-import React from 'react';
-import Image from 'next/image';
+import React, { useState } from 'react';
+import Link from 'next/link';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700', '800'],
+  display: 'swap',
+});
+
+const YOUTUBE_ID = 'r0vrPSZjWMQ';
+const THUMBNAIL = `https://img.youtube.com/vi/${YOUTUBE_ID}/maxresdefault.jpg`;
 
 export default function EasyLessonInfoSection() {
+  const [playing, setPlaying] = useState(false);
+
   return (
-    <section className="relative bg-white overflow-hidden pt-12 pb-0 ">
-  {/* Gradient blobs */}
-  <div className="absolute inset-0 overflow-hidden pointer-events-none">
-    {/* Żółta plama - lewy górny */}
-    <div 
-      className="absolute -top-64 -left-64 w-[800px] h-[800px] rounded-full opacity-25 blur-3xl"
-      style={{
-        background: 'radial-gradient(circle, rgba(253, 224, 71, 0.5) 0%, rgba(253, 224, 71, 0) 70%)'
-      }}
-    />
-    
-    {/* Zielonkawa plama - prawy środek */}
-    <div 
-      className="absolute top-1/4 -right-64 w-[700px] h-[700px] rounded-full opacity-25 blur-3xl"
-      style={{
-        background: 'radial-gradient(circle, rgba(134, 239, 172, 0.5) 0%, rgba(134, 239, 172, 0) 70%)'
-      }}
-    />
-    
-    {/* Pomarańczowa plama - lewy dół */}
-    <div 
-      className="absolute -bottom-48 left-1/4 w-[600px] h-[600px] rounded-full opacity-20 blur-3xl"
-      style={{
-        background: 'radial-gradient(circle, rgba(251, 191, 36, 0.5) 0%, rgba(251, 191, 36, 0) 70%)'
-      }}
-    />
-  </div>
-      {/* Kontener szerszy niż max-w-7xl */}
-      <div className="max-w-[1600px] mx-auto px-8 sm:px-12 lg:px-16">
-        
-        {/* Gwiazdka na górze */}
-        <div className="flex justify-center mb-12">
-          <div className="relative w-12 h-12 opacity-80">
-            <svg viewBox="0 0 100 100" className="w-full h-full">
-              <path 
-                d="M50 10 L60 40 L90 50 L60 60 L50 90 L40 60 L10 50 L40 40 Z" 
-                fill="#f97316" 
-              />
-              {/* Małe promieniujące linie */}
-              <line x1="50" y1="0" x2="50" y2="8" stroke="#f97316" strokeWidth="3" />
-              <line x1="50" y1="92" x2="50" y2="100" stroke="#f97316" strokeWidth="3" />
-              <line x1="0" y1="50" x2="8" y2="50" stroke="#f97316" strokeWidth="3" />
-              <line x1="92" y1="50" x2="100" y2="50" stroke="#f97316" strokeWidth="3" />
-              <line x1="15" y1="15" x2="20" y2="20" stroke="#f97316" strokeWidth="3" />
-              <line x1="80" y1="80" x2="85" y2="85" stroke="#f97316" strokeWidth="3" />
-              <line x1="85" y1="15" x2="80" y2="20" stroke="#f97316" strokeWidth="3" />
-              <line x1="20" y1="80" x2="15" y2="85" stroke="#f97316" strokeWidth="3" />
-            </svg>
-          </div>
-        </div>
+    <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 py-8`}>
 
-        {/* Główny nagłówek */}
-{/* Główny nagłówek */}
-<div className="text-center max-w-5xl mx-auto mb-16">
-  <h2 className="text-4xl sm:text-5xl font-light text-gray-900 leading-tight mb-6">
-    Zmień standardowe zajęcia
-    <br />
-    w lekcje pełne{' '}
-    <span 
-      style={{ 
-        fontFamily: 'Prata, serif',
-        fontSize: '1.15em',
-        fontStyle: 'italic',
-        fontWeight: '600'
-      }}
-    >
-      konkretów
-    </span>
-  </h2>
-  
-  {/* Podtytuł */}
-  <p className="text-base md:text-lg text-gray-600 leading-relaxed max-w-3xl mx-auto font-light">
-    Platforma, która pomaga uczyć efektywniej i ułatwia pracę.
-    <br />
-    Zaoszczędź czas na dojazdy i przejdź na{' '}
-    <span 
-      className="text-gray-900"
-      style={{ 
-        fontFamily: 'Prata, serif',
-        fontSize: '1.05em',
-        fontStyle: 'italic'
-      }}
-    >
-      EasyLesson
-    </span>
-  </p>
-</div>
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          borderRadius: '24px',
+          background: '#111112',
+          padding: '5vh clamp(2rem, 5vw, 5rem)',
+        }}
+      >
 
-        {/* Film YouTube - EasyLesson w 3 minuty */}
-<div className="max-w-4xl mx-auto mb-8">
-  <h3 className="text-center text-2xl font-semibold text-gray-600 mb-6">
-    Obejrzyj{' '}
-    <span 
-      className="text-gray-900"
-      style={{ 
-        fontFamily: 'Prata, serif',
-        fontSize: '1.3em',
-        fontStyle: 'italic'
-      }}
-    >
-      3 minuty
-    </span>
-    {' '}filmu i korzystaj{' '}
-    <span 
-      className="text-gray-900"
-      style={{ 
-        fontFamily: 'Prata, serif',
-        fontSize: '1.3em',
-        fontStyle: 'italic'
-      }}
-    >
-      na zawsze
-    </span>
-  </h3>
-          <div className="bg-gray-100 rounded-2xl overflow-hidden shadow-lg">
-            <div className="aspect-video relative">
-              <iframe
-                width="100%"
-                height="100%"
-                src="https://www.youtube.com/embed/r0vrPSZjWMQ?start=0"
-                title="EasyLesson w 3 minuty"
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="rounded-2xl"
-              />
-            </div>
+        {/* Siatka */}
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)
+            `,
+            backgroundSize: '48px 48px',
+          }}
+        />
+        <div
+          className="absolute inset-0 pointer-events-none"
+          style={{
+            background: 'radial-gradient(ellipse at 50% 100%, rgba(17,17,18,0.0) 0%, rgba(17,17,18,0.85) 65%)',
+          }}
+        />
+
+        {/* Centralny kontener */}
+        <div className="relative flex flex-col items-center text-center">
+
+          {/* Badge */}
+          <div className="flex items-center gap-2 mb-5">
+            <div
+              className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[9px] rotate-90"
+              style={{ borderBottomColor: '#2bcc82' }}
+            />
+            <span
+              className="font-semibold tracking-widest uppercase"
+              style={{
+                fontSize: 'clamp(0.6rem, 0.85vw, 0.72rem)',
+                color: 'rgba(255,255,255,0.45)',
+                letterSpacing: '0.14em',
+              }}
+            >
+              JAK TO DZIAŁA
+            </span>
           </div>
-          <p className="text-center text-sm text-gray-600 mt-4">
-            Easylesson to nie tylko aplikacja. Wprowadzamy najnowocześniejszą technologie do polskich szkół!
+
+          {/* H2 */}
+          <h2
+            className="font-bold text-white leading-tight mb-4"
+            style={{
+              fontSize: 'clamp(1.8rem, 4vw, 3.8rem)',
+              lineHeight: 1.1,
+              maxWidth: '820px',
+            }}
+          >
+            Zmień standardowe zajęcia
+            <br />
+            w lekcje pełne{' '}
+            <span style={{ color: '#2bcc82' }}>konkretów.</span>
+          </h2>
+
+          {/* H3 */}
+          <p
+            className="font-light leading-relaxed mb-8"
+            style={{
+              fontSize: 'clamp(0.95rem, 1.4vw, 1.15rem)',
+              color: 'rgba(255,255,255,0.55)',
+              maxWidth: '520px',
+            }}
+          >
+            Platforma, która pomaga uczyć efektywniej i ułatwia pracę.
+            Zaoszczędź czas i przejdź na{' '}
+            <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>EasyLesson</span>.
           </p>
-        </div>
 
+          {/* Film */}
+          <div className="w-full mb-8" style={{ maxWidth: '780px' }}>
+            <div
+              className="relative overflow-hidden cursor-pointer group w-full"
+              style={{
+                borderRadius: '16px',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.50)',
+                aspectRatio: '16/9',
+              }}
+              onClick={() => setPlaying(true)}
+            >
+              {playing ? (
+                <iframe
+                  className="absolute inset-0 w-full h-full"
+                  src={`https://www.youtube.com/embed/${YOUTUBE_ID}?autoplay=1&rel=0`}
+                  title="EasyLesson w 3 minuty"
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              ) : (
+                <>
+                  <img
+                    src={THUMBNAIL}
+                    alt="EasyLesson w 3 minuty"
+                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.20)' }} />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div
+                      className="flex items-center justify-center transition-transform duration-200 group-hover:scale-110"
+                      style={{
+                        width: '72px',
+                        height: '72px',
+                        borderRadius: '50%',
+                        background: '#fff',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.35)',
+                      }}
+                    >
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="#111112">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div
+                    className="absolute bottom-3 right-3 font-semibold"
+                    style={{
+                      background: 'rgba(0,0,0,0.75)',
+                      color: '#fff',
+                      fontSize: '0.72rem',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    3:00
+                  </div>
+                </>
+              )}
+            </div>
+            <p
+              className="mt-2 font-medium"
+              style={{ fontSize: '0.73rem', color: 'rgba(255,255,255,0.30)' }}
+            >
+              Obejrzyj 3 minuty i korzystaj na zawsze
+            </p>
+          </div>
+
+          {/* CTA */}
+          <Link href="/rejestracja">
+            <button
+              className="inline-flex items-center font-bold"
+              style={{
+                padding: '13px 36px',
+                borderRadius: '100px',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 'clamp(14px, 1.1vw, 16px)',
+                color: '#032515',
+                background: '#4bffab',
+                boxShadow: '0 2px 16px rgba(75,255,171,0.30)',
+                transition: 'transform 0.13s ease, background 0.13s ease',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'scale(1.03)';
+                e.currentTarget.style.background = 'rgb(6,250,144)';
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'scale(1)';
+                e.currentTarget.style.background = '#4bffab';
+              }}
+            >
+              Zaloguj się
+            </button>
+          </Link>
+
+        </div>
       </div>
-    </section>
+    </div>
   );
 }

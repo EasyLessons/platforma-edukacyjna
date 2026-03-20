@@ -12,6 +12,7 @@ import TestimonialsSection from './sections/TestimonialsSection';
 import EasyLessonInfoSection from './sections/EasyLessonInfoSection';
 import QuickNavSection from './sections/QuickNavSection';
 import BenefitsSection from './sections/BenefitsSection';
+import Footer from './sections/Footer';
 
 export default function Home() {
   return (
@@ -34,22 +35,10 @@ export default function Home() {
 
       <BenefitsSection />
 
-      {/* Sekcja problemów i rozwiązań - pokazuje się na wszystkich urządzeniach */}
-      <ProblemsAndSolutionsSection />
-
-      <MainFunctionsSection />
-
-      <HowItWorksSection />
-
-      <ForWhoSection />
 
       <PricingSection />
 
-      <SocialProofSection />
-
-      <FAQSection />
-
-      <LastCTASection />
+      <Footer />
     </div>
   );
 }

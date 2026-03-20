@@ -1,193 +1,217 @@
 'use client';
 
 import React from 'react';
+import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700', '800'],
+  display: 'swap',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['700'],
+  style: ['italic'],
+  display: 'swap',
+});
 
 interface Stat {
   number: string;
   label: string;
-  icon: string;
 }
 
 interface Testimonial {
   text: string;
   author: string;
   role: string;
-  color: string;
+  avatar: string;
 }
 
 const stats: Stat[] = [
-  {
-    number: '1,200+',
-    label: 'korepetytorów',
-    icon: '👨‍🏫',
-  },
-  {
-    number: '5,000+',
-    label: 'lekcji przeprowadzonych',
-    icon: '📚',
-  },
-  {
-    number: '4.8/5',
-    label: 'średnia ocena',
-    icon: '⭐',
-  },
+  { number: '1 200+', label: 'korepetytorów' },
+  { number: '5 000+', label: 'lekcji przeprowadzonych' },
+  { number: '4.8 / 5', label: 'średnia ocena' },
 ];
 
 const testimonials: Testimonial[] = [
   {
     text: 'Dzięki EasyLesson mogę prowadzić lekcje matematyki bez problemów. AI pomaga mi w przygotowaniu materiałów!',
-    author: 'Anna',
+    author: 'Anna K.',
     role: 'korepetytorka matematyki',
-    color: '#3b82f6',
+    avatar: 'https://i.pravatar.cc/150?img=47',
   },
   {
     text: 'SmartSearch to game changer. Nie muszę już googlować wzorów w trakcie lekcji.',
-    author: 'Marek',
+    author: 'Marek W.',
     role: 'student fizyki',
-    color: '#ec4899',
+    avatar: 'https://i.pravatar.cc/150?img=11',
   },
   {
-    text: 'Najlepsza tablica online jakiej używałem. Intuicyjna, szybka i z wszystkim czego potrzebuję.',
-    author: 'Kasia',
+    text: 'Najlepsza tablica online jakiej używałam. Intuicyjna, szybka i z wszystkim czego potrzebuję.',
+    author: 'Kasia M.',
     role: 'nauczycielka chemii',
-    color: '#8b5cf6',
+    avatar: 'https://i.pravatar.cc/150?img=32',
   },
   {
     text: 'Współpraca w czasie rzeczywistym działa rewelacyjnie. Uczniowie widzą wszystko na żywo!',
-    author: 'Tomek',
+    author: 'Tomek R.',
     role: 'korepetytor online',
-    color: '#14b8a6',
+    avatar: 'https://i.pravatar.cc/150?img=53',
   },
 ];
 
 export default function SocialProofSection() {
   return (
-    <section className="relative bg-white py-20 px-4">
-      {/* GŁÓWNA ZAWARTOŚĆ */}
-      <div className="relative max-w-6xl mx-auto z-10">
-        {/* TYTUŁ SEKCJI */}
-        <div className="text-center mb-16">
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+    <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pb-8`}>
+
+      {/* Blok z zaokrąglonymi rogami - pomarańczowe tło */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          borderRadius: '24px',
+          background: 'linear-gradient(145deg, #ff8427 0%, #ff9a4d 50%, #ffaa66 100%)',
+          padding: '4vh 4vw',
+        }}
+      >
+
+        {/* Dekoracyjne kółka w tle */}
+        <div
+          className="absolute top-0 right-0 pointer-events-none"
+          style={{
+            width: '40vw',
+            height: '40vw',
+            maxWidth: '500px',
+            maxHeight: '500px',
+            borderRadius: '50%',
+            background: 'rgba(255,255,255,0.06)',
+            transform: 'translate(30%, -30%)',
+          }}
+        />
+        <div
+          className="absolute bottom-0 left-0 pointer-events-none"
+          style={{
+            width: '30vw',
+            height: '30vw',
+            maxWidth: '380px',
+            maxHeight: '380px',
+            borderRadius: '50%',
+            background: 'rgba(0,0,0,0.04)',
+            transform: 'translate(-30%, 30%)',
+          }}
+        />
+
+        {/* Nagłówek sekcji */}
+        <div className="relative text-center mb-10 sm:mb-14">
+          <p
+            className="text-white font-semibold tracking-widest uppercase mb-3"
+            style={{ fontSize: 'clamp(0.6rem, 1vw, 0.75rem)', opacity: 0.8, letterSpacing: '0.14em' }}
+          >
+            ZAUFANIE UŻYTKOWNIKÓW
+          </p>
+          <h2
+            className="font-bold text-white leading-tight"
+            style={{ fontSize: 'clamp(1.8rem, 4vw, 3.6rem)' }}
+          >
             Zaufali{' '}
-            <span className="relative inline-block">
+            <span className={playfair.className} style={{ color: '#fff3e0' }}>
               nam...
-              <svg
-                className="absolute -bottom-2 left-0 w-full"
-                height="12"
-                viewBox="0 0 150 12"
-                fill="none"
-              >
-                <path
-                  d="M2 8C40 4 80 3 120 6C135 7 145 5 148 7"
-                  stroke="#4ade80"
-                  strokeWidth="3"
-                  strokeLinecap="round"
-                />
-              </svg>
             </span>
           </h2>
         </div>
 
-        {/* STATYSTYKI */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+        {/* Statystyki */}
+        <div className="relative grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10 sm:mb-14">
           {stats.map((stat, index) => (
-            <div key={index} className="text-center relative">
-              {/* Rysowana ramka */}
-              <div className="relative bg-[#f5f3ef] rounded-2xl p-8 shadow-lg">
-                <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                  <rect
-                    x="3"
-                    y="3"
-                    width="calc(100% - 6px)"
-                    height="calc(100% - 6px)"
-                    rx="16"
-                    fill="none"
-                    stroke="#4ade80"
-                    strokeWidth="3"
-                  />
-                </svg>
-
-                <div className="relative z-10">
-                  <div className="text-5xl mb-3">{stat.icon}</div>
-                  <div className="text-4xl md:text-5xl font-black text-gray-900 mb-2">
-                    {stat.number}
-                  </div>
-                  <div className="text-lg text-gray-600">{stat.label}</div>
-                </div>
+            <div
+              key={index}
+              className="text-center"
+              style={{
+                background: 'rgba(255,255,255,0.15)',
+                borderRadius: '16px',
+                padding: '3vh 2vw',
+                backdropFilter: 'blur(8px)',
+                border: '1px solid rgba(255,255,255,0.25)',
+              }}
+            >
+              <div
+                className="font-black text-white"
+                style={{ fontSize: 'clamp(2rem, 4vw, 3.5rem)', lineHeight: 1 }}
+              >
+                {stat.number}
+              </div>
+              <div
+                className="text-white mt-2 font-medium"
+                style={{ fontSize: 'clamp(0.8rem, 1.2vw, 1rem)', opacity: 0.85 }}
+              >
+                {stat.label}
               </div>
             </div>
           ))}
         </div>
 
-        {/* OPINIE */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Opinie */}
+        <div className="relative grid grid-cols-1 sm:grid-cols-2 gap-4">
           {testimonials.map((testimonial, index) => (
-            <div key={index} className="relative">
-              {/* Karta opinii */}
-              <div className="relative bg-white rounded-2xl p-6 shadow-lg border-2 border-gray-100 hover:shadow-xl transition-all duration-300">
-                {/* Rysowany kontur */}
-                <svg className="absolute inset-0 w-full h-full pointer-events-none">
-                  <rect
-                    x="3"
-                    y="3"
-                    width="calc(100% - 6px)"
-                    height="calc(100% - 6px)"
-                    rx="16"
-                    fill="none"
-                    stroke={testimonial.color}
-                    strokeWidth="3"
-                  />
-                </svg>
-
-                <div className="relative z-10">
-                  {/* Cytat */}
-                  <div className="mb-4">
-                    <svg width="40" height="30" viewBox="0 0 40 30" fill="none">
-                      <path
-                        d="M0 15C0 6.716 6.716 0 15 0h2v15H2v10h13v5H0V15zm23 0C23 6.716 29.716 0 38 0h2v15H25v10h13v5H23V15z"
-                        fill={testimonial.color}
-                        opacity="0.2"
-                      />
-                    </svg>
-                  </div>
-
-                  <p className="text-gray-700 text-lg leading-relaxed mb-6 italic">
-                    "{testimonial.text}"
-                  </p>
-
-                  {/* Autor */}
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-xl"
-                      style={{ backgroundColor: testimonial.color }}
-                    >
-                      {testimonial.author[0]}
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-900">{testimonial.author}</div>
-                      <div className="text-sm text-gray-600">{testimonial.role}</div>
-                    </div>
-                  </div>
-                </div>
+            <div
+              key={index}
+              style={{
+                background: 'rgba(255,255,255,0.92)',
+                borderRadius: '16px',
+                padding: '2.5vh 2.5vw',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.10)',
+              }}
+            >
+              {/* Cudzysłów */}
+              <div
+                className="font-black mb-3"
+                style={{ fontSize: '3rem', lineHeight: 0.8, color: '#ff8427', opacity: 0.35 }}
+              >
+                "
               </div>
 
-              {/* Rysowane gwiazdki obok */}
-              {index === 0 && (
-                <div className="hidden lg:block absolute -right-8 top-4">
-                  <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-                    <path
-                      d="M20 5 L23 15 L33 15 L25 21 L28 31 L20 25 L12 31 L15 21 L7 15 L17 15 Z"
-                      fill="#fbbf24"
-                      stroke="#f59e0b"
-                      strokeWidth="2"
-                    />
-                  </svg>
+              <p
+                className="text-gray-700 leading-relaxed mb-5"
+                style={{ fontSize: 'clamp(0.85rem, 1.2vw, 1rem)' }}
+              >
+                {testimonial.text}
+              </p>
+
+              {/* Autor */}
+              <div className="flex items-center gap-3">
+                <img
+                  src={testimonial.avatar}
+                  alt={testimonial.author}
+                  className="rounded-full object-cover border-2"
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderColor: '#ff8427',
+                    flexShrink: 0,
+                  }}
+                />
+                <div>
+                  <div className="font-bold text-gray-900" style={{ fontSize: '0.9rem' }}>
+                    {testimonial.author}
+                  </div>
+                  <div className="text-gray-500" style={{ fontSize: '0.78rem' }}>
+                    {testimonial.role}
+                  </div>
                 </div>
-              )}
+                {/* Gwiazdki */}
+                <div className="ml-auto flex gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <svg key={i} width="14" height="14" viewBox="0 0 14 14" fill="#ff8427">
+                      <path d="M7 1l1.5 4H13l-3.5 2.5 1.3 4L7 9 3.2 11.5l1.3-4L1 5h4.5z" />
+                    </svg>
+                  ))}
+                </div>
+              </div>
             </div>
           ))}
         </div>
+
       </div>
-    </section>
+    </div>
   );
 }

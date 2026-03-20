@@ -109,7 +109,7 @@ export default function AuthHeader() {
 
   return (
     <header className="sticky top-0 z-50 bg-white shadow-md border-b border-gray-200">
-      <div className="max-w-[1400px] mx-auto px-6">
+      <div className="max-w-[99%] mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           {/* Logo po lewej */}
           <div className="flex items-center gap-8">

@@ -9,11 +9,17 @@
 }
 
 .dashboard-shell {
-  background: var(--dash-bg);
+  background: var(--dash-panel); /* Teraz tło całego dashboardu to ten jasny szary */
 }
 
+/* To zostawiamy jako białe, bo to będzie nasza karta */
 .dashboard-main {
-  background: var(--dash-bg);
+  background: var(--dash-bg); 
+  border-top-left-radius: 2.5rem;
+  border-top-right-radius: 2.5rem;
+  border-bottom-left-radius: 2.5rem;
+  border-bottom-right-radius: 2.5rem;
+  overflow-x: hidden;
 }
 
 .dashboard-title-label {

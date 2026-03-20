@@ -1,7 +1,7 @@
 'use client';
 
 import './dashboard-theme.css';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/boards-section';
@@ -23,6 +23,8 @@ export default function Dashboard() {
   } = useWorkspaces();
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+  const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);
+  const workspaceTopNavRef = useRef<HTMLDivElement | null>(null);
 
   const handleWorkspaceSelect = (id: number, name: string) => {
     setActiveWorkspaceId(id);
@@ -50,13 +52,35 @@ export default function Dashboard() {
     return workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name;
   }, [workspaces, activeWorkspaceId]);
 
-  return (
-    <div className="dashboard-shell min-h-screen flex flex-col">
-      <DashboardHeader 
-        refreshWorkspaces={refreshWorkspaces}
-      />
+  useEffect(() => {
+    const topNavElement = workspaceTopNavRef.current;
+    if (!topNavElement) return;
 
-      <div className="flex flex-1">
+    const updateHeight = () => {
+      const measuredHeight = Math.ceil(topNavElement.getBoundingClientRect().height);
+      if (measuredHeight > 0) {
+        setWorkspaceTopNavHeight(measuredHeight);
+      }
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight);
+      return () => window.removeEventListener('resize', updateHeight);
+    }
+
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(topNavElement);
+
+    return () => resizeObserver.disconnect();
+  }, [activeWorkspaceId, workspaces.length]);
+
+  return (
+    <div className="dashboard-shell h-screen flex flex-col overflow-hidden bg-[var(--dash-panel)]">
+      <DashboardHeader refreshWorkspaces={refreshWorkspaces} />
+
+      <div className="flex flex-1 min-h-0 overflow-hidden ">
         <WorkspaceSidebar
           activeWorkspaceId={activeWorkspaceId}
           onWorkspaceSelect={handleWorkspaceSelect}
@@ -70,26 +94,32 @@ export default function Dashboard() {
           toggleFavourite={toggleFavourite}
         />
 
-        <div className="dashboard-main flex-1 overflow-auto">
-          <div className="w-full">
-            <WorkspaceTopNav
-              activeWorkspaceId={activeWorkspaceId}
-              workspaces={workspaces}
-              toggleFavourite={toggleFavourite}
-              updateWorkspace={updateWorkspace}
-              deleteWorkspace={deleteWorkspace}
-              leaveWorkspace={leaveWorkspace}
-            />
+        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] mr-6 mb-6">
+          <div className="flex flex-col w-full min-h-full">
+            <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-[var(--dash-panel)]">
+              <WorkspaceTopNav
+                activeWorkspaceId={activeWorkspaceId}
+                workspaces={workspaces}
+                toggleFavourite={toggleFavourite}
+                updateWorkspace={updateWorkspace}
+                deleteWorkspace={deleteWorkspace}
+                leaveWorkspace={leaveWorkspace}
+              />
+            </div>
 
-            <div className="p-8">
+            <div className="p-8 pb-20">
               <TemplatesSection workspaceId={activeWorkspaceId} />
 
               {activeWorkspaceId && (
-                <BoardsSection workspaceId={activeWorkspaceId} workspaceName={activeWorkspaceName} />
+                <BoardsSection
+                  workspaceId={activeWorkspaceId}
+                  workspaceName={activeWorkspaceName}
+                  stickyOffset={workspaceTopNavHeight}
+                />
               )}
             </div>
           </div>
-        </div>
+        </main>
       </div>
     </div>
   );

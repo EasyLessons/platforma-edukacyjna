@@ -82,12 +82,12 @@ export default function WorkspaceTopNav({
 
   return (
     <>
-      <div className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-[var(--dash-border)] bg-white px-4 py-3 sm:px-8">
+      <div className="w-full shrink-0 bg-[var(--dash-panel)] ">
+        
+        {/* Biały pasek Navu */}
+      <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 sm:px-8 rounded-t-[2.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+        
         <div className="min-w-0 flex items-center gap-3">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-            PRZESTRZEŃ /
-          </span>
-
           {activeWorkspace && WorkspaceIcon && (
             <div
               className={`flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm ${workspaceColorClass}`}
@@ -97,7 +97,7 @@ export default function WorkspaceTopNav({
           )}
 
           <div className="min-w-0">
-            <p className="truncate text-sm font-medium leading-tight text-gray-800">
+            <p className="truncate text-sm font-bold leading-tight text-gray-800">
               {activeWorkspace?.name || 'Wybierz przestrzeń'}
             </p>
           </div>
@@ -156,14 +156,15 @@ export default function WorkspaceTopNav({
               variant="secondary"
               leftIcon={<UserPlus size={14} />}
               onClick={() => setInvitingWorkspace(activeWorkspace)}
-              className="h-8 px-3 text-xs"
+              className="h-8 px-3 text-xs font-semibold"
+              
             >
               Zaproś uczestników
             </DashboardButton>
 
             {activeWorkspace.is_owner && (
               <Button
-                variant="secondary"
+                variant="primary"
                 size="iconSm"
                 onClick={() => setEditingWorkspace(activeWorkspace)}
                 title="Zmień nazwę przestrzeni"
@@ -174,7 +175,7 @@ export default function WorkspaceTopNav({
             )}
 
             <Button
-              variant="secondary"
+              variant="primary"
               size="iconSm"
               onClick={() => toggleFavourite(activeWorkspace.id, !activeWorkspace.is_favourite)}
               title={
@@ -206,6 +207,7 @@ export default function WorkspaceTopNav({
           <span className="text-xs text-gray-500">Wybierz workspace z menu po lewej</span>
         )}
       </div>
+      </div>
 
       {invitingWorkspace && (
         <WorkspaceInviteModal
@@ -217,6 +219,7 @@ export default function WorkspaceTopNav({
 
       {editingWorkspace && (
         <WorkspaceEditModal
+          
           isOpen={!!editingWorkspace}
           onClose={() => setEditingWorkspace(null)}
           workspace={editingWorkspace}
