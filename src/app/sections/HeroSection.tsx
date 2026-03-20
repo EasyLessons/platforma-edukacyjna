@@ -97,7 +97,7 @@ export default function HeroSection() {
               lineHeight: '1',
             }}
           >
-            Jeden board.{' '}
+            Jedna tablica.{' '}
             <span style={{ color: '#4bffab' }}>
               Milion<br/ > możliwości
             </span>

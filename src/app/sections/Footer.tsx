@@ -94,7 +94,7 @@ export default function Footer() {
                 className="font-bold text-white"
                 style={{ fontSize: 'clamp(1.4rem, 3vw, 2.4rem)', lineHeight: 1.15 }}
               >
-                Jeden board.{' '}
+                Jedna tablica.{' '}
                 <span style={{ color: '#4bffab' }}>Milion możliwości</span>{' '}nauki.
               </p>
               <p style={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.60)', fontWeight: 300 }}>
