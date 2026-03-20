@@ -70,7 +70,8 @@ async def validation_error_handler(request, exc: ValidationError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
-            error=exc.message
+            error=exc.message,
+            code=exc.code
         ).model_dump()
     )
 
@@ -82,7 +83,8 @@ async def auth_error_handler(request, exc: AuthenticationError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
-            error=exc.message
+            error=exc.message,
+            code=exc.code
         ).model_dump()
     )
 
@@ -94,7 +96,8 @@ async def not_found_handler(request, exc: NotFoundError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
-            error=exc.message
+            error=exc.message,
+            code=exc.code
         ).model_dump()
     )
 
@@ -106,7 +109,8 @@ async def app_exception_handler(request, exc: AppException):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
-            error=exc.message
+            error=exc.message,
+            code=exc.code
         ).model_dump()
     )
 
@@ -118,7 +122,8 @@ async def global_exception_handler(request, exc: Exception):
         status_code=500,
         content=ApiResponse(
             success=False,
-            error="Internal server error"
+            error="Internal server error",
+            code="APP_ERROR"
         ).model_dump()
     )
 

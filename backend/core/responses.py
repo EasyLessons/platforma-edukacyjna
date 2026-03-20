@@ -12,6 +12,7 @@ class ApiResponse(BaseModel, Generic[T]):
     success: bool
     data: Optional[T] = None
     error: Optional[str] = None
+    code: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
     class Config:
