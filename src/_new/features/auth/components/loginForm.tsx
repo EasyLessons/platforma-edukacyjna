@@ -6,7 +6,7 @@ import { Eye, EyeOff } from 'lucide-react';
 
 import { Input } from '@new/shared/ui/input';
 import { Button } from '@new/shared/ui/button';
-import { useLogin } from '../hooks/use-login';
+import { useLogin } from '../hooks/useLogin';
 
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,14 +21,14 @@ export function LoginForm() {
         </div>
       )}
 
-      {/* Email Input */}
+      {/* Login Input */}
       <Input
-        type="email"
-        name="email"
-        value={formData.email}
+        type="login"
+        name="login"
+        value={formData.login}
         onChange={handleChange}
-        placeholder="Email"
-        error={errors.email}
+        placeholder="Login"
+        error={errors.login}
       />
 
       {/* Password Input */}

@@ -1,19 +1,16 @@
 'use client';
 
 import { Mail } from 'lucide-react';
-import { CodeInput } from './code-input';
+import { CodeInput } from './codeInput';
 import { useRouter } from 'next/navigation';
-import { verifyEmail, resendVerificationCode } from '../api/auth-api';
+import { verifyEmail, resendVerificationCode } from '../api/authApi';
 
 type EmailVerificationFormProps = {
   userId: string;
   email: string;
 };
 
-export function EmailVerificationForm({ 
-  userId, 
-  email 
-}: EmailVerificationFormProps) {
+export function EmailVerificationForm({ userId, email }: EmailVerificationFormProps) {
   const router = useRouter();
 
   if (!userId || !email) {
@@ -40,7 +37,6 @@ export function EmailVerificationForm({
         onResend={async () => {
           await resendVerificationCode({
             user_id: parseInt(userId),
-            email: email,
           });
         }}
         label="Wprowadź 6-cyfrowy kod"

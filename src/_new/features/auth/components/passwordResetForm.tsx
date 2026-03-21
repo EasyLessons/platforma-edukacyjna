@@ -2,17 +2,14 @@
 
 import { useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
-import { requestPasswordReset, verifyResetCode } from '../api/auth-api';
-
 import { Input } from '@/_new/shared/ui/input';
 import { Button } from '@/_new/shared/ui/button';
-import { CodeInput } from './code-input';
-import { usePasswordReset } from '../hooks/use-password-reset';
+import { CodeInput } from './codeInput';
+import { usePasswordReset } from '../hooks/usePasswordReset';
 
 export function PasswordResetForm() {
   const {
     step,
-    setStep,
     // Step 1
     email,
     handleEmailChange,

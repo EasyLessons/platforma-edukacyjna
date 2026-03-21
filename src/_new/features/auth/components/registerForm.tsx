@@ -6,7 +6,7 @@ import { Eye, EyeOff } from 'lucide-react';
 
 import { Input } from '@new/shared/ui/input';
 import { Button } from '@new/shared/ui/button';
-import { useRegister } from '../hooks/use-register';
+import { useRegister } from '../hooks/useRegister';
 
 export function RegisterForm() {
   const {
@@ -34,11 +34,11 @@ export function RegisterForm() {
       {/* Login Input */}
       <Input
         type="text"
-        name="login"
-        value={formData.login}
+        name="username"
+        value={formData.username}
         onChange={handleChange}
-        placeholder="Login"
-        error={errors.login}
+        placeholder="Username"
+        error={errors.username}
       />
 
       {/* Email Input */}
@@ -66,15 +66,15 @@ export function RegisterForm() {
       {/* Confirm Password Input */}
       <Input
         type={showConfirmPassword ? 'text' : 'password'}
-        name="confirmPassword"
-        value={formData.confirmPassword}
+        name="password_confirm"
+        value={formData.password_confirm}
         onChange={handleChange}
         placeholder="••••••••"
         rightIcon={
           showConfirmPassword ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />
         }
         onRightIconClick={() => setShowConfirmPassword(!showConfirmPassword)}
-        error={errors.confirmPassword}
+        error={errors.password_confirm}
       />
 
       {/* Terms Checkbox */}

@@ -30,7 +30,7 @@ import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/white
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
-import { getMyRole } from '@/_new/features/workspace/api/workspace-api'; 
+import { getMyRole } from '@/_new/features/workspace/api/workspaceApi'; 
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';

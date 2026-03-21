@@ -25,6 +25,8 @@ import { AppError } from '@/_new/lib/errors';
 interface ErrorHandlerOptions {
   /** Nadpisuje domyślny redirect na /login przy 401 */
   onUnauthorized?: () => void;
+  /** Wywołwane przy 403 - np. konto niezweryfikowane */
+  onForbidden?: (err: AppError) => void | Promise<void>;
   /** Wywołane dla każdego błędu — np. toast/snackbar */
   onError?: (message: string) => void;
   /** Wywołane przy błędach sieciowych */
@@ -35,7 +37,7 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
   const router = useRouter();
 
   const handleError = useCallback(
-    (err: unknown): string => {
+    async (err: unknown): Promise<string> => {
       // Nieznany błąd (nie AppError)
       if (!(err instanceof AppError)) {
         const message = err instanceof Error ? err.message : 'Nieoczekiwany błąd';
@@ -49,6 +51,16 @@ export function useErrorHandler(options: ErrorHandlerOptions = {}) {
           options.onUnauthorized();
         } else {
           router.push('/login');
+        }
+        return err.message;
+      }
+
+      // 403 - brak dostępu
+      if (err.isForbidden()) {
+        if (options.onForbidden) {
+          await options.onForbidden(err);
+        } else {
+          options.onError?.(err.message);
         }
         return err.message;
       }

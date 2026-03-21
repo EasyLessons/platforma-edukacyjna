@@ -11,7 +11,7 @@
 'use client';
 
 import { Button } from '@new/shared/ui/button';
-import { useCodeInput } from '../hooks/use-code-input';
+import { useCodeInput } from '../hooks/useCodeInput';
 
 interface CodeInputProps {
   onVerify: (code: string) => Promise<void>;

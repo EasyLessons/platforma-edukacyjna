@@ -9,75 +9,76 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { registerUser, checkUser } from '../api/auth-api';
+import { registerUser, checkUser } from '../api/authApi';
 import {
   validateEmail,
   validatePassword,
   validatePasswordsMatch,
-  validateLogin,
+  validateUsername,
 } from '../utils/validation';
-import type { RegisterFormData, RegisterErrors } from '../types';
+import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
+import { AppError } from '@/_new/lib/errors';
+import type { RegisterFormData, FormErrors } from '../types';
 
 export function useRegister() {
   const router = useRouter();
 
   // STATE
   const [formData, setFormData] = useState<RegisterFormData>({
-    login: '',
+    username: '',
     email: '',
     password: '',
-    confirmPassword: '',
+    password_confirm: '',
   });
 
-  const [errors, setErrors] = useState<RegisterErrors>({});
+  const [errors, setErrors] = useState<FormErrors<RegisterFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [generalError, setGeneralError] = useState('');
   const [acceptTerms, setAcceptTerms] = useState(false);
 
+  const { handleError, isError } = useErrorHandler({
+    onError: setGeneralError,
+  });
+
   // VALIDATION
   const validateForm = (): boolean => {
-    const newErrors: RegisterErrors = {};
-    let isValid = true;
+    const newErrors: FormErrors<RegisterFormData> = {};
 
-    // Login validation
-    const loginValidation = validateLogin(formData.login);
-    if (!loginValidation.valid) {
-      newErrors.login = loginValidation.error;
-      isValid = false;
+    // Username validation
+    const usernameValidation = validateUsername(formData.username);
+    if (!usernameValidation.valid) {
+      newErrors.username = usernameValidation.error;
     }
 
     // Email validation
     const emailValidation = validateEmail(formData.email);
     if (!emailValidation.valid) {
       newErrors.email = emailValidation.error;
-      isValid = false;
     }
 
     // Password validation
     const passwordValidation = validatePassword(formData.password);
     if (!passwordValidation.valid) {
       newErrors.password = passwordValidation.error;
-      isValid = false;
     }
 
     // Passwords match validation
     const passwordsMatchValidation = validatePasswordsMatch(
       formData.password,
-      formData.confirmPassword
+      formData.password_confirm
     );
     if (!passwordsMatchValidation.valid) {
-      newErrors.confirmPassword = passwordsMatchValidation.error;
-      isValid = false;
+      newErrors.password_confirm = passwordsMatchValidation.error;
     }
 
     // Terms acceptance
     if (!acceptTerms) {
-        setGeneralError('Musisz zaakceptować regulamin');
-        isValid = false;
+      setGeneralError('Musisz zaakceptować regulamin');
+      return false;
     }
 
     setErrors(newErrors);
-    return isValid;
+    return Object.keys(newErrors).length === 0;
   };
 
   // HANDLERS
@@ -91,52 +92,42 @@ export function useRegister() {
   const handleTermsChange = (checked: boolean) => {
     setAcceptTerms(checked);
     setGeneralError('');
-  }
+  };
+
+  const handleConflict = async () => {
+    try {
+      const checkData = await checkUser(formData.email);
+      if (checkData.verified) {
+        setGeneralError('To konto już istnieje. Przejdź do logowania.');
+      } else {
+        router.push(
+          `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
+        );
+      }
+    } catch {
+      handleError(new AppError('Email już zajęty', 'CONFLICT', 409));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
     if (!validateForm()) return;
 
     setIsLoading(true);
     setGeneralError('');
 
     try {
-      // Call API
-      const response = await registerUser({
-        login: formData.login,
-        email: formData.email,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword,
-      });
-
-      // Redirect to verification
+      const response = await registerUser(formData);
       router.push(
         `/weryfikacja?userId=${response.user_id}&email=${encodeURIComponent(formData.email)}`
       );
-    } catch (error: any) {
+    } catch (err) {
       setIsLoading(false);
-
-      // Handle "Email zajęty" error
-      if (error.message.includes('Email zajęty')) {
-        try {
-          const checkData = await checkUser(formData.email);
-
-          if (checkData.verified) {
-            // Account verified - redirect to login
-            setGeneralError('To konto już istnieje. Przejdź do logowania.');
-          } else {
-            // Account not verified - resend code
-            router.push(
-              `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
-            );
-          }
-        } catch (checkError) {
-          setGeneralError('Email już zajęty');
-        }
-      } else {
-        setGeneralError(error.message || 'Błąd rejestracji');
+      if (isError(err, 'CONFLICT')) {
+        await handleConflict();
+        return;
       }
+      await handleError(err);
     }
   };
 
@@ -147,7 +138,6 @@ export function useRegister() {
     isLoading,
     generalError,
     acceptTerms,
-
     // Handlers
     handleChange,
     handleTermsChange,

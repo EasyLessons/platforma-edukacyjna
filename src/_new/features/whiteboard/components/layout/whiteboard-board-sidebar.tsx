@@ -18,7 +18,7 @@ import { PanelLeftClose, Search, Star, MoreVertical } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useBoards } from '@/_new/features/board/hooks/use-boards';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 import {
   getIconComponent as getBoardIconComponent,
   getGradientClass,
