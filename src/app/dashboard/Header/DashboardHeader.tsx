@@ -8,7 +8,7 @@ import { Bell, Gift, Crown, Settings, Menu, X, LogOut, User as UserIcon } from '
 
 import { getUser, isAuthenticated, type User } from '@/auth_api/api';
 import { useAuth } from '@/app/context/AuthContext';
-import { useNotifications } from '@/_new/features/notifications/hooks/use-notifications';
+import { useNotifications } from '@/_new/features/notifications/hooks/useNotifications';
 
 import GiftPopup from './popups/GiftPopup';
 import UserMenuPopup from './popups/UserMenuPopup';

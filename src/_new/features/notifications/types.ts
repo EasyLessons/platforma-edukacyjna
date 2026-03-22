@@ -10,7 +10,6 @@ export type NotificationType = 'invite';
 // PAYLOADS
 
 export interface InvitePayload {
-  id: number;
   workspace_id: number;
   workspace_name: string;
   workspace_icon: string;
@@ -27,10 +26,10 @@ type PayloadMap = {
   // W przyszłości można dodać inne typy powiadomień
 };
 
-
 // NOTIFICATION
 export interface Notification<T extends NotificationType = NotificationType> {
   id: number;
+  user_id: number;
   type: T;
   payload: PayloadMap[T];
   is_read: boolean;
@@ -46,5 +45,9 @@ export type InviteNotification = Notification<'invite'>;
 
 export interface NotificationsListResponse {
   notifications: Notification[];
-  unread_count:  number;
+  unread_count: number;
+}
+
+export interface ReadAllResponse {
+  updated: number;
 }

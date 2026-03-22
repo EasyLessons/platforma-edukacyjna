@@ -20,7 +20,8 @@ import {
   markNotificationAsRead,
   markAllNotificationsAsRead,
   deleteNotification,
-} from '../api/notification-api';
+} from '../api/notificationApi';
+import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
 import type { Notification, InvitePayload, InviteNotification } from '../types';
 
 export function useNotifications() {
@@ -28,9 +29,12 @@ export function useNotifications() {
   const { user, isLoggedIn } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Zapobiega duplikatom gdy Broadcast i initial fetch dostarczą ten sam rekord
   const seenIds = useRef<Set<number>>(new Set());
+
+  const { handleError } = useErrorHandler({ onError: setError });
 
   // INITIAL FETCH
   const loadInitialNotifications = useCallback(async () => {
@@ -40,11 +44,12 @@ export function useNotifications() {
     }
     try {
       setLoading(true);
+      setError(null);
       const { notifications } = await fetchNotifications();
       notifications.forEach((n) => seenIds.current.add(n.id));
       setNotifications(notifications);
-    } catch (error) {
-      console.error('useNotifications: błąd initial fetch:', error);
+    } catch (err) {
+      await handleError(err);
     } finally {
       setLoading(false);
     }
@@ -58,18 +63,17 @@ export function useNotifications() {
   useEffect(() => {
     if (!isLoggedIn || !user?.id) return;
 
-    const channelName = `notifications:${user.id}`;
-
     const channel = supabase
-      .channel(channelName)
+      .channel(`notifications:${user.id}`)
       .on('broadcast', { event: 'new_invite' }, ({ payload }) => {
-        const p = payload as InvitePayload;
+        const p = payload as InvitePayload  & { notification_id: number };
 
-        if (seenIds.current.has(p.id)) return;
-        seenIds.current.add(p.id);
+        if (seenIds.current.has(p.notification_id)) return;
+        seenIds.current.add(p.notification_id);
 
         const notification: InviteNotification = {
-          id: p.id,
+          id: p.notification_id,
+          user_id: user.id!,
           type: 'invite',
           payload: p,
           is_read: false,
@@ -93,43 +97,58 @@ export function useNotifications() {
   }, []);
 
   const markAsRead = useCallback(async (id: number) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    await markNotificationAsRead(id).catch((e) =>
-      console.error('useNotifications: błąd markAsRead:', e)
+    // Optimistic update
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    try {
+      await markNotificationAsRead(id);
+    } catch (err) {
+      // Cofnij optimistic update przy błędzie
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, is_read: false } : n))
+      );
+      await handleError(err);
+    }
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    await markAllNotificationsAsRead().catch((e) =>
-      console.error('useNotifications: błąd markAllAsRead:', e)
-    );
-  }, []);
+    // Optimistic update
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+    try {
+      await markAllNotificationsAsRead();
+    } catch (err) {
+      await loadInitialNotifications(); // reload przy błędzie
+      await handleError(err);
+    }
+  }, [loadInitialNotifications]);
 
   const handleAcceptInvite = useCallback(async (notification: InviteNotification) => {
     await acceptInvite(notification.payload.invite_token);
-    await deleteNotification(notification.id).catch((e) =>
-      console.error('useNotifications: błąd deleteNotification:', e)
-    );
+    try {
+      await deleteNotification(notification.id);
+    } catch {
+      // Best-effort
+    }
     dismiss(notification.id);
   }, [dismiss]);
 
-  const handleRejectInvite = useCallback(
-    async (notification: InviteNotification) => {
-      await rejectInvite(notification.payload.invite_token);
-      await deleteNotification(notification.id).catch((e) =>
-        console.error('useNotifications: błąd deleteNotification:', e)
-      );
-      dismiss(notification.id);
-    },
-    [dismiss]
-  );
+  const handleRejectInvite = useCallback(async (notification: InviteNotification) => {
+    await rejectInvite(notification.payload.invite_token);
+    try {
+      await deleteNotification(notification.id);
+    } catch {
+      // Best-effort
+    }
+    dismiss(notification.id);
+  }, [dismiss]);
 
   // RETURN
   return {
     notifications,
     unreadCount: notifications.filter((n) => !n.is_read).length,
     loading,
+    error,
     markAsRead,
     markAllAsRead,
     dismiss,

@@ -31,6 +31,7 @@ export function useLogin() {
 
   const { handleError } = useErrorHandler({
     onError: setGeneralError,
+    onUnauthorized: () => setGeneralError('Błędny email lub hasło'),
     onForbidden: async () => {
       try {
         const checkData = await checkUser(formData.login);
@@ -54,13 +55,7 @@ export function useLogin() {
     if (!emailValidation.valid) {
       newErrors.login = emailValidation.error;
     }
-
-    // Password validation
-    const passwordValidation = validatePassword(formData.password);
-    if (!passwordValidation.valid) {
-      newErrors.password = passwordValidation.error;
-    }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

@@ -76,7 +76,7 @@ async def create_invite(
         db.commit()
         db.refresh(new_invite)
  
-        create_notification(
+        notification = create_notification(
             db=db,
             user_id=invited_user_id,
             type="invite",
@@ -101,6 +101,7 @@ async def create_invite(
                     "workspace_name": workspace.name,
                     "inviter_name": inviter_name,
                     "invite_token": invite_token,
+                    "notification_id": notification.id,
                 },
             )
         except Exception:

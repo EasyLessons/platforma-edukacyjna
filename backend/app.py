@@ -72,7 +72,7 @@ async def validation_error_handler(request, exc: ValidationError):
             success=False,
             error=exc.message,
             code=exc.code
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 @app.exception_handler(AuthenticationError)
@@ -85,7 +85,7 @@ async def auth_error_handler(request, exc: AuthenticationError):
             success=False,
             error=exc.message,
             code=exc.code
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 @app.exception_handler(NotFoundError)
@@ -98,7 +98,7 @@ async def not_found_handler(request, exc: NotFoundError):
             success=False,
             error=exc.message,
             code=exc.code
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 @app.exception_handler(AppException)
@@ -111,7 +111,7 @@ async def app_exception_handler(request, exc: AppException):
             success=False,
             error=exc.message,
             code=exc.code
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 @app.exception_handler(Exception)
@@ -124,7 +124,7 @@ async def global_exception_handler(request, exc: Exception):
             success=False,
             error="Internal server error",
             code="APP_ERROR"
-        ).model_dump()
+        ).model_dump(mode='json')
     )
 
 # Include routers
