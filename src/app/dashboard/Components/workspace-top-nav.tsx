@@ -4,14 +4,14 @@ import { useMemo, useState } from 'react';
 import { Loader2, Pencil, Star, UserPlus } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from './DashboardButton';
-import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspace-invite-modal';
-import { WorkspaceDropdownMenu } from '@/_new/features/workspace/components/workspace-dropdown-menu';
-import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspace-edit-modal';
-import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspace-members-modal';
+import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
+import { WorkspaceDropdownMenu } from '@/_new/features/workspace/components/workspaceDropdownMenu';
+import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspaceEditModal';
+import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspaceMembersModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { getColorClass, getIconComponent } from '@/_new/features/workspace/utils/helpers';
-import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/use-workspace-members';
+import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/useWorkspaceMember';
 import { ROLE_COLORS, ROLE_LABELS } from '@/_new/features/workspace/utils/constants';
 import type {
   Workspace,

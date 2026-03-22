@@ -9,13 +9,15 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
-import { createInvite, checkUserInviteStatus } from '../api/invite_api';
+import { createInvite, checkUserInviteStatus } from '../api/inviteApi';
 import { UserSearchResult, searchUsers } from '@/auth_api/api';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
+import { useWorkspaceInvite } from '../hooks/useWorkspaceInvite';
 import { Workspace } from '../types';
+import { UserWithStatus } from '../hooks/useWorkspaceInvite';
 
 interface WorkspaceInviteModalProps {
   isOpen: boolean;
@@ -23,26 +25,20 @@ interface WorkspaceInviteModalProps {
   workspace: Workspace;
 }
 
-interface UserWithStatus extends UserSearchResult {
-  is_member?: boolean;
-  has_pending_invite?: boolean;
-  can_invite?: boolean;
-  status_checked?: boolean;
-}
-
-export function WorkspaceInviteModal({
-  isOpen,
-  onClose,
-  workspace,
-}: WorkspaceInviteModalProps) {
+export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceInviteModalProps) {
   // STATE
   // ================================
-  const [searchQuery, setSearchQuery] = useState('');
-  const [users, setUsers] = useState<UserWithStatus[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [inviting, setInviting] = useState<number | null>(null);
-  const [invitedUsers, setInvitedUsers] = useState<number[]>([]);
-  const [error, setError] = useState<string>('');
+  const {
+    searchQuery,
+    setSearchQuery,
+    users,
+    searchLoading,
+    searchError,
+    invite,
+    invitingUserId,
+    invitedUserIds,
+    isInviting,
+  } = useWorkspaceInvite({ workspace_id: workspace.id, isOpen });
 
   // REFS
   // ================================
@@ -56,86 +52,9 @@ export function WorkspaceInviteModal({
     onClose,
     modalRef,
     focusRef: inputRef,
-    preventCloseWhen: () => !!inviting,
+    preventCloseWhen: () => !!invitingUserId,
   });
 
-  // Reset stanu przy zamknięciu
-  useEffect(() => {
-    if (!isOpen) {
-      setSearchQuery('');
-      setUsers([]);
-      setError('');
-      setInvitedUsers([]);
-    }
-  }, [isOpen]);
-
-  // EFFECTS
-  // ================================
-  useEffect(() => {
-    if (searchQuery.length < 2) {
-      setUsers([]);
-      setError('');
-      return;
-    }
-
-    const searchUsersDebounced = async () => {
-      try {
-        setLoading(true);
-        setError('');
-
-        const results = await searchUsers(searchQuery, 10);
-        console.log('✅ Search results:', results);
-
-        const usersWithStatus = await Promise.all(
-          results.map(async (user: any) => {
-            try {
-              const status = await checkUserInviteStatus(workspace.id, user.id);
-              return { ...user, ...status, status_checked: true };
-            } catch (err) {
-              console.warn('⚠️ Status check failed for user:', user.id, err);
-              return { ...user, status_checked: false };
-            }
-          })
-        );
-
-        setUsers(usersWithStatus);
-      } catch (error: any) {
-        console.error('❌ Search error:', error);
-        setError(error.message || 'Nieznany błąd wyszukiwania');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const debounce = setTimeout(searchUsersDebounced, 300);
-    return () => clearTimeout(debounce);
-  }, [searchQuery, workspace.id]);
-
-  const handleInvite = async (userId: number) => {
-    try {
-      setInviting(userId);
-      setError('');
-
-      await createInvite(workspace.id, userId);
-
-      setInvitedUsers((prev) => [...prev, userId]);
-
-      setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId ? { ...u, has_pending_invite: true, can_invite: false } : u
-        )
-      );
-
-      setTimeout(() => {
-        setInvitedUsers((prev) => prev.filter((id) => id !== userId));
-      }, 3000);
-    } catch (error: any) {
-      setError(error.message || 'Błąd wysyłania zaproszenia');
-      console.error('Błąd wysyłania zaproszenia:', error);
-    } finally {
-      setInviting(null);
-    }
-  };
 
   // HELPERS
   // ================================
@@ -163,14 +82,8 @@ export function WorkspaceInviteModal({
   if (!isOpen || !workspace) return null;
 
   return (
-    <div
-      className="dashboard-modal-overlay"
-      onClick={onClose}
-    >
-      <div
-        className="dashboard-modal-surface max-w-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="dashboard-modal-overlay" onClick={onClose}>
+      <div className="dashboard-modal-surface max-w-lg" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="dashboard-modal-header flex-shrink-0">
           <div>
@@ -179,7 +92,11 @@ export function WorkspaceInviteModal({
               do workspace'a: <span className="font-medium text-gray-700">{workspace.name}</span>
             </p>
           </div>
-          <DashboardButton variant="secondary" onClick={onClose} className="h-9 w-9 rounded-full p-0">
+          <DashboardButton
+            variant="secondary"
+            onClick={onClose}
+            className="h-9 w-9 rounded-full p-0"
+          >
             <X size={20} />
           </DashboardButton>
         </div>
@@ -201,16 +118,16 @@ export function WorkspaceInviteModal({
         </div>
 
         {/* Error */}
-        {error && (
+        {searchError && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2">
             <AlertCircle size={18} className="text-red-600 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-red-800">{error}</p>
+            <p className="text-sm text-red-800">{searchError}</p>
           </div>
         )}
 
         {/* Results */}
         <div className="flex-1 overflow-y-auto">
-          {loading ? (
+          {searchLoading ? (
             <div className="flex items-center justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-gray-700"></div>
             </div>
@@ -218,8 +135,7 @@ export function WorkspaceInviteModal({
             <div className="divide-y divide-[var(--dash-border)]">
               {users.map((user) => {
                 const canInvite = user.can_invite !== false;
-                const isInviting = inviting === user.id;
-                const justInvited = invitedUsers.includes(user.id);
+                const justInvited = invitedUserIds.has(user.id);
 
                 return (
                   <div
@@ -246,12 +162,16 @@ export function WorkspaceInviteModal({
 
                     <DashboardButton
                       variant={justInvited ? 'secondary' : 'primary'}
-                      onClick={() => handleInvite(user.id)}
+                      onClick={() => invite(user.id)}
                       disabled={isInviting || justInvited || !canInvite}
                       className={`flex-shrink-0 ml-3 ${
-                        !justInvited && canInvite ? 'h-10 min-w-[128px] px-4 text-sm font-medium' : ''
+                        !justInvited && canInvite
+                          ? 'h-10 min-w-[128px] px-4 text-sm font-medium'
+                          : ''
                       } ${
-                        justInvited ? 'bg-[var(--dash-hover)] text-gray-800 hover:bg-[var(--dash-hover)]' : ''
+                        justInvited
+                          ? 'bg-[var(--dash-hover)] text-gray-800 hover:bg-[var(--dash-hover)]'
+                          : ''
                       }`}
                     >
                       {justInvited ? (

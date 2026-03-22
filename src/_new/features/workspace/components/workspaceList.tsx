@@ -11,7 +11,7 @@
 
 import { useMemo } from 'react';
 import { Star } from 'lucide-react';
-import { WorkspaceCard } from './workspace-card';
+import { WorkspaceCard } from './workspaceCard';
 import {
   sortWorkspacesByFavourite,
   sortWorkspacesByCustomOrder,

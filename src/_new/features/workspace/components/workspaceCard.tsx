@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Star, GripVertical, UserPlus, Pencil } from 'lucide-react';
-import { WorkspaceDropdownMenu } from './workspace-dropdown-menu';
+import { WorkspaceDropdownMenu } from './workspaceDropdownMenu';
 import { getIconComponent, getColorClass } from '../utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
 import type {

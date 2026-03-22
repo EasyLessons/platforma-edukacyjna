@@ -1,7 +1,7 @@
 /**
- * WORKSPACE CREATE MODAL
+ * WORKSPACE EDIT MODAL
  *
- * Modal z formularzem tworzenia workspace'a.
+ * Modal z formularzem edycji workspace'a.
  *
  */
 
@@ -12,23 +12,29 @@ import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
-import { WorkspaceIconPicker } from './workspace-icon-picker';
-import { WorkspaceColorPicker } from './workspace-color-picker';
-import { useCreateWorkspaceForm } from '../hooks/use-create-workspace-form';
-import type { WorkspaceCreateRequest } from '../types';
+import { WorkspaceIconPicker } from './workspaceIconPicker';
+import { WorkspaceColorPicker } from './workspaceColorPicker';
+import { useEditWorkspaceForm } from '../hooks/useEditWorkspaceForm';
+import type { Workspace, WorkspaceUpdateRequest } from '../types';
 
-interface WorkspaceCreateModalProps {
+interface WorkspaceEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: WorkspaceCreateRequest) => Promise<void>;
+  workspace: Workspace;
+  onSubmit: (data: WorkspaceUpdateRequest) => Promise<void>;
 }
 
-export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCreateModalProps) {
+export function WorkspaceEditModal({
+  isOpen,
+  onClose,
+  workspace,
+  onSubmit,
+}: WorkspaceEditModalProps) {
   // STATE
   // ================================
 
-  const { formData, errors, isSubmitting, isReady, handleChange, handleClose, handleSubmit } =
-    useCreateWorkspaceForm({ onSubmit, onClose });
+  const { formData, errors, isSubmitting, isDirty, handleChange, handleClose, handleSubmit } =
+    useEditWorkspaceForm({ workspace, onSubmit, onClose });
 
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -57,7 +63,10 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
       >
         {/* Header */}
         <div className="dashboard-modal-header">
-          <h2 className="text-xl font-bold text-gray-900">Stwórz nową przestrzeń</h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Ustawienia przestrzeni</h2>
+            <p className="text-sm text-gray-500 mt-1">{workspace.name}</p>
+          </div>
 
           <DashboardButton
             variant="secondary"
@@ -78,7 +87,7 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
             type="text"
             value={formData.name}
             onChange={(e) => handleChange('name', e.target.value)}
-            placeholder="np. Moja Firma"
+            placeholder="Nazwa przestrzeni"
             label="Nazwa przestrzeni"
             error={errors.name}
             maxLength={200}
@@ -104,9 +113,9 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
             variant="primary"
             type="submit"
             className="w-full"
-            disabled={isSubmitting || !isReady}
+            disabled={isSubmitting || !isDirty}
           >
-            {isSubmitting ? 'Tworzenie...' : 'Utwórz przestrzeń'}
+            {isSubmitting ? 'Zapisywanie...' : 'Zapisz zmiany'}
           </DashboardButton>
         </form>
       </div>

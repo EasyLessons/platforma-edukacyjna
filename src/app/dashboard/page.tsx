@@ -7,7 +7,7 @@ import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/boards-section';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 export default function Dashboard() {
   const {

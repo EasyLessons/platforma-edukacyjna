@@ -12,20 +12,17 @@
  */
 
 import { useState, useEffect } from 'react';
-import {
-  fetchWorkspaceMembers,
-  removeWorkspaceMember,
-  updateMemberRole,
-} from '../api/workspace-api';
+import { fetchWorkspaceMembers, removeWorkspaceMember, updateMemberRole } from '../api/memberApi';
+import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
 import type { WorkspaceMember } from '../types';
 
 interface UseWorkspaceMembersOptions {
-  workspaceId: number | null;
+  workspace_id: number | null;
   autoLoad?: boolean;
 }
 
 export function useWorkspaceMembers(options: UseWorkspaceMembersOptions) {
-  const { workspaceId, autoLoad = true } = options;
+  const { workspace_id, autoLoad = true } = options;
 
   // STATE
   // ================================
@@ -35,27 +32,25 @@ export function useWorkspaceMembers(options: UseWorkspaceMembersOptions) {
   const [removingMemberId, setRemovingMemberId] = useState<number | null>(null);
   const [changingRoleMemberId, setChangingRoleMemberId] = useState<number | null>(null);
 
+  const { handleError } = useErrorHandler({ onError: setError });
+
   // MEMBERS CRUD
   // ================================
 
   // loadMembers - Pobiera członków z backendu
   const loadMembers = async () => {
-    if (!workspaceId) {
+    if (!workspace_id) {
       setMembers([]);
       setError(null);
       return;
     }
-
     try {
       setLoading(true);
       setError(null);
-
-      const response = await fetchWorkspaceMembers(workspaceId);
+      const response = await fetchWorkspaceMembers(workspace_id);
       setMembers(response.members);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Błąd ładowania członków';
-      setError(errorMessage);
-      console.error('Error loading members:', err);
+      await handleError(err);
     } finally {
       setLoading(false);
     }
@@ -63,19 +58,13 @@ export function useWorkspaceMembers(options: UseWorkspaceMembersOptions) {
 
   // removeMember - Usuwa członka z workspace'a
   const removeMember = async (userId: number) => {
-    if (!workspaceId) return;
-
+    if (!workspace_id) return;
     setRemovingMemberId(userId);
-
     try {
-      await removeWorkspaceMember(workspaceId, userId);
-
-      // Optymistic update - usuń ze stanu
+      await removeWorkspaceMember(workspace_id, userId);
       setMembers((prev) => prev.filter((m) => m.user_id !== userId));
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Błąd usuwania członka';
-      setError(errorMessage);
-      console.error('Error removing member:', err);
+      await handleError(err);
       throw err; // Re-throw żeby komponent mógł obsłużyć
     } finally {
       setRemovingMemberId(null);
@@ -84,23 +73,17 @@ export function useWorkspaceMembers(options: UseWorkspaceMembersOptions) {
 
   // changeRole - Zmienia role członka
   const changeRole = async (userId: number, newRole: 'owner' | 'editor' | 'viewer') => {
-    if (!workspaceId) return;
-
+    if (!workspace_id) return;
     setChangingRoleMemberId(userId);
-
     try {
-      await updateMemberRole(workspaceId, userId, newRole);
-
-      // Optymistic update - zaktualizuj w stanie
+      await updateMemberRole(workspace_id, userId, newRole);
       setMembers((prev) =>
         prev.map((m) =>
           m.user_id === userId ? { ...m, role: newRole, is_owner: newRole === 'owner' } : m
         )
       );
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Błąd zmiany roli';
-      setError(errorMessage);
-      console.error('Error changing role:', err);
+      await handleError(err);
       throw err; // Re-throw żeby komponent mógł obsłużyć
     } finally {
       setChangingRoleMemberId(null);
@@ -110,33 +93,26 @@ export function useWorkspaceMembers(options: UseWorkspaceMembersOptions) {
   // HELPERS
   // ================================
 
-  // refreshMembers - Odświeża listę członków
   const refreshMembers = loadMembers;
-
-  // getMemberById
   const getMemberById = (userId: number): WorkspaceMember | undefined => {
     return members.find((m) => m.user_id === userId);
   };
-
-  // getOwner - Zwraca właściciela workspace'a
   const getOwner = (): WorkspaceMember | undefined => {
     return members.find((m) => m.is_owner);
   };
-
-  // getMembersByRole - Filtruje członków po roli
   const getMembersByRole = (role: string): WorkspaceMember[] => {
     return members.filter((m) => m.role === role);
   };
 
-  // HELPERS
+  // EFFECTS
   // ================================
 
   // Odświeża stan członków.
   useEffect(() => {
-    if (autoLoad && workspaceId) {
+    if (autoLoad && workspace_id) {
       loadMembers();
     }
-  }, [workspaceId, autoLoad]);
+  }, [workspace_id, autoLoad]);
 
   return {
     // State
