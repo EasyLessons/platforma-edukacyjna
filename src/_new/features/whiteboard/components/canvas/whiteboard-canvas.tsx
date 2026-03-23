@@ -652,6 +652,13 @@ useMultiTouchGestures({
     });
   }, [el.elements, el.loadedImages, vp.viewport, boardSettingsProp]);
 
+  // ─── FOCUS na kontenerze przy starcie (skróty działają bez klikania w tablicę) ──
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.focus();
+    }
+  }, []);
+
   // ─── RESIZE CANVAS ─────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -963,42 +970,38 @@ useMultiTouchGestures({
       const target = e.target as HTMLElement;
       if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA') return;
 
-      // Ctrl+Z — cofnij
-      if (e.ctrlKey && e.key === 'z' && !e.shiftKey) {
+      // Ctrl+Z — cofnij (odporne na Caps Lock)
+      if (e.ctrlKey && e.key.toLowerCase() === 'z' && !e.shiftKey) {
         e.preventDefault();
         hist.undo();
         return;
       }
       // Ctrl+Y / Ctrl+Shift+Z — ponów
-      if ((e.ctrlKey && e.key === 'y') || (e.ctrlKey && e.shiftKey && e.key === 'z')) {
+      if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) {
         e.preventDefault();
         hist.redo();
         return;
       }
       // Ctrl+C — kopiuj
-      if (e.ctrlKey && e.key === 'c') {
+      if (e.ctrlKey && e.key.toLowerCase() === 'c') {
         if (sel.selectedElementIds.size > 0) {
           e.preventDefault();
           clip.handleCopy();
         }
         return;
       }
-      // Ctrl+V — wklej (inteligentnie: najpierw sprawdź schowek systemowy pod kątem obrazu)
-      if (e.ctrlKey && e.key === 'v') {
+      // Ctrl+V — wklej (zawsze najpierw sprawdź schowek OS pod kątem obrazu)
+      if (e.ctrlKey && e.key.toLowerCase() === 'v') {
         e.preventDefault();
-        // Jeśli mamy skopiowane elementy wewnątrz aplikacji — wklej je bezpośrednio
-        if (clip.copiedElements.length > 0) {
-          clip.handlePaste();
-        } else {
-          // Brak wewnętrznej kopii — sprawdź schowek OS (screenshot itp.)
-          handleOsClipboardPasteRef.current().then((pasted) => {
-            if (!pasted) clip.handlePaste(); // fallback (no-op gdy copiedElements=[])
-          });
-        }
+        handleOsClipboardPasteRef.current().then((pastedImage) => {
+          if (!pastedImage && clip.copiedElements.length > 0) {
+            clip.handlePaste();
+          }
+        });
         return;
       }
       // Ctrl+D — duplikuj
-      if (e.ctrlKey && e.key === 'd') {
+      if (e.ctrlKey && e.key.toLowerCase() === 'd') {
         if (sel.selectedElementIds.size > 0) {
           e.preventDefault();
           clip.handleDuplicate();
@@ -1909,7 +1912,8 @@ useMultiTouchGestures({
     {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
       <div
         ref={containerRef}
-        className="absolute inset-0 overflow-hidden touch-none overscroll-none"
+        tabIndex={-1}
+        className="absolute inset-0 overflow-hidden touch-none overscroll-none outline-none"
         onContextMenu={(e) => e.preventDefault()}       
         style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
       >

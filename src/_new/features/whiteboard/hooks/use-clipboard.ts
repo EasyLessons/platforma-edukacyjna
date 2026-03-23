@@ -128,6 +128,12 @@ export function useClipboard({
     if (!selectedIds || selectedIds.size === 0) return;
     const toCopy = (elementsRef.current ?? []).filter((el) => selectedIds.has(el.id));
     setCopiedElements(toCopy);
+
+    try {
+      navigator.clipboard.writeText('whiteboard-internal-copy');
+    } catch {
+      // Ignorujemy brak uprawnień
+    }
   }, [elementsRef, selectedElementIdsRef]);
 
   // ─── Duplicate ─────────────────────────────────────────────────────────
