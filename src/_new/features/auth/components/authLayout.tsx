@@ -97,7 +97,7 @@ export function AuthLayout({
   // Handler logowania Google
   const handleGoogleLogin = () => {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const authUrl = `${baseUrl}/api/auth/google`;
+    const authUrl = `${baseUrl}/api/v1/auth/google`;
     
     console.log('🚀 Otwieram Google OAuth popup:', authUrl);
     
