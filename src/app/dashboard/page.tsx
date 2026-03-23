@@ -27,17 +27,31 @@ export default function Dashboard() {
 
   const queryClient = useQueryClient();
 
-  // Prefetch boards for all workspaces as soon as workspace list arrives.
-  // React Query won't re-fetch if data is already fresh (within staleTime).
+  // Priority prefetch: active workspace boards fire immediately.
+  // Background prefetch: remaining workspaces load after 800ms so they
+  // don't compete with the primary request for bandwidth.
   useEffect(() => {
     if (workspaces.length === 0) return;
-    workspaces.forEach((ws) => {
-      void queryClient.prefetchQuery({
-        queryKey: boardKeys.workspace(ws.id),
-        queryFn: () => fetchBoards(ws.id),
-        staleTime: 10 * 60 * 1000,
-      });
+
+    void queryClient.prefetchQuery({
+      queryKey: boardKeys.workspace(workspaces[0].id),
+      queryFn: () => fetchBoards(workspaces[0].id),
+      staleTime: 10 * 60 * 1000,
     });
+
+    if (workspaces.length <= 1) return;
+
+    const timer = setTimeout(() => {
+      workspaces.slice(1).forEach((ws) => {
+        void queryClient.prefetchQuery({
+          queryKey: boardKeys.workspace(ws.id),
+          queryFn: () => fetchBoards(ws.id),
+          staleTime: 10 * 60 * 1000,
+        });
+      });
+    }, 800);
+
+    return () => clearTimeout(timer);
   }, [workspaces, queryClient]);
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
