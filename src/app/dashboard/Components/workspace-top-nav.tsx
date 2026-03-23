@@ -43,7 +43,7 @@ export default function WorkspaceTopNav({
   );
 
   const { members, loading: membersLoading } = useWorkspaceMembers({
-    workspaceId: activeWorkspaceId,
+    workspace_id: activeWorkspaceId,
     autoLoad: !!activeWorkspaceId,
   });
 
