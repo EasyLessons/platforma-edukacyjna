@@ -122,7 +122,7 @@ export function useWorkspaces() {
   );
 
   const leaveWorkspace = useCallback(
-    (id: number): Promise<{ message: string }> => leaveMutation.mutateAsync(id),
+    (id: number): Promise<void> => leaveMutation.mutateAsync(id).then(() => undefined),
     [leaveMutation]
   );
 
