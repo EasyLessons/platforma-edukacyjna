@@ -1,7 +1,7 @@
 'use client';
 
 import './dashboard-theme.css';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
@@ -26,9 +26,9 @@ export default function Dashboard() {
   const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);
   const workspaceTopNavRef = useRef<HTMLDivElement | null>(null);
 
-  const handleWorkspaceSelect = (id: number, name: string) => {
+  const handleWorkspaceSelect = useCallback((id: number, _name: string) => {
     setActiveWorkspaceId(id);
-  };
+  }, []);
 
   useEffect(() => {
     if (workspaces.length === 0) {
@@ -112,7 +112,6 @@ export default function Dashboard() {
 
               {activeWorkspaceId && (
                 <BoardsSection
-                  key={activeWorkspaceId}
                   workspace_id={activeWorkspaceId}
                   workspace_name={activeWorkspaceName}
                   stickyOffset={workspaceTopNavHeight}

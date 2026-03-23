@@ -8,7 +8,7 @@
  */
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Layout } from 'lucide-react';
 import { BoardCard } from './boardCard';
 import { fetchOnlineUsers } from '../../whiteboard/api/whiteboardApi';
@@ -47,25 +47,68 @@ export function BoardList({
 
   // Online Users - pobierane zbiorczo dla wszystkich tablic
   const [onlineUsersMap, setOnlineUsersMap] = useState<Record<number, OnlineUser[]>>({});
+  const boardIdsKey = useMemo(() => boards.map((b) => b.id).sort((a, b) => a - b).join(','), [boards]);
+  const onlineUsersCacheRef = useRef<Record<number, OnlineUser[]>>({});
+
   useEffect(() => {
-    if (!onlineUsersEnabled || boards.length === 0) return;
+    if (!onlineUsersEnabled) return;
+    if (boards.length === 0) {
+      setOnlineUsersMap((prev) => (Object.keys(prev).length > 0 ? {} : prev));
+      onlineUsersCacheRef.current = {};
+      return;
+    }
+
+    const boardIds = boards.map((b) => b.id);
+    const missingIds = boardIds.filter((id) => !(id in onlineUsersCacheRef.current));
+
+    if (missingIds.length === 0) {
+      const nextMap: Record<number, OnlineUser[]> = {};
+      for (const id of boardIds) {
+        nextMap[id] = onlineUsersCacheRef.current[id] ?? [];
+      }
+      setOnlineUsersMap((prev) => {
+        const prevKeys = Object.keys(prev);
+        const nextKeys = Object.keys(nextMap);
+        if (
+          prevKeys.length === nextKeys.length &&
+          nextKeys.every((key) => prev[Number(key)] === nextMap[Number(key)])
+        ) {
+          return prev;
+        }
+        return nextMap;
+      });
+      return;
+    }
+
+    let cancelled = false;
 
     const fetchAll = async () => {
       const results = await Promise.allSettled(
-        boards.map((b) => fetchOnlineUsers(b.id).then((users) => ({ board_id: b.id, users })))
+        missingIds.map((id) => fetchOnlineUsers(id).then((users) => ({ board_id: id, users })))
       );
 
-      const map: Record<number, OnlineUser[]> = {};
+      if (cancelled) return;
+
+      const cache = { ...onlineUsersCacheRef.current };
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          map[result.value.board_id] = result.value.users;
+          cache[result.value.board_id] = result.value.users;
         }
       }
-      setOnlineUsersMap(map);
+      onlineUsersCacheRef.current = cache;
+
+      const nextMap: Record<number, OnlineUser[]> = {};
+      for (const id of boardIds) {
+        nextMap[id] = cache[id] ?? [];
+      }
+      setOnlineUsersMap(nextMap);
     };
 
     fetchAll();
-  }, [boards, onlineUsersEnabled]);
+    return () => {
+      cancelled = true;
+    };
+  }, [boardIdsKey, boards, onlineUsersEnabled]);
 
   // Computed - sortowanie i filtrowanie
   const processedBoards = useMemo(() => {

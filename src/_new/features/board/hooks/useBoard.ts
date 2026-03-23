@@ -13,6 +13,7 @@
  */
 'use client'
 
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchBoards,
@@ -122,39 +123,63 @@ export function useBoards(options: UseBoardsOptions) {
 
   // ── Public API (zachowana sygnatura dla komponentów) ───────────────────────
 
-  const createBoard = (payload: BoardCreateRequest): Promise<Board> =>
-    createMutation.mutateAsync(payload);
+  const createBoard = useCallback(
+    (payload: BoardCreateRequest): Promise<Board> => createMutation.mutateAsync(payload),
+    [createMutation]
+  );
 
-  const updateBoard = (id: number, data: BoardUpdateRequest): Promise<Board> =>
-    updateMutation.mutateAsync({ id, data });
+  const updateBoard = useCallback(
+    (id: number, data: BoardUpdateRequest): Promise<Board> => updateMutation.mutateAsync({ id, data }),
+    [updateMutation]
+  );
 
-  const deleteBoard = (id: number): Promise<void> =>
-    deleteMutation.mutateAsync(id);
+  const deleteBoard = useCallback(
+    (id: number): Promise<void> => deleteMutation.mutateAsync(id),
+    [deleteMutation]
+  );
 
-  const toggleFavourite = (id: number, is_favourite: boolean): Promise<void> =>
-    toggleFavouriteMutation.mutateAsync({ id, is_favourite }).then(() => undefined);
+  const toggleFavourite = useCallback(
+    (id: number, is_favourite: boolean): Promise<void> =>
+      toggleFavouriteMutation.mutateAsync({ id, is_favourite }).then(() => undefined),
+    [toggleFavouriteMutation]
+  );
 
-  const refreshBoards = () => {
+  const refreshBoards = useCallback(() => {
     if (workspace_id) {
       queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspace_id) });
     }
-  };
+  }, [workspace_id, queryClient]);
 
-  const getBoardById = (id: number): Board | undefined =>
-    boards.find((b) => b.id === id);
+  const getBoardById = useCallback(
+    (id: number): Board | undefined => boards.find((b) => b.id === id),
+    [boards]
+  );
 
-  return {
-    // State
-    boards,
-    loading,
-    error,
-    // CRUD
-    createBoard,
-    updateBoard,
-    deleteBoard,
-    toggleFavourite,
-    // Helpers
-    refreshBoards,
-    getBoardById,
-  };
+  return useMemo(
+    () => ({
+      // State
+      boards,
+      loading,
+      error,
+      // CRUD
+      createBoard,
+      updateBoard,
+      deleteBoard,
+      toggleFavourite,
+      // Helpers
+      refreshBoards,
+      getBoardById,
+    }),
+    [
+      boards,
+      loading,
+      error,
+      createBoard,
+      updateBoard,
+      deleteBoard,
+      toggleFavourite,
+      refreshBoards,
+      getBoardById,
+    ]
+  );
 }

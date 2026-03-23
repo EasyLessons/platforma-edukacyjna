@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -51,28 +51,25 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
 
-  // State dla danych użytkownika
-  const [user, setUser] = useState<ExtendedUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  const user = useMemo<ExtendedUser | null>(() => {
+    if (!isLoggedIn || !authUser) return null;
+    return {
+      ...authUser,
+      name: authUser.full_name || authUser.username,
+      isPremium: false,
+    };
+  }, [authUser, isLoggedIn]);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!isLoggedIn || !authUser) {
       router.push('/login');
-      return;
     }
-
-    setUser({
-      ...authUser,
-      name: authUser.full_name || authUser.username,
-      isPremium: false,
-    });
-    setLoading(false);
   }, [authUser, isLoggedIn, authLoading, router]);
 
   // Loading state
-  if (loading) {
+  if (authLoading) {
     return (
       <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">

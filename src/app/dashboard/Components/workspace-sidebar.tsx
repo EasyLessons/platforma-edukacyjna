@@ -89,7 +89,11 @@ export default function WorkspaceSidebar({
       const ids = workspaces.map((w) => w.id);
       const newIds = ids.filter((id) => !prev.includes(id));
       const filtered = prev.filter((id) => ids.includes(id));
-      return [...filtered, ...newIds];
+      const next = [...filtered, ...newIds];
+      if (next.length === prev.length && next.every((id, idx) => id === prev[idx])) {
+        return prev;
+      }
+      return next;
     });
   }, [workspaces]);
 

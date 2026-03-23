@@ -12,7 +12,7 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { searchUsers } from '../../auth/api/authApi';
 import type { UserSearchResult } from '../../auth/api/authApi';
 import { createInvite, checkUserInviteStatus } from '../api/inviteApi';
@@ -38,6 +38,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
   const [searchError, setSearchError] = useState('');
   const [invitingUserId, setInvitingUserId] = useState<number | null>(null);
   const [invitedUserIds, setInvitedUserIds] = useState<Set<number>>(new Set());
+  const statusCacheRef = useRef<Record<number, InviteStatusResponse>>({});
 
   const { handleError } = useErrorHandler({ onError: setSearchError });
 
@@ -48,6 +49,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
       setUsers([]);
       setSearchError('');
       setInvitedUserIds(new Set());
+      statusCacheRef.current = {};
     }
   }, [isOpen]);
 
@@ -65,20 +67,36 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
         setSearchError('');
 
         const results = await searchUsers(searchQuery, 10);
+        const cache = statusCacheRef.current;
+        const missingStatusUsers = results.filter((user) => !cache[user.id]);
 
-        const usersWithStatus = await Promise.all(
-          results.map(async (user) => {
+        const checkedStatuses = await Promise.all(
+          missingStatusUsers.map(async (user) => {
             try {
               const status: InviteStatusResponse = await checkUserInviteStatus(
                 workspace_id,
                 user.id
               );
-              return { ...user, ...status, status_checked: true };
+              return { userId: user.id, status };
             } catch {
-              return { ...user, status_checked: false };
+              return null;
             }
           })
         );
+
+        for (const checked of checkedStatuses) {
+          if (checked) {
+            cache[checked.userId] = checked.status;
+          }
+        }
+
+        const usersWithStatus = results.map((user) => {
+          const cachedStatus = cache[user.id];
+          if (cachedStatus) {
+            return { ...user, ...cachedStatus, status_checked: true };
+          }
+          return { ...user, status_checked: false };
+        });
 
         setUsers(usersWithStatus);
       } catch (err) {
@@ -100,6 +118,11 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
       await createInvite(workspace_id, user_id);
 
       // Optimistic update
+      statusCacheRef.current[user_id] = {
+        is_member: false,
+        has_pending_invite: true,
+        can_invite: false,
+      };
       setInvitedUserIds((prev) => new Set(prev).add(user_id));
       setUsers((prev) =>
         prev.map((u) =>

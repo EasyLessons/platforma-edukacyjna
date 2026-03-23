@@ -1,5 +1,6 @@
 
 
+import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/context/AuthContext';
 import {
@@ -104,40 +105,70 @@ export function useWorkspaces() {
 
   // ── Public API (zachowana sygnatura dla komponentów) ───────────────────────
 
-  const createWorkspace = (data: WorkspaceCreateRequest): Promise<Workspace> =>
-    createMutation.mutateAsync(data);
+  const createWorkspace = useCallback(
+    (data: WorkspaceCreateRequest): Promise<Workspace> => createMutation.mutateAsync(data),
+    [createMutation]
+  );
 
-  const updateWorkspace = (id: number, data: WorkspaceUpdateRequest): Promise<Workspace> =>
-    updateMutation.mutateAsync({ id, data });
+  const updateWorkspace = useCallback(
+    (id: number, data: WorkspaceUpdateRequest): Promise<Workspace> =>
+      updateMutation.mutateAsync({ id, data }),
+    [updateMutation]
+  );
 
-  const deleteWorkspace = (id: number): Promise<void> =>
-    deleteMutation.mutateAsync(id);
+  const deleteWorkspace = useCallback(
+    (id: number): Promise<void> => deleteMutation.mutateAsync(id),
+    [deleteMutation]
+  );
 
-  const leaveWorkspace = (id: number): Promise<{ message: string }> =>
-    leaveMutation.mutateAsync(id);
+  const leaveWorkspace = useCallback(
+    (id: number): Promise<{ message: string }> => leaveMutation.mutateAsync(id),
+    [leaveMutation]
+  );
 
-  const toggleFavourite = (id: number, isFavourite: boolean): Promise<void> =>
-    toggleFavouriteMutation.mutateAsync({ id, is_favourite: isFavourite }).then(() => undefined);
+  const toggleFavourite = useCallback(
+    (id: number, isFavourite: boolean): Promise<void> =>
+      toggleFavouriteMutation.mutateAsync({ id, is_favourite: isFavourite }).then(() => undefined),
+    [toggleFavouriteMutation]
+  );
 
-  const refreshWorkspaces = (): Promise<void> =>
-    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+  const refreshWorkspaces = useCallback(
+    (): Promise<void> => queryClient.invalidateQueries({ queryKey: workspaceKeys.list() }),
+    [queryClient]
+  );
 
-  const getWorkspaceById = (id: number): Workspace | undefined =>
-    workspaces.find((ws) => ws.id === id);
+  const getWorkspaceById = useCallback(
+    (id: number): Workspace | undefined => workspaces.find((ws) => ws.id === id),
+    [workspaces]
+  );
 
-  return {
-    // State
-    workspaces,
-    loading,
-    error,
-    // CRUD
-    createWorkspace,
-    updateWorkspace,
-    deleteWorkspace,
-    leaveWorkspace,
-    toggleFavourite,
-    // Helpers
-    refreshWorkspaces,
-    getWorkspaceById,
-  };
+  return useMemo(
+    () => ({
+      // State
+      workspaces,
+      loading,
+      error,
+      // CRUD
+      createWorkspace,
+      updateWorkspace,
+      deleteWorkspace,
+      leaveWorkspace,
+      toggleFavourite,
+      // Helpers
+      refreshWorkspaces,
+      getWorkspaceById,
+    }),
+    [
+      workspaces,
+      loading,
+      error,
+      createWorkspace,
+      updateWorkspace,
+      deleteWorkspace,
+      leaveWorkspace,
+      toggleFavourite,
+      refreshWorkspaces,
+      getWorkspaceById,
+    ]
+  );
 }
