@@ -36,7 +36,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
     removeMember,
     changeRole,
   } = useWorkspaceMembers({
-    workspaceId: workspace?.id || null,
+    workspace_id: workspace?.id || null,
     autoLoad: isOpen,
   });
 
