@@ -95,6 +95,27 @@ class WhiteboardService:
         )
         return [OnlineUserInfo(user_id=u.id, username=u.username) for _, u in rows]
 
+    def get_online_users_batch(self, board_ids: List[int]) -> Dict[int, List[OnlineUserInfo]]:
+        unique_board_ids = sorted(set(board_ids))
+        if not unique_board_ids:
+            return {}
+
+        rows = (
+            self.db.query(BoardUsers.board_id, User.id, User.username)
+            .join(User, User.id == BoardUsers.user_id)
+            .filter(
+                BoardUsers.board_id.in_(unique_board_ids),
+                BoardUsers.is_online == True,
+            )
+            .all()
+        )
+
+        by_board: Dict[int, List[OnlineUserInfo]] = {board_id: [] for board_id in unique_board_ids}
+        for board_id, user_id, username in rows:
+            by_board[board_id].append(OnlineUserInfo(user_id=user_id, username=username))
+
+        return by_board
+
     # ── Board metadata ─────────────────────────────────────────────────────
 
     def get_owner_info(self, board_id: int) -> BoardOwnerInfo:

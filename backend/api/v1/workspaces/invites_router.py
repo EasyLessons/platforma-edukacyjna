@@ -12,11 +12,11 @@ from core.responses import ApiResponse
 
 from .schemas import (
     InviteCreate, InviteResponse, PendingInviteResponse,
-    AcceptInviteResponse, InviteStatusResponse, MessageResponse,
+    AcceptInviteResponse, InviteStatusResponse, InviteStatusBatchRequest, InviteStatusBatchResponse, MessageResponse,
 )
 from .invites_service import (
     create_invite, accept_invite, reject_invite,
-    get_user_pending_invites, check_invite_status,
+    get_user_pending_invites, check_invite_status, check_invite_status_batch,
 )
 
 router = APIRouter(tags=["Invites"])
@@ -42,3 +42,13 @@ async def reject_workspace_invite(token: str, db=Depends(get_db), current_user=D
 @router.get("/{workspace_id}/members/check/{user_id}", response_model=ApiResponse[InviteStatusResponse])
 async def check_user_invite_status(workspace_id: int, user_id: int, db=Depends(get_db)):
     return ApiResponse(success=True, data=check_invite_status(db, workspace_id, user_id))
+
+
+@router.post("/{workspace_id}/members/check-batch", response_model=ApiResponse[InviteStatusBatchResponse])
+async def check_users_invite_status_batch(
+    workspace_id: int,
+    payload: InviteStatusBatchRequest,
+    db: Session = Depends(get_db),
+):
+    statuses = check_invite_status_batch(db, workspace_id, payload.user_ids)
+    return ApiResponse(success=True, data=InviteStatusBatchResponse(statuses=statuses))

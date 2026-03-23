@@ -20,6 +20,8 @@ from .invites import (
     InviteResponse,
     PendingInviteResponse,
     InviteStatusResponse,
+    InviteStatusBatchRequest,
+    InviteStatusBatchResponse,
     AcceptInviteResponse,
 )
 
@@ -30,5 +32,5 @@ __all__ = [
     "MessageResponse", "WorkspaceMemberResponse", "WorkspaceMembersListResponse",
     "UpdateMemberRoleRequest", "MyRoleResponse", "RemoveMemberResponse",
     "InviteCreate", "InviteResponse", "PendingInviteResponse",
-    "InviteStatusResponse", "AcceptInviteResponse",
+    "InviteStatusResponse", "InviteStatusBatchRequest", "InviteStatusBatchResponse", "AcceptInviteResponse",
 ]

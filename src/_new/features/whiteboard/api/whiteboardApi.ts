@@ -42,6 +42,16 @@ export const fetchOnlineUsers = (
     params: { limit, offset },
   }).then(res => res.data);
 
+export const fetchOnlineUsersBatch = (
+  board_ids: number[]
+): Promise<Record<number, OnlineUser[]>> =>
+  apiClient
+    .post<{ online_users_by_board: Record<number, OnlineUser[]> }>(
+      '/api/v1/whiteboard/online-users/batch',
+      { board_ids }
+    )
+    .then((res) => res.data.online_users_by_board);
+
 export const saveBoardElementsBatch = (
   id: number,
   elements: BoardElement[],

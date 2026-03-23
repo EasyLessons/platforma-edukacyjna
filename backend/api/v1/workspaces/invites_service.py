@@ -4,7 +4,7 @@ Invites service — zaproszenia do workspace'ów.
 import asyncio
 import secrets
 from datetime import datetime, timedelta
-from typing import List
+from typing import Dict, List
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -261,3 +261,42 @@ def check_invite_status(
         has_pending_invite=has_pending,
         can_invite=not is_member and not has_pending,
     )
+
+
+def check_invite_status_batch(
+    db: Session, workspace_id: int, user_ids: List[int]
+) -> Dict[int, InviteStatusResponse]:
+    unique_user_ids = sorted(set(user_ids))
+    if not unique_user_ids:
+        return {}
+
+    member_ids = {
+        row[0]
+        for row in db.query(WorkspaceMember.user_id)
+        .filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id.in_(unique_user_ids),
+        )
+        .all()
+    }
+
+    pending_ids = {
+        row[0]
+        for row in db.query(WorkspaceInvite.invited_id)
+        .filter(
+            WorkspaceInvite.workspace_id == workspace_id,
+            WorkspaceInvite.invited_id.in_(unique_user_ids),
+            WorkspaceInvite.expires_at > datetime.utcnow(),
+            WorkspaceInvite.is_used == False,
+        )
+        .all()
+    }
+
+    return {
+        user_id: InviteStatusResponse(
+            is_member=user_id in member_ids,
+            has_pending_invite=user_id in pending_ids,
+            can_invite=(user_id not in member_ids and user_id not in pending_ids),
+        )
+        for user_id in unique_user_ids
+    }

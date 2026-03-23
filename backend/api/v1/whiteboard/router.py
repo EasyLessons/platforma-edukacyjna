@@ -24,7 +24,7 @@ from core.responses import ApiResponse
 
 from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
-    OnlineUserInfo, OnlineStatusResponse,
+    OnlineUserInfo, OnlineStatusResponse, OnlineUsersBatchRequest, OnlineUsersBatchResponse,
     BoardElement, BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse,
 )
@@ -72,6 +72,16 @@ async def get_online_users(
     service = WhiteboardService(db)
     result = service.get_online_users(board_id, limit, offset)
     return ApiResponse(success=True, data=result)
+
+
+@router.post("/online-users/batch", response_model=ApiResponse[OnlineUsersBatchResponse])
+async def get_online_users_batch(
+    payload: OnlineUsersBatchRequest,
+    db: Session = Depends(get_db),
+):
+    service = WhiteboardService(db)
+    result = service.get_online_users_batch(payload.board_ids)
+    return ApiResponse(success=True, data=OnlineUsersBatchResponse(online_users_by_board=result))
 
 
 # ── Board metadata ─────────────────────────────────────────────────────────

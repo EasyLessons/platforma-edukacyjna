@@ -12,6 +12,14 @@ class OnlineUserInfo(BaseModel):
         from_attributes = True
 
 
+class OnlineUsersBatchRequest(BaseModel):
+    board_ids: List[int]
+
+
+class OnlineUsersBatchResponse(BaseModel):
+    online_users_by_board: Dict[int, List[OnlineUserInfo]]
+
+
 class OnlineStatusResponse(BaseModel):
     status: str
     board_id: int

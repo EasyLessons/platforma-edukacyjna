@@ -48,3 +48,14 @@ export const checkUserInviteStatus = (
   apiClient
     .get<InviteStatusResponse>(`/api/v1/workspaces/${workspace_id}/members/check/${user_id}`)
     .then((res) => res.data);
+
+export const checkUsersInviteStatusBatch = (
+  workspace_id: number,
+  user_ids: number[]
+): Promise<Record<number, InviteStatusResponse>> =>
+  apiClient
+    .post<{ statuses: Record<number, InviteStatusResponse> }>(
+      `/api/v1/workspaces/${workspace_id}/members/check-batch`,
+      { user_ids }
+    )
+    .then((res) => res.data.statuses);
