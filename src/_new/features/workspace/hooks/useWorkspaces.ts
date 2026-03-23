@@ -1,19 +1,6 @@
-/**
- * USE WORKSPACES HOOK
- *
- * Hook który zarządza WSZYSTKIMI workspace'ami użytkownika.
- *
- * Odpowiada za:
- * - Pobieranie listy workspace'ów z backendu
- * - Tworzenie nowego workspace'a
- * - Aktualizacja workspace'a
- * - Usuwanie workspace'a
- * - Toggle ulubione
- * - Zarządzanie stanem (loading, error)
- *
- */
 
-import { useState, useEffect } from 'react';
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/context/AuthContext';
 import {
   fetchWorkspaces,
@@ -23,89 +10,120 @@ import {
   leaveWorkspace as apiLeaveWorkspace,
   toggleWorkspaceFavourite as apiToggleFavourite,
 } from '../api/workspaceApi';
-import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
-import type { Workspace, WorkspaceCreateRequest, WorkspaceUpdateRequest } from '../types';
+import type { Workspace, WorkspaceCreateRequest, WorkspaceListResponse, WorkspaceUpdateRequest } from '../types';
+
+
+export const workspaceKeys = {
+  all: ['workspaces'] as const,
+  list: () => ['workspaces', 'list'] as const,
+};
 
 export function useWorkspaces() {
-  // STATE
-  // ================================
   const { isLoggedIn } = useAuth();
+  const queryClient = useQueryClient();
 
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const { handleError } = useErrorHandler({ onError: setError });
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+  } = useQuery<WorkspaceListResponse>({
+    queryKey: workspaceKeys.list(),
+    queryFn: fetchWorkspaces,
+    enabled: !!isLoggedIn,
+  });
 
-  // WORKSPACE CRUD
-  // ================================
+  const workspaces: Workspace[] = data?.workspaces ?? [];
+  const error: string | null = queryError
+    ? (queryError instanceof Error ? queryError.message : String(queryError))
+    : null;
 
-  // loadWorkspaces - Pobiera workspace'y z backendu
-  const loadWorkspaces = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetchWorkspaces();
-      setWorkspaces(response.workspaces);
-    } catch (err) {
-      await handleError(err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  // createWorkspace - Tworzy nowy workspace
-  const createWorkspace = async (data: WorkspaceCreateRequest) => {
-    const newWorkspace = await apiCreateWorkspace(data);
-    setWorkspaces((prev) => [...prev, newWorkspace]);
-    return newWorkspace;
-  };
 
-  // updateWorkspace - Aktualizuje workspace
-  const updateWorkspace = async (id: number, data: WorkspaceUpdateRequest) => {
-    const updatedWorkspace = await apiUpdateWorkspace(id, data);
-    setWorkspaces((prev) => prev.map((ws) => (ws.id === id ? updatedWorkspace : ws)));
-    return updatedWorkspace;
-  };
+  const createMutation = useMutation({
+    mutationFn: apiCreateWorkspace,
+    onSuccess: () => {
+      // Przy tworzeniu: pełna inwalidacja, bo backend przypisuje ID i daty
+      queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+    },
+  });
 
-  // deleteWorkspace - Usuwa workspace
-  const deleteWorkspace = async (id: number) => {
-    await apiDeleteWorkspace(id);
-    setWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
-  };
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: WorkspaceUpdateRequest }) =>
+      apiUpdateWorkspace(id, data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<WorkspaceListResponse>(
+        workspaceKeys.list(),
+        (old) =>
+          old
+            ? { ...old, workspaces: old.workspaces.map((ws) => (ws.id === updated.id ? updated : ws)) }
+            : old,
+      );
+    },
+  });
 
-  // leaveWorkspace - Opuszcza workspace (członek)
-  const leaveWorkspace = async (id: number) => {
-    await apiLeaveWorkspace(id);
-    setWorkspaces((prev) => prev.filter((ws) => ws.id !== id));
-  };
+  const deleteMutation = useMutation({
+    mutationFn: apiDeleteWorkspace,
+    onSuccess: (_, deletedId) => {
+      queryClient.setQueryData<WorkspaceListResponse>(
+        workspaceKeys.list(),
+        (old) =>
+          old
+            ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== deletedId) }
+            : old,
+      );
+    },
+  });
 
-  // toggleFavourite - Dodaje/usuwa workspace z ulubionych
-  const toggleFavourite = async (id: number, isFavourite: boolean) => {
-    await apiToggleFavourite(id, isFavourite);
-    setWorkspaces((prev) =>
-      prev.map((ws) => (ws.id === id ? { ...ws, is_favourite: isFavourite } : ws))
-    );
-  };
+  const leaveMutation = useMutation({
+    mutationFn: apiLeaveWorkspace,
+    onSuccess: (_, leftId) => {
+      queryClient.setQueryData<WorkspaceListResponse>(
+        workspaceKeys.list(),
+        (old) =>
+          old
+            ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== leftId) }
+            : old,
+      );
+    },
+  });
 
-  // HELPERS
-  // ================================
+  const toggleFavouriteMutation = useMutation({
+    mutationFn: ({ id, is_favourite }: { id: number; is_favourite: boolean }) =>
+      apiToggleFavourite(id, is_favourite),
+    onSuccess: (_, { id, is_favourite }) => {
+      queryClient.setQueryData<WorkspaceListResponse>(
+        workspaceKeys.list(),
+        (old) =>
+          old
+            ? { ...old, workspaces: old.workspaces.map((ws) => (ws.id === id ? { ...ws, is_favourite } : ws)) }
+            : old,
+      );
+    },
+  });
 
-  const refreshWorkspaces = loadWorkspaces;
+  // ── Public API (zachowana sygnatura dla komponentów) ───────────────────────
 
-  const getWorkspaceById = (id: number): Workspace | undefined => {
-    return workspaces.find((ws) => ws.id === id);
-  };
+  const createWorkspace = (data: WorkspaceCreateRequest): Promise<Workspace> =>
+    createMutation.mutateAsync(data);
 
-  // EFFECTS
-  // ================================
+  const updateWorkspace = (id: number, data: WorkspaceUpdateRequest): Promise<Workspace> =>
+    updateMutation.mutateAsync({ id, data });
 
-  // Pobierz workspace'y przy mount i logowaniu użytkownika
-  useEffect(() => {
-    if (isLoggedIn) {
-      loadWorkspaces();
-    }
-  }, [isLoggedIn]);
+  const deleteWorkspace = (id: number): Promise<void> =>
+    deleteMutation.mutateAsync(id);
+
+  const leaveWorkspace = (id: number): Promise<{ message: string }> =>
+    leaveMutation.mutateAsync(id);
+
+  const toggleFavourite = (id: number, isFavourite: boolean): Promise<void> =>
+    toggleFavouriteMutation.mutateAsync({ id, is_favourite: isFavourite }).then(() => undefined);
+
+  const refreshWorkspaces = (): Promise<void> =>
+    queryClient.invalidateQueries({ queryKey: workspaceKeys.list() });
+
+  const getWorkspaceById = (id: number): Workspace | undefined =>
+    workspaces.find((ws) => ws.id === id);
 
   return {
     // State

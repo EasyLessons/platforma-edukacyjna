@@ -20,12 +20,11 @@ To jak "manager" który rozmawia z bazą danych.
 """
 
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_
+from sqlalchemy import func, and_, select as sa_select
 from typing import List, Optional
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 import secrets
-import asyncio
 
 # Importy modeli z bazy danych
 from core.models import Workspace, WorkspaceMember, Board, User, WorkspaceInvite
@@ -44,98 +43,78 @@ from notifications.service import create_notification
 
 def get_user_workspaces(db: Session, user_id: int) -> List[WorkspaceResponse]:
     """
-    Pobiera WSZYSTKIE workspace'y do których użytkownik ma dostęp
-    
-    LOGIKA:
-    1. Znajdź workspace'y gdzie użytkownik jest TWÓRCĄ
-    2. Znajdź workspace'y gdzie użytkownik jest CZŁONKIEM
-    3. Połącz obie listy (usuń duplikaty)
-    4. Dla każdego workspace'a dodaj:
-       - Liczbę członków
-       - Liczbę tablic
-       - Rolę użytkownika (owner/member)
-       - Czy oznaczony jako ulubiony
-    
+    Pobiera WSZYSTKIE workspace'y do których użytkownik ma dostęp.
+
+    OPTYMALIZACJA — jedno zapytanie SQL z podzapytaniami zamiast N+1:
+      Stary kod: dla N workspace'ów robił 1 + 2*N zapytań do bazy.
+        (dla każdego workspace'a osobne COUNT dla członków i tablic)
+      Nowy kod: ZAWSZE 1 zapytanie, niezależnie od liczby workspace'ów.
+        scalar_subquery() = SQL sam liczy member_count i board_count
+        wewnątrz jednego SELECT, bez dodatkowych round-tripów do Neon.
+
     PARAMETRY:
     - db: Sesja bazy danych (SQLAlchemy)
     - user_id: ID zalogowanego użytkownika
-    
+
     ZWRACA:
     Lista WorkspaceResponse (może być pusta [])
-    
-    PRZYKŁAD UŻYCIA:
-    workspaces = get_user_workspaces(db, current_user.id)
     """
-    
-    # ───────────────────────────────────────────────────────────────────────
-    # Krok 1: Pobierz workspace'y gdzie użytkownik jest CZŁONKIEM
-    # ───────────────────────────────────────────────────────────────────────
-    
-    # Zapytanie SQL (w uproszczeniu):
-    # SELECT workspace_members.*, workspaces.* 
-    # FROM workspace_members 
-    # JOIN workspaces ON workspace_members.workspace_id = workspaces.id
-    # WHERE workspace_members.user_id = {user_id}
-    
-    memberships = (
-        db.query(WorkspaceMember)
-        .filter(WorkspaceMember.user_id == user_id)
-        .options(
-            joinedload(WorkspaceMember.workspace)  # Pobierz też dane workspace'a
-            .joinedload(Workspace.creator)  # I dane twórcy
+
+ 
+    member_count_sq = (
+        sa_select(func.count(WorkspaceMember.id))
+        .where(WorkspaceMember.workspace_id == Workspace.id)
+        .correlate(Workspace)
+        .scalar_subquery()
+    )
+
+  
+    board_count_sq = (
+        sa_select(func.count(Board.id))
+        .where(Board.workspace_id == Workspace.id)
+        .correlate(Workspace)
+        .scalar_subquery()
+    )
+
+    # Jedno zapytanie: membership + workspace + creator + oba liczniki
+    rows = (
+        db.query(
+            WorkspaceMember,
+            Workspace,
+            User,
+            member_count_sq.label("member_count"),
+            board_count_sq.label("board_count"),
         )
+        .join(Workspace, WorkspaceMember.workspace_id == Workspace.id)
+        .join(User, Workspace.created_by == User.id)
+        .filter(WorkspaceMember.user_id == user_id)
         .all()
     )
-    
-    # ───────────────────────────────────────────────────────────────────────
-    # Krok 2: Przygotuj odpowiedź dla każdego workspace'a
-    # ───────────────────────────────────────────────────────────────────────
-    
+
     workspaces_data = []
-    
-    for membership in memberships:
-        workspace = membership.workspace
-        
-        # Policz członków (ile osób ma dostęp)
-        member_count = (
-            db.query(WorkspaceMember)
-            .filter(WorkspaceMember.workspace_id == workspace.id)
-            .count()
-        )
-        
-        # Policz tablice (ile tablic jest w workspace'ie)
-        board_count = (
-            db.query(Board)
-            .filter(Board.workspace_id == workspace.id)
-            .count()
-        )
-        
-        # Sprawdź rolę użytkownika
+    for membership, workspace, creator, member_count, board_count in rows:
         is_owner = workspace.created_by == user_id
         role = "owner" if is_owner else membership.role
-        
-        # Stwórz obiekt odpowiedzi
-        workspace_data = WorkspaceResponse(
+
+        workspaces_data.append(WorkspaceResponse(
             id=workspace.id,
             name=workspace.name,
             icon=workspace.icon,
             bg_color=workspace.bg_color,
             created_by=workspace.created_by,
             creator={
-                "id": workspace.creator.id,
-                "username": workspace.creator.username,
-                "email": workspace.creator.email,
-                "full_name": workspace.creator.full_name
-            } if workspace.creator else None,
+                "id": creator.id,
+                "username": creator.username,
+                "email": creator.email,
+                "full_name": creator.full_name,
+            },
             member_count=member_count,
             board_count=board_count,
             is_owner=is_owner,
             role=role,
-            is_favourite=membership.is_favourite
-        )
-        
-        workspaces_data.append(workspace_data)
-    
+            is_favourite=membership.is_favourite,
+        ))
+
     return workspaces_data
 
 
