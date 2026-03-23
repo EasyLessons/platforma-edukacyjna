@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBoard } from '@/boards_api/api';
+import { createBoard } from '@/_new/features/board/api/boardApi';
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 type Subject = 'Matematyka' | 'Angielski' | 'Chemia' | 'Fizyka' | 'Biologia';

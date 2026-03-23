@@ -34,6 +34,7 @@ import type { ApiSuccessResponse } from './types';
 // KONFIGURACJA BAZOWA
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const REQUEST_TIMEOUT_MS = 60_000;
 
 export const apiClient: AxiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -41,7 +42,7 @@ export const apiClient: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
   withCredentials: true, // HttpOnly cookie potrzebne dla refresh
-  timeout: 15_000,
+  timeout: REQUEST_TIMEOUT_MS,
 });
 
 // REQUEST INTERCEPTOR

@@ -4,7 +4,7 @@ import './dashboard-theme.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/workspace-sidebar';
-import BoardsSection from './Components/boards-section';
+import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
@@ -112,8 +112,8 @@ export default function Dashboard() {
 
               {activeWorkspaceId && (
                 <BoardsSection
-                  workspaceId={activeWorkspaceId}
-                  workspaceName={activeWorkspaceName}
+                  workspace_id={activeWorkspaceId}
+                  workspace_name={activeWorkspaceName}
                   stickyOffset={workspaceTopNavHeight}
                 />
               )}

@@ -40,7 +40,7 @@ import {
   X,
   User,
 } from 'lucide-react';
-import type { BoardElementWithAuthor } from '@/boards_api/api';
+import type { BoardElementWithAuthor } from '../../api/whiteboardApi';
 import type { DrawingElement, ViewportTransform } from '@/_new/features/whiteboard/types';
 
 // ============================================================================
@@ -139,8 +139,9 @@ const getElementTypeName = (type: string): string => {
  * Oblicza bounding box elementu
  */
 const getElementBounds = (
-  data: DrawingElement
+  rawData: unknown
 ): { minX: number; minY: number; maxX: number; maxY: number } | null => {
+  const data = rawData as DrawingElement;
   if (!data) return null;
 
   switch (data.type) {
@@ -318,7 +319,7 @@ const ActivityGroupItem = memo(
     const elementCounts = useMemo(() => {
       const counts: Record<string, number> = {};
       for (const el of group.elements) {
-        const type = el.data?.type || 'unknown';
+        const type = (el.data?.['type'] as string) || 'unknown';
         counts[type] = (counts[type] || 0) + 1;
       }
       return counts;

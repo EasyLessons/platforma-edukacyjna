@@ -32,6 +32,7 @@ export function mapAxiosError(err: unknown): AppError {
 
   // Brak odpowiedzi (sieć, timeout)
   if (!axiosErr.response) {
+      console.log('No response error:', axiosErr.code, axiosErr.message, axiosErr.config?.url);
     return new AppError('Brak połączenia z serwerem', ErrorCode.NETWORK_ERROR, 0);
   }
 

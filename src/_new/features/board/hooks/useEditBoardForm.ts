@@ -1,40 +1,49 @@
 /**
- * USE CREATE BOARD FORM
+ * USE EDIT BOARD FORM
  *
- * Hook zarządzający formularzem tworzenia tablicy.
+ * Hook zarządzający formularzem edycji tablicy.
  *
  * Odpowiada za:
- * - Stan formularza (nazwa, ikona, kolor)
+ * - Stan formularza zainicjowany danymi tablicy
  * - Walidację przed submit
  * - Obsługę błędów
- * - Reset formularza po zamknięciu
+ * - Reset do wartości pierwotnych po zamknięciu
  */
+'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { validateBoardName, validateBoardIcon } from '../utils/validation';
-import { DEFAULT_BOARD_ICON, DEFAULT_BOARD_COLOR } from '../utils/constants';
-import type { BoardFormData, BoardErrors, BoardCreateRequest } from '../types';
+import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
+import type { BoardFormData, BoardErrors, Board, BoardUpdateRequest } from '../types';
 
-interface UseCreateBoardFormOptions {
-  workspaceId: number;
-  onSubmit: (data: BoardCreateRequest) => Promise<void>;
+interface UseEditBoardFormOptions {
+  board: Board;
+  onSubmit: (data: BoardUpdateRequest) => Promise<void>;
   onClose: () => void;
 }
 
-export function useCreateBoardForm({ workspaceId, onSubmit, onClose }: UseCreateBoardFormOptions) {
+export function useEditBoardForm({ board, onSubmit, onClose }: UseEditBoardFormOptions) {
   // STATE
-  // ================================
 
   const [formData, setFormData] = useState<BoardFormData>({
-    name: '',
-    icon: DEFAULT_BOARD_ICON,
-    bg_color: DEFAULT_BOARD_COLOR,
+    name: board.name,
+    icon: board.icon,
+    bg_color: board.bg_color,
   });
   const [errors, setErrors] = useState<BoardErrors>({});
+  const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { handleError } = useErrorHandler({ onError: setSubmitError });
+
+  // Gdy zmieni się edytowana tablica, zsynchronizuj formularz
+  useEffect(() => {
+    setFormData({ name: board.name, icon: board.icon, bg_color: board.bg_color });
+    setErrors({});
+    setSubmitError('');
+  }, [board.id]);
+
   // VALIDATION
-  // ================================
 
   const validateForm = (): boolean => {
     const newErrors: BoardErrors = {};
@@ -50,16 +59,17 @@ export function useCreateBoardForm({ workspaceId, onSubmit, onClose }: UseCreate
   };
 
   // ACTIONS
-  // ================================
 
   const handleChange = (field: keyof BoardFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }));
+    setSubmitError('');
   };
 
   const resetForm = () => {
-    setFormData({ name: '', icon: DEFAULT_BOARD_ICON, bg_color: DEFAULT_BOARD_COLOR });
-    setErrors({});
+    setFormData({ name: board.name, icon: board.icon, bg_color: board.bg_color });
+    setErrors({})
+    setSubmitError('');
     setIsSubmitting(false);
   };
 
@@ -73,29 +83,32 @@ export function useCreateBoardForm({ workspaceId, onSubmit, onClose }: UseCreate
     if (!validateForm()) return;
 
     setIsSubmitting(true);
+    setSubmitError('');
     try {
       await onSubmit({
         name: formData.name.trim(),
         icon: formData.icon,
         bg_color: formData.bg_color,
-        workspace_id: workspaceId,
       });
       handleClose();
     } catch (err) {
-      console.error('Error creating board:', err);
-      alert('Nie udało się utworzyć tablicy. Spróbuj ponownie.');
+      await handleError(err); 
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const isReady = formData.name.trim() !== '';
+  const isDirty =
+    formData.name !== board.name ||
+    formData.icon !== board.icon ||
+    formData.bg_color !== board.bg_color;
 
   return {
     formData,
     errors,
+    submitError,
     isSubmitting,
-    isReady,
+    isDirty,
     handleChange,
     handleClose,
     handleSubmit,

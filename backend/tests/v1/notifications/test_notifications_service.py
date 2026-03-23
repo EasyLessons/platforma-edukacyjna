@@ -23,7 +23,7 @@ INVITE_PAYLOAD = {
     "workspace_name": "Test WS",
     "workspace_icon": "Home",
     "workspace_bg_color": "bg-green-500",
-    "inviter_name": "admin",
+    "inviter_name": "inviter",
     "invite_token": "token-abc",
     "expires_at": (datetime.utcnow() + timedelta(days=7)).isoformat(),
     "created_at": datetime.utcnow().isoformat(),

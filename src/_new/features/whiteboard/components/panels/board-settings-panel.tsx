@@ -18,7 +18,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Settings, Users, Bot, Grid3X3, Search, PanelLeft, Crown, Shield, User, Eye, ChevronDown, Check, Loader2 } from 'lucide-react';
 import type { BoardSettings, BoardMember } from '@/_new/features/board/types';
-import { fetchBoardMembers, updateBoardSettings, updateBoardMemberRole } from '@/_new/features/board/api/board-api';
+import { fetchBoardMembers, updateBoardSettings, updateBoardMemberRole } from '@/_new/features/board/api/boardApi';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 // ─── TYPY ───────────────────────────────────────────────────────────────────
@@ -34,9 +34,7 @@ interface BoardSettingsPanelProps {
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 const ROLE_CONFIG = {
-  owner:  { label: 'Właściciel', icon: Crown,  color: '#f59e0b', bg: '#fef3c7' },
-  admin:  { label: 'Admin',      icon: Shield, color: '#3b82f6', bg: '#dbeafe' },
-  member: { label: 'Członek',    icon: User,   color: '#6b7280', bg: '#f3f4f6' },
+  editor:  { label: 'Edytor',      icon: Shield, color: '#3b82f6', bg: '#dbeafe' },
   viewer: { label: 'Obserwator', icon: Eye,    color: '#8b5cf6', bg: '#ede9fe' },
 } as const;
 
@@ -118,7 +116,7 @@ interface RoleSelectProps {
   currentRole: Role;
   userId: number;
   boardId: number;
-  onRoleChange: (userId: number, newRole: 'admin' | 'member' | 'viewer') => void;
+  onRoleChange: (userId: number, newRole: 'editor' | 'viewer') => void;
   saving: boolean;
 }
 
@@ -134,9 +132,7 @@ function RoleSelect({ currentRole, userId, boardId, onRoleChange, saving }: Role
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  const options: Array<'admin' | 'member' | 'viewer'> = ['admin', 'member', 'viewer'];
-
-  if (currentRole === 'owner') return <RoleBadge role="owner" />;
+  const options: Array<'editor' | 'viewer'> = ['editor', 'viewer'];
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
@@ -210,10 +206,7 @@ export function BoardSettingsPanel({
     if (tab !== 'members') return;
     setMembersLoading(true);
     setMembersError(null);
-    fetchBoardMembers(boardId)
-      .then(setMembers)
-      .catch((err) => setMembersError(err.message || 'Błąd ładowania członków'))
-      .finally(() => setMembersLoading(false));
+    fetchBoardMembers(boardId).then(res => setMembers(res.members));
   }, [tab, boardId]);
 
   // Debounced save ustawień do backendu (tylko właściciel)
@@ -239,7 +232,7 @@ export function BoardSettingsPanel({
   );
 
   const handleRoleChange = useCallback(
-    async (userId: number, newRole: 'admin' | 'member' | 'viewer') => {
+    async (userId: number, newRole: 'editor' | 'viewer') => {
       setSavingRoles((prev) => new Set(prev).add(userId));
       try {
         await updateBoardMemberRole(boardId, userId, newRole);

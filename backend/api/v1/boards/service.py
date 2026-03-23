@@ -10,6 +10,7 @@ BoardService obsługuje:
   toggle_favourite()  — ulubione
   get_members()       — lista członków (z workspace)
   update_settings()   — ustawienia tablicy
+  join_board_workspace() — dołącza użytkownika przez link
 """
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
@@ -22,7 +23,7 @@ from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse, BoardSettings,
     ToggleFavouriteResponse, BoardMember, BoardMembersResponse,
-    UpdateBoardSettings,
+    UpdateBoardSettings, JoinBoardResponse
 )
 
 logger = get_logger(__name__)
@@ -229,3 +230,54 @@ class BoardService:
         self.db.commit()
         self.db.refresh(board)
         return {"success": True, "settings": board.settings}
+    
+    async def join_board_workspace(
+        self, 
+        board_id: int, 
+        user_id: int
+    ) -> JoinBoardResponse:
+        """
+        Dołącza użytkownika do workspace powiązanego z tablicą.
+ 
+        Jeśli użytkownik jest już członkiem — zwraca current state.
+        Jeśli nie jest — dodaje jako 'editor'.
+        """
+        board = self._get_board_or_404(board_id)
+        is_owner = board.created_by == user_id
+ 
+        existing_member = self.db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == board.workspace_id,
+            WorkspaceMember.user_id == user_id,
+        ).first()
+ 
+        if existing_member:
+            return JoinBoardResponse(
+                success=True,
+                already_member=True,
+                workspace_id=board.workspace_id,
+                board_id=board_id,
+                owner_id=board.created_by,
+                is_owner=is_owner,
+                user_role="owner" if is_owner else existing_member.role,
+            )
+ 
+        new_member = WorkspaceMember(
+            workspace_id=board.workspace_id,
+            user_id=user_id,
+            role="editor",
+            is_favourite=False,
+            joined_at=datetime.utcnow(),
+        )
+        self.db.add(new_member)
+        self.db.commit()
+ 
+        return JoinBoardResponse(
+            success=True,
+            already_member=False,
+            workspace_id=board.workspace_id,
+            board_id=board_id,
+            owner_id=board.created_by,
+            is_owner=is_owner,
+            user_role="owner" if is_owner else "editor",
+            message="Dołączono do workspace",
+        )

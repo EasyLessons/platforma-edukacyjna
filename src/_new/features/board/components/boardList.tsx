@@ -6,13 +6,12 @@
  * - Sortowania i filtrowania (dane z parent)
  *
  */
-
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Loader2, Layout } from 'lucide-react';
-import { BoardCard } from './board-card';
-import { fetchBoardOnlineUsers } from '../api/board-api';
+import { Layout } from 'lucide-react';
+import { BoardCard } from './boardCard';
+import { fetchOnlineUsers } from '../../whiteboard/api/whiteboardApi';
 import { sortBoards, filterBoards } from '../utils/helpers';
 import type { Board, BoardCardActions } from '../types';
 import type { SortBy, FilterOwner } from '../utils/helpers';
@@ -53,13 +52,13 @@ export function BoardList({
 
     const fetchAll = async () => {
       const results = await Promise.allSettled(
-        boards.map((b) => fetchBoardOnlineUsers(b.id).then((users) => ({ boardId: b.id, users })))
+        boards.map((b) => fetchOnlineUsers(b.id).then((users) => ({ board_id: b.id, users })))
       );
 
       const map: Record<number, OnlineUser[]> = {};
       for (const result of results) {
         if (result.status === 'fulfilled') {
-          map[result.value.boardId] = result.value.users;
+          map[result.value.board_id] = result.value.users;
         }
       }
       setOnlineUsersMap(map);

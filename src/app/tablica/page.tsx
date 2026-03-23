@@ -29,8 +29,8 @@ import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { BoardRealtimeProvider } from '../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../context/VoiceChatContext';
-import { joinBoardWorkspace, fetchBoardById } from '@/boards_api/api';
-import { getMyRole } from '@/_new/features/workspace/api/workspaceApi'; 
+import { joinBoardWorkspace, fetchBoardById } from '@/_new/features/board/api/boardApi';
+import { getMyRole } from '@/_new/features/workspace/api/memberApi';  
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
@@ -98,7 +98,9 @@ export function TablicaContent() {
     // Pobierz dane tablicy z bazy
     const loadBoardData = async () => {
       try {
-        const board = await fetchBoardById(id);
+        const numericId = parseInt(id, 10);
+        if (isNaN(numericId)) return;
+        const board = await fetchBoardById(numericId);
         if (board) {
           setBoardName(board.name);
           setBoardIcon(board.icon || 'PenTool');

@@ -10,7 +10,7 @@
 'use client';
 
 import { Star, MoreVertical, Clock, User, Pencil } from 'lucide-react';
-import { BoardOnlineUsers } from './board-online-users';
+import { BoardOnlineUsers } from './boardOnlineUsers';
 import { getIconComponent, getGradientClass, formatDate } from '../utils/helpers';
 import type { Board, BoardCardActions } from '../types';
 import type { OnlineUser } from '@/_new/shared/types/user';

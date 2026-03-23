@@ -1,7 +1,7 @@
 /**
- * BOARD CREATE MODAL
+ * BOARD EDIT MODAL
  *
- * Modal z formularzem tworzenia tablicy.
+ * Modal z formularzem edycji tablicy.
  */
 
 'use client';
@@ -11,25 +11,25 @@ import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
-import { BoardIconPicker } from './board-icon-picker';
-import { BoardColorPicker } from './board-color-picker';
-import { useCreateBoardForm } from '../hooks/use-create-board-form';
+import { BoardIconPicker } from './boardIconPicker';
+import { BoardColorPicker } from './boardColorPicker';
+import { useEditBoardForm } from '../hooks/useEditBoardForm';
 import { getGradientClass, getIconComponent } from '../utils/helpers';
-import type { BoardCreateRequest } from '../types';
+import type { Board, BoardUpdateRequest } from '../types';
 
-interface BoardCreateModalProps {
+interface BoardEditModalProps {
   isOpen: boolean;
   onClose: () => void;
-  workspaceId: number;
-  onSubmit: (data: BoardCreateRequest) => Promise<void>;
+  board: Board;
+  onSubmit: (data: BoardUpdateRequest) => Promise<void>;
 }
 
-export function BoardCreateModal({ isOpen, onClose, workspaceId, onSubmit }: BoardCreateModalProps) {
+export function BoardEditModal({ isOpen, onClose, board, onSubmit }: BoardEditModalProps) {
   // STATE
   // ================================
 
-  const { formData, errors, isSubmitting, isReady, handleChange, handleClose, handleSubmit } =
-    useCreateBoardForm({ workspaceId, onSubmit, onClose });
+  const { formData, errors, isSubmitting, isDirty, handleChange, handleClose, handleSubmit } =
+    useEditBoardForm({ board, onSubmit, onClose });
 
   const inputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -61,7 +61,10 @@ export function BoardCreateModal({ isOpen, onClose, workspaceId, onSubmit }: Boa
       >
         {/* Header */}
         <div className="dashboard-modal-header">
-          <h2 className="text-xl font-bold text-gray-900">Nowa tablica</h2>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">Ustawienia tablicy</h2>
+            <p className="text-sm text-gray-500 mt-1">{board.name}</p>
+          </div>
           <DashboardButton
             variant="secondary"
             onClick={handleClose}
@@ -91,7 +94,7 @@ export function BoardCreateModal({ isOpen, onClose, workspaceId, onSubmit }: Boa
               type="text"
               value={formData.name}
               onChange={(e) => handleChange('name', e.target.value)}
-              placeholder="np. Projekt X, Sprint 1..."
+              placeholder="Nazwa tablicy"
               label="Nazwa tablicy"
               error={errors.name}
               maxLength={50}
@@ -124,9 +127,9 @@ export function BoardCreateModal({ isOpen, onClose, workspaceId, onSubmit }: Boa
             variant="primary"
             type="submit"
             onClick={handleSubmit}
-            disabled={isSubmitting || !isReady}
+            disabled={isSubmitting || !isDirty}
           >
-            {isSubmitting ? 'Tworzenie...' : 'Utwórz tablicę'}
+            {isSubmitting ? 'Zapisywanie...' : 'Zapisz zmiany'}
           </DashboardButton>
         </div>
       </div>

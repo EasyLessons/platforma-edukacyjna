@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { PanelLeftClose, Search, Star, MoreVertical } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
-import { useBoards } from '@/_new/features/board/hooks/use-boards';
+import { useBoards } from '@/_new/features/board/hooks/useBoard';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 import {
   getIconComponent as getBoardIconComponent,
@@ -56,7 +56,7 @@ export function WhiteboardBoardSidebar({
   }, [workspaceId]);
 
   const { boards, loading, error } = useBoards({
-    workspaceId: selectedWorkspaceId,
+    workspace_id: selectedWorkspaceId,
     autoLoad: !!selectedWorkspaceId,
   });
 

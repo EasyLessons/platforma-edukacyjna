@@ -10,8 +10,8 @@
  * - Usuwanie tablicy
  * - Toggle ulubione
  * - Zarządzanie stanem (loading, error)
- *
  */
+'use client'
 
 import { useState, useEffect } from 'react';
 import {
@@ -20,16 +20,17 @@ import {
   updateBoard as apiUpdateBoard,
   deleteBoard as apiDeleteBoard,
   toggleBoardFavourite as apiToggleFavourite,
-} from '../api/board-api';
+} from '../api/boardApi';
+import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
 import type { Board, BoardCreateRequest, BoardUpdateRequest } from '../types';
 
 interface UseBoardsOptions {
-  workspaceId: number | null;
+  workspace_id: number | null;
   autoLoad?: boolean;
 }
 
 export function useBoards(options: UseBoardsOptions) {
-  const { workspaceId, autoLoad = true } = options;
+  const { workspace_id, autoLoad = true } = options;
 
   // STATE
   // ================================
@@ -38,88 +39,63 @@ export function useBoards(options: UseBoardsOptions) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // BOARD CRUD
-  // ================================
+  const { handleError } = useErrorHandler({ onError: setError });
 
-  // loadBoards - Pobiera tablice z backendu
+  // BOARD CRUD
+
   const loadBoards = async () => {
-    if (!workspaceId) {
+    if (!workspace_id) {
       setBoards([]);
       setError(null);
       return;
     }
-
     try {
       setLoading(true);
       setError(null);
-
-      const response = await fetchBoards(workspaceId);
+      const response = await fetchBoards(workspace_id);
       setBoards(response.boards);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Błąd ładowania tablic';
-      setError(errorMessage);
-      console.error('Error loading boards:', err);
+      await handleError(err);
     } finally {
       setLoading(false);
     }
   };
 
-  // createBoard - Tworzy nową tablicę
   const createBoard = async (data: BoardCreateRequest) => {
     const newBoard = await apiCreateBoard(data);
-
-    // Optimistic update - dodaj do listy od razu
     setBoards((prev) => [...prev, newBoard]);
-
     return newBoard;
   };
 
-  // updateBoard - Aktualizuje tablicę
-  const updateBoard = async (id: number, data: BoardUpdateRequest) => {
-    const updatedBoard = await apiUpdateBoard(id, data);
-
-    // Update w stanie
-    setBoards((prev) => prev.map((b) => (b.id === id ? updatedBoard : b)));
-
-    return updatedBoard;
+  const updateBoard = async (id: number, data: BoardUpdateRequest): Promise<Board> => {
+    const updated = await apiUpdateBoard(id, data);
+    setBoards((prev) => prev.map((b) => (b.id === id ? updated : b)));
+    return updated;
   };
 
-  // deleteBoard - Usuwa tablicę
-  const deleteBoard = async (id: number) => {
+  const deleteBoard = async (id: number): Promise<void> => {
     await apiDeleteBoard(id);
-
-    // Usuń ze stanu
     setBoards((prev) => prev.filter((b) => b.id !== id));
   };
 
-  // toggleFavourite - Dodaje/usuwa tablicę z ulubionych
-  const toggleFavourite = async (id: number, isFavourite: boolean) => {
-    await apiToggleFavourite(id, isFavourite);
-
-    // Update w stanie
-    setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, is_favourite: isFavourite } : b)));
+  const toggleFavourite = async (id: number, is_favourite: boolean): Promise<void> => {
+    await apiToggleFavourite(id, is_favourite);
+    setBoards((prev) => prev.map((b) => (b.id === id ? { ...b, is_favourite } : b)));
   };
 
   // HELPERS
-  // ================================
 
-  // refreshBoards - Odśwież listę tablic
   const refreshBoards = loadBoards;
-
-  // getBoardById - Znajdź tablicę w stanie
   const getBoardById = (id: number): Board | undefined => {
     return boards.find((b) => b.id === id);
   };
 
   // EFFECTS
-  // ================================
 
   // Pobierz tablice gdy workspaceId się zmieni
   useEffect(() => {
-    if (autoLoad) {
-      loadBoards();
-    }
-  }, [workspaceId]);
+    if (autoLoad) loadBoards();
+  }, [workspace_id, autoLoad]);
 
   return {
     // State

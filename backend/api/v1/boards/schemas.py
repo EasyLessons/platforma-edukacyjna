@@ -90,3 +90,13 @@ class DeleteBoardResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+class JoinBoardResponse(BaseModel):
+    success: bool
+    already_member: bool
+    workspace_id: int
+    board_id: int
+    owner_id: int
+    is_owner: bool
+    user_role: str
+    message: Optional[str] = None

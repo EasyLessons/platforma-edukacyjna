@@ -11,7 +11,6 @@
  * - Modals: tworzenie, edycja, potwierdzenie usunięcia
  * - Nawigację do tablicy
  * - Przekazanie danych i onAction do BoardList
- *
  */
 
 'use client';
@@ -20,24 +19,24 @@ import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Filter, ChevronDown } from 'lucide-react';
 import { DashboardButton } from './DashboardButton';
-import { BoardList } from '@/_new/features/board/components/board-list';
-import { BoardCreateModal } from '@/_new/features/board/components/board-create-modal';
-import { BoardEditModal } from '@/_new/features/board/components/board-edit-modal';
+import { BoardList } from '@/_new/features/board/components/boardList';
+import { BoardCreateModal } from '@/_new/features/board/components/boardCreateModal';
+import { BoardEditModal } from '@/_new/features/board/components/boardEditModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
-import { useBoards } from '@/_new/features/board/hooks/use-boards';
+import { useBoards } from '@/_new/features/board/hooks/useBoard';
 import { useAuth } from '@/app/context/AuthContext';
 import type { Board, BoardCardActions } from '@/_new/features/board/types';
 import type { SortBy, FilterOwner } from '@/_new/features/board/utils/helpers';
 
 interface BoardsSectionProps {
-  workspaceId: number;
-  workspaceName?: string;
+  workspace_id: number;
+  workspace_name?: string;
   stickyOffset?: number;
 }
 
 export default function BoardsSection({
-  workspaceId,
-  workspaceName,
+  workspace_id,
+  workspace_name,
   stickyOffset = 72,
 }: BoardsSectionProps) {
   const router = useRouter();
@@ -54,7 +53,7 @@ export default function BoardsSection({
     updateBoard,
     deleteBoard,
     toggleFavourite,
-  } = useBoards({ workspaceId });
+  } = useBoards({ workspace_id });
 
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [filterOwner, setFilterOwner] = useState<FilterOwner>('all');
@@ -101,7 +100,7 @@ export default function BoardsSection({
           {/* Header */}
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <h2 className="text-lg md:text-2xl font-bold text-gray-900">
-              {workspaceName ? `Tablice — ${workspaceName}` : 'Tablice'}
+              {workspace_name ? `Tablice — ${workspace_name}` : 'Tablice'}
             </h2>
             <DashboardButton
               variant="primary"
@@ -189,7 +188,7 @@ export default function BoardsSection({
       <BoardCreateModal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        workspaceId={workspaceId}
+        workspace_id={workspace_id}
         onSubmit={async (data) => {
           await createBoard(data);
           setShowCreateModal(false);

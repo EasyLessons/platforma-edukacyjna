@@ -184,22 +184,24 @@ class WhiteboardService:
             BoardElement.board_id == board_id
         ).all()
 
-        result = []
-        for el in elements:
-            creator = (
-                self.db.query(User).filter(User.id == el.created_by).first()
-                if el.created_by else None
-            )
-            result.append(BoardElementWithAuthor(
-                element_id=el.element_id,
-                type=el.type,
-                data=el.data,
-                created_by_id=el.created_by,
-                created_by_username=creator.username if creator else None,
-                created_at=el.created_at,
-            ))
+        # Pobierz wszystkich twórców jednym zapytaniem
+        creator_ids = {el.created_by for el in elements if el.created_by}
+        creators = {
+            u.id: u for u in
+            self.db.query(User).filter(User.id.in_(creator_ids)).all()
+        } if creator_ids else {}
 
-        return result
+        return [
+        BoardElementWithAuthor(
+            element_id=el.element_id,
+            type=el.type,
+            data=el.data,
+            created_by_id=el.created_by,
+            created_by_username=creators.get(el.created_by).username if el.created_by and el.created_by in creators else None,
+            created_at=el.created_at,
+        )
+        for el in elements
+    ]
 
     def delete_element(
         self, board_id: int, element_id: str, user_id: int
