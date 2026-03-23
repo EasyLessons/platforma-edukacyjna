@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Edit2, User, Mail } from 'lucide-react';
-import { User as UserType } from '../../../../auth_api/api';
+import type { User as UserType } from '@/_new/shared/types/user';
 
 interface BasicInfoProps {
   user: UserType | null;

@@ -7,10 +7,8 @@
 
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
+import { useRef } from 'react';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
-import { createInvite, checkUserInviteStatus } from '../api/inviteApi';
-import { UserSearchResult, searchUsers } from '@/auth_api/api';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
