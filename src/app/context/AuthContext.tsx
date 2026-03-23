@@ -46,14 +46,14 @@ import {
 // Importujemy funkcje do zarządzania tokenem i danymi użytkownika
 // Te funkcje są zdefiniowane w api.ts i operują na localStorage
 import {
-  getToken, // Pobiera token z localStorage
-  getUser, // Pobiera dane użytkownika z localStorage
-  saveToken, // Zapisuje token do localStorage (i cookies)
-  saveUser, // Zapisuje dane użytkownika do localStorage
-  removeToken, // Usuwa token z localStorage (i cookies)
-  removeUser, // Usuwa dane użytkownika z localStorage
-  User, // Typ TypeScript opisujący strukturę danych użytkownika
-} from '../../auth_api/api';
+  getAccessToken as getToken,
+  setAccessToken as saveToken,
+  removeAccessToken as removeToken,
+  getStoredUser as getUser,
+  setStoredUser as saveUser,
+  removeStoredUser as removeUser,
+} from '@/_new/lib/auth';
+import type { User } from '@/_new/shared/types/user';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📝 DEFINICJA TYPÓW

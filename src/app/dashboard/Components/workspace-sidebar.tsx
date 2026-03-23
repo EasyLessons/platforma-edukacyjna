@@ -5,11 +5,11 @@ import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from './DashboardButton';
 import { Input } from '@/_new/shared/ui/input';
-import { WorkspaceList } from '@/_new/features/workspace/components/workspace-list';
-import { WorkspaceCreateModal } from '@/_new/features/workspace/components/workspace-create-modal';
-import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspace-edit-modal';
-import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspace-members-modal';
-import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspace-invite-modal';
+import { WorkspaceList } from '@/_new/features/workspace/components/workspaceList';
+import { WorkspaceCreateModal } from '@/_new/features/workspace/components/workspaceCreateModal';
+import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspaceEditModal';
+import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspaceMembersModal';
+import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
 import {
   Workspace,

@@ -9,45 +9,43 @@
 
 import { User } from "@/_new/shared/types/user";
 
+export type FormErrors<T> = Partial<Record<keyof T, string>>;
+
 // FORM DATA TYPES
 export interface LoginFormData {
-  email: string;
+  login: string;
   password: string;
 }
 
 export interface RegisterFormData {
-  login: string;
+  username: string;
   email: string;
   password: string;
-  confirmPassword: string;
-}
-
-// VALIDATION ERROR TYPES
-export interface LoginErrors {
-  email?: string;
-  password?: string;
-}
-
-export interface RegisterErrors {
-  login?: string;
-  email?: string;
-  password?: string;
-  confirmPassword?: string;
+  password_confirm: string;
+  full_name?: string;
 }
 
 // API REQUEST TYPES
 export interface LoginRequest {
   login: string;
   password: string;
-  email?: string;
 }
 
 export interface RegisterRequest {
-  login: string;
+  username: string;
   email: string;
   password: string;
-  confirmPassword: string;
+  password_confirm: string;
   full_name?: string;
+}
+
+export interface VerifyEmailRequest {
+  user_id: number;
+  code: string;
+}
+
+export interface ResendCodeRequest {
+  user_id: number;
 }
 
 export interface PasswordResetRequest {
@@ -66,19 +64,10 @@ export interface ResetPasswordRequest {
   password_confirm: string;
 }
 
-export interface VerifyEmailRequest {
-  user_id: number;
-  code: string;
-}
-
-export interface ResendCodeRequest {
-  user_id: number;
-  email: string;
-}
-
 // API RESPONSE TYPES
 export interface LoginResponse {
   access_token: string;
+  token_type: string;
   user: User;
 }
 

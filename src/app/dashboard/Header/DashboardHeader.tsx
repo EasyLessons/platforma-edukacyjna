@@ -6,9 +6,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Bell, Gift, Crown, Settings, Menu, X, LogOut, User as UserIcon } from 'lucide-react';
 
-import { getUser, isAuthenticated, type User } from '@/auth_api/api';
 import { useAuth } from '@/app/context/AuthContext';
-import { useNotifications } from '@/_new/features/notifications/hooks/use-notifications';
+import { useNotifications } from '@/_new/features/notifications/hooks/useNotifications';
 
 import GiftPopup from './popups/GiftPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
@@ -18,6 +17,8 @@ import { NotificationPanel } from '@/_new/features/notifications/components/noti
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from '../Components/DashboardButton';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
+
+import type { User } from '@/_new/shared/types/user';
 
 // Rozszerzony typ User z dodatkowymi polami dla UI
 interface ExtendedUser extends User {
@@ -31,7 +32,7 @@ interface DashboardHeaderProps {
 
 export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderProps) {
   const router = useRouter();
-  const { logout } = useAuth();
+  const { logout, user: authUser, isLoggedIn, loading: authLoading } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
 
   // Hook do powiadomień
@@ -49,46 +50,26 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [inviteCount, setInviteCount] = useState(0);
 
   // State dla danych użytkownika
   const [user, setUser] = useState<ExtendedUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Pobieranie danych użytkownika
   useEffect(() => {
-    const fetchUser = () => {
-      try {
-        // Sprawdź czy użytkownik jest zalogowany
-        if (!isAuthenticated()) {
-          router.push('/login');
-          return;
-        }
+    if (authLoading) return;
 
-        // Pobierz dane użytkownika z localStorage
-        const userData = getUser();
+    if (!isLoggedIn || !authUser) {
+      router.push('/login');
+      return;
+    }
 
-        if (!userData) {
-          router.push('/login');
-          return;
-        }
-
-        // Rozszerz dane użytkownika o dodatkowe pola
-        setUser({
-          ...userData,
-          name: userData.full_name || userData.username,
-          isPremium: false, // Tutaj później sprawdzisz czy ma premium
-        });
-      } catch (error) {
-        console.error('Błąd pobierania danych użytkownika:', error);
-        router.push('/login');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchUser();
-  }, [router]);
+    setUser({
+      ...authUser,
+      name: authUser.full_name || authUser.username,
+      isPremium: false,
+    });
+    setLoading(false);
+  }, [authUser, isLoggedIn, authLoading, router]);
 
   // Loading state
   if (loading) {
@@ -134,10 +115,8 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
     <>
       <header className="bg-[var(--dash-panel)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
- 
           {/* DESKTOP */}
           <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
- 
             {/* LEWA STRONA */}
             <div className="flex items-center gap-3">
               <Link href="/" className="flex items-center cursor-pointer">
@@ -156,7 +135,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                 </div>
               )}
             </div>
- 
+
             {/* PRAWA STRONA */}
             <div className="flex items-center justify-end gap-2 font-bold">
               {user && !user.isPremium && (
@@ -166,9 +145,9 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                   </DashboardButton>
                 </Link>
               )}
- 
+
               <div className="w-px h-6 bg-gray-200 mx-1" />
- 
+
               <Button
                 variant="secondary"
                 size="iconSm"
@@ -178,12 +157,12 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
               >
                 <Gift size={16} />
               </Button>
- 
+
               <NotificationBell
                 unreadCount={unreadCount}
                 onClick={() => setShowNotifications(!showNotifications)}
               />
- 
+
               {user && (
                 <div className="relative">
                   <div
@@ -239,7 +218,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
               )}
             </div>
           </div>
- 
+
           {/* MOBILE */}
           <div className="min-[1640px]:hidden flex items-center justify-between">
             <Link href="/" className="flex items-center cursor-pointer">
@@ -260,7 +239,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
               <Menu size={24} />
             </Button>
           </div>
- 
+
           {/* MOBILE MENU DRAWER */}
           {showMobileMenu && (
             <div className="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-200">
@@ -270,7 +249,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                   <X size={20} />
                 </Button>
               </div>
- 
+
               <div className="p-4 space-y-3">
                 {user && (
                   <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
@@ -287,7 +266,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                     </div>
                   </div>
                 )}
- 
+
                 <div className="space-y-2">
                   {user && !user.isPremium && (
                     <Link href="/#pricing">
@@ -301,7 +280,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                       </DashboardButton>
                     </Link>
                   )}
- 
+
                   <Button
                     variant="secondary"
                     leftIcon={<Bell size={20} />}
@@ -318,7 +297,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                       </span>
                     )}
                   </Button>
- 
+
                   <Button
                     variant="secondary"
                     leftIcon={<UserIcon size={20} />}
@@ -330,9 +309,9 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                   >
                     Profil
                   </Button>
- 
+
                   <div className="border-t border-gray-200 my-2" />
- 
+
                   <Button
                     variant="destructive"
                     leftIcon={<LogOut size={20} />}
@@ -346,7 +325,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                     Wyloguj się
                   </Button>
                 </div>
- 
+
                 {user && !user.isPremium && (
                   <div className="mt-4 px-4">
                     <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
@@ -359,9 +338,9 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
           )}
         </div>
       </header>
- 
+
       {showGiftPopup && <GiftPopup onClose={() => setShowGiftPopup(false)} />}
- 
+
       {showNotifications && (
         <NotificationPanel
           notifications={notifications}

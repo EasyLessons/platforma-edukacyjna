@@ -2,8 +2,8 @@
 
 import { useSearchParams } from 'next/navigation';
 
-import { EmailVerificationForm } from "@new/features/auth/components/email-verification-form";
-import { AuthLayout } from "@/_new/features/auth/components/auth-layout";
+import { EmailVerificationForm } from "@/_new/features/auth/components/emailVerificationForm";
+import { AuthLayout } from "@/_new/features/auth/components/authLayout";
 
 export default function EmailVerificationPage() {
   const searchParams = useSearchParams();

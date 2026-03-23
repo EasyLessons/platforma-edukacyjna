@@ -12,7 +12,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/use-workspaces';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 const WORKSPACE_STRIP_WIDTH = 48;
 
 interface WorkspaceIconStripProps {

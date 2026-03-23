@@ -34,6 +34,7 @@ Technologie:
 """
 
 import time
+import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import NullPool
@@ -42,6 +43,7 @@ from core.config import get_settings
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
+logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
@@ -64,6 +66,14 @@ settings = get_settings()
 engine = create_engine(
     settings.database_url,
     poolclass=NullPool,  # Bez lokalnego poola — Neon pooler zarządza połączeniami
+    connect_args={
+        # Nie pozwól requestom wisieć przy problemach sieci/SSL do Neon.
+        "connect_timeout": 5,
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 5,
+    },
 )
 
 # ============================================
@@ -162,7 +172,7 @@ def get_db():
             db = None
             last_exc = e
             if attempt < MAX_RETRIES - 1:
-                time.sleep(2 ** attempt)  # 1s, 2s
+                time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s
 
     if last_exc is not None:
         raise last_exc
@@ -171,4 +181,9 @@ def get_db():
         yield db
     finally:
         if db is not None:
-            db.close()
+            try:
+                db.close()
+            except OperationalError:
+                # Połączenie mogło zostać ubite zdalnie; ignorujemy przy cleanupie,
+                # bo i tak kończymy request.
+                logger.warning("DB session close failed: stale/closed SSL connection")

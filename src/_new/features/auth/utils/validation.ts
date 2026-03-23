@@ -57,11 +57,11 @@ export const validatePasswordsMatch = (
 };
 
 // Walidacja loginu
-export const validateLogin = (login: string): { valid: boolean; error?: string } => {
-  if (!login) {
+export const validateUsername = (username: string): { valid: boolean; error?: string } => {
+  if (!username) {
     return { valid: false, error: 'Login jest wymagany' };
   }
-  if (login.trim().length < 3) {
+  if (username.trim().length < 3) {
     return { valid: false, error: 'Login musi mieć co najmniej 3 znaki' };
   }
   return { valid: true };

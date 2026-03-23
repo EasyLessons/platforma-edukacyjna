@@ -143,8 +143,8 @@ class WorkspaceResponse(BaseModel):
     is_owner: bool = False
     # ☝️ Czy AKTUALNY użytkownik jest właścicielem?
     
-    role: str = "member"
-    # ☝️ Rola użytkownika: "owner" lub "member"
+    role: str = "editor"
+    # ☝️ Rola użytkownika: "owner" lub "editor"
     
     is_favourite: bool = False
     # ☝️ Czy użytkownik oznaczył jako ulubiony?

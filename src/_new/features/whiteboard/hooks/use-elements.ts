@@ -18,13 +18,13 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import {
+  toSaveFormat,
   loadBoardElements as apiLoadElements,
   saveBoardElementsBatch,
   deleteBoardElement as apiDeleteElement,
-  toSaveFormat,
 } from '../api/elements-api';
 import type { DrawingElement, ImageElement } from '../types';
-import type { BoardElementWithAuthor } from '../api/elements-api';
+import { BoardElementWithAuthor } from '../api/whiteboardApi';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -88,8 +88,12 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   const isSavingRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => { elementsRef.current = elements; }, [elements]);
-  useEffect(() => { unsavedElementsRef.current = unsavedElements; }, [unsavedElements]);
+  useEffect(() => {
+    elementsRef.current = elements;
+  }, [elements]);
+  useEffect(() => {
+    unsavedElementsRef.current = unsavedElements;
+  }, [unsavedElements]);
 
   // ─── Załaduj obraz do cache ────────────────────────────────────────────
   const loadImage = useCallback((id: string, src: string) => {
@@ -109,43 +113,45 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
         setIsLoading(true);
         setLoadingProgress(10);
 
- const rawElements = await apiLoadElements(boardIdNum);
+        const rawElements = await apiLoadElements(boardIdNum);
         setLoadingProgress(50);
 
-        const dbElements = rawElements.map((e: BoardElementWithAuthor) => e.data);
+        const dbElements = rawElements.map(
+          (e: BoardElementWithAuthor) => e.data as unknown as DrawingElement
+        );
 
         // 🔥 INTELIGENTNE ŁĄCZENIE ELEMENTÓW
         setElements((prev) => {
-          const currentRamMap = new Map(prev.map(e => [e.id, e]));
-          
+          const currentRamMap = new Map(prev.map((e) => [e.id, e]));
+
           // Krok 1: Wersja RAM > Wersja DB. Jeśli element jest już w pamięci z WebSocket, ignoruj bazę!
-          const merged = dbElements.map(dbEl => 
+          const merged = dbElements.map((dbEl) =>
             currentRamMap.has(dbEl.id) ? currentRamMap.get(dbEl.id)! : dbEl
           );
 
           // Krok 2: Kreski z RAM, których baza jeszcze w ogóle nie zna
-          const dbMap = new Map(dbElements.map(e => [e.id, e]));
-          prev.forEach(ramEl => {
+          const dbMap = new Map(dbElements.map((e) => [e.id, e]));
+          prev.forEach((ramEl) => {
             if (!dbMap.has(ramEl.id)) merged.push(ramEl);
           });
-          
+
           elementsRef.current = merged; // Natychmiastowa synchronizacja refa
           return merged;
         });
 
         // 🔥 INTELIGENTNE ŁĄCZENIE AUTORÓW (żeby panele boczne nie wariowały)
         setElementsWithAuthor((prev) => {
-          const currentRamMap = new Map(prev.map(e => [e.element_id, e]));
-          
-          const merged = rawElements.map(dbEl => 
+          const currentRamMap = new Map(prev.map((e) => [e.element_id, e]));
+
+          const merged = rawElements.map((dbEl) =>
             currentRamMap.has(dbEl.element_id) ? currentRamMap.get(dbEl.element_id)! : dbEl
           );
 
-          const dbMap = new Map(rawElements.map(e => [e.element_id, e]));
-          prev.forEach(ramEl => {
+          const dbMap = new Map(rawElements.map((e) => [e.element_id, e]));
+          prev.forEach((ramEl) => {
             if (!dbMap.has(ramEl.element_id)) merged.push(ramEl);
           });
-          
+
           return merged;
         });
 
@@ -173,7 +179,10 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
                     setLoadingProgress(90 + (loaded_ / imageEls.length) * 10);
                     resolve();
                   };
-                  img.onerror = () => { loaded_++; resolve(); };
+                  img.onerror = () => {
+                    loaded_++;
+                    resolve();
+                  };
                 } else {
                   resolve();
                 }
@@ -192,7 +201,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     load();
   }, [boardId]);
 
-// ─── Debounced save ────────────────────────────────────────────────────
+  // ─── Debounced save ────────────────────────────────────────────────────
   const debouncedSave = useCallback((boardIdStr: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
@@ -205,9 +214,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
         setIsSaving(true);
         isSavingRef.current = true;
 
-        const toSave = elementsRef.current.filter((el) =>
-          unsavedElementsRef.current.has(el.id)
-        );
+        const toSave = elementsRef.current.filter((el) => unsavedElementsRef.current.has(el.id));
         if (toSave.length === 0) return;
 
         // 🔥 POPRAWKA: Chunkowanie elementów do zapisu (max 100 na request)
@@ -234,14 +241,17 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
 
   // ─── Mutatory ──────────────────────────────────────────────────────────
 
-  const markUnsaved = useCallback((ids: string[]) => {
-    setUnsavedElements((prev) => {
-      const next = new Set(prev);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
-    debouncedSave(boardId);
-  }, [boardId, debouncedSave]);
+  const markUnsaved = useCallback(
+    (ids: string[]) => {
+      setUnsavedElements((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.add(id));
+        return next;
+      });
+      debouncedSave(boardId);
+    },
+    [boardId, debouncedSave]
+  );
 
   const addElements = useCallback((newEls: DrawingElement[]) => {
     setElements((prev) => [...prev, ...newEls]);
@@ -250,7 +260,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
       ...newEls.map((el) => ({
         element_id: el.id,
         type: el.type,
-        data: el,
+        data: el as unknown as Record<string, unknown>,
         created_by_id: 0,
         created_by_username: '',
         created_at: new Date().toISOString(),
@@ -266,12 +276,16 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   const updateElement = useCallback((updated: DrawingElement) => {
     setElements((prev) => prev.map((el) => (el.id === updated.id ? updated : el)));
     setElementsWithAuthor((prev) =>
-      prev.map((el) => (el.element_id === updated.id ? { ...el, data: updated } : el))
+      prev.map((el) =>
+        el.element_id === updated.id
+          ? { ...el, data: updated as unknown as Record<string, unknown> }
+          : el
+      )
     );
   }, []);
 
-const updateElements = useCallback((updates: DrawingElement[]) => {
-    const updateMap = new Map(updates.map(u => [u.id, u]));
+  const updateElements = useCallback((updates: DrawingElement[]) => {
+    const updateMap = new Map(updates.map((u) => [u.id, u]));
     const newElements: DrawingElement[] = [];
 
     // 1. Zaktualizuj istniejące (szybki Ref)
@@ -285,7 +299,7 @@ const updateElements = useCallback((updates: DrawingElement[]) => {
     });
 
     // 2. Pozostałe w mapie to NOWE elementy (wklejone z paczki od innego użytkownika)
-    updateMap.forEach(newEl => newElements.push(newEl));
+    updateMap.forEach((newEl) => newElements.push(newEl));
     if (newElements.length > 0) {
       elementsRef.current = [...elementsRef.current, ...newElements];
     }
@@ -294,18 +308,21 @@ const updateElements = useCallback((updates: DrawingElement[]) => {
     setElements([...elementsRef.current]);
 
     // 4. Aktualizacja panelu historii aktywności (zawsze — też przy zwykłym przesunięciu)
-    setElementsWithAuthor(prev => {
-      const authorUpdateMap = new Map(updates.map(u => [u.id, u]));
-      const updatedAuthors = prev.map(authorEl => {
+    setElementsWithAuthor((prev) => {
+      const authorUpdateMap = new Map(updates.map((u) => [u.id, u]));
+      const updatedAuthors = prev.map((authorEl) => {
         if (authorUpdateMap.has(authorEl.element_id)) {
-          return { ...authorEl, data: authorUpdateMap.get(authorEl.element_id)! };
+          return {
+            ...authorEl,
+            data: authorUpdateMap.get(authorEl.element_id)! as unknown as Record<string, unknown>,
+          };
         }
         return authorEl;
       });
-      const newAuthors = newElements.map(el => ({
+      const newAuthors = newElements.map((el) => ({
         element_id: el.id,
         type: el.type,
-        data: el,
+        data: el as unknown as Record<string, unknown>,
         created_by_id: 0,
         created_by_username: 'Ktoś inny',
         created_at: new Date().toISOString(),
@@ -314,19 +331,13 @@ const updateElements = useCallback((updates: DrawingElement[]) => {
     });
   }, []);
 
-  const saveElementDirectly = useCallback(
-    async (boardIdNum: number, element: DrawingElement) => {
-      await saveBoardElementsBatch(boardIdNum, toSaveFormat([element]));
-    },
-    []
-  );
+  const saveElementDirectly = useCallback(async (boardIdNum: number, element: DrawingElement) => {
+    await saveBoardElementsBatch(boardIdNum, toSaveFormat([element]));
+  }, []);
 
-  const deleteElementDirectly = useCallback(
-    async (boardIdNum: number, elementId: string) => {
-      await apiDeleteElement(boardIdNum, elementId);
-    },
-    []
-  );
+  const deleteElementDirectly = useCallback(async (boardIdNum: number, elementId: string) => {
+    await apiDeleteElement(boardIdNum, elementId);
+  }, []);
 
   return {
     elements,

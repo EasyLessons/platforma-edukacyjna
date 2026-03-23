@@ -19,7 +19,7 @@ import {
   deleteBoardElement as _deleteElement,
   type BoardElement,
   type BoardElementWithAuthor,
-} from '@/boards_api/api';
+} from './whiteboardApi';
 
 import type { DrawingElement } from '../types';
 
@@ -37,7 +37,7 @@ export type { BoardElement, BoardElementWithAuthor };
 export interface ElementToSave {
   element_id: string;
   type: DrawingElement['type'];
-  data: DrawingElement;
+  data: Record<string, unknown>;
 }
 
 // ─── FUNKCJE API ─────────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ export interface ElementToSave {
  */
 export async function saveBoardElementsBatch(
   boardId: number,
-  elements: ElementToSave[]
+  elements: BoardElement[]
 ): Promise<{ success: boolean; saved: number }> {
   return _saveBatch(boardId, elements);
 }
@@ -66,8 +66,7 @@ export async function saveBoardElementsBatch(
 export async function loadBoardElements(
   boardId: number
 ): Promise<BoardElementWithAuthor[]> {
-  const result = await _loadElements(boardId);
-  return result.elements;
+  return _loadElements(boardId);
 }
 
 /**
@@ -92,7 +91,7 @@ export function toSaveFormat(elements: DrawingElement[]): ElementToSave[] {
   return elements.map((el) => ({
     element_id: el.id,
     type: el.type,
-    data: el,
+    data: el as unknown as Record<string, unknown>,
   }));
 }
 
@@ -108,5 +107,5 @@ export function toSaveFormat(elements: DrawingElement[]): ElementToSave[] {
 export function fromSaveFormat(raw: BoardElementWithAuthor[]): DrawingElement[] {
   return raw
     .filter((el) => el.data && el.element_id)
-    .map((el) => el.data as DrawingElement);
+    .map((el) => el.data as unknown as DrawingElement);
 }

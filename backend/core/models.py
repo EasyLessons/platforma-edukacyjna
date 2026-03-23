@@ -68,7 +68,7 @@ class WorkspaceMember(Base):
     id = Column(Integer, primary_key=True, index=True)
     workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    role = Column(String(20), default="member", nullable=False)
+    role = Column(String(20), default="editor", nullable=False)
     is_favourite = Column(Boolean, default=False, index=True)
     joined_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     

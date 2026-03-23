@@ -6,8 +6,9 @@
  *
  */
 
+import type { FormErrors } from "../auth/types";
+
 // CORE TYPES
-// ================================
 
 export interface BoardSettings {
   ai_enabled: boolean;
@@ -20,7 +21,7 @@ export interface BoardMember {
   user_id: number;
   username: string;
   email: string;
-  role: 'owner' | 'admin' | 'member' | 'viewer';
+  role: 'owner' | 'editor' | 'viewer';
   is_owner: boolean;
   joined_at: string | null;
 }
@@ -31,18 +32,10 @@ export interface Board {
   icon: string;
   bg_color: string;
   workspace_id: number;
-
-  // Właściciel
   owner_id: number;
   owner_username: string;
-
-  // Statusy
   is_favourite: boolean;
-
-  // Ustawienia tablicy
   settings: BoardSettings | null;
-
-  // Timestamps
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
@@ -51,7 +44,6 @@ export interface Board {
 }
 
 // FORM DATA TYPES
-// ================================
 
 export interface BoardFormData {
   name: string;
@@ -59,11 +51,7 @@ export interface BoardFormData {
   bg_color: string;
 }
 
-export interface BoardErrors {
-  name?: string;
-  icon?: string;
-  bg_color?: string;
-}
+export type BoardErrors = FormErrors<BoardFormData>;
 
 // API REQUEST TYPES
 // ================================
@@ -85,8 +73,11 @@ export interface BoardToggleFavouriteRequest {
   is_favourite: boolean;
 }
 
+export interface UpdateBoardSettingsRequest {
+  settings: BoardSettings;
+}
+
 // API RESPONSE TYPES
-// ================================
 
 export interface BoardListResponse {
   boards: Board[];
@@ -100,7 +91,28 @@ export interface BoardToggleFavouriteResponse {
   message: string;
 }
 
-// BOARD CARD TYPES
+export interface BoardMembersResponse {
+  members: BoardMember[];
+}
+
+export interface UpdateSettingsResponse {
+  success: boolean;
+  settings: BoardSettings;
+}
+
+export interface JoinBoardResponse {
+  success: boolean;
+  already_member: boolean;
+  workspace_id: number;
+  board_id: number;
+  owner_id: number;
+  is_owner: boolean;
+  user_role: string;
+  message?: string;
+}
+
+// UI TYPES
+
 export interface BoardCardActions {
   edit: (board: Board) => void;
   delete: (board: Board) => void;

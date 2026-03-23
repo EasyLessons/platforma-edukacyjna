@@ -473,11 +473,11 @@ async def join_board_workspace(
             "user_role": "owner" if is_owner else existing_member.role,
         }
     
-    # Dodaj jako member workspace
+    # Dodaj jako editor workspace
     new_member = WorkspaceMember(
         workspace_id=board.workspace_id,
         user_id=user_id,
-        role="member"
+        role="editor"
     )
     db.add(new_member)
     db.commit()
@@ -489,7 +489,7 @@ async def join_board_workspace(
         "board_id": board_id,
         "owner_id": board.created_by,
         "is_owner": is_owner,
-        "user_role": "owner" if is_owner else "member",
+        "user_role": "owner" if is_owner else "editor",
         "message": "Dołączono do workspace"
     }
 
@@ -576,10 +576,10 @@ async def update_member_role(
 ):
     """
     Zmienia rolę workspace dla użytkownika (tylko właściciel tablicy).
-    Role: admin | member | viewer
+    Role: editor | viewer
     """
-    if role not in ("admin", "member", "viewer"):
-        raise HTTPException(status_code=400, detail="Nieprawidłowa rola. Dozwolone: admin, member, viewer")
+    if role not in ("editor", "viewer"):
+        raise HTTPException(status_code=400, detail="Nieprawidłowa rola. Dozwolone: admin, editor, viewer")
 
     board = db.query(Board).filter(Board.id == board_id).first()
     if not board:
