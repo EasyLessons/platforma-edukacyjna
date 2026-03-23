@@ -43,10 +43,12 @@ ALLOWED_ORIGINS = [
     "https://easylesson.app",
     "https://www.easylesson.app",
 ]
+ALLOWED_ORIGIN_REGEX = r"^https://((www\.)?easylesson\.app|[a-z0-9-]+\.vercel\.app)$"
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
