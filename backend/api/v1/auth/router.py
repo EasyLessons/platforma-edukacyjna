@@ -8,9 +8,12 @@ from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 import json
 import base64
+from urllib.parse import quote_plus
 
 from core.database import get_db
 from core.responses import ApiResponse
+from core.exceptions import AppException, AuthenticationError
+from core.logging import get_logger
 from auth.dependencies import get_current_user
 from .schemas import (
     RegisterUser, RegisterResponse,
@@ -24,6 +27,7 @@ from .service import AuthService
 from core.models import User
 
 router = APIRouter(tags=["Authentication"])
+logger = get_logger(__name__)
 
 # === REGISTRATION & EMAIL VERIFICATION ===
 
@@ -189,7 +193,12 @@ async def google_login(db: Session = Depends(get_db)):
     description="Obsługuje callback z Google OAuth",
     responses={307: {"description": "Redirect to frontend with token and user data"}}
 )
-async def google_callback(code: str, db: Session = Depends(get_db)):
+async def google_callback(
+    code: str | None = None,
+    error: str | None = None,
+    error_description: str | None = None,
+    db: Session = Depends(get_db)
+):
     """
     Callback od Google po autoryzacji.
     - Jeśli użytkownik istnieje: loguje do systemu
@@ -197,12 +206,30 @@ async def google_callback(code: str, db: Session = Depends(get_db)):
     - Zwraca: RedirectResponse na frontend z token i user data w base64
     """
     service = AuthService(db)
-    result = await service.google_login(code)
-    
-    # Zakoduj dane użytkownika do base64 (dla przesłania w URL)
-    user_json = json.dumps(result['user'], default=str)
-    user_encoded = base64.b64encode(user_json.encode()).decode()
-    
-    # Przekieruj na frontend z tokenem i danymi
-    frontend_url = service.settings.frontend_url
-    return RedirectResponse(f"{frontend_url}/auth/callback?token={result['access_token']}&user={user_encoded}")
+
+    if error:
+        logger.warning("⚠️ Google OAuth zwrócił error=%s description=%s", error, error_description)
+        frontend_url = service.settings.frontend_url
+        safe_error = quote_plus(error_description or error)
+        return RedirectResponse(f"{frontend_url}/auth/callback?error={safe_error}")
+
+    if not code:
+        raise AuthenticationError("Brak kodu autoryzacji Google")
+
+    try:
+        result = await service.google_login(code)
+
+        # Zakoduj dane użytkownika do base64 (dla przesłania w URL)
+        user_json = json.dumps(result.user.model_dump(mode="json"), default=str)
+        user_encoded = base64.b64encode(user_json.encode()).decode()
+
+        # Przekieruj na frontend z tokenem i danymi
+        frontend_url = service.settings.frontend_url
+        return RedirectResponse(f"{frontend_url}/auth/callback?token={result.access_token}&user={user_encoded}")
+    except AppException:
+        raise
+    except Exception as exc:
+        logger.exception("❌ Nieobsłużony wyjątek w callback Google OAuth: %s", exc)
+        frontend_url = service.settings.frontend_url
+        safe_error = quote_plus("Błąd logowania przez Google")
+        return RedirectResponse(f"{frontend_url}/auth/callback?error={safe_error}")

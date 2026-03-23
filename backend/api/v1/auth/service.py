@@ -11,6 +11,7 @@ from core.exceptions import (
 )
 from typing import List
 import httpx
+from sqlalchemy.exc import OperationalError
 
 from core.models import User, Workspace, WorkspaceMember
 from .schemas import (
@@ -448,75 +449,91 @@ class AuthService:
         name = user_info.get("name", "")
         picture = user_info.get("picture")
 
+        if not google_id or not email:
+            logger.error(
+                "❌ Brak wymaganych danych z Google userinfo (id/email): %s",
+                user_info,
+            )
+            raise AuthenticationError("Google nie zwrócił wymaganych danych konta")
+
         logger.info(f"📧 Dane Google: {email}")
 
-        user = self.db.query(User).filter(
-            (User.google_id == google_id) | (User.email == email)
-        ).first()
+        try:
+            user = self.db.query(User).filter(
+                (User.google_id == google_id) | (User.email == email)
+            ).first()
 
-        if user:
-            if not user.google_id:
-                user.google_id = google_id
-                user.auth_provider = "google"
-                user.profile_picture = picture
-                user.is_active = True
-                self.db.commit()
-                logger.info(f"🔄 Zaktualizowano użytkownika: {user.username}")
-            logger.info(f"✅ Logowanie istniejącego użytkownika: {user.username}")
-        else:
-            username = email.split("@")[0]
-            counter = 1
-            original_username = username
-            while self.db.query(User).filter(User.username == username).first():
-                username = f"{original_username}{counter}"
-                counter += 1
+            if user:
+                if not user.google_id:
+                    user.google_id = google_id
+                    user.auth_provider = "google"
+                    user.profile_picture = picture
+                    user.is_active = True
+                    self.db.commit()
+                    logger.info(f"🔄 Zaktualizowano użytkownika: {user.username}")
+                logger.info(f"✅ Logowanie istniejącego użytkownika: {user.username}")
+            else:
+                username = email.split("@")[0]
+                counter = 1
+                original_username = username
+                while self.db.query(User).filter(User.username == username).first():
+                    username = f"{original_username}{counter}"
+                    counter += 1
 
-            user = User(
-                username=username,
-                email=email,
-                full_name=name,
-                google_id=google_id,
-                auth_provider="google",
-                profile_picture=picture,
-                is_active=True,
-                hashed_password=None
+                user = User(
+                    username=username,
+                    email=email,
+                    full_name=name,
+                    google_id=google_id,
+                    auth_provider="google",
+                    profile_picture=picture,
+                    is_active=True,
+                    hashed_password=None
+                )
+
+                try:
+                    self.db.add(user)
+                    self.db.flush()
+                    logger.info(f"✅ Nowy użytkownik Google: {user.username} (ID: {user.id})")
+
+                    starter_workspace = Workspace(
+                        name="Moja Przestrzeń",
+                        icon="Home",
+                        bg_color="bg-green-500",
+                        created_by=user.id,
+                        created_at=datetime.utcnow()
+                    )
+                    self.db.add(starter_workspace)
+                    self.db.flush()
+
+                    membership = WorkspaceMember(
+                        workspace_id=starter_workspace.id,
+                        user_id=user.id,
+                        role="owner",
+                        is_favourite=True,
+                        joined_at=datetime.utcnow()
+                    )
+                    self.db.add(membership)
+
+                    user.active_workspace_id = starter_workspace.id
+
+                    self.db.commit()
+                    logger.info(f"🏢 Workspace utworzony dla {user.username}")
+
+                except Exception as e:
+                    self.db.rollback()
+                    logger.error(f"❌ Błąd tworzenia użytkownika Google: {str(e)}")
+                    raise AppException("Błąd tworzenia konta", status_code=500)
+
+            self.db.refresh(user)
+        except OperationalError:
+            self.db.rollback()
+            logger.exception("❌ Błąd połączenia z bazą podczas Google OAuth")
+            raise AppException(
+                "Baza danych chwilowo niedostępna. Spróbuj ponownie za moment.",
+                code="DB_ERROR",
+                status_code=503,
             )
-
-            try:
-                self.db.add(user)
-                self.db.flush()
-                logger.info(f"✅ Nowy użytkownik Google: {user.username} (ID: {user.id})")
-
-                starter_workspace = Workspace(
-                    name="Moja Przestrzeń",
-                    icon="Home",
-                    bg_color="bg-green-500",
-                    created_by=user.id,
-                    created_at=datetime.utcnow()
-                )
-                self.db.add(starter_workspace)
-                self.db.flush()
-
-                membership = WorkspaceMember(
-                    workspace_id=starter_workspace.id,
-                    user_id=user.id,
-                    role="owner",
-                    is_favourite=True,
-                    joined_at=datetime.utcnow()
-                )
-                self.db.add(membership)
-
-                user.active_workspace_id = starter_workspace.id
-
-                self.db.commit()
-                logger.info(f"🏢 Workspace utworzony dla {user.username}")
-
-            except Exception as e:
-                self.db.rollback()
-                logger.error(f"❌ Błąd tworzenia użytkownika Google: {str(e)}")
-                raise AppException("Błąd tworzenia konta", status_code=500)
-
-        self.db.refresh(user)
 
         jwt_token = create_access_token(
             data={"sub": str(user.id)},
