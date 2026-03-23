@@ -2,15 +2,12 @@
 
 import './dashboard-theme.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
-import { boardKeys } from '@/_new/features/board/hooks/useBoard';
-import { fetchBoards } from '@/_new/features/board/api/boardApi';
 
 export default function Dashboard() {
   const {
@@ -24,35 +21,6 @@ export default function Dashboard() {
     toggleFavourite,
     refreshWorkspaces,
   } = useWorkspaces();
-
-  const queryClient = useQueryClient();
-
-  // Priority prefetch: active workspace boards fire immediately.
-  // Background prefetch: remaining workspaces load after 800ms so they
-  // don't compete with the primary request for bandwidth.
-  useEffect(() => {
-    if (workspaces.length === 0) return;
-
-    void queryClient.prefetchQuery({
-      queryKey: boardKeys.workspace(workspaces[0].id),
-      queryFn: () => fetchBoards(workspaces[0].id),
-      staleTime: 10 * 60 * 1000,
-    });
-
-    if (workspaces.length <= 1) return;
-
-    const timer = setTimeout(() => {
-      workspaces.slice(1).forEach((ws) => {
-        void queryClient.prefetchQuery({
-          queryKey: boardKeys.workspace(ws.id),
-          queryFn: () => fetchBoards(ws.id),
-          staleTime: 10 * 60 * 1000,
-        });
-      });
-    }, 800);
-
-    return () => clearTimeout(timer);
-  }, [workspaces, queryClient]);
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
   const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);

@@ -9,9 +9,12 @@
 
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Star } from 'lucide-react';
 import { WorkspaceCard } from './workspaceCard';
+import { boardKeys } from '@/_new/features/board/hooks/useBoard';
+import { fetchBoards } from '@/_new/features/board/api/boardApi';
 import {
   sortWorkspacesByFavourite,
   sortWorkspacesByCustomOrder,
@@ -65,6 +68,18 @@ export function WorkspaceList({
   }, [workspaces, searchQuery, customOrder]);
 
   const favouriteCount = processedWorkspaces.filter((w) => w.is_favourite).length;
+
+  const queryClient = useQueryClient();
+  const handlePrefetch = useCallback(
+    (workspaceId: number) => {
+      void queryClient.prefetchQuery({
+        queryKey: boardKeys.workspace(workspaceId),
+        queryFn: () => fetchBoards(workspaceId),
+        staleTime: 10 * 60 * 1000,
+      });
+    },
+    [queryClient]
+  );
 
   // RENDERS
   // ================================
@@ -140,7 +155,7 @@ export function WorkspaceList({
         const showSeparator = !isCollapsed && prev?.is_favourite && !workspace.is_favourite;
 
         return (
-          <div key={workspace.id}>
+          <div key={workspace.id} onMouseEnter={() => handlePrefetch(workspace.id)} onTouchStart={() => handlePrefetch(workspace.id)}>
             {showSeparator && <div className="h-px bg-gray-300 my-3 mx-4" />}
             <WorkspaceCard
               workspace={workspace}
