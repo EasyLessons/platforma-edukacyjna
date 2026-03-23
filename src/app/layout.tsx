@@ -7,6 +7,7 @@ import Header from './layout/Header';
 import Footer from './layout/Footer';
 import AuthHeader from './layout/AuthHeader';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { QueryProvider } from '@/_new/lib/query-provider';
 import { usePathname } from 'next/navigation';
 
 const geistSans = Geist({
@@ -89,9 +90,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
       >
-        <AuthProvider>
-          <LayoutContent>{children}</LayoutContent>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <LayoutContent>{children}</LayoutContent>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

@@ -1,12 +1,11 @@
 """
 BOARDS SERVICE - Logika zarządzania tablicami w dashboardzie
 """
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, aliased
 from datetime import datetime
 from fastapi import HTTPException
 from core.logging import get_logger
 from core.config import get_settings
-import asyncio
 
 from core.models import User, Board, BoardUsers, Workspace
 from dashboard.boards.schemas import (
@@ -292,59 +291,64 @@ class BoardService:
         )
     
     async def list_boards(self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0) -> BoardListResponse:
-        """Pobierz listę tablic w przestrzeni roboczej"""
-        query = self.db.query(Board).options(
-            joinedload(Board.users)
-        ).filter(Board.workspace_id == workspace_id)
-        
-        total = query.count()
-        boards = query.offset(offset).limit(limit).all()
-        
+        """Pobierz listę tablic w przestrzeni roboczej.
+
+        Jedno zapytanie SQL z JOIN-ami zamiast N+1:
+          Board → Owner (JOIN)
+          Board → Modifier (LEFT OUTER JOIN, bo last_modified_by może być NULL)
+          Board → BoardUsers dla bieżącego usera (LEFT OUTER JOIN)
+        """
+        Owner = aliased(User)
+        Modifier = aliased(User)
+
+        total = (
+            self.db.query(Board)
+            .filter(Board.workspace_id == workspace_id)
+            .count()
+        )
+
+        rows = (
+            self.db.query(Board, Owner, Modifier, BoardUsers)
+            .join(Owner, Board.created_by == Owner.id)
+            .outerjoin(Modifier, Board.last_modified_by == Modifier.id)
+            .outerjoin(
+                BoardUsers,
+                (BoardUsers.board_id == Board.id) & (BoardUsers.user_id == user_id),
+            )
+            .filter(Board.workspace_id == workspace_id)
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
+
         board_responses = []
-        for board in boards:
+        for board, owner, modifier, board_user in rows:
             try:
-                # Pobierz informacje asynchronicznie
-                results = await asyncio.gather(
-                    self.get_board_owner_info(board.id),
-                    self.get_last_modifier_info(board.id),
-                    self.get_last_opened_info(board.id, user_id),
-                    return_exceptions=True
+                board_responses.append(
+                    BoardResponse(
+                        id=board.id,
+                        name=board.name,
+                        icon=board.icon,
+                        bg_color=board.bg_color,
+                        workspace_id=board.workspace_id,
+                        owner_id=owner.id,
+                        owner_username=owner.username,
+                        is_favourite=board_user.is_favourite if board_user else False,
+                        settings=BoardSettings(**(board.settings or {})),
+                        last_modified=board.last_modified,
+                        last_modified_by=(modifier or owner).username,
+                        last_opened=board_user.last_opened if board_user else None,
+                        created_at=board.created_at,
+                        created_by=owner.username,
+                    )
                 )
-                
-                owner_info = results[0] if not isinstance(results[0], Exception) else None
-                last_modifier_info = results[1] if not isinstance(results[1], Exception) else None
-                last_opened_info = results[2] if not isinstance(results[2], Exception) else None
-                
-                # Sprawdź czy wszystkie wymagane dane są dostępne
-                if not owner_info or not last_modifier_info:
-                    logger.error(f"❌ Brak wymaganych danych dla tablicy {board.id}")
-                    continue
-                
-                board_response = BoardResponse(
-                    id=board.id,
-                    name=board.name,
-                    icon=board.icon,
-                    bg_color=board.bg_color,
-                    workspace_id=board.workspace_id,
-                    owner_id=owner_info.user_id,
-                    owner_username=owner_info.username,
-                    is_favourite=any(bu.is_favourite for bu in board.users if bu.user_id == user_id),
-                    settings=BoardSettings(**(board.settings or {})),
-                    last_modified=board.last_modified,
-                    last_modified_by=last_modifier_info.username,
-                    last_opened=last_opened_info.last_opened if last_opened_info else None,
-                    created_at=board.created_at,
-                    created_by=owner_info.username
-                )
-                board_responses.append(board_response)
-                
             except Exception as e:
                 logger.error(f"❌ Błąd przy przetwarzaniu tablicy {board.id}: {e}")
                 continue
-        
+
         return BoardListResponse(
             boards=board_responses,
             total=total,
             limit=limit,
-            offset=offset
+            offset=offset,
         )

@@ -112,6 +112,7 @@ export default function Dashboard() {
 
               {activeWorkspaceId && (
                 <BoardsSection
+                  key={activeWorkspaceId}
                   workspace_id={activeWorkspaceId}
                   workspace_name={activeWorkspaceName}
                   stickyOffset={workspaceTopNavHeight}

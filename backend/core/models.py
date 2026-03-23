@@ -87,7 +87,7 @@ class Board(Base):
     icon = Column(String(50), default="PenTool")
     bg_color = Column(String(50), default="bg-gray-500")
     last_modified = Column(DateTime, default=datetime.utcnow, nullable=False)
-    last_modified_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
+    last_modified_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), index=True)
     settings = Column(JSONB, nullable=True, default=None)
 
     # Relationships
@@ -114,8 +114,8 @@ class WorkspaceInvite(Base):
     __tablename__ = "workspace_invites"
     
     id = Column(Integer, primary_key=True, index=True)
-    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
-    invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    invited_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     invited_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     invite_token = Column(String(100), unique=True, nullable=False, index=True)
     expires_at = Column(DateTime, nullable=False)
