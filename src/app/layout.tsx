@@ -40,8 +40,8 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     pathname === '/rejestracja' ||
     pathname === '/weryfikacja';
 
-  // Footer tylko na homepage dla niezalogowanych
-  const showFooter = pathname === '/' && !isLoggedIn;
+  // Footer na homepage niezależnie od stanu logowania
+  const showFooter = pathname === '/';
 
   if (loading) {
     return (
@@ -63,7 +63,7 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
 
       <main className={isLoggedIn ? '' : 'min-h-screen'}>{children}</main>
 
-      {/* Footer tylko na homepage dla niezalogowanych */}
+      {/* Footer tylko na homepage */}
       {showFooter && <Footer />}
     </>
   );
