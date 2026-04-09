@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useRef } from 'react';
 import Link from 'next/link';
-import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+import Image from 'next/image';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -10,236 +10,125 @@ const jakartaSans = Plus_Jakarta_Sans({
   display: 'swap',
 });
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  weight: ['700'],
-  style: ['italic'],
-  display: 'swap',
-});
-
-const testAvatars = [
-  'https://i.pravatar.cc/150?img=32',
-  'https://i.pravatar.cc/150?img=47',
-  'https://i.pravatar.cc/150?img=12',
-  'https://i.pravatar.cc/150?img=25',
-];
-
 export default function HeroSection() {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
   return (
-    <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pt-4 pb-8`}>
-
-      <section
-        className="relative w-full overflow-hidden"
-        style={{
-          borderRadius: '24px',
-          height: '88vh',
-          minHeight: '560px',
-        }}
-      >
-
+    <section
+      className={`${jakartaSans.className} relative w-screen overflow-hidden`}
+      style={{
+        height: '100vh',
+        minHeight: '100vh',
+        marginLeft: 'calc(50% - 50vw)',
+        marginRight: 'calc(50% - 50vw)',
+      }}
+    >
         <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          src="/HeroFilm/EasylessonHeroFilm.mp4"
+          className="absolute inset-0 w-[100vw] h-full object-cover scale-[1.05]"
+          src="https://pub-9f3b498e57d045a682d3009381570da0.r2.dev/EasylessonherosectionWEBM.webm"
           autoPlay
           muted
           loop
           playsInline
+          disablePictureInPicture
+          disableRemotePlayback
         />
 
-        {/* Overlay - bardziej błękitny */}
+        {/* Płynne przyciemnienie od dołu */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-x-0 bottom-0 h-[70%] pointer-events-none"
           style={{
-            background: `linear-gradient(
-  160deg,
-  rgba(0, 61, 167, 0.87) 0%,
-  rgba(0, 115, 255, 0.87) 50%,
-  rgba(0, 98, 184, 0.82) 100%
-)`,
+            background:
+              'linear-gradient(to top, rgba(0,0,0,0.90) 0%, rgba(0,0,0,0.76) 26%, rgba(0,0,0,0.50) 54%, rgba(0,0,0,0.16) 82%, rgba(0,0,0,0) 100%)',
           }}
         />
 
-        {/* Gradient od dołu - lżejszy */}
+        {/* Blur od dołu dla lepszej czytelności */}
         <div
-          className="absolute inset-0"
+          className="absolute inset-x-0 bottom-0 h-[46%] backdrop-blur-[7px] pointer-events-none"
           style={{
-            background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 28%, transparent 50%)',
+            WebkitMaskImage:
+              'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.78) 44%, rgba(0,0,0,0.12) 76%, rgba(0,0,0,0) 100%)',
+            maskImage:
+              'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.78) 44%, rgba(0,0,0,0.12) 76%, rgba(0,0,0,0) 100%)',
           }}
         />
 
-        {/* Środkowa treść */}
-        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-6 z-10">
+        {/* Karta info w prawym górnym rogu */}
+        <div className="absolute top-20 right-8 sm:top-24 sm:right-12 lg:top-28 lg:right-16 z-20 w-[90%] max-w-[320px] sm:max-w-[360px] rounded-3xl border border-white/20 bg-black/82 backdrop-blur-md py-4 px-6 sm:py-4 sm:px-8">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1 py-1">
+              <div className="flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-red-500 shrink-0" />
+                <p className="text-[9px] font-bold uppercase tracking-wider text-white/90">Nadchodzące wydarzenie</p>
+              </div>
+              <p className="mt-2 text-[11px] sm:text-xs leading-relaxed text-white/85">
+                Easylesson rusza z nauczaniem na TikToku. Wpadaj i ucz się razem z nami do matury! Czekamy na ciebie ;)
+              </p>
+            </div>
 
-          <div className="flex items-center gap-2 mb-5">
-            <div
-              className="w-0 h-0 border-l-[5px] border-l-transparent border-r-[5px] border-r-transparent border-b-[9px] rotate-90"
-              style={{ borderBottomColor: '#2bcc82' }}
-            />
-            <span
-              className="text-white font-semibold tracking-widest uppercase"
-              style={{
-                fontSize: 'clamp(0.6rem, 0.85vw, 0.75rem)',
-                letterSpacing: '0.14em',
-              }}
-            >
-              STWORZONY DLA UCZNIÓW, KOREPETYTORÓW I NAUCZYCIELI
-            </span>
-          </div>
-
-          <h1
-            className="font-bold leading-tight text-white mb-5"
-            style={{
-              fontSize: 'clamp(4rem, 5.5vw, 5.2rem)',
-              maxWidth: '1100px',
-              lineHeight: '1',
-            }}
-          >
-            Jedna tablica.{' '}
-            <span style={{ color: '#4bffab' }}>
-              Milion<br/ > możliwości
-            </span>
-            {' '}nauki.
-          </h1>
-
-          <p
-            className="font-light leading-relaxed mb-10"
-            style={{
-              fontSize: 'clamp(1rem, 1.5vw, 1.3rem)',
-              color: 'rgba(255,255,255,0.82)',
-              maxWidth: '640px',
-            }}
-          >
-            Interaktywne tablice, notatki, AI-tutor i wspólna nauka w jednym miejscu.{' '}
-<span style={{ fontWeight: 700, color: '#fff' }}>Zacznij już dziś — bezpłatnie.</span>
-          </p>
-
-          <div className="flex flex-wrap items-center justify-center gap-3">
-            <Link href="/rejestracja">
-              <button className="hero-btn-primary">Zaloguj się</button>
-            </Link>
-            <Link href="/poradnik">
-              <button className="hero-btn-secondary">Obejrzyj poradnik</button>
-            </Link>
-          </div>
-        </div>
-
-        {/* Dolny pasek */}
-        <div className="absolute bottom-0 left-0 right-0 z-10 flex items-end justify-between px-8 sm:px-10 pb-7">
-
-          <div className="flex flex-col gap-2">
-            <p
-              className="text-white font-semibold"
-              style={{ fontSize: 'clamp(0.7rem, 1vw, 0.85rem)', opacity: 0.9 }}
-            >
-              Easylesson wybierają najlepsi korepetytorzy 
-            </p>
-            <div className="flex items-center gap-1">
-              {testAvatars.map((src, index) => (
-                <img
-                  key={index}
-                  src={src}
-                  alt=""
-                  className="rounded-full border-2 border-white object-cover"
-                  style={{
-                    width: '34px',
-                    height: '34px',
-                    marginLeft: index === 0 ? '0' : '-8px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-                  }}
-                />
-              ))}
-              <span
-                className="text-white font-semibold ml-2"
-                style={{ fontSize: '0.78rem', opacity: 0.85 }}
-              >
-                +40 użytkowników
-              </span>
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 shrink-0 overflow-hidden rounded-xl border border-white/20 bg-black/80">
+              <Image
+                src="/resources/tiktok-event.jpg"
+                alt="Wydarzenie TikTok"
+                fill
+                className="object-cover"
+              />
             </div>
           </div>
-
-          <div className="flex items-center gap-4">
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Instagram ↗</a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Facebook ↗</a>
-            <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">TikTok ↗</a>
-          </div>
-
         </div>
 
-        <style jsx>{`
+        {/* Główna treść Hero */}
+        <div className="absolute inset-0 z-10 px-6 sm:px-12 lg:px-20 xl:px-28 pb-16 sm:pb-24 lg:pb-32 pt-24 sm:pt-28 flex items-end">
+          <div className="w-full max-w-[1536px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-16 items-start">
+            <div className="lg:col-span-7 xl:col-span-7">
+              <h1
+                className="font-bold leading-[0.96] text-white"
+                style={{ fontSize: 'clamp(2.25rem, 5.9vw, 4.9rem)', maxWidth: '760px' }}
+              >
+                <span className="block whitespace-nowrap">Jedna tablica. Milion</span>
+                <span className="block">możliwości nauki.</span>
+              </h1>
+            </div>
 
-          .hero-btn-primary {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 13px 34px;
-            border-radius: 100px;
-            border: none;
-            cursor: pointer;
-            font-size: clamp(14px, 1.1vw, 16px);
-            font-weight: 700;
-            color: #032515;
-            background: #4bffab;
-            box-shadow: 0 2px 14px rgba(43, 204, 130, 0.40);
-            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
-            user-select: none;
-          }
+            <div className="lg:col-span-5">
+              <p className="text-white/95 text-lg sm:text-xl leading-relaxed max-w-xl">
+                Easylesson to platforma, która łączy nowoczesne narzędzia, praktykę i wsparcie korepetytorów.
+                Ucz się skutecznie, wygodnie i regularnie aż do matury.
+              </p>
 
-          .hero-btn-primary:hover {
-            transform: scale(1.03);
-            background: rgb(6, 250, 144);
-            box-shadow: 0 4px 22px rgba(43, 204, 130, 0.60);
-          }
+              <div className="mt-8">
+                <Link href="/login">
+                  <button
+                    type="button"
+                    className="group relative cursor-pointer inline-flex items-center gap-3.5 rounded-xl bg-green-500 text-white font-bold px-7 py-4 ring-1 ring-green-400/50 hover:bg-green-400 transition-colors duration-200 hover:scale-[1.02] shadow-lg shadow-green-500/20"
+                  >
+                    <span className="inline-flex h-[34px] w-[34px] items-center justify-center rounded-full bg-white shadow-sm">
+                      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true">
+                        <path
+                          fill="#EA4335"
+                          d="M12 10.2v3.9h5.4c-.2 1.3-1.5 3.9-5.4 3.9-3.2 0-5.9-2.7-5.9-6s2.7-6 5.9-6c1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.5 14.5 2.6 12 2.6 6.9 2.6 2.8 6.7 2.8 11.8S6.9 21 12 21c6.9 0 9.1-4.8 9.1-7.3 0-.5 0-.8-.1-1.1H12z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M3.9 7.3l3.2 2.3c.9-1.8 2.7-3 4.9-3 1.8 0 3 .8 3.7 1.5l2.5-2.4C16.6 3.5 14.5 2.6 12 2.6c-3.6 0-6.7 2-8.3 4.7z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M12 21c2.4 0 4.5-.8 6.1-2.2l-2.8-2.3c-.8.6-1.9 1-3.3 1-3.9 0-5.2-2.6-5.4-3.9l-3.2 2.5C4.9 18.9 8.2 21 12 21z"
+                        />
+                        <path
+                          fill="#4285F4"
+                          d="M21.1 13.7c0-.5 0-.8-.1-1.1H12v3.9h5.4c-.3 1.1-1 2.1-2 2.8l2.8 2.3c1.7-1.6 2.9-3.9 2.9-6.9z"
+                        />
+                      </svg>
+                    </span>
+                    Zaloguj się z Google
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
 
-          .hero-btn-primary:active {
-            transform: scale(0.98);
-          }
-
-          .hero-btn-secondary {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 13px 34px;
-            border-radius: 100px;
-            border: none;
-            cursor: pointer;
-            font-size: clamp(14px, 1.1vw, 16px);
-            font-weight: 700;
-            color: #432f00;
-            background: #ffce22;
-            box-shadow: 0 2px 14px rgba(255, 206, 34, 0.35);
-            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
-            user-select: none;
-          }
-
-          .hero-btn-secondary:hover {
-            transform: scale(1.03);
-            background: #ffd84a;
-            box-shadow: 0 4px 20px rgba(255, 206, 34, 0.55);
-          }
-
-          .hero-btn-secondary:active {
-            transform: scale(0.98);
-          }
-
-          .hero-social-link {
-            color: rgba(255, 255, 255, 0.75);
-            font-size: 0.78rem;
-            font-weight: 600;
-            text-decoration: none;
-            letter-spacing: 0.03em;
-            transition: color 0.15s ease;
-          }
-
-          .hero-social-link:hover {
-            color: rgba(255, 255, 255, 1);
-          }
-
-        `}</style>
-
-      </section>
-    </div>
+    </section>
   );
 }

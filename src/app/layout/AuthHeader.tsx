@@ -1,15 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/_new/shared/ui/button';
 
 export default function AuthHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const { logout, user } = useAuth();
+  const [scrolledPastHero, setScrolledPastHero] = useState(false);
+
+  const isHeroSectionActive = pathname === '/' && !scrolledPastHero;
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolledPastHero(window.scrollY >= window.innerHeight);
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll);
+    };
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -23,92 +40,20 @@ export default function AuthHeader() {
   const [showPricingMenu, setShowPricingMenu] = useState(false);
   const [showNewsMenu, setShowNewsMenu] = useState(false);
 
-  // States for closing animations
-  const [productMenuClosing, setProductMenuClosing] = useState(false);
-  const [coursesMenuClosing, setCoursesMenuClosing] = useState(false);
-  const [pricingMenuClosing, setPricingMenuClosing] = useState(false);
-  const [newsMenuClosing, setNewsMenuClosing] = useState(false);
+  const headerBgClass = isHeroSectionActive 
+    ? 'bg-black/60 backdrop-blur-md border-none text-white shadow-none' 
+    : 'bg-white border-gray-200 shadow-md text-gray-900 border-b';
 
-  // Timeout refs
-  const [productMenuTimeout, setProductMenuTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [coursesMenuTimeout, setCoursesMenuTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [pricingMenuTimeout, setPricingMenuTimeout] = useState<NodeJS.Timeout | null>(null);
-  const [newsMenuTimeout, setNewsMenuTimeout] = useState<NodeJS.Timeout | null>(null);
-
-  // Handlers for Product menu
-  const handleProductMouseEnter = () => {
-    if (productMenuTimeout) clearTimeout(productMenuTimeout);
-    setProductMenuClosing(false);
-    setShowProductMenu(true);
-  };
-
-  const handleProductMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setProductMenuClosing(true);
-      setTimeout(() => {
-        setShowProductMenu(false);
-        setProductMenuClosing(false);
-      }, 200);
-    }, 150);
-    setProductMenuTimeout(timeout);
-  };
-
-  // Handlers for Courses menu
-  const handleCoursesMouseEnter = () => {
-    if (coursesMenuTimeout) clearTimeout(coursesMenuTimeout);
-    setCoursesMenuClosing(false);
-    setShowCoursesMenu(true);
-  };
-
-  const handleCoursesMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setCoursesMenuClosing(true);
-      setTimeout(() => {
-        setShowCoursesMenu(false);
-        setCoursesMenuClosing(false);
-      }, 200);
-    }, 150);
-    setCoursesMenuTimeout(timeout);
-  };
-
-  // Handlers for Pricing menu
-  const handlePricingMouseEnter = () => {
-    if (pricingMenuTimeout) clearTimeout(pricingMenuTimeout);
-    setPricingMenuClosing(false);
-    setShowPricingMenu(true);
-  };
-
-  const handlePricingMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setPricingMenuClosing(true);
-      setTimeout(() => {
-        setShowPricingMenu(false);
-        setPricingMenuClosing(false);
-      }, 200);
-    }, 150);
-    setPricingMenuTimeout(timeout);
-  };
-
-  // Handlers for News menu
-  const handleNewsMouseEnter = () => {
-    if (newsMenuTimeout) clearTimeout(newsMenuTimeout);
-    setNewsMenuClosing(false);
-    setShowNewsMenu(true);
-  };
-
-  const handleNewsMouseLeave = () => {
-    const timeout = setTimeout(() => {
-      setNewsMenuClosing(true);
-      setTimeout(() => {
-        setShowNewsMenu(false);
-        setNewsMenuClosing(false);
-      }, 200);
-    }, 150);
-    setNewsMenuTimeout(timeout);
+  const getMenuButtonClass = (isActive: boolean) => {
+    const base = 'hover-shine hover:cursor-pointer flex items-center justify-center gap-1 transition-colors text-sm font-medium h-full px-4 rounded-none';
+    if (isHeroSectionActive) {
+      return `${base} ${isActive ? 'text-black bg-white' : 'text-white hover:text-black hover:bg-white'}`;
+    }
+    return `${base} ${isActive ? 'text-black bg-gray-100' : 'text-gray-600 hover:text-black hover:bg-gray-100'}`;
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-white shadow-md border-b border-gray-200">
+    <header className={`fixed w-full top-0 z-50 transition-all duration-300 ${headerBgClass}`}>
       <div className="max-w-[99%] mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           {/* Logo po lewej */}
@@ -119,7 +64,7 @@ export default function AuthHeader() {
                 alt="EasyLesson Logo"
                 width={160}
                 height={40}
-                className="h-10 w-auto"
+                className={`h-10 w-auto transition-all duration-300 ${isHeroSectionActive ? 'brightness-0 invert' : ''}`}
                 priority
               />
             </Link>
@@ -128,11 +73,11 @@ export default function AuthHeader() {
             <nav className="flex items-center gap-2">
               {/* Produkt z dropdown */}
               <div 
-                className="relative"
-                onMouseEnter={handleProductMouseEnter}
-                onMouseLeave={handleProductMouseLeave}
+                className="relative flex items-stretch h-16"
+                onMouseEnter={() => setShowProductMenu(true)}
+                onMouseLeave={() => setShowProductMenu(false)}
               >
-                <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-500 hover:text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium rounded-md">
+                <button className={getMenuButtonClass(showProductMenu)}>
                   Produkt
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -142,11 +87,11 @@ export default function AuthHeader() {
 
               {/* Kursy z dropdown */}
               <div 
-                className="relative"
-                onMouseEnter={handleCoursesMouseEnter}
-                onMouseLeave={handleCoursesMouseLeave}
+                className="relative flex items-stretch h-16"
+                onMouseEnter={() => setShowCoursesMenu(true)}
+                onMouseLeave={() => setShowCoursesMenu(false)}
               >
-                <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-500 hover:text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium rounded-md">
+                <button className={getMenuButtonClass(showCoursesMenu)}>
                   Kursy video
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -156,11 +101,11 @@ export default function AuthHeader() {
 
               {/* Aktualności */}
               <div 
-                className="relative"
-                onMouseEnter={handleNewsMouseEnter}
-                onMouseLeave={handleNewsMouseLeave}
+                className="relative flex items-stretch h-16"
+                onMouseEnter={() => setShowNewsMenu(true)}
+                onMouseLeave={() => setShowNewsMenu(false)}
               >
-                <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-500 hover:text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium rounded-md">
+                <button className={getMenuButtonClass(showNewsMenu)}>
                   Aktualności
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -170,11 +115,11 @@ export default function AuthHeader() {
 
               {/* Cennik */}
               <div 
-                className="relative"
-                onMouseEnter={handlePricingMouseEnter}
-                onMouseLeave={handlePricingMouseLeave}
+                className="relative flex items-stretch h-16"
+                onMouseEnter={() => setShowPricingMenu(true)}
+                onMouseLeave={() => setShowPricingMenu(false)}
               >
-                <button className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-500 hover:text-gray-600 hover:bg-gray-200 transition-colors text-sm font-medium rounded-md">
+                <button className={getMenuButtonClass(showPricingMenu)}>
                   Cennik
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -187,7 +132,7 @@ export default function AuthHeader() {
           {/* Prawa strona - wersja dla zalogowanych */}
           <div className="flex items-center gap-2">
             {/* Kontakt z działem sprzedaży */}
-            <button className="px-4 py-2 hover:cursor-pointer hover-shine text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors flex items-center gap-2 group">
+            <button className={`px-4 py-2 hover:cursor-pointer hover-shine text-sm font-medium transition-colors flex items-center gap-2 group ${isHeroSectionActive ? 'text-gray-200 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>
               Kontakt z działem sprzedaży
               <svg className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all duration-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -196,8 +141,8 @@ export default function AuthHeader() {
 
             {/* Witaj username */}
             {user && (
-              <span className="text-gray-600 text-sm px-2">
-                Witaj, <strong>{user.username}</strong>!
+              <span className={`text-sm px-2 transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-600'}`}>
+                Witaj, <strong className={isHeroSectionActive ? 'text-white' : 'text-black'}>{user.username}</strong>!
               </span>
             )}
 
@@ -221,11 +166,11 @@ export default function AuthHeader() {
 
             {/* Wersja językowa */}
             <div className="flex items-center gap-1 ml-2">
-              <svg className="w-4 h-4 text-gray-500" fill="currentColor" viewBox="0 0 20 20">
+              <svg className={`w-4 h-4 transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-500'}`} fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
               </svg>
               <select 
-                className="bg-transparent text-gray-700 text-sm font-medium cursor-pointer border-none outline-none"
+                className={`bg-transparent text-sm font-medium cursor-pointer border-none outline-none transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-700'}`}
                 defaultValue="pl"
               >
                 <option value="pl">PL</option>
@@ -237,11 +182,11 @@ export default function AuthHeader() {
       </div>
 
       {/* Mega Menu - Produkt */}
-      {(showProductMenu || productMenuClosing) && (
+      {showProductMenu && (
         <>
           {/* Backdrop - blur i przyciemnienie TYLKO dla contentu pod headerem */}
           <div 
-            className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-30 ${productMenuClosing ? 'animate-backdropFadeOut' : 'animate-backdropFadeIn'}`}
+            className={`fixed inset-0 bg-black/70 backdrop-blur-sm z-30 animate-backdropFadeIn`}
             style={{ 
               top: '64px'
             }}
@@ -251,12 +196,12 @@ export default function AuthHeader() {
           {/* Mega Menu */}
           <div 
             className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
-            onMouseEnter={handleProductMouseEnter}
-            onMouseLeave={handleProductMouseLeave}
+            onMouseEnter={() => setShowProductMenu(true)}
+            onMouseLeave={() => setShowProductMenu(false)}
           >
             {/* Białe tło mega menu z animacją */}
             <div 
-              className={`bg-white ${productMenuClosing ? 'animate-megaMenuFadeOut' : 'animate-slideDown'}`}
+              className={`bg-white animate-slideDown`}
               style={{
                 boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
               }}
@@ -399,17 +344,8 @@ export default function AuthHeader() {
                       Zapoznaj się z EasyLesson
                     </h3>
                     <div className="bg-gray-100 rounded-lg overflow-hidden shadow-md">
-                      <div className="aspect-video relative">
-                        <iframe
-                          width="100%"
-                          height="100%"
-                          src="https://www.youtube.com/embed/r0vrPSZjWMQ?start=0"
-                          title="Historie użytkowników"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          className="rounded-lg"
-                        />
+                      <div className="aspect-video relative flex items-center justify-center bg-gray-200">
+                        <span className="text-gray-500 font-medium">Wideo wkrótce</span>
                       </div>
                     </div>
                     <p className="text-gray-600 text-sm mt-3 leading-snug">
@@ -464,11 +400,11 @@ export default function AuthHeader() {
       )}
 
       {/* Mega Menu dla Kursów */}
-      {(showCoursesMenu || coursesMenuClosing) && (
+      {showCoursesMenu && (
         <>
           {/* Backdrop */}
           <div 
-            className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-30 ${coursesMenuClosing ? 'animate-backdropFadeOut' : 'animate-backdropFadeIn'}`}
+            className={`fixed inset-0 bg-black/70 backdrop-blur-sm z-30 animate-backdropFadeIn`}
             style={{ 
               top: '64px'
             }}
@@ -478,12 +414,12 @@ export default function AuthHeader() {
           {/* Mega Menu */}
           <div 
             className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
-            onMouseEnter={handleCoursesMouseEnter}
-            onMouseLeave={handleCoursesMouseLeave}
+            onMouseEnter={() => setShowCoursesMenu(true)}
+            onMouseLeave={() => setShowCoursesMenu(false)}
           >
             {/* Białe tło mega menu z animacją */}
             <div 
-              className={`bg-white ${coursesMenuClosing ? 'animate-megaMenuFadeOut' : 'animate-slideDown'}`}
+              className={`bg-white animate-slideDown`}
               style={{
                 boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
               }}
@@ -566,17 +502,8 @@ export default function AuthHeader() {
                     
                     {/* Film YouTube */}
                     <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md mb-4">
-                      <div className="aspect-video relative">
-                        <iframe
-                          width="100%"
-                          height="100%"
-                          src="https://www.youtube.com/embed/YBW-EY4OJT0"
-                          title="Program kursów matematyki"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          className="rounded-xl"
-                        />
+                      <div className="aspect-video relative flex items-center justify-center bg-gray-200">
+                        <span className="text-gray-500 font-medium">Wideo wkrótce</span>
                       </div>
                     </div>
                     
@@ -634,11 +561,11 @@ export default function AuthHeader() {
       )}
 
       {/* Mega Menu dla Cennika */}
-      {(showPricingMenu || pricingMenuClosing) && (
+      {showPricingMenu && (
         <>
           {/* Backdrop */}
           <div 
-            className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-30 ${pricingMenuClosing ? 'animate-backdropFadeOut' : 'animate-backdropFadeIn'}`}
+            className={`fixed inset-0 bg-black/70 backdrop-blur-sm z-30 animate-backdropFadeIn`}
             style={{ 
               top: '64px'
             }}
@@ -648,12 +575,12 @@ export default function AuthHeader() {
           {/* Mega Menu */}
           <div 
             className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
-            onMouseEnter={handlePricingMouseEnter}
-            onMouseLeave={handlePricingMouseLeave}
+            onMouseEnter={() => setShowPricingMenu(true)}
+            onMouseLeave={() => setShowPricingMenu(false)}
           >
             {/* Białe tło mega menu z animacją */}
             <div 
-              className={`bg-white ${pricingMenuClosing ? 'animate-megaMenuFadeOut' : 'animate-slideDown'}`}
+              className={`bg-white animate-slideDown`}
               style={{
                 boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
               }}
@@ -690,17 +617,8 @@ export default function AuthHeader() {
 
                     {/* Film z Historiami użytkowników */}
                     <div className="bg-gray-100 rounded-xl overflow-hidden shadow-md">
-                      <div className="aspect-video relative">
-                        <iframe
-                          width="100%"
-                          height="100%"
-                          src="https://www.youtube.com/embed/Jc72Ot0Qdq0"
-                          title="Historie użytkowników"
-                          frameBorder="0"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          className="rounded-xl"
-                        />
+                      <div className="aspect-video relative flex items-center justify-center bg-gray-200">
+                        <span className="text-gray-500 font-medium">Wideo wkrótce</span>
                       </div>
                     </div>
                     <p className="text-gray-600 text-sm mt-3 leading-snug">
@@ -930,11 +848,11 @@ export default function AuthHeader() {
       )}
 
       {/* Mega Menu dla Aktualności */}
-      {(showNewsMenu || newsMenuClosing) && (
+      {showNewsMenu && (
         <>
           {/* Backdrop */}
           <div 
-            className={`fixed inset-0 bg-black/30 backdrop-blur-sm z-30 ${newsMenuClosing ? 'animate-backdropFadeOut' : 'animate-backdropFadeIn'}`}
+            className={`fixed inset-0 bg-black/70 backdrop-blur-sm z-30 animate-backdropFadeIn`}
             style={{ 
               top: '64px'
             }}
@@ -944,12 +862,12 @@ export default function AuthHeader() {
           {/* Mega Menu */}
           <div 
             className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
-            onMouseEnter={handleNewsMouseEnter}
-            onMouseLeave={handleNewsMouseLeave}
+            onMouseEnter={() => setShowNewsMenu(true)}
+            onMouseLeave={() => setShowNewsMenu(false)}
           >
             {/* Białe tło mega menu z animacją */}
             <div 
-              className={`bg-white ${newsMenuClosing ? 'animate-megaMenuFadeOut' : 'animate-slideDown'}`}
+              className={`bg-white animate-slideDown`}
               style={{
                 boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
               }}
