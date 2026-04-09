@@ -10,7 +10,7 @@
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ReactNode } from 'react';
 import { Button } from '@new/shared/ui/button';
 import { FcGoogle } from 'react-icons/fc';
@@ -23,6 +23,7 @@ interface AuthLayoutProps {
   showHelpLink?: boolean;
   showBackToLogin?: boolean;
   showGoogle?: boolean;
+  autoStartGoogle?: boolean;
 }
 
 export function AuthLayout({
@@ -32,8 +33,15 @@ export function AuthLayout({
   showHelpLink = false,
   showBackToLogin = false,
   showGoogle = true,
+  autoStartGoogle = false,
 }: AuthLayoutProps) {
   const { login: authLogin } = useAuth();
+  const autoStartRef = useRef(false);
+
+  const getGoogleAuthUrl = () => {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    return `${baseUrl}/api/v1/auth/google`;
+  };
   
   // Blokada przewijania
   useEffect(() => {
@@ -96,8 +104,7 @@ export function AuthLayout({
 
   // Handler logowania Google
   const handleGoogleLogin = () => {
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-    const authUrl = `${baseUrl}/api/v1/auth/google`;
+    const authUrl = getGoogleAuthUrl();
     
     console.log('🚀 Otwieram Google OAuth popup:', authUrl);
     
@@ -119,6 +126,22 @@ export function AuthLayout({
       console.log('✅ Popup otwarty pomyślnie');
     }
   };
+
+  useEffect(() => {
+    if (!autoStartGoogle || !showGoogle || autoStartRef.current) {
+      return;
+    }
+
+    autoStartRef.current = true;
+    const timer = window.setTimeout(() => {
+      // Auto-start używa redirectu w tym samym oknie, żeby ominąć blokady popupów.
+      window.location.href = getGoogleAuthUrl();
+    }, 120);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [autoStartGoogle, showGoogle]);
 
   return (
     <div className="h-screen flex flex-col items-center justify-center relative overflow-hidden bg-white">

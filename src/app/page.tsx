@@ -1,44 +1,15 @@
 import HeroSection from './sections/HeroSection';
-import HeroMobileSection from './sections/HeroMobileSection';
-import ProblemsAndSolutionsSection from './sections/ProblemsSection';
-import MainFunctionsSection from './sections/MainFunctionsSection';
-import HowItWorksSection from './sections/HowItWorksSection';
-import ForWhoSection from './sections/ForWhoSection';
+import WhyTutorsSection from './sections/WhyTutorsSection';
 import PricingSection from './sections/PricingSection';
-import SocialProofSection from './sections/SocialProofSection';
-import FAQSection from './sections/FAQSection';
-import LastCTASection from './sections/LastCTASection';
-import TestimonialsSection from './sections/TestimonialsSection';
-import EasyLessonInfoSection from './sections/EasyLessonInfoSection';
-import QuickNavSection from './sections/QuickNavSection';
-import BenefitsSection from './sections/BenefitsSection';
-import Footer from './sections/Footer';
 
 export default function Home() {
   return (
     <div>
-      {/* Desktop Hero - ukryty na mobile */}
-      <div className="hidden lg:block">
-        <HeroSection />
-      </div>
+      <HeroSection />
 
-      {/* Mobile Hero - ukryty na desktop */}
-      <div className="block lg:hidden">
-        <HeroMobileSection />
-      </div>
-
-      <TestimonialsSection />
-
-      <QuickNavSection />
-
-      <EasyLessonInfoSection />
-
-      <BenefitsSection />
-
+      <WhyTutorsSection />
 
       <PricingSection />
-
-      <Footer />
     </div>
   );
 }

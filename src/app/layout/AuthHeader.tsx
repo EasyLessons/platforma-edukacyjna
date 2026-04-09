@@ -12,6 +12,7 @@ export default function AuthHeader() {
   const pathname = usePathname();
   const { logout, user } = useAuth();
   const [scrolledPastHero, setScrolledPastHero] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const isHeroSectionActive = pathname === '/' && !scrolledPastHero;
 
@@ -40,6 +41,10 @@ export default function AuthHeader() {
   const [showPricingMenu, setShowPricingMenu] = useState(false);
   const [showNewsMenu, setShowNewsMenu] = useState(false);
 
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
+
   const headerBgClass = isHeroSectionActive 
     ? 'bg-black/60 backdrop-blur-md border-none text-white shadow-none' 
     : 'bg-white border-gray-200 shadow-md text-gray-900 border-b';
@@ -53,7 +58,104 @@ export default function AuthHeader() {
   };
 
   return (
-    <header className={`fixed w-full top-0 z-50 transition-all duration-300 ${headerBgClass}`}>
+    <>
+    <header
+      className="fixed top-0 z-50 w-full transition-all duration-300 lg:hidden"
+      style={{
+        backgroundColor: '#FFFFFF',
+        borderBottom: '1px solid #E5E7EB',
+        boxShadow: mobileMenuOpen ? '0 14px 32px rgba(0,0,0,0.30)' : 'none',
+      }}
+    >
+      <div className="px-4">
+        <div className="flex h-16 items-center justify-between">
+          <Link href="/dashboard" className="flex items-center">
+            <Image
+              src="/resources/LogoEasyLesson.webp"
+              alt="EasyLesson Logo"
+              width={150}
+              height={36}
+              className="h-9 w-auto"
+              priority
+            />
+          </Link>
+
+          <div className="flex items-center gap-2">
+            <Link href="/dashboard">
+              <button
+                className="rounded-md px-3 py-2 text-sm font-semibold transition-colors"
+                style={{
+                  backgroundColor: '#EEF0F3',
+                  color: '#111827',
+                }}
+              >
+                Panel
+              </button>
+            </Link>
+
+            <button
+              type="button"
+              aria-label="Otwórz menu"
+              aria-expanded={mobileMenuOpen}
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="flex h-10 w-10 items-center justify-center rounded-md"
+              style={{
+                backgroundColor: '#EEF0F3',
+                color: '#111827',
+              }}
+            >
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                {mobileMenuOpen ? (
+                  <>
+                    <path d="M6 6L18 18" />
+                    <path d="M18 6L6 18" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M3 6h18" />
+                    <path d="M3 12h18" />
+                    <path d="M3 18h18" />
+                  </>
+                )}
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <div
+          className="overflow-hidden transition-all duration-300 ease-out"
+          style={{
+            maxHeight: mobileMenuOpen ? '320px' : '0px',
+            opacity: mobileMenuOpen ? 1 : 0,
+            backgroundColor: '#FFFFFF',
+            borderTop: '1px solid #F1F3F5',
+          }}
+        >
+          <nav className="flex flex-col gap-1 pb-4 pt-1">
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
+              Produkt
+            </Link>
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
+              Kursy Wideo
+            </Link>
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
+              Cennik
+            </Link>
+            <Link href="/" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
+              Aktualności
+            </Link>
+            <button
+              onClick={handleLogout}
+              className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-black"
+            >
+              Wyloguj się
+            </button>
+          </nav>
+        </div>
+      </div>
+    </header>
+
+    <header className={`fixed w-full top-0 z-50 transition-all duration-300 hidden lg:block ${headerBgClass}`}>
       <div className="max-w-[99%] mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           {/* Logo po lewej */}
@@ -1028,5 +1130,6 @@ export default function AuthHeader() {
       )}
 
     </header>
+    </>
   );
 }
