@@ -43,16 +43,17 @@ export function AuthLayout({
     return `${baseUrl}/api/v1/auth/google`;
   };
   
-  // Blokada przewijania
+  // Blokada przewijania (tylko w poziomie ze względów estetycznych, w pionie zwalniamy na telefonach by móc użyć klawiatury i scrolla)
   useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
+    const prevBodyOverflowX = document.body.style.overflowX;
+    const prevHtmlOverflowX = document.documentElement.style.overflowX;
+    
+    document.body.style.overflowX = 'hidden';
+    document.documentElement.style.overflowX = 'hidden';
 
     return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.documentElement.style.overflow = prevHtmlOverflow;
+      document.body.style.overflowX = prevBodyOverflowX;
+      document.documentElement.style.overflowX = prevHtmlOverflowX;
     };
   }, []);
 
@@ -144,7 +145,7 @@ export function AuthLayout({
   }, [autoStartGoogle, showGoogle]);
 
   return (
-    <div className="h-screen flex flex-col items-center justify-center relative overflow-hidden bg-white">
+    <div className="min-h-screen sm:h-screen flex flex-col items-center justify-center relative overflow-x-hidden overflow-y-auto sm:overflow-hidden bg-white py-12 sm:py-0">
       {/* Gradient blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         {/* Zielonkawy - lewy górny */}
@@ -176,16 +177,18 @@ export function AuthLayout({
       </div>
 
       {/* Content */}
-      <div className="relative z-10 w-full max-w-md px-6 -mt-40">
+      <div className="relative z-10 w-full max-w-md px-6 md:-mt-40 py-10 sm:py-0">
         {/* Logo */}
         <div className="text-center mb-10">
-          <Image
-            src="/resources/LogoEasyLesson.webp"
-            alt="EasyLesson"
-            width={200}
-            height={60}
-            className="mx-auto"
-          />
+          <Link href="/">
+            <Image
+              src="/resources/LogoEasyLesson.webp"
+              alt="EasyLesson"
+              width={200}
+              height={60}
+              className="mx-auto cursor-pointer"
+            />
+          </Link>
         </div>
 
         {/* Title */}

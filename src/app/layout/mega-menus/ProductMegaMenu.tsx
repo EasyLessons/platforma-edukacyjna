@@ -41,7 +41,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica" 
+                    href="/produkt#dashboard" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">

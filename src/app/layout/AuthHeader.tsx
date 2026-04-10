@@ -4,8 +4,11 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
+import { Plus_Jakarta_Sans } from 'next/font/google';
 import { useAuth } from '../context/AuthContext';
 import { Button } from '@/_new/shared/ui/button';
+
+const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export default function AuthHeader() {
   const router = useRouter();
@@ -45,6 +48,32 @@ export default function AuthHeader() {
     setMobileMenuOpen(false);
   }, [pathname]);
 
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const lang = e.target.value;
+    const domain = window.location.hostname;
+    if (lang === 'pl') {
+      document.cookie = `googtrans=/pl/pl; path=/; domain=${domain};`;
+      document.cookie = `googtrans=/pl/pl; path=/; domain=.${domain};`;
+      document.cookie = `googtrans=/pl/pl; path=/;`;
+    } else {
+      const cookieValue = `/pl/${lang}`;
+      document.cookie = `googtrans=${cookieValue}; path=/; domain=${domain};`;
+      document.cookie = `googtrans=${cookieValue}; path=/; domain=.${domain};`;
+      document.cookie = `googtrans=${cookieValue}; path=/;`;
+    }
+    window.location.reload();
+  };
+
+  useEffect(() => {
+    const cookies = document.cookie.split(';');
+    const googtrans = cookies.find(c => c.trim().startsWith('googtrans='));
+    if (googtrans) {
+      const lang = googtrans.split('/').pop() || 'pl';
+      const select = document.getElementById('auth-lang-select') as HTMLSelectElement;
+      if (select) select.value = lang === 'pl' ? 'pl' : lang; // default to pl
+    }
+  }, []);
+
   const headerBgClass = isHeroSectionActive 
     ? 'bg-black/60 backdrop-blur-md border-none text-white shadow-none' 
     : 'bg-white border-gray-200 shadow-md text-gray-900 border-b';
@@ -60,7 +89,7 @@ export default function AuthHeader() {
   return (
     <>
     <header
-      className="fixed top-0 z-50 w-full transition-all duration-300 lg:hidden"
+      className={`fixed top-0 z-50 w-full transition-all duration-300 lg:hidden ${plusJakarta.className}`}
       style={{
         backgroundColor: '#FFFFFF',
         borderBottom: '1px solid #E5E7EB',
@@ -155,7 +184,7 @@ export default function AuthHeader() {
       </div>
     </header>
 
-    <header className={`fixed w-full top-0 z-50 transition-all duration-300 hidden lg:block ${headerBgClass}`}>
+    <header className={`fixed w-full top-0 z-50 transition-all duration-300 hidden lg:block ${headerBgClass} ${plusJakarta.className}`}>
       <div className="max-w-[99%] mx-auto px-6">
         <div className="flex justify-between items-center h-16">
           {/* Logo po lewej */}
@@ -179,12 +208,12 @@ export default function AuthHeader() {
                 onMouseEnter={() => setShowProductMenu(true)}
                 onMouseLeave={() => setShowProductMenu(false)}
               >
-                <button className={getMenuButtonClass(showProductMenu)}>
+                <Link href="/produkt" className={getMenuButtonClass(showProductMenu)}>
                   Produkt
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                   </svg>
-                </button>
+                </Link>
               </div>
 
               {/* Kursy z dropdown */}
@@ -234,12 +263,12 @@ export default function AuthHeader() {
           {/* Prawa strona - wersja dla zalogowanych */}
           <div className="flex items-center gap-2">
             {/* Kontakt z działem sprzedaży */}
-            <button className={`px-4 py-2 hover:cursor-pointer hover-shine text-sm font-medium transition-colors flex items-center gap-2 group ${isHeroSectionActive ? 'text-gray-200 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Link href="/kontakt" className={`px-4 py-2 hover:cursor-pointer hover-shine text-sm font-medium transition-colors flex items-center gap-2 group ${isHeroSectionActive ? 'text-gray-200 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>
               Kontakt z działem sprzedaży
               <svg className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all duration-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
               </svg>
-            </button>
+            </Link>
 
             {/* Witaj username */}
             {user && (
@@ -272,11 +301,13 @@ export default function AuthHeader() {
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
               </svg>
               <select 
+                id="auth-lang-select"
                 className={`bg-transparent text-sm font-medium cursor-pointer border-none outline-none transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-700'}`}
                 defaultValue="pl"
+                onChange={handleLanguageChange}
               >
-                <option value="pl">PL</option>
-                <option value="en">EN</option>
+                <option value="pl" className="text-gray-900">PL</option>
+                <option value="en" className="text-gray-900">EN</option>
               </select>
             </div>
           </div>
@@ -297,7 +328,7 @@ export default function AuthHeader() {
           
           {/* Mega Menu */}
           <div 
-            className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
+            className={`fixed left-0 right-0 top-16 z-50 mega-menu-extend ${plusJakarta.className}`}
             onMouseEnter={() => setShowProductMenu(true)}
             onMouseLeave={() => setShowProductMenu(false)}
           >
@@ -317,7 +348,7 @@ export default function AuthHeader() {
                     </h3>
                     <div className="space-y-1">
                       <Link 
-                        href="/dashboard" 
+                        href="/produkt#dashboard" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -331,7 +362,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica" 
+                        href="/produkt#dashboard" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -354,7 +385,7 @@ export default function AuthHeader() {
                     </h3>
                     <div className="space-y-1">
                       <Link 
-                        href="/tablica#board" 
+                        href="/produkt#tutoring-board" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-purple-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -368,7 +399,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica#tools" 
+                        href="/produkt#tools" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -382,7 +413,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica#smart-search" 
+                        href="/produkt#smart-search" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -396,7 +427,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica#voice-chat" 
+                        href="/produkt#voice-chat" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-pink-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -410,7 +441,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica#ai-tutor" 
+                        href="/produkt#ai-tutor" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-indigo-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -424,7 +455,7 @@ export default function AuthHeader() {
                         </div>
                       </Link>
                       <Link 
-                        href="/tablica#collaboration" 
+                        href="/produkt#collaboration" 
                         className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                       >
                         <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -515,7 +546,7 @@ export default function AuthHeader() {
           
           {/* Mega Menu */}
           <div 
-            className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
+            className={`fixed left-0 right-0 top-16 z-50 mega-menu-extend ${plusJakarta.className}`}
             onMouseEnter={() => setShowCoursesMenu(true)}
             onMouseLeave={() => setShowCoursesMenu(false)}
           >
@@ -676,7 +707,7 @@ export default function AuthHeader() {
           
           {/* Mega Menu */}
           <div 
-            className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
+            className={`fixed left-0 right-0 top-16 z-50 mega-menu-extend ${plusJakarta.className}`}
             onMouseEnter={() => setShowPricingMenu(true)}
             onMouseLeave={() => setShowPricingMenu(false)}
           >
@@ -697,7 +728,7 @@ export default function AuthHeader() {
                     
                     {/* Link do szczegółowego cennika */}
                     <Link 
-                      href="/cennik" 
+                      href="/#pakiet-premium" 
                       className="hover-shine flex items-start gap-3 px-4 py-3 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-lg transition-all group mb-5"
                     >
                       <div className="w-10 h-10 bg-indigo-500 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -753,12 +784,12 @@ export default function AuthHeader() {
                           <tr className="hover:bg-gray-50 transition-colors h-14">
                             <td className="px-4 py-3 text-gray-700">Liczba workspace'ów</td>
                             <td className="text-center px-4 py-3 text-gray-600">3</td>
-                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                           </tr>
                           <tr className="hover:bg-gray-50 transition-colors h-14">
                             <td className="px-4 py-3 text-gray-700">Liczba tablic</td>
                             <td className="text-center px-4 py-3 text-gray-600">3</td>
-                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                           </tr>
                           <tr className="hover:bg-gray-50 transition-colors h-14">
                             <td className="px-4 py-3 text-gray-700">Współpraca realtime</td>
@@ -768,12 +799,12 @@ export default function AuthHeader() {
                           <tr className="hover:bg-gray-50 transition-colors h-14">
                             <td className="px-4 py-3 text-gray-700">Ilość elementów na tablicy</td>
                             <td className="text-center px-4 py-3 text-gray-600">500</td>
-                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                           </tr>
                           <tr className="hover:bg-gray-50 transition-colors h-14">
                             <td className="px-4 py-3 text-gray-700">Chat na tablicy</td>
                             <td className="text-center px-4 py-3 text-gray-600">5 pytań</td>
-                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                            <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                           </tr>
                         </tbody>
                       </table>
@@ -887,7 +918,7 @@ export default function AuthHeader() {
                     </div>
 
                     {/* CTA Button */}
-                    <Link href="/rejestracja?plan=premium">
+                    <Link href="/#pakiet-premium">
                       <button 
                         className="hover-shine hover:cursor-pointer w-full flex items-center justify-center gap-2 px-6 py-4 text-white hover:text-white transition-all text-base font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
                         style={{ backgroundColor: '#212224' }}
@@ -963,7 +994,7 @@ export default function AuthHeader() {
           
           {/* Mega Menu */}
           <div 
-            className="fixed left-0 right-0 top-16 z-50 mega-menu-extend"
+            className={`fixed left-0 right-0 top-16 z-50 mega-menu-extend ${plusJakarta.className}`}
             onMouseEnter={() => setShowNewsMenu(true)}
             onMouseLeave={() => setShowNewsMenu(false)}
           >
@@ -1003,8 +1034,7 @@ export default function AuthHeader() {
                 {/* Grid z 3 artykułami */}
                 <div className="grid grid-cols-3 gap-6">
                   {/* Artykuł 1 */}
-                  <Link 
-                    href="/aktualnosci/nowe-narzedzia-matematyczne" 
+                  <div 
                     className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200 animate-fadeInUp"
                     style={{ animationDelay: '0ms' }}
                   >
@@ -1027,11 +1057,10 @@ export default function AuthHeader() {
                         Dodaliśmy nowy kalkulator naukowy, rysowanie funkcji matematycznych i zaawansowany edytor równań. Idealne dla nauczycieli matematyki!
                       </p>
                     </div>
-                  </Link>
+                  </div>
 
                   {/* Artykuł 2 */}
-                  <Link 
-                    href="/aktualnosci/ai-tutor-ulepszenia" 
+                  <div 
                     className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200 animate-fadeInUp"
                     style={{ animationDelay: '50ms' }}
                   >
@@ -1054,11 +1083,10 @@ export default function AuthHeader() {
                         Ulepszyliśmy algorytm AI Tutora! Teraz jeszcze lepiej rozumie kontekst pytań i udziela bardziej szczegółowych odpowiedzi.
                       </p>
                     </div>
-                  </Link>
+                  </div>
 
                   {/* Artykuł 3 */}
-                  <Link 
-                    href="/aktualnosci/wspolpraca-realtime" 
+                  <div 
                     className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200 animate-fadeInUp"
                     style={{ animationDelay: '100ms' }}
                   >
@@ -1081,9 +1109,8 @@ export default function AuthHeader() {
                         Zwiększyliśmy limit współpracy realtime! Teraz w planie Premium do 50 osób może pracować jednocześnie na tablicy.
                       </p>
                     </div>
-                  </Link>
+                  </div>
                 </div>
-
                 {/* Separator i Newsletter */}
                 <div className="border-t border-gray-200 mt-8 pt-6 animate-newsletterFadeIn">
                   <div className="grid grid-cols-12 gap-8 items-center">

@@ -156,7 +156,7 @@ export default function WorkspaceTopNav({
               variant="secondary"
               leftIcon={<UserPlus size={14} />}
               onClick={() => setInvitingWorkspace(activeWorkspace)}
-              className="h-8 px-3 text-xs font-semibold"
+              className="hidden sm:flex h-8 px-3 text-xs font-semibold"
               
             >
               Zaproś uczestników
@@ -168,7 +168,7 @@ export default function WorkspaceTopNav({
                 size="iconSm"
                 onClick={() => setEditingWorkspace(activeWorkspace)}
                 title="Zmień nazwę przestrzeni"
-                className="dashboard-btn-secondary"
+                className="dashboard-btn-secondary hidden sm:flex"
               >
                 <Pencil size={15} className="text-gray-600" />
               </Button>
@@ -197,6 +197,7 @@ export default function WorkspaceTopNav({
 
             <WorkspaceDropdownMenu
               workspace={activeWorkspace}
+              onInvite={() => setInvitingWorkspace(activeWorkspace)}
               onEdit={() => setEditingWorkspace(activeWorkspace)}
               onMembers={() => setMembersWorkspace(activeWorkspace)}
               onDelete={() => setDeletingWorkspace(activeWorkspace)}

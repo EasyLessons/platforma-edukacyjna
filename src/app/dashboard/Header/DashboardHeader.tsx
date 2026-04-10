@@ -228,108 +228,111 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                 priority
               />
             </Link>
-            <Button
-              variant="secondary"
-              size="icon"
-              onClick={() => setShowMobileMenu(!showMobileMenu)}
-            >
-              <Menu size={24} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <NotificationBell
+                unreadCount={unreadCount}
+                onClick={() => setShowNotifications(!showNotifications)}
+              />
+              <Button
+                variant="secondary"
+                size="icon"
+                onClick={() => setShowMobileMenu(!showMobileMenu)}
+              >
+                {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
+              </Button>
+            </div>
           </div>
 
-          {/* MOBILE MENU DRAWER */}
-          {showMobileMenu && (
-            <div className="fixed top-0 right-0 h-full w-80 max-w-[85vw] bg-white shadow-2xl z-50 overflow-y-auto border-l border-gray-200">
-              <div className="sticky top-0 bg-white border-b border-gray-200 px-4 py-4 flex items-center justify-between">
-                <span className="font-semibold text-gray-800">Menu</span>
-                <Button variant="secondary" size="icon" onClick={() => setShowMobileMenu(false)}>
-                  <X size={20} />
-                </Button>
-              </div>
-
-              <div className="p-4 space-y-3">
-                {user && (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-lg">
+          {/* MOBILE MENU DROPDOWN (Stylized exactly like desktop UserMenuPopup) */}
+          {showMobileMenu && user && (
+            <div className="absolute top-[100%] left-0 w-full min-[1640px]:hidden z-40 bg-transparent animate-in slide-in-from-top-2">
+              <div className="dashboard-popup-surface w-full overflow-hidden mx-auto rounded-t-none border-t-0 border-x-0 sm:border-x shadow-2xl">
+                
+                {/* Info użytkownika */}
+                <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
+                  <div className="flex items-center gap-3">
                     <div
-                      className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
+                      className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
                     >
-                      <span className="text-white font-semibold text-base">
-                        {getInitials(user.name)}
-                      </span>
+                      <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
+                      <div className="text-xs text-gray-500 truncate">{user.email}</div>
                     </div>
                   </div>
-                )}
 
-                <div className="space-y-2">
-                  {user && !user.isPremium && (
-                    <Link href="/#pricing">
-                      <DashboardButton
-                        variant="secondary"
-                        leftIcon={<Crown size={20} />}
-                        onClick={() => setShowMobileMenu(false)}
-                        className="w-full justify-start py-8"
-                      >
-                        Przejdź na Premium
-                      </DashboardButton>
-                    </Link>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    leftIcon={<Bell size={20} />}
-                    onClick={() => {
-                      setShowNotifications(true);
-                      setShowMobileMenu(false);
-                    }}
-                    className="w-full justify-start py-8"
-                  >
-                    <span>Powiadomienia</span>
-                    {unreadCount > 0 && (
-                      <span className="ml-auto bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </span>
+                  {/* Badge Premium lub Free */}
+                  <div className="mt-3">
+                    {user.isPremium ? (
+                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--dash-border)] bg-white px-2.5 py-1">
+                        <Crown size={14} className="text-yellow-600" />
+                        <span className="text-xs font-semibold text-yellow-700">Premium</span>
+                      </div>
+                    ) : (
+                      <div className="inline-flex items-center rounded-lg border border-[var(--dash-border)] bg-white px-2.5 py-1">
+                        <span className="text-xs font-semibold text-gray-700">FREE PLAN</span>
+                      </div>
                     )}
-                  </Button>
+                  </div>
+                </div>
 
-                  <Button
+                {/* Menu opcje */}
+                <div className="space-y-1.5 p-2 bg-white">
+                  <DashboardButton
                     variant="secondary"
-                    leftIcon={<UserIcon size={20} />}
+                    leftIcon={<UserIcon size={16} />}
                     onClick={() => {
                       router.push('/clientPanel');
                       setShowMobileMenu(false);
                     }}
-                    className="w-full justify-start py-8"
+                    className="w-full justify-start"
                   >
                     Profil
-                  </Button>
+                  </DashboardButton>
 
-                  <div className="border-t border-gray-200 my-2" />
+                  {!user.isPremium && (
+                    <DashboardButton
+                      variant="secondary"
+                      leftIcon={<Crown size={16} />}
+                      onClick={() => {
+                        router.push('/#pricing');
+                        setShowMobileMenu(false);
+                      }}
+                      className="w-full justify-start"
+                    >
+                      Przejdź na Premium
+                    </DashboardButton>
+                  )}
 
-                  <Button
-                    variant="destructive"
-                    leftIcon={<LogOut size={20} />}
+                  <DashboardButton
+                    variant="secondary"
+                    leftIcon={<Gift size={16} />}
+                    onClick={() => {
+                      setShowGiftPopup(true);
+                      setShowMobileMenu(false);
+                    }}
+                    className="w-full justify-start text-blue-600 border-blue-100 hover:bg-blue-50"
+                  >
+                    Odbierz 10% zniżki
+                  </DashboardButton>
+
+                  <div className="my-2 border-t border-[var(--dash-border)]"></div>
+
+                  {/* Wyloguj */}
+                  <DashboardButton
+                    variant="primary"
+                    leftIcon={<LogOut size={16} />}
                     onClick={() => {
                       logout();
                       setShowMobileMenu(false);
                       router.push('/');
                     }}
-                    className="w-full py-8"
+                    className="w-full justify-center"
                   >
                     Wyloguj się
-                  </Button>
+                  </DashboardButton>
                 </div>
-
-                {user && !user.isPremium && (
-                  <div className="mt-4 px-4">
-                    <div className="px-3 py-2 bg-gray-100 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg text-center">
-                      FREE PLAN
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )}

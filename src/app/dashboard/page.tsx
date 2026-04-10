@@ -94,7 +94,7 @@ export default function Dashboard() {
           toggleFavourite={toggleFavourite}
         />
 
-        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] mr-6 mb-6">
+        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white md:rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] md:mr-6 md:mb-6">
           <div className="flex flex-col w-full min-h-full">
             <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-[var(--dash-panel)]">
               <WorkspaceTopNav
@@ -107,7 +107,7 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="p-8 pb-20">
+            <div className="p-4 pb-10 md:p-8 md:pb-20">
               <TemplatesSection workspaceId={activeWorkspaceId} />
 
               {activeWorkspaceId && (

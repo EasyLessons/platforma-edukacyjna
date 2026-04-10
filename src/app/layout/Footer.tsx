@@ -3,12 +3,19 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Youtube, Instagram, Facebook, Mail, Phone } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
+import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+
+const jakartaSans = Plus_Jakarta_Sans({
+  subsets: ['latin'],
+  weight: ['300', '400', '600', '700', '800'],
+  display: 'swap',
+});
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="text-[#D2D2D2]" style={{ backgroundColor: '#0f0f0f' }}>
+    <footer className={`text-[#D2D2D2] ${jakartaSans.className}`} style={{ backgroundColor: '#0f0f0f' }}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Logo i Sociale - po lewej, zajmuje 2 kolumny na desktop */}
@@ -69,12 +76,12 @@ const Footer = () => {
             {/* Kontakt */}
             <div className="space-y-2">
               <a
-                href="mailto:kontakt@easylesson.pl"
+                href="mailto:kontakt@easylesson.app"
                 className="flex items-center gap-2 transition-colors"
                 style={{ color: '#A9A9A9' }}
               >
                 <Mail className="w-4 h-4" />
-                <span className="text-sm">kontakt@easylesson.pl</span>
+                <span className="text-sm">kontakt@easylesson.app</span>
               </a>
               <a
                 href="tel:+48123456789"
@@ -92,28 +99,18 @@ const Footer = () => {
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Produkt</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/features" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Funkcje
+                <Link href="/produkt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                  O produkcie
                 </Link>
               </li>
               <li>
-                <Link href="/pricing" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/#pakiet-premium" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Cennik
                 </Link>
               </li>
               <li>
-                <Link href="/integrations" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Integracje
-                </Link>
-              </li>
-              <li>
-                <Link href="/changelog" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Co nowego
-                </Link>
-              </li>
-              <li>
-                <Link href="/roadmap" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Roadmapa
+                <Link href="/aktualnosci" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                  Aktualności
                 </Link>
               </li>
             </ul>
@@ -124,59 +121,44 @@ const Footer = () => {
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Firma</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/about" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  O nas
-                </Link>
-              </li>
-              <li>
-                <Link href="/blog" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/aktualnosci" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="/careers" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Kariera
                 </Link>
               </li>
               <li>
-                <Link href="/press" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Dla prasy
-                </Link>
-              </li>
-              <li>
-                <Link href="/contact" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Kontakt
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Kolumna 3 - Pomoc i Prawne */}
+          {/* Kolumna 3 - Pomoc */}
           <div>
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Pomoc</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/help" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Centrum pomocy
                 </Link>
               </li>
               <li>
-                <Link href="/docs" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Dokumentacja
+                <Link href="/podrecznik-uzytkownika" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                  Podręcznik użytkownika
                 </Link>
               </li>
               <li>
-                <Link href="/tutorials" className="transition-colors" style={{ color: '#C5C5C5' }}>
-                  Tutoriale
-                </Link>
-              </li>
-              <li>
-                <Link href="/faq" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/faq" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   FAQ
                 </Link>
               </li>
               <li>
-                <Link href="/support" className="transition-colors" style={{ color: '#C5C5C5' }}>
+                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Wsparcie
                 </Link>
               </li>
@@ -195,23 +177,23 @@ const Footer = () => {
             {/* Linki prawne */}
             <div className="flex flex-wrap justify-center gap-6 text-sm">
               <Link
-                href="/privacy-policy"
-                className="transition-colors"
+                href="/polityka-prywatnosci"
+                className="transition-colors hover:text-white"
                 style={{ color: '#B1B1B1' }}
               >
                 Polityka prywatności
               </Link>
               <Link
-                href="/cookie-policy"
-                className="transition-colors"
+                href="/polityka-cookies"
+                className="transition-colors hover:text-white"
                 style={{ color: '#B1B1B1' }}
               >
                 Polityka cookies
               </Link>
-              <Link href="/terms" className="transition-colors" style={{ color: '#B1B1B1' }}>
+              <Link href="/regulamin" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
                 Regulamin
               </Link>
-              <Link href="/gdpr" className="transition-colors" style={{ color: '#B1B1B1' }}>
+              <Link href="/rodo" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
                 RODO
               </Link>
             </div>

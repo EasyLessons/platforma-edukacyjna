@@ -78,12 +78,12 @@ export default function PricingMegaMenu({
                 <tr className="hover:bg-gray-50 transition-colors h-14">
                   <td className="px-4 py-3 text-gray-700">Liczba workspace'ów</td>
                   <td className="text-center px-4 py-3 text-gray-600">3</td>
-                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors h-14">
                   <td className="px-4 py-3 text-gray-700">Liczba tablic</td>
                   <td className="text-center px-4 py-3 text-gray-600">3</td>
-                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors h-14">
                   <td className="px-4 py-3 text-gray-700">Współpraca realtime</td>
@@ -93,12 +93,12 @@ export default function PricingMegaMenu({
                 <tr className="hover:bg-gray-50 transition-colors h-14">
                   <td className="px-4 py-3 text-gray-700">Ilość elementów na tablicy</td>
                   <td className="text-center px-4 py-3 text-gray-600">500</td>
-                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                 </tr>
                 <tr className="hover:bg-gray-50 transition-colors h-14">
                   <td className="px-4 py-3 text-gray-700">Chat na tablicy</td>
                   <td className="text-center px-4 py-3 text-gray-600">5 pytań</td>
-                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">Nielimitowane</td>
+                  <td className="text-center px-4 py-3 font-semibold text-indigo-600">∞</td>
                 </tr>
               </tbody>
             </table>

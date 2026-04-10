@@ -51,6 +51,12 @@ export default function WorkspaceSidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      setIsCollapsed(true);
+    }
+  }, []);
+
   const [draggedId, setDraggedId] = useState<number | null>(null);
   const [dragOverId, setDragOverId] = useState<number | null>(null);
   const [customOrder, setCustomOrder] = useState<number[]>([]);
@@ -103,13 +109,8 @@ export default function WorkspaceSidebar({
     }
   }, [customOrder]);
 
-  useEffect(() => {
-    if (!isCollapsed) {
-      requestAnimationFrame(() => {
-        searchInputRef.current?.focus();
-      });
-    }
-  }, [isCollapsed]);
+  // Usunięty useEffect z auto-focusem, by zapobiec wyskakiwaniu klawiatury na mobile przy ładowaniu strony
+  // Automatyczny focus został przeniesiony tylko do explicite interakcji użytkownika (np. kliknięcie w ikonę lupy)
 
   const dragHandlers: WorkspaceDragHandlers = useMemo(
     () => ({

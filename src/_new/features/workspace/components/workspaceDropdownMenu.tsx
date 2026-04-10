@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { MoreVertical, Pencil, Settings, Users, Trash2 } from 'lucide-react';
+import { MoreVertical, Pencil, Settings, Users, Trash2, UserPlus } from 'lucide-react';
 import type { Workspace } from '../types';
 import { Button } from '@/_new/shared/ui/button';
 
@@ -22,6 +22,7 @@ interface WorkspaceDropdownMenuProps {
   onMembers: () => void;
   onDelete: () => void;
   onLeave: () => void;
+  onInvite?: () => void; // Nowy props na mobile zapraszanie
 }
 
 export function WorkspaceDropdownMenu({
@@ -30,6 +31,7 @@ export function WorkspaceDropdownMenu({
   onMembers,
   onDelete,
   onLeave,
+  onInvite,
 }: WorkspaceDropdownMenuProps) {
   // STATE
   // ================================
@@ -100,6 +102,18 @@ export function WorkspaceDropdownMenu({
           {workspace.is_owner ? (
             // Owner menu
             <>
+              {/* Opcja zapraszania widoczna tylko jeśli przekazano funkcję (używane na mobile) */}
+              {onInvite && (
+                <button
+                  onClick={handleAction(onInvite)}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 sm:hidden flex items-center gap-2 transition-colors cursor-pointer"
+                  role="menuitem"
+                >
+                  <UserPlus size={14} />
+                  <span>Zaproś uczestników</span>
+                </button>
+              )}
+
               <button
                 onClick={handleAction(onEdit)}
                 className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"

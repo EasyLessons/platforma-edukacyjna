@@ -1,6 +1,6 @@
 'use client';
 
-import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
+import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import Ad from './layout/ad';
 import Header from './layout/Header';
@@ -9,15 +9,10 @@ import AuthHeader from './layout/AuthHeader';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { QueryProvider } from '@/_new/lib/query-provider';
 import { usePathname } from 'next/navigation';
+import Script from 'next/script';
 
-const geistSans = Geist({
-  variable: '--font-geist-sans',
-  subsets: ['latin'],
-  preload: false,
-});
-
-const geistMono = Geist_Mono({
-  variable: '--font-geist-mono',
+const plusJakarta = Plus_Jakarta_Sans({
+  variable: '--font-plus-jakarta',
   subsets: ['latin'],
   preload: false,
 });
@@ -38,10 +33,12 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     pathname === '/' ||
     pathname === '/login' ||
     pathname === '/rejestracja' ||
-    pathname === '/weryfikacja';
+    pathname === '/weryfikacja' ||
+    pathname === '/produkt' ||
+    pathname?.startsWith('/aktualnosci');
 
   // Footer na homepage niezależnie od stanu logowania
-  const showFooter = pathname === '/';
+  const showFooter = pathname === '/' || pathname === '/produkt' || pathname?.startsWith('/aktualnosci');
 
   if (loading) {
     return (
@@ -88,8 +85,24 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable} antialiased`}
+        className={`${plusJakarta.className} ${plusJakarta.variable} ${playfair.variable} antialiased`}
       >
+        <div id="google_translate_element" style={{ display: 'none' }}></div>
+        <Script 
+          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" 
+          strategy="afterInteractive" 
+        />
+        <Script id="google-translate-init" strategy="afterInteractive">
+          {`
+            function googleTranslateElementInit() {
+              new window.google.translate.TranslateElement({
+                pageLanguage: 'pl',
+                autoDisplay: false
+              }, 'google_translate_element');
+            }
+          `}
+        </Script>
+        
         <QueryProvider>
           <AuthProvider>
             <LayoutContent>{children}</LayoutContent>

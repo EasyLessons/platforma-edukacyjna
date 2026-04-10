@@ -80,7 +80,7 @@ const comparisonRows = [
   { name: 'Smart Search', starter: 'Bez limitu', premium: 'Bez limitu', tutor: 'Bez limitu' },
   { name: 'Voice Chat', starter: 'Podstawowy', premium: 'Premium', tutor: 'Premium + AI' },
   { name: 'Asystent rozwiazywania zadan', starter: '-', premium: '-', tutor: 'check' },
-  { name: 'Aktywne tablice', starter: '3', premium: 'Nielimitowane', tutor: 'Nielimitowane' },
+  { name: 'Aktywne tablice', starter: '3', premium: '∞', tutor: '∞' },
   { name: 'Priorytetowe wsparcie', starter: '-', premium: 'check', tutor: 'check' },
 ];
 
@@ -153,8 +153,8 @@ export default function PricingSection() {
 
             <PricingCard
               plan="Premium"
-              monthlyPrice={49.99}
-              yearlyPrice={39.99}
+              monthlyPrice={29.99}
+              yearlyPrice={24.99}
               yearly={yearly}
               subtitle="Najlepszy wybór dla korepetytorów z większą liczbą uczniów"
               ctaLabel="Kup plan Premium"
@@ -165,8 +165,8 @@ export default function PricingSection() {
 
             <PricingCard
               plan="Inteligentny Korepetytor"
-              monthlyPrice={79.99}
-              yearlyPrice={64.99}
+              monthlyPrice={69.99}
+              yearlyPrice={59.99}
               yearly={yearly}
               subtitle="Plan Premium + AI, który siedzi z Toba na Voice Chacie podczas korepetycji"
               ctaLabel="Kup plan AI Tutor"
