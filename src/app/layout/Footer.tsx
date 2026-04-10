@@ -16,12 +16,11 @@ const Footer = () => {
             {/* Logo większe */}
             <Link href="/" className="inline-block mb-4">
               <Image
-                src="/resources/LogoEasyLesson.webp"
+                src="/resources/LogoEasyLessonWhite.webp"
                 alt="EasyLesson Logo"
                 width={220}
                 height={60}
                 className="h-14 w-auto"
-                style={{ filter: 'brightness(0) invert(1)' }}
               />
             </Link>
 

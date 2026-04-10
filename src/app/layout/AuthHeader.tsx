@@ -162,11 +162,11 @@ export default function AuthHeader() {
           <div className="flex items-center gap-8">
             <Link href="/dashboard" className="flex items-center">
               <Image
-                src="/resources/LogoEasyLesson.webp"
+                src={isHeroSectionActive ? '/resources/LogoEasyLessonWhite.webp' : '/resources/LogoEasyLesson.webp'}
                 alt="EasyLesson Logo"
                 width={160}
                 height={40}
-                className={`h-10 w-auto transition-all duration-300 ${isHeroSectionActive ? 'brightness-0 invert' : ''}`}
+                className="h-10 w-auto transition-all duration-300"
                 priority
               />
             </Link>
