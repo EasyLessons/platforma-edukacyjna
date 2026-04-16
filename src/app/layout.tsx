@@ -35,10 +35,17 @@ function LayoutContent({ children }: { children: React.ReactNode }) {
     pathname === '/rejestracja' ||
     pathname === '/weryfikacja' ||
     pathname === '/produkt' ||
-    pathname?.startsWith('/aktualnosci');
+    pathname?.startsWith('/aktualnosci') ||
+    pathname?.startsWith('/podrecznik-uzytkownika') ||
+    pathname?.startsWith('/dokumentacja');
 
   // Footer na homepage niezależnie od stanu logowania
-  const showFooter = pathname === '/' || pathname === '/produkt' || pathname?.startsWith('/aktualnosci');
+  const showFooter =
+    pathname === '/' ||
+    pathname === '/produkt' ||
+    pathname?.startsWith('/aktualnosci') ||
+    pathname?.startsWith('/podrecznik-uzytkownika') ||
+    pathname?.startsWith('/dokumentacja');
 
   if (loading) {
     return (

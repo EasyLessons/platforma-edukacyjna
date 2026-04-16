@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    root: process.cwd(),
+  },
+
   // ═══════════════════════════════════════════════════════════════════════════
   // 🔒 SECURITY HEADERS
   // ═══════════════════════════════════════════════════════════════════════════
@@ -47,6 +51,7 @@ const nextConfig: NextConfig = {
   // ═══════════════════════════════════════════════════════════════════════════
   compress: true,
   poweredByHeader: false, // Ukryj "X-Powered-By: Next.js" header
+  pageExtensions: ['ts', 'tsx', 'js', 'jsx'],
 };
 
 export default nextConfig;
