@@ -23,6 +23,7 @@ import {
 } from '@/_new/features/board/utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 interface BoardHeaderProps {
   boardName: string;
@@ -86,75 +87,37 @@ export function BoardHeader({
             }}
           >
             {/* Logo — link powrotu do dashboardu */}
-            <button
-              onClick={() => router.push('/dashboard')}
-              onMouseEnter={(e) => {
-                setShowTooltip(true);
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                setShowTooltip(false);
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              style={{
-                padding: '4px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                position: 'relative',
-                borderRadius: '8px',
-              }}
-            >
-              <Image
-                src="/resources/LogoEasyLesson.webp"
-                alt="EasyLesson Logo"
-                width={160}
-                height={50}
-                className="h-9 w-auto"
-                priority
-              />
-
-              {/* Tooltip */}
-              {showTooltip && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '8px',
-                    backgroundColor: '#1f2937',
-                    color: 'white',
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    pointerEvents: 'none',
-                    zIndex: 101,
-                  }}
-                >
-                  Wróć do panelu
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '6px solid transparent',
-                      borderRight: '6px solid transparent',
-                      borderBottom: '6px solid #1f2937',
-                    }}
-                  />
-                </div>
-              )}
-            </button>
+            <Tooltip content="Wróć do panelu" position="bottom">
+              <button
+                onClick={() => router.push('/dashboard')}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                style={{
+                  padding: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  position: 'relative',
+                  borderRadius: '8px',
+                }}
+              >
+                <Image
+                  src="/resources/LogoEasyLesson.webp"
+                  alt="EasyLesson Logo"
+                  width={160}
+                  height={50}
+                  className="h-9 w-auto"
+                  priority
+                />
+              </button>
+            </Tooltip>
 
             {/* Separator przed togglem */}
             {onSidebarToggle && (
@@ -171,30 +134,31 @@ export function BoardHeader({
 
             {/* Sidebar toggle (po prawej stronie logo) */}
             {onSidebarToggle && (
-              <button
-                onClick={onSidebarToggle}
-                title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
-                style={{
-                  padding: '6px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#374151',
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-              </button>
+              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom">
+                <button
+                  onClick={onSidebarToggle}
+                  style={{
+                    padding: '6px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#374151',
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+                </button>
+              </Tooltip>
             )}
 
             {/* Separator przed ustawieniami */}
@@ -212,29 +176,30 @@ export function BoardHeader({
 
             {/* Przycisk ustawień tablicy */}
             {onSettingsClick && (
-              <button
-                onClick={onSettingsClick}
-                title="Ustawienia tablicy"
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <MoreVertical size={18} color="#6b7280" />
-              </button>
+              <Tooltip content="Ustawienia tablicy" position="bottom">
+                <button
+                  onClick={onSettingsClick}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <MoreVertical size={18} color="#6b7280" />
+                </button>
+              </Tooltip>
             )}
 
             {/* Separator przed nazwą tablicy */}
@@ -249,36 +214,38 @@ export function BoardHeader({
             />
 
             {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
-            <div
-              title={boardName}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '10px',
-                maxWidth: '260px',
-                minWidth: 0,
-                color: '#374151',
-              }}
-            >
+            <Tooltip content={boardName || 'Tablica'} position="bottom">
               <div
-                className={`w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
-              >
-                <BoardIcon size={13} color="white" />
-              </div>
-              <span
                 style={{
-                  display: 'block',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  maxWidth: '160px',
                   minWidth: 0,
-                  fontSize: '13px',
-                  fontWeight: '600',
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
+                  color: '#374151',
+                  cursor: 'default',
                 }}
               >
-                {boardName || 'Tablica'}
-              </span>
-            </div>
+                <div
+                  className={`w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
+                >
+                  <BoardIcon size={13} color="white" />
+                </div>
+                <span
+                  style={{
+                    display: 'block',
+                    minWidth: 0,
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                >
+                  {boardName || 'Tablica'}
+                </span>
+              </div>
+            </Tooltip>
 
             {showUpgradeButton && (
               <>
@@ -293,15 +260,16 @@ export function BoardHeader({
                   }}
                 />
 
-                <Button
-                  onClick={() => router.push('/#pricing')}
-                  variant="secondary"
-                  size="sm"
-                  title="Przejdź do sekcji pricing"
-                  className="ml-1 hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700 px-3 whitespace-nowrap transition-all duration-300 ease-in-out"
+                <Tooltip content="Zmień wersję na premium" position="bottom">
+                  <Button
+                    onClick={() => router.push('/#pricing')}
+                    variant="secondary"
+                    size="sm"
+                  className="font-semibold ml-1 hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700 px-3 whitespace-nowrap transition-all duration-300 ease-in-out"
                 >
                   Zmień wersję
                 </Button>
+                </Tooltip>
               </>
             )}
 
@@ -337,112 +305,76 @@ export function BoardHeader({
               pointerEvents: 'auto',
             }}
           >
-            <button
-              onClick={() => router.push('/dashboard')}
-              onMouseEnter={(e) => {
-                setShowTooltip(true);
-                e.currentTarget.style.backgroundColor = '#f3f4f6';
-              }}
-              onMouseLeave={(e) => {
-                setShowTooltip(false);
-                e.currentTarget.style.backgroundColor = 'transparent';
-              }}
-              style={{
-                padding: '4px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                cursor: 'pointer',
-                transition: 'background-color 0.15s',
-                display: 'flex',
-                alignItems: 'center',
-                position: 'relative',
-                borderRadius: '8px',
-              }}
-            >
-              <Image
-                src="/resources/LogoEasyLesson.webp"
-                alt="EasyLesson Logo"
-                width={160}
-                height={50}
-                className="h-9 w-auto"
-                priority
-              />
+            <Tooltip content="Wróć do panelu" position="bottom">
+              <button
+                onClick={() => router.push('/dashboard')}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+                style={{
+                  padding: '4px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  position: 'relative',
+                  borderRadius: '8px',
+                }}
+              >
+                <Image
+                  src="/resources/LogoEasyLesson.webp"
+                  alt="EasyLesson Logo"
+                  width={160}
+                  height={50}
+                  className="h-9 w-auto"
+                  priority
+                />
+              </button>
+            </Tooltip>
 
-              {showTooltip && (
-                <div
+            {onSidebarToggle && (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  width: '1px',
+                  height: '28px',
+                  backgroundColor: '#e5e7eb',
+                }}
+              />
+            )}
+
+            {onSidebarToggle && (
+              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom">
+                <button
+                  onClick={onSidebarToggle}
                   style={{
-                    position: 'absolute',
-                    top: '100%',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    marginTop: '8px',
-                    backgroundColor: '#1f2937',
-                    color: 'white',
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                    whiteSpace: 'nowrap',
-                    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
-                    pointerEvents: 'none',
-                    zIndex: 101,
+                    padding: '6px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#374151',
+                    transition: 'background-color 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
                   }}
                 >
-                  Wróć do panelu
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '-6px',
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      width: 0,
-                      height: 0,
-                      borderLeft: '6px solid transparent',
-                      borderRight: '6px solid transparent',
-                      borderBottom: '6px solid #1f2937',
-                    }}
-                  />
-                </div>
-              )}
-            </button>
-
-            {onSidebarToggle && (
-              <div
-                style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
-                }}
-              />
-            )}
-
-            {onSidebarToggle && (
-              <button
-                onClick={onSidebarToggle}
-                title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
-                style={{
-                  padding: '6px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#374151',
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-              </button>
+                  {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+                </button>
+              </Tooltip>
             )}
 
             {onSettingsClick && (
@@ -458,29 +390,30 @@ export function BoardHeader({
             )}
 
             {onSettingsClick && (
-              <button
-                onClick={onSettingsClick}
-                title="Ustawienia tablicy"
-                style={{
-                  padding: '8px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'background 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f0f0f2';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <MoreVertical size={18} color="#6b7280" />
-              </button>
+              <Tooltip content="Ustawienia tablicy" position="bottom">
+                <button
+                  onClick={onSettingsClick}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <MoreVertical size={18} color="#6b7280" />
+                </button>
+              </Tooltip>
             )}
           </div>
         </div>
@@ -500,64 +433,66 @@ export function BoardHeader({
           }}
         >
           {onSidebarToggle && (
-            <button
-              onClick={onSidebarToggle}
-              title={isSidebarOpen ? 'Zamknij panel' : 'Otwórz panel tablic'}
-              style={{
-                width: `${metrics.boardHeader.fallbackButtonSize}px`,
-                height: `${metrics.boardHeader.fallbackButtonSize}px`,
-                backgroundColor: 'white',
-                border: '2px solid #e0e0e0',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'box-shadow 0.15s',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#374151',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-              }}
-            >
-              {isSidebarOpen ? (
-                <PanelLeftClose size={metrics.boardHeader.fallbackIconSize} />
-              ) : (
-                <PanelLeftOpen size={metrics.boardHeader.fallbackIconSize} />
-              )}
-            </button>
+            <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="right">
+              <button
+                onClick={onSidebarToggle}
+                style={{
+                  width: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  height: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  backgroundColor: 'white',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#374151',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }}
+              >
+                {isSidebarOpen ? (
+                  <PanelLeftClose size={metrics.boardHeader.fallbackIconSize} />
+                ) : (
+                  <PanelLeftOpen size={metrics.boardHeader.fallbackIconSize} />
+                )}
+              </button>
+            </Tooltip>
           )}
 
           {showSettingsInFallback && onSettingsClick && (
-            <button
-              onClick={onSettingsClick}
-              title="Ustawienia tablicy"
-              style={{
-                width: `${metrics.boardHeader.fallbackButtonSize}px`,
-                height: `${metrics.boardHeader.fallbackButtonSize}px`,
-                backgroundColor: 'white',
-                border: '2px solid #e0e0e0',
-                borderRadius: '12px',
-                cursor: 'pointer',
-                transition: 'box-shadow 0.15s',
-                boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-              }}
-            >
-              <MoreVertical size={metrics.boardHeader.fallbackIconSize} color="#6b7280" />
-            </button>
+            <Tooltip content="Ustawienia tablicy" position="right">
+              <button
+                onClick={onSettingsClick}
+                style={{
+                  width: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  height: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  backgroundColor: 'white',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }}
+              >
+                <MoreVertical size={metrics.boardHeader.fallbackIconSize} color="#6b7280" />
+              </button>
+            </Tooltip>
           )}
         </div>
       )}

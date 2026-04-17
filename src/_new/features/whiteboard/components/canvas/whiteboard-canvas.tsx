@@ -207,6 +207,8 @@ export default function WhiteboardCanvasNew({
     },
   ]);
 
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
   /** Aktywne linie snap — aktualizuje SelectTool podczas przeciągania */
   const [activeGuides, setActiveGuides] = useState<GuideLine[]>([]);
 
@@ -1922,6 +1924,8 @@ useMultiTouchGestures({
           onStopFollowing={handleStopFollowing}
           followingUserId={vp.followingUserId}
           userRole={userRole}
+          isHistoryOpen={isHistoryOpen}
+          onToggleHistory={() => setIsHistoryOpen(!isHistoryOpen)}
         />
 
         {/* ── FOLLOW MODE BANNER (Minimalist Version) ────────────────────────── */}
@@ -2386,12 +2390,15 @@ useMultiTouchGestures({
         )}
 
         {/* ── HISTORIA AKTYWNOŚCI ───────────────────────────────────────── */}
-        <ActivityHistory
-          elements={el.elementsWithAuthor}
-          viewport={vp.viewport}
-          onCenterView={handleCenterViewAndSelectElements}
-          onSelectElements={handleSelectElementsFromHistory}
-        />
+        {isHistoryOpen && (
+          <ActivityHistory
+            elements={el.elementsWithAuthor}
+            viewport={vp.viewport}
+            onCenterView={handleCenterViewAndSelectElements}
+            onSelectElements={handleSelectElementsFromHistory}
+            onClose={() => setIsHistoryOpen(false)}
+          />
+        )}
 
         {/* ── SNAP GUIDES ───────────────────────────────────────────────── */}
         <SnapGuides

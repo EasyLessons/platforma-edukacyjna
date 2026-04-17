@@ -22,12 +22,13 @@
 import { useState, useRef, useEffect } from 'react';
 import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeContext';
 import { useAuth } from '@/app/context/AuthContext';
-import { Check, Eye, EyeOff, Phone, Plus, Users } from 'lucide-react';
+import { Check, Eye, EyeOff, Phone, Plus, Users, History } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { useVoiceChat } from '@/app/context/VoiceChatContext';
 import { Button } from '@/_new/shared/ui/button';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🧩 KOMPONENT
@@ -43,9 +44,11 @@ interface OnlineUsersProps {
   onStopFollowing?: () => void;
   followingUserId?: number | null;
   userRole?: 'owner' | 'editor' | 'viewer';
+  onToggleHistory?: () => void;
+  isHistoryOpen?: boolean;
 }
 
-export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, userRole }: OnlineUsersProps) {
+export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, userRole, onToggleHistory, isHistoryOpen }: OnlineUsersProps) {
   const { onlineUsers, isConnected, subscribeViewports } = useBoardRealtime();
   const { user: currentUser } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
@@ -173,7 +176,7 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
       }}
     >
       <div
-        className="w-fit max-w-full overflow-hidden bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-300/80 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
+        className="w-fit max-w-full overflow-visible bg-white/95 backdrop-blur-xl rounded-2xl border border-gray-300/80 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
         style={{
           height: `${metrics.onlineUsers.stripHeight}px`,
           paddingLeft: `${metrics.onlineUsers.stripPaddingX}px`,
@@ -181,15 +184,16 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
         }}
       >
         <div className="h-full flex flex-nowrap items-center gap-3 transition-all duration-300 ease-in-out">
-          {metrics.onlineUsers.showClock && (
-            <div className="flex items-center text-gray-600 px-1">
-            <span className="text-sm font-medium whitespace-nowrap">
-              {currentTime || '--:--'}
-            </span>
-            </div>
-          )}
+          <Tooltip content="Historia aktywności" position="bottom" className="-ml-1">
+            <button
+              onClick={onToggleHistory}
+              className={`hover-shine h-8 w-8 flex items-center justify-center rounded-lg text-gray-600 cursor-pointer hover:text-gray-900 transition-colors ${isHistoryOpen ? 'bg-gray-200 text-gray-900' : ''}`}
+            >
+              <History className="w-6 h-6" strokeWidth={2.5} />
+            </button>
+          </Tooltip>
 
-          <div className="flex -space-x-1.5 shrink-0">
+          <div className="flex -space-x-1.5 shrink-0 ml-1">
             {onlineUsers.map((onlineUser, index) => {
             const isCurrentUser = onlineUser.user_id === currentUser?.id;
             const isBeingFollowed = followingUserId === onlineUser.user_id;
@@ -224,93 +228,87 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
             };
 
             return (
-              <div
+              <Tooltip
                 key={uniqueKey}
-                onClick={handleClick}
-                className={`
-                  relative group w-8 h-8 rounded-full 
-                  ${(onlineUser as any).avatar_url ? '' : avatarColorClass} 
-                  flex items-center justify-center 
-                  text-white text-xs font-bold
-                  transition-transform hover:scale-110 mb-0.5 hover:z-10
-                  ${
-                    isBeingFollowed
-                      ? 'ring-2 ring-blue-400 cursor-pointer shadow-md'
-                      : !isCurrentUser
-                        ? 'ring-2 ring-green-400 cursor-pointer shadow-md'
-                        : 'ring-2 ring-white/90'
-                  }
-                `}
-                title={onlineUser.username}
+                position="bottom"
+                content={
+                  <>
+                    {onlineUser.username}
+                    {isCurrentUser && userRole && ` (${userRole})`}
+                    {!isCurrentUser && (isBeingFollowed ? ' – Kliknij, by przestać śledzić' : ' – Kliknij, by śledzić')}
+                  </>
+                }
               >
-                {(onlineUser as any).avatar_url ? (
-                  <img 
-                    src={(onlineUser as any).avatar_url} 
-                    alt={onlineUser.username} 
-                    className="w-full h-full object-cover rounded-full"
-                  />
-                ) : (
-                  initials
-                )}
-
-                {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
-                {!isCurrentUser && (
-                  <div
-                    className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow-md border border-white ${
-                      isBeingFollowed ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
-                    }`}
-                  >
-                    {isBeingFollowed ? (
-                      <EyeOff size={10} className="text-white" />
-                    ) : (
-                      <Eye size={10} className="text-white" />
-                    )}
-                  </div>
-                )}
-
-                {/* Tooltip */}
                 <div
-                  className="
-                  absolute top-10 right-0 
-                  bg-gray-800 text-white text-xs 
-                  px-2 py-1 rounded 
-                  whitespace-nowrap
-                  opacity-0 group-hover:opacity-100
-                  transition-opacity
-                  pointer-events-none
-                  z-[260]
-                "
+                  onClick={handleClick}
+                  className={`
+                    relative w-8 h-8 rounded-full 
+                    ${(onlineUser as any).avatar_url ? '' : avatarColorClass} 
+                    flex items-center justify-center 
+                    text-white text-xs font-bold
+                    transition-transform hover:scale-110 mb-0.5 hover:z-10
+                    ${
+                      isBeingFollowed
+                        ? 'ring-2 ring-blue-400 cursor-pointer shadow-md'
+                        : !isCurrentUser
+                          ? 'ring-2 ring-green-400 cursor-pointer shadow-md'
+                          : 'ring-2 ring-white/90'
+                    }
+                  `}
                 >
-                  {onlineUser.username}
-                  {isCurrentUser && userRole && ` (${userRole})`}
-                  {!isCurrentUser && (isBeingFollowed ? ' – Kliknij aby przestać śledzić' : ' – Kliknij aby śledzić')}
+                  {(onlineUser as any).avatar_url ? (
+                    <img 
+                      src={(onlineUser as any).avatar_url} 
+                      alt={onlineUser.username} 
+                      className="w-full h-full object-cover rounded-full"
+                    />
+                  ) : (
+                    initials
+                  )}
+
+                  {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
+                  {!isCurrentUser && (
+                    <div
+                      className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow-md border border-white ${
+                        isBeingFollowed ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
+                      }`}
+                    >
+                      {isBeingFollowed ? (
+                        <EyeOff size={10} className="text-white" />
+                      ) : (
+                        <Eye size={10} className="text-white" />
+                      )}
+                    </div>
+                  )}
                 </div>
-              </div>
+              </Tooltip>
             );
             })}
           </div>
 
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={handleVoiceButton}
-            className={`hover-shine h-10 rounded-lg bg-gray-200 hover:bg-gray-200 text-gray-700 ${metrics.onlineUsers.compactButtons ? 'px-0 w-10 min-w-10 justify-center' : 'px-3'} whitespace-nowrap transition-all duration-300 ease-in-out shrink-0`}
-            title="Czat głosowy"
-            leftIcon={<Phone className="w-4 h-4" />}
-          >
-            {!metrics.onlineUsers.compactButtons && 'Czat głosowy'}
-          </Button>
+          <Tooltip position="bottom" content="Czat głosowy">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleVoiceButton}
+              className={`font-semibold hover-shine h-10 rounded-lg bg-gray-200 hover:bg-gray-200 text-gray-700 ${metrics.onlineUsers.compactButtons ? 'px-0 w-10 min-w-10 justify-center' : 'px-3'} whitespace-nowrap transition-all duration-300 ease-in-out shrink-0`}
+              leftIcon={<Phone className="w-4 h-4" />}
+            >
+              {!metrics.onlineUsers.compactButtons && 'Czat głosowy'}
+            </Button>
+          </Tooltip>
 
-          <Button
-            variant="dark"
-            size="sm"
-            onClick={handleCopyLink}
-            className={`h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.onlineUsers.compactButtons ? 'px-3 min-w-[106px] justify-center' : 'px-4'}`}
-            title={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'}
-            leftIcon={shareIcon}
-          >
-            {linkCopied ? 'Skopiowano' : 'Udostępnij'}
-          </Button>
+          <Tooltip position="bottom" content={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'}>
+            <Button
+              variant="dark"
+              size="sm"
+              onClick={handleCopyLink}
+              className={`font-semibold h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.onlineUsers.compactButtons ? 'px-3 min-w-[106px] justify-center' : 'px-4'}`}
+              leftIcon={shareIcon}
+            >
+              {linkCopied ? 'Skopiowano link' : 'Udostępnij'}
+            </Button>
+          </Tooltip>
         </div>
       </div>
 

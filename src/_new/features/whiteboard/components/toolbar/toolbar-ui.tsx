@@ -60,6 +60,7 @@ import {
   Highlighter,
 } from 'lucide-react';
 import { Tool, ShapeType } from '@/_new/features/whiteboard/types';
+import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 interface ToolbarUIProps {
   // Tool state
@@ -119,6 +120,7 @@ const ToolButton = ({
   disabled = false,
   filled = false,
   fillOpacity,
+  position = 'right'
 }: {
   icon: React.ComponentType<{ className?: string; fill?: string; fillOpacity?: number }>;
   active: boolean;
@@ -127,39 +129,38 @@ const ToolButton = ({
   disabled?: boolean;
   filled?: boolean;
   fillOpacity?: number;
+  position?: 'top' | 'right' | 'bottom' | 'left';
 }) => (
-  <button
-    onClick={onClick}
-    disabled={disabled}
-    title={title}
-    className={`
-      relative p-1.5 rounded-md transition-colors group
-      ${active 
-        ? 'bg-blue-500/20 text-blue-600' 
-        : 'text-gray-700 hover:bg-gray-100'
-      }
-      ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
-    `}
-  >
-    <Icon 
-      className="w-5 h-5" 
-      {...(() => {
-        if (filled) {
-          return { fill: 'currentColor', fillOpacity };
+  <Tooltip content={title} position={position}>
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      className={`
+        relative p-1.5 rounded-md transition-colors group
+        ${active 
+          ? 'bg-blue-500/20 text-blue-600' 
+          : 'text-gray-700 hover:bg-gray-100'
         }
-        if (active) {
-          return { 
-            fill: 'rgb(37 99 235 / 0.1)',
-            stroke: 'currentColor' 
-          };
-        }
-        return {};
-      })()} 
-    />
-    <span className="absolute left-full ml-2 top-1/2 -translate-y-1/2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
-      {title}
-    </span>
-  </button>
+        ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
+      `}
+    >
+      <Icon 
+        className="w-5 h-5" 
+        {...(() => {
+          if (filled) {
+            return { fill: 'currentColor', fillOpacity };
+          }
+          if (active) {
+            return { 
+              fill: 'rgb(37 99 235 / 0.1)',
+              stroke: 'currentColor' 
+            };
+          }
+          return {};
+        })()} 
+      />
+    </button>
+  </Tooltip>
 );
 
 const Divider = () => <div className="h-px w-6 bg-gray-200 my-1" />;

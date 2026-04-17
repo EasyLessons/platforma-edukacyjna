@@ -23,6 +23,7 @@
 
 import React, { memo } from 'react';
 import { Home, ZoomIn, ZoomOut } from 'lucide-react';
+import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 const ZoomControlsComponent = ({
   zoom,
@@ -38,33 +39,36 @@ const ZoomControlsComponent = ({
   return (
     <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg border border-gray-200 z-50 pointer-events-auto">
       <div className="flex items-center gap-1 p-1.5">
-        <button
-          onClick={onResetView}
-          className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors border-r border-gray-200"
-          title="Wróć do początku (Home)"
-        >
-          <Home className="w-4 h-4" />
-        </button>
+        <Tooltip content="Powrót na środek tablicy" position="top">
+          <button
+            onClick={onResetView}
+            className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors border-r border-gray-200"
+          >
+            <Home className="w-4 h-4" />
+          </button>
+        </Tooltip>
 
-        <button
-          onClick={onZoomOut}
-          className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
-          title="Oddal"
-        >
-          <ZoomOut className="w-4 h-4" />
-        </button>
+        <Tooltip content="Zmniejsz" position="top">
+          <button
+            onClick={onZoomOut}
+            className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+        </Tooltip>
 
         <span className="text-xs font-medium text-gray-700 min-w-[45px] text-center px-1">
           {Math.round(zoom * 100)}%
         </span>
 
-        <button
-          onClick={onZoomIn}
-          className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
-          title="Przybliż"
-        >
-          <ZoomIn className="w-4 h-4" />
-        </button>
+        <Tooltip content="Powiększ" position="top">
+          <button
+            onClick={onZoomIn}
+            className="p-1.5 text-gray-700 hover:bg-gray-100 rounded transition-colors"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+        </Tooltip>
       </div>
     </div>
   );
