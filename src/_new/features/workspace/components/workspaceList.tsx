@@ -11,7 +11,7 @@
 
 import { useCallback, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Star } from 'lucide-react';
+import { Star, Plus } from 'lucide-react';
 import { WorkspaceCard } from './workspaceCard';
 import { boardKeys } from '@/_new/features/board/hooks/useBoard';
 import { fetchBoards } from '@/_new/features/board/api/boardApi';
@@ -40,6 +40,7 @@ interface WorkspaceListProps {
   onAction: WorkspaceCardActions;
   dragState: WorkspaceDragState;
   dragHandlers: WorkspaceDragHandlers;
+  onCreateClick?: () => void;
 }
 
 export function WorkspaceList({
@@ -55,6 +56,7 @@ export function WorkspaceList({
   onAction,
   dragState,
   dragHandlers,
+  onCreateClick,
 }: WorkspaceListProps) {
   // COMPUTED
   // ================================
@@ -138,12 +140,11 @@ export function WorkspaceList({
 
   // Workspace list
   return (
-    <div className="flex-1 overflow-y-auto px-2 py-2">
+    <div className="flex-1 overflow-y-auto px-2 py-1 gap-0.5 flex flex-col">
       {/* Nagłówek "Ulubione" — tylko gdy są ulubione i sidebar rozwinięty */}
       {!isCollapsed && favouriteCount > 0 && (
-        <div className="px-4 pt-4 pb-2">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-            <Star size={14} className="text-yellow-500 fill-yellow-500" />
+        <div className="px-2 pt-2 pb-0.5">
+          <h3 className="text-[11px] font-medium text-gray-400 uppercase tracking-widest flex items-center gap-1">
             Ulubione
           </h3>
         </div>
@@ -152,11 +153,15 @@ export function WorkspaceList({
       {processedWorkspaces.map((workspace, index) => {
         // Separator między ostatnim ulubionym a pierwszym zwykłym
         const prev = processedWorkspaces[index - 1];
-        const showSeparator = !isCollapsed && prev?.is_favourite && !workspace.is_favourite;
+        const isFirstNormal = !workspace.is_favourite && (index === 0 || prev?.is_favourite);
 
         return (
-          <div key={workspace.id} onMouseEnter={() => handlePrefetch(workspace.id)} onTouchStart={() => handlePrefetch(workspace.id)}>
-            {showSeparator && <div className="h-px bg-gray-300 my-3 mx-4" />}
+          <div key={workspace.id} className="mb-0" onMouseEnter={() => handlePrefetch(workspace.id)} onTouchStart={() => handlePrefetch(workspace.id)}>
+            {!isCollapsed && isFirstNormal && (
+              <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 px-2">
+                Przestrzenie
+              </h3>
+            )}
             <WorkspaceCard
               workspace={workspace}
               isActive={workspace.id === activeWorkspaceId}
@@ -170,6 +175,24 @@ export function WorkspaceList({
           </div>
         );
       })}
+
+      {!isCollapsed && onCreateClick && (
+        <div className="mt-1 px-1">
+          <button
+            onClick={onCreateClick}
+            className="w-full relative flex items-center gap-1.5 pr-2 pl-[18px] py-2 rounded-md transition-colors duration-100 cursor-pointer group shadow-none bg-transparent hover:bg-gray-100"
+          >
+            <div className="relative flex items-center justify-center flex-shrink-0 w-[18px] h-[18px]">
+              <Plus size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors stroke-[2.5]" />
+            </div>
+            <div className="flex-1 min-w-0 flex items-center gap-1.5 pr-1">
+              <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors truncate">
+                Nowa przestrzeń
+              </span>
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

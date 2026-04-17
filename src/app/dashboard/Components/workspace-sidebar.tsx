@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PanelLeftClose, PanelLeftOpen, Plus, Search } from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen, Plus, Search, FolderPlus, Home, Clock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from './DashboardButton';
 import { Input } from '@/_new/shared/ui/input';
@@ -178,38 +178,49 @@ export default function WorkspaceSidebar({
           isCollapsed ? 'w-[72px]' : 'w-[344px]'
         } h-[calc(100vh-64px)] bg-[var(--dash-panel)] border-r border-[var(--dash-border)] flex flex-col sticky top-[64px] transition-all duration-300 z-10`}
       >
-        <div className="p-4 bg-[var(--dash-panel)]">
-          <div className="flex items-center justify-between mb-3">
+        <div className="px-4 pt-6 pb-2 bg-[var(--dash-panel)]">
+          <div className="flex items-center justify-between mb-4 group">
             {!isCollapsed && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
                   Przestrzenie
                 </h2>
-                <span className="text-xs text-gray-500 bg-[var(--dash-hover)] px-2 py-0.5 rounded-full font-medium">
-                  {workspaces.length}
-                </span>
+                <div className="flex items-center gap-1 transition-opacity">
+                  <Button
+                    variant="ghost"
+                    size="iconSm"
+                    onClick={() => setShowCreateModal(true)}
+                    className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
+                    title="Dodaj przestrzeń"
+                  >
+                    <FolderPlus size={18} strokeWidth={2.5} />
+                  </Button>
+                </div>
               </div>
             )}
             <Button
-              variant="secondary"
-              size="icon"
+              variant="ghost"
+              size="iconSm"
               onClick={() => setIsCollapsed(!isCollapsed)}
-              className="bg-transparent"
-              title={isCollapsed ? 'Rozwin sidebar' : 'Zwin sidebar'}
+              className={`h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer ${isCollapsed ? 'mx-auto' : ''}`}
+              title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
-              {isCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+              {isCollapsed ? <PanelLeftOpen size={18} strokeWidth={2.5} /> : <PanelLeftClose size={18} strokeWidth={2.5} />}
             </Button>
           </div>
 
           {!isCollapsed && (
-            <Input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Wyszukaj przestrzenie..."
-              leftIcon={<Search size={16} />}
-            />
+            <div className="pt-2">
+              <Input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Szukaj tablicy lub przestrzeni..."
+                leftIcon={<Search size={18} className="text-gray-400" strokeWidth={2.5} />}
+                className="bg-gray-100 border-transparent rounded-md focus:bg-gray-200/52 hover:bg-gray-100 focus:ring-0 transition-colors shadow-none h-[34px] text-[13px] placeholder:text-gray-500"
+              />
+            </div>
           )}
           {isCollapsed && (
             <Button
@@ -221,12 +232,70 @@ export default function WorkspaceSidebar({
                   searchInputRef.current?.focus();
                 });
               }}
-              className="bg-transparent"
-              title="Rozwin aby wyszukac"
+              className="w-full flex justify-center items-center bg-transparent hover:bg-gray-100 border-none text-gray-400 hover:text-gray-600"
+              title="Rozwiń aby wyszukać"
             >
-              <Search size={18} />
+              <Search size={18} strokeWidth={2.5} />
             </Button>
           )}
+        </div>
+
+        {/* SYSTEM LINKS */}
+        <div className="px-2 flex flex-col gap-[2px]">
+          {!isCollapsed ? (
+            <>
+              <button
+                className="relative w-full flex items-center gap-1.5 pr-2 py-2 rounded-md transition-colors duration-100 cursor-pointer group shadow-none bg-transparent hover:bg-gray-100"
+              >
+                <div className="w-[18px] pl-0.5 border-none" />
+                <div className="relative flex items-center justify-center flex-shrink-0 w-[18px] h-[18px]">
+                  <Home size={18} className="text-gray-400 group-hover:text-gray-600 transition-colors" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0 flex items-center text-left gap-1.5 pr-1">
+                  <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition-colors truncate">
+                    Strona główna
+                  </span>
+                </div>
+              </button>
+              <button
+                className="relative w-full flex items-center gap-1.5 pr-2 py-2 rounded-md transition-colors duration-100 cursor-pointer group shadow-none bg-transparent hover:bg-gray-100"
+              >
+                <div className="w-[18px] pl-0.5 border-none" />
+                <div className="relative flex items-center justify-center flex-shrink-0 w-[18px] h-[18px]">
+                  <Clock size={17} className="text-gray-400 group-hover:text-gray-600 transition-colors" strokeWidth={2.5} />
+                </div>
+                <div className="flex-1 min-w-0 flex items-center text-left gap-1.5 pr-1">
+                  <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900 transition-colors truncate">
+                    Ostatnio używane
+                  </span>
+                </div>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                className="relative w-full flex justify-center py-2 rounded-md transition-colors duration-100 cursor-pointer group hover:bg-gray-100"
+                title="Strona główna"
+              >
+                <div className="relative flex items-center justify-center w-6 h-6">
+                  <Home size={18} className="text-gray-400 group-hover:text-gray-600 transition-colors" strokeWidth={2.5} />
+                </div>
+              </button>
+              <button
+                className="relative w-full flex justify-center py-2 rounded-md transition-colors duration-100 cursor-pointer group hover:bg-gray-100"
+                title="Ostatnio używane"
+              >
+                <div className="relative flex items-center justify-center w-6 h-6">
+                  <Clock size={17} className="text-gray-400 group-hover:text-gray-600 transition-colors" strokeWidth={2.5} />
+                </div>
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* SUBTELNY SEPARATOR */}
+        <div className="px-5 mt-3 mb-1">
+          <div className="h-[1px] bg-gray-200/50 w-full" />
         </div>
 
         <WorkspaceList
@@ -242,37 +311,8 @@ export default function WorkspaceSidebar({
           onAction={cardActions}
           dragState={dragState}
           dragHandlers={dragHandlers}
+          onCreateClick={() => setShowCreateModal(true)}
         />
-
-        <div className="p-4 bg-[var(--dash-panel)]">
-          {isCollapsed ? (
-            <div className="flex justify-center">
-              <DashboardButton
-                variant="primary"
-                onClick={() => setShowCreateModal(true)}
-                title="Dodaj przestrzen"
-                className="h-10 w-10 rounded-full p-0"
-              >
-                <Plus size={20} />
-              </DashboardButton>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center justify-between mb-3 text-xs text-gray-500">
-                <span>Ulubione: {workspaces.filter((w) => w.is_favourite).length}</span>
-                <span>Wszystkie: {workspaces.length}</span>
-              </div>
-              <DashboardButton
-                variant="primary"
-                leftIcon={<Plus size={18} />}
-                onClick={() => setShowCreateModal(true)}
-                className="w-full justify-center"
-              >
-                Dodaj przestrzeń
-              </DashboardButton>
-            </>
-          )}
-        </div>
       </div>
 
       <WorkspaceCreateModal

@@ -17,7 +17,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Star, GripVertical, UserPlus, Pencil } from 'lucide-react';
 import { WorkspaceDropdownMenu } from './workspaceDropdownMenu';
-import { getIconComponent, getColorClass } from '../utils/helpers';
+import { getIconComponent, getColorClass, getTextColorClass } from '../utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
 import type {
   Workspace,
@@ -59,7 +59,7 @@ export function WorkspaceCard({
   // ================================
 
   const Icon = getIconComponent(workspace.icon);
-  const colorClass = getColorClass(workspace.bg_color);
+  const textColorClass = getTextColorClass(workspace.bg_color);
 
   const isDragging = dragState?.draggedId === workspace.id;
   const isDragOver = dragState?.dragOverId === workspace.id;
@@ -119,23 +119,13 @@ export function WorkspaceCard({
           onBlur={() => setIsHovered(false)}
           aria-label={workspace.name}
           className={`
-            relative w-full flex justify-center p-2 rounded-lg
-            transition-all duration-200 cursor-pointer
-            ${isActive ? 'bg-[#ececef]' : isHovered ? 'bg-[#f0f0f2]' : ''}
+            relative w-full flex justify-center py-2 rounded-[4px]
+            transition-colors duration-100 cursor-pointer
+            ${isActive ? 'bg-gray-100/80 shadow-none' : isHovered ? 'bg-gray-50' : ''}
           `}
         >
-          {/* Pasek aktywności */}
-          <div
-            className={`
-              absolute left-0 top-1/2 -translate-y-1/2
-              bg-black rounded-r-full transition-all duration-200
-              ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
-            `}
-          />
-          <div
-            className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center`}
-          >
-            <Icon size={16} className="text-white" />
+          <div className="relative flex items-center justify-center w-6 h-6">
+            <Icon size={18} className={textColorClass} />
           </div>
         </button>
 
@@ -143,7 +133,7 @@ export function WorkspaceCard({
           tooltipPosition &&
           createPortal(
             <div
-              className="pointer-events-none fixed z-[1200] whitespace-nowrap rounded-md bg-black px-3 py-1.5 text-[11px] font-bold text-white shadow-xl"
+              className="pointer-events-none fixed z-[1200] whitespace-nowrap rounded-md bg-black px-3 py-1.5 text-[11px] font-bold text-white shadow-none"
               style={{
                 top: tooltipPosition.top,
                 left: tooltipPosition.left,
@@ -162,22 +152,13 @@ export function WorkspaceCard({
   // Default version
   return (
     <div
-      className={`relative mb-1 ${isHovered ? 'z-30' : 'z-0'}`}
+      className={`relative ${isHovered ? 'z-30' : 'z-0'}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Pasek aktywności po lewej */}
-      <div
-        className={`
-          absolute left-0 top-1/2 -translate-y-1/2
-          bg-black rounded-r-full transition-all duration-200
-          ${isActive ? 'w-1 h-10' : isHovered ? 'w-0.5 h-10' : 'w-0 h-10'}
-        `}
-      />
-
       {/* Wskaźnik drag-over */}
       {isDragOver && (
-        <div className="absolute left-2 right-2 top-0 h-0.5 bg-green-500 rounded-full z-10" />
+        <div className="absolute left-1 right-1 -top-0.5 h-px bg-gray-300 z-10" />
       )}
 
       <div
@@ -190,108 +171,95 @@ export function WorkspaceCard({
         onClick={() => onSelect?.(workspace.id, workspace.name)}
         aria-label={`Workspace: ${workspace.name}`}
         className={`
-          relative flex items-center gap-2 px-2.5 py-2 ml-2 rounded-lg
-          transition-all duration-200 cursor-pointer group
-          ${
-            isActive
-              ? 'bg-[#ececef]'
-              : isHovered
-                ? 'bg-[#f0f0f2]'
-                : workspace.is_favourite
-                  ? 'bg-[#f3f3f5]'
-                  : ''
-          }
+          relative flex items-center gap-1.5 pr-2 py-2 rounded-md
+          transition-colors duration-100 cursor-pointer group shadow-none
+          ${isActive ? 'bg-gray-200/60' : 'bg-transparent hover:bg-gray-100'}
           ${isDragging ? 'opacity-50' : ''}
         `}
       >
-        {/* Ikona */}
-        <div
-          className={`w-8 h-8 ${colorClass} rounded-lg flex items-center justify-center flex-shrink-0`}
-        >
-          <Icon size={16} className="text-white" />
-        </div>
-
-        {/* Grip przy hover — tylko gdy D&D aktywne */}
-        {dragHandlers && (
+        {/* Grip przy hover — maks z lewej */}
+        {dragHandlers ? (
           <div
-            className={`flex w-4 items-center text-gray-400 transition-opacity ${
-              isHovered ? ' opacity-100 cursor-move' : ' opacity-0'
-            }`}
+            className="flex w-[18px] pl-0.5 items-center justify-center text-gray-400 transition-opacity opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
           >
-            <GripVertical size={16} />
+            <GripVertical size={14} />
           </div>
+        ) : (
+          <div className="w-[18px] pl-0.5" /> // Wyrównanie gdy brak drag (np. ulubione)
         )}
 
-        {/* Nazwa */}
-        <span
-          className={`text-sm font-medium flex-1 min-w-0 transition-all duration-150 ${
-            isHovered
-              ? 'truncate pr-[148px]'
-              : 'overflow-hidden whitespace-nowrap text-clip pr-1'
-          } ${
-            isActive ? 'text-black font-bold' : 'font-bold text-gray-600 group-hover:text-gray-900'
-          }`}
-        >
-          {workspace.name}
-        </span>
-
-        {/* Akcje */}
+        {/* Ikona (zawsze w docelowym kolorze na linii, bez kropek/backgroundów) */}
         <div
-          className={`absolute right-2 top-1/2 z-40 flex -translate-y-1/2 items-center gap-1 transition-opacity duration-150 ${
-            isHovered ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
+          className={`relative flex items-center justify-center flex-shrink-0 w-[18px] h-[18px]`}
+        >
+          <Icon size={16} className={textColorClass} />
+        </div>
+
+        {/* Nazwa przestrzeni - single line + gwiazdka */}
+        <div
+          className={`flex-1 min-w-0 flex items-center gap-1.5 pr-1 group-hover:pr-[120px] transition-all`}
+        >
+          <span
+            className={`text-sm truncate leading-normal ${
+              isActive ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'
+            }`}
+          >
+            {workspace.name}
+          </span>
+          {workspace.is_favourite && (
+            <Star size={11} className="flex-shrink-0 fill-yellow-500 text-yellow-500" />
+          )}
+        </div>
+
+        {/* Akcje - pokaż na grupowym hoverze całego wiersza */}
+        <div
+          className="absolute right-1 top-1/2 z-40 flex -translate-y-1/2 items-center gap-0.5 transition-opacity duration-150 bg-transparent opacity-0 group-hover:opacity-100 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-            <Button
-              variant="secondary"
-              size="iconSm"
+            <button
               onClick={handleToggleFavourite}
-              className={
-                workspace.is_favourite
-                  ? 'dashboard-btn-secondary bg-yellow-100 hover:bg-yellow-200'
-                  : 'dashboard-btn-secondary'
-              }
+              className={`flex justify-center items-center w-[26px] h-[26px] rounded bg-transparent hover:bg-gray-200 transition-colors ${
+                workspace.is_favourite ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'
+              }`}
               title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
             >
               <Star
                 size={14}
-                className={
-                  workspace.is_favourite ? 'text-yellow-600 fill-yellow-600' : 'text-gray-600'
-                }
+                className={workspace.is_favourite ? 'fill-yellow-500' : ''}
               />
-            </Button>
+            </button>
 
-            <Button
-              variant="secondary"
-              size="iconSm"
+            <button
               onClick={() => onAction.invite(workspace)}
-              className="dashboard-btn-secondary"
+              className="flex justify-center items-center w-[26px] h-[26px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
               title="Zaproś członków"
               aria-label="Zaproś członków"
             >
-              <UserPlus className="w-4 h-4 text-gray-600" />
-            </Button>
+              <UserPlus size={14} />
+            </button>
 
             {workspace.is_owner && (
-              <Button
-                variant="secondary"
-                size="iconSm"
+              <button
                 onClick={() => onAction.edit(workspace)}
-                className="dashboard-btn-secondary"
+                className="flex justify-center items-center w-[26px] h-[26px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
                 title="Zmień nazwę"
                 aria-label="Zmień nazwę"
               >
-                <Pencil className="w-4 h-4 text-gray-600" />
-              </Button>
+                <Pencil size={14} />
+              </button>
             )}
 
-            <WorkspaceDropdownMenu
-              workspace={workspace}
-              onEdit={() => onAction.edit(workspace)}
-              onMembers={() => onAction.members(workspace)}
-              onDelete={() => onAction.delete(workspace)}
-              onLeave={() => onAction.leave(workspace)}
-            />
+            <div className="relative flex" onClick={(e) => e.stopPropagation()}>
+              <WorkspaceDropdownMenu
+                workspace={workspace}
+                triggerClassName="w-[26px] h-[26px]"
+                iconSize={14}
+                onEdit={() => onAction.edit(workspace)}
+                onMembers={() => onAction.members(workspace)}
+                onDelete={() => onAction.delete(workspace)}
+                onLeave={() => onAction.leave(workspace)}
+              />
+            </div>
         </div>
       </div>
     </div>

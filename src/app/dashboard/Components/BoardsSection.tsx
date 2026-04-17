@@ -98,8 +98,8 @@ export default function BoardsSection({
       >
         <div className="pt-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-4 md:mb-6">
-            <h2 className="text-lg md:text-2xl font-bold text-gray-900">
+          <div className="flex items-center justify-between mb-6 md:mb-8">
+            <h2 className="text-2xl md:text-[28px] font-bold text-gray-900">
               {workspace_name ? `Tablice — ${workspace_name}` : 'Tablice'}
             </h2>
             <DashboardButton

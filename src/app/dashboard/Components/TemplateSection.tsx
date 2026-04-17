@@ -178,7 +178,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
     <section className="mb-8 rounded-3xl bg-[#ffffff] border border-[var(--dash-border)] p-4 sm:p-5">
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-          <h2 className="text-lg md:text-2xl font-bold text-gray-900">Szablony</h2>
+          <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 ml-3 mb-2">Szablony</h2>
           
           <div className="flex items-center gap-2">
             <div className="relative" ref={subjectDropdownRef}>
@@ -189,7 +189,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
               }}
               className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
             >
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Zestaw szablonow:</span>
+              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 my-auto">Zestaw szablonow:</span>
               <span className="font-medium text-gray-900">{subject}</span>
               <ChevronDown
                 size={14}
@@ -274,7 +274,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
           onClick={() => createAndOpenBoard('Czysta tablica')}
           className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
         >
-          <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
+          <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white border border-dashed border-gray-300 flex items-center justify-center">
             <img src={THUMBNAILS.whiteboard} alt="Czysta tablica" className="h-full w-full object-cover" />
             <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">

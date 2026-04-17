@@ -11,9 +11,28 @@ import type { Workspace } from '../types';
 // HELPERS - KOLORY
 // ================================
 
-// getColorClass - Zwraca klasę Tailwind dla koloru
+// getColorClass - Zwraca klasę Tailwind dla koloru tła
 export const getColorClass = (color: string): string => {
   return COLOR_MAP[color] || COLOR_MAP['green-500'];
+};
+
+// getTextColorClass - Zwraca stałą klasę Tailwind dla koloru tekstu/ikony
+export const getTextColorClass = (color: string): string => {
+  const map: Record<string, string> = {
+    'green-500': 'text-green-500',
+    'blue-500': 'text-blue-500',
+    'purple-500': 'text-purple-500',
+    'pink-500': 'text-pink-500',
+    'orange-500': 'text-orange-500',
+    'red-500': 'text-red-500',
+    'yellow-500': 'text-yellow-500',
+    'indigo-500': 'text-indigo-500',
+    'teal-500': 'text-teal-500',
+    'cyan-500': 'text-cyan-500',
+    'emerald-500': 'text-emerald-500',
+    'gray-500': 'text-gray-500'
+  };
+  return map[normalizeColorFormat(color)] || 'text-gray-500';
 };
 
 // normalizeColorFormat - Normalizuje format koloru dla backendu

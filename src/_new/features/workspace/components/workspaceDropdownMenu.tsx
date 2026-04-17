@@ -11,7 +11,8 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { MoreVertical, Pencil, Settings, Users, Trash2, UserPlus } from 'lucide-react';
 import type { Workspace } from '../types';
 import { Button } from '@/_new/shared/ui/button';
@@ -23,6 +24,8 @@ interface WorkspaceDropdownMenuProps {
   onDelete: () => void;
   onLeave: () => void;
   onInvite?: () => void; // Nowy props na mobile zapraszanie
+  triggerClassName?: string;
+  iconSize?: number;
 }
 
 export function WorkspaceDropdownMenu({
@@ -32,21 +35,48 @@ export function WorkspaceDropdownMenu({
   onDelete,
   onLeave,
   onInvite,
+  triggerClassName = "w-8 h-8", // Domyślny rozmiar dla TopNav i innych miejsc
+  iconSize = 16,
 }: WorkspaceDropdownMenuProps) {
   // STATE
   // ================================
 
   const [isOpen, setIsOpen] = useState(false);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, right: 0 });
+  const [isMounted, setIsMounted] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // EFFECTS
   // ================================
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  const updatePosition = useCallback(() => {
+    if (menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4, // 4px below button
+        right: window.innerWidth - rect.right, // align exactly to the right side of the button
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     if (!isOpen) return;
 
+    updatePosition();
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        menuRef.current && !menuRef.current.contains(target) &&
+        dropdownRef.current && !dropdownRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -57,15 +87,24 @@ export function WorkspaceDropdownMenu({
     }, 0);
 
     return () => {
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [isOpen]);
+  }, [isOpen, updatePosition]);
 
   // HANDLERS
   // ================================
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!isOpen && menuRef.current) {
+      const rect = menuRef.current.getBoundingClientRect();
+      setDropdownPosition({
+        top: rect.bottom + 4,
+        right: window.innerWidth - rect.right,
+      });
+    }
     setIsOpen(!isOpen);
   };
 
@@ -80,22 +119,25 @@ export function WorkspaceDropdownMenu({
 
   return (
     <div ref={menuRef} className={`relative ${isOpen ? 'z-50' : 'z-10'}`}>
-      {/* Trigger Button */}
       <Button
-        variant="secondary"
+        variant="ghost"
         size="iconSm"
         onClick={handleToggle}
         title="Menu"
         aria-label="Menu"
-        className="dashboard-btn-secondary"
+        className={`flex justify-center items-center p-0 min-w-0 rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600 ${triggerClassName} ${
+          isOpen ? 'bg-gray-200' : ''
+        }`}
       >
-        <MoreVertical className="w-4 h-4 text-gray-600" />
+        <MoreVertical size={iconSize} className={isOpen ? 'text-gray-600' : ''} />
       </Button>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
+      {/* Dropdown Menu (Portal) */}
+      {isMounted && isOpen && createPortal(
         <div
-          className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-50 min-w-[180px] animate-in fade-in slide-in-from-top-2 duration-150"
+          ref={dropdownRef}
+          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[1500] min-w-[180px] animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
           role="menu"
           aria-orientation="vertical"
         >
@@ -163,7 +205,8 @@ export function WorkspaceDropdownMenu({
               <span>Opuść</span>
             </button>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
