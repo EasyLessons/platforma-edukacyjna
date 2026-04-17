@@ -6,6 +6,7 @@ Wszystkie endpointy zwracają ApiResponse[T] z timestamp i metadata
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 import json
 import base64
 from urllib.parse import quote_plus
@@ -21,7 +22,8 @@ from .schemas import (
     VerifyEmail, ResendCode, CheckUser,
     UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
-    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse
+    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
+    UserResponse
 )
 from .service import AuthService
 from core.models import User
