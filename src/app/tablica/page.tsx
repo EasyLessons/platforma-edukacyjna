@@ -114,6 +114,7 @@ export function TablicaContent() {
           if (board.settings) {
             setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...board.settings });
           }
+          import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) => addRecentBoard(board));
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {

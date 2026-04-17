@@ -7,6 +7,7 @@ import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
+import RecentsView from './Components/RecentsView';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 export default function Dashboard() {
@@ -23,11 +24,13 @@ export default function Dashboard() {
   } = useWorkspaces();
 
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+  const [currentView, setCurrentView] = useState<'workspace' | 'recent'>('workspace');
   const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);
   const workspaceTopNavRef = useRef<HTMLDivElement | null>(null);
 
   const handleWorkspaceSelect = useCallback((id: number, _name: string) => {
     setActiveWorkspaceId(id);
+    setCurrentView('workspace');
   }, []);
 
   useEffect(() => {
@@ -86,7 +89,9 @@ export default function Dashboard() {
       <div className="flex flex-1 min-h-0 overflow-hidden ">
         <WorkspaceSidebar
           activeWorkspaceId={activeWorkspaceId}
+          currentView={currentView}
           onWorkspaceSelect={handleWorkspaceSelect}
+          onRecentSelect={() => setCurrentView('recent')}
           workspaces={workspaces}
           loading={loading}
           error={error}
@@ -97,31 +102,35 @@ export default function Dashboard() {
           toggleFavourite={toggleFavourite}
         />
 
-        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white md:rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)]  md:mr-6 md:mb-6">
-          <div className="flex flex-col w-full min-h-full">
-            <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-[var(--dash-panel)]">
-              <WorkspaceTopNav
-                activeWorkspaceId={activeWorkspaceId}
-                workspaces={workspaces}
-                toggleFavourite={toggleFavourite}
-                updateWorkspace={updateWorkspace}
-                deleteWorkspace={deleteWorkspace}
-                leaveWorkspace={leaveWorkspace}
-              />
-            </div>
-
-            <div className="p-4 pb-10 md:p-8 md:pb-20">
-              <TemplatesSection workspaceId={activeWorkspaceId} />
-
-              {activeWorkspaceId && (
-                <BoardsSection
-                  workspace_id={activeWorkspaceId}
-                  workspace_name={activeWorkspaceName}
-                  stickyOffset={workspaceTopNavHeight}
+        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white">
+          {currentView === 'recent' ? (
+            <RecentsView />
+          ) : (
+            <div className="flex flex-col w-full min-h-full">
+              <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-white">
+                <WorkspaceTopNav
+                  activeWorkspaceId={activeWorkspaceId}
+                  workspaces={workspaces}
+                  toggleFavourite={toggleFavourite}
+                  updateWorkspace={updateWorkspace}
+                  deleteWorkspace={deleteWorkspace}
+                  leaveWorkspace={leaveWorkspace}
                 />
-              )}
+              </div>
+
+              <div className="p-4 pb-10 md:p-8 md:pb-20">
+                <TemplatesSection workspaceId={activeWorkspaceId} />
+
+                {activeWorkspaceId && (
+                  <BoardsSection
+                    workspace_id={activeWorkspaceId}
+                    workspace_name={activeWorkspaceName}
+                    stickyOffset={workspaceTopNavHeight}
+                  />
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </main>
       </div>
     </div>

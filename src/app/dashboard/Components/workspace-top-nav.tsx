@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Loader2, Pencil, Star, UserPlus } from 'lucide-react';
+import { Loader2, Pencil, Star, UserPlus, Lock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from './DashboardButton';
 import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
@@ -82,12 +82,11 @@ export default function WorkspaceTopNav({
 
   return (
     <>
-      <div className="w-full shrink-0 bg-[var(--dash-panel)] ">
-        
+      <div className="w-full shrink-0 bg-white">
         {/* Biały pasek Navu */}
-      <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 sm:px-8 rounded-t-[2.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-        
-        <div className="min-w-0 flex items-center gap-3">
+        <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 sm:px-8 border-b border-gray-100">
+          
+          <div className="min-w-0 flex items-center gap-3">
           {activeWorkspace && WorkspaceIcon && (
             <div
               className={`flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm ${workspaceColorClass}`}
@@ -168,57 +167,52 @@ export default function WorkspaceTopNav({
               )}
             </div>
 
-            <DashboardButton
-              variant="primary"
-              leftIcon={<UserPlus size={14} />}
+            <button
               onClick={() => setInvitingWorkspace(activeWorkspace)}
-              className="hidden sm:flex h-8 px-3 text-xs font-semibold"
-              
+              className="hover-shine cursor-pointer hidden sm:flex items-center gap-2 h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-200 text-[13px] font-semibold text-gray-700 transition"
             >
-              Zaproś uczestników
-            </DashboardButton>
+              <UserPlus size={14} className="text-gray-600" />
+              <span>Zaproś uczestników</span>
+            </button>
 
             {activeWorkspace.is_owner && (
-              <Button
-                variant="primary"
-                size="iconSm"
+              <button
                 onClick={() => setEditingWorkspace(activeWorkspace)}
                 title="Zmień nazwę przestrzeni"
-                className="dashboard-btn-secondary hidden sm:flex"
+                className="cursor-pointer hidden sm:flex items-center justify-center h-8 w-8 text-gray-500 hover:text-gray-800 transition"
               >
-                <Pencil size={15} className="text-gray-600" />
-              </Button>
+                <Pencil size={16} />
+              </button>
             )}
 
-            <Button
-              variant="primary"
-              size="iconSm"
+            <button
               onClick={() => toggleFavourite(activeWorkspace.id, !activeWorkspace.is_favourite)}
               title={
                 activeWorkspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'
               }
-              className={
+              className={`cursor-pointer flex items-center justify-center h-8 w-8 transition ${
                 activeWorkspace.is_favourite
-                  ? 'dashboard-btn-secondary bg-yellow-100 hover:bg-yellow-200'
-                  : 'dashboard-btn-secondary'
-              }
+                  ? 'text-yellow-500 hover:text-yellow-600'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
             >
               <Star
-                size={15}
-                className={
-                  activeWorkspace.is_favourite ? 'fill-yellow-500 text-yellow-600' : 'text-gray-600'
-                }
+                size={16}
+                className={activeWorkspace.is_favourite ? 'fill-yellow-500' : ''}
               />
-            </Button>
+            </button>
 
-            <WorkspaceDropdownMenu
-              workspace={activeWorkspace}
-              onInvite={() => setInvitingWorkspace(activeWorkspace)}
-              onEdit={() => setEditingWorkspace(activeWorkspace)}
-              onMembers={() => setMembersWorkspace(activeWorkspace)}
-              onDelete={() => setDeletingWorkspace(activeWorkspace)}
-              onLeave={() => setLeavingWorkspace(activeWorkspace)}
-            />
+            <div className="cursor-pointer flex items-center justify-center h-8 w-8">
+              <WorkspaceDropdownMenu
+                workspace={activeWorkspace}
+                onInvite={() => setInvitingWorkspace(activeWorkspace)}
+                onEdit={() => setEditingWorkspace(activeWorkspace)}
+                onMembers={() => setMembersWorkspace(activeWorkspace)}
+                onDelete={() => setDeletingWorkspace(activeWorkspace)}
+                onLeave={() => setLeavingWorkspace(activeWorkspace)}
+                triggerClassName="h-8 w-8 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
+              />
+            </div>
           </div>
         ) : (
           <span className="text-xs text-gray-500">Wybierz workspace z menu po lewej</span>

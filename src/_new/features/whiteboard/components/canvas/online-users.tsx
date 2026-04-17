@@ -229,10 +229,10 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
                 onClick={handleClick}
                 className={`
                   relative group w-8 h-8 rounded-full 
-                  ${avatarColorClass} 
+                  ${(onlineUser as any).avatar_url ? '' : avatarColorClass} 
                   flex items-center justify-center 
                   text-white text-xs font-bold
-                  transition-transform hover:scale-110 hover:z-10
+                  transition-transform hover:scale-110 mb-0.5 hover:z-10
                   ${
                     isBeingFollowed
                       ? 'ring-2 ring-blue-400 cursor-pointer shadow-md'
@@ -243,7 +243,15 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
                 `}
                 title={onlineUser.username}
               >
-                {initials}
+                {(onlineUser as any).avatar_url ? (
+                  <img 
+                    src={(onlineUser as any).avatar_url} 
+                    alt={onlineUser.username} 
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                ) : (
+                  initials
+                )}
 
                 {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
                 {!isCurrentUser && (

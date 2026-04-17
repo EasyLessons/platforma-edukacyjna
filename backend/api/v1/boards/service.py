@@ -115,7 +115,7 @@ class BoardService:
         
         # Pusty albo z jednym tworzącym jako online. Dla pewności zwracamy twórce
         owner = self.db.query(User).filter(User.id == user_id).first()
-        online_users = [OnlineUserInfo(user_id=user_id, username=owner.username)] if owner else []
+        online_users = [OnlineUserInfo(user_id=user_id, username=owner.username, avatar_url=owner.avatar_url)] if owner else []
 
         logger.info(f"✅ Tablica utworzona: {board.id} przez {user_id}")
         return _build_board_response(self.db, board, user_id, online_users)
@@ -155,7 +155,7 @@ class BoardService:
             from datetime import timedelta
             active_threshold = datetime.utcnow() - timedelta(minutes=2)
             online_records = (
-                self.db.query(BoardUsers.board_id, User.id, User.username)
+                self.db.query(BoardUsers.board_id, User.id, User.username, User.avatar_url)
                 .join(User, User.id == BoardUsers.user_id)
                 .filter(
                     BoardUsers.board_id.in_(board_ids), 
@@ -164,10 +164,10 @@ class BoardService:
                 )
                 .all()
             )
-            for bid, uid, uname in online_records:
+            for bid, uid, uname, av_url in online_records:
                 if bid not in online_map:
                     online_map[bid] = []
-                online_map[bid].append(OnlineUserInfo(user_id=uid, username=uname))
+                online_map[bid].append(OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url))
 
         responses = []
         for board in boards:

@@ -53,6 +53,7 @@ import { DrawingElement } from '@/_new/features/whiteboard/types';
 interface OnlineUser {
   user_id: number;
   username: string;
+  avatar_url?: string;
   online_at: string;
   cursor_x?: number; // Opcjonalnie: pozycja kursora
   cursor_y?: number;
@@ -608,6 +609,7 @@ export function BoardRealtimeProvider({
           const presenceData: any = {
             user_id: user.id,
             username: user.username,
+            avatar_url: (user as any).avatar_url,
             online_at: new Date().toISOString(),
           };
 
