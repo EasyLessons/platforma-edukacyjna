@@ -250,5 +250,4 @@ async def update_user_profile(
         success=True,
         data=UserResponse.model_validate(current_user)
     )
-    )
 
