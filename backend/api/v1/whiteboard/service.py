@@ -86,33 +86,44 @@ class WhiteboardService:
     def get_online_users(
         self, board_id: int, limit: int = 50, offset: int = 0
     ) -> List[OnlineUserInfo]:
+        from datetime import timedelta, datetime
+        active_threshold = datetime.utcnow() - timedelta(minutes=2)
+
         rows = (
             self.db.query(BoardUsers, User)
             .join(User, User.id == BoardUsers.user_id)
-            .filter(BoardUsers.board_id == board_id, BoardUsers.is_online == True)
+            .filter(
+                BoardUsers.board_id == board_id, 
+                BoardUsers.is_online == True,
+                BoardUsers.last_opened >= active_threshold
+            )
             .offset(offset).limit(limit)
             .all()
         )
-        return [OnlineUserInfo(user_id=u.id, username=u.username) for _, u in rows]
+        return [OnlineUserInfo(user_id=u.id, username=u.username, avatar_url=u.avatar_url) for _, u in rows]
 
     def get_online_users_batch(self, board_ids: List[int]) -> Dict[int, List[OnlineUserInfo]]:
         unique_board_ids = sorted(set(board_ids))
         if not unique_board_ids:
             return {}
 
+        from datetime import timedelta, datetime
+        active_threshold = datetime.utcnow() - timedelta(minutes=2)
+
         rows = (
-            self.db.query(BoardUsers.board_id, User.id, User.username)
+            self.db.query(BoardUsers.board_id, User)
             .join(User, User.id == BoardUsers.user_id)
             .filter(
                 BoardUsers.board_id.in_(unique_board_ids),
                 BoardUsers.is_online == True,
+                BoardUsers.last_opened >= active_threshold
             )
             .all()
         )
 
         by_board: Dict[int, List[OnlineUserInfo]] = {board_id: [] for board_id in unique_board_ids}
-        for board_id, user_id, username in rows:
-            by_board[board_id].append(OnlineUserInfo(user_id=user_id, username=username))
+        for board_id, user in rows:
+            by_board[board_id].append(OnlineUserInfo(user_id=user.id, username=user.username, avatar_url=user.avatar_url))
 
         return by_board
 

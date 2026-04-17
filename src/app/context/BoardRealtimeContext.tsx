@@ -39,6 +39,8 @@ import {
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from './AuthContext';
+import { markUserOnline } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { apiClient } from '@/_new/lib/api';
 import { DrawingElement } from '@/_new/features/whiteboard/types';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -631,9 +633,15 @@ export function BoardRealtimeProvider({
           trackPresence({ x, y, scale });
         };
 
-        // Heartbeat co 60 sekund - Supabase ma własny heartbeat, nie potrzebujemy częstego
+        // Ping the PostgreSQL backend to let Dashboard know we are actively on this board
+        markUserOnline(Number(boardId)).catch(() => {});
+
+        // Heartbeat co 60 sekund - Supabase ma własny heartbeat, dla Backend DB potrzebujemy własny
         if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-        presenceHeartbeat = setInterval(() => trackPresence(), 60000);
+        presenceHeartbeat = setInterval(() => {
+          trackPresence();
+          markUserOnline(Number(boardId)).catch(() => {}); // Odśwież ping w PostgreSQL
+        }, 60000);
       } else if (status === 'CHANNEL_ERROR') {
         // 🛡️ Supabase ma auto-reconnect - nie panikuj
         // Loguj tylko przy pierwszym błędzie w serii
@@ -676,6 +684,13 @@ export function BoardRealtimeProvider({
 
     return () => {
       console.log('🔌 Rozłączanie z kanału tablicy');
+      try {
+        // Ignorujemy błędy w catch() - przy zamykaniu okna przeglądarki (np. w Edge) żądanie fetch jest przerywane
+        apiClient.delete(`/api/v1/whiteboard/${boardId}/online`).catch(() => {});
+      } catch (e) {
+        console.error('Cleanup error:', e);
+      }
+      
       if (presenceHeartbeat) clearInterval(presenceHeartbeat);
       if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);

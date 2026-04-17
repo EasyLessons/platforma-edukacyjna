@@ -42,6 +42,7 @@ def get_workspace_members(
             username=m.user.username,
             email=m.user.email,
             full_name=m.user.full_name,
+            avatar_url=m.user.avatar_url,
             role="owner" if is_owner else m.role,
             joined_at=m.joined_at,
             is_owner=is_owner,

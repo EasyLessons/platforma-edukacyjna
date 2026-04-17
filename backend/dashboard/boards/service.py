@@ -209,18 +209,21 @@ class BoardService:
         )
     
     async def get_online_users(self, board_id: int, limit: int = 50, offset: int = 0) -> list[OnlineUserInfo]:
-        """Pobierz użytkowników online na tablicy (wymaga WebSocket)"""
-        # TODO: Zaimplementować WebSocket do aktualizacji is_online
-        # Na razie zwraca pustą listę, bo nikt nie jest oznaczony jako online
+        """Pobierz użytkowników online na tablicy"""
+        from datetime import timedelta
+        active_threshold = datetime.utcnow() - timedelta(minutes=2)
+
         online_users = self.db.query(BoardUsers).join(User).filter(
             BoardUsers.board_id == board_id,
-            BoardUsers.is_online == True
+            BoardUsers.is_online == True,
+            BoardUsers.last_opened >= active_threshold
         ).offset(offset).limit(limit).all()
         
         return [
             OnlineUserInfo(
                 user_id=bu.user.id,
-                username=bu.user.username
+                username=bu.user.username,
+                avatar_url=bu.user.avatar_url
             ) 
             for bu in online_users
         ]

@@ -7,7 +7,8 @@
 
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
@@ -53,9 +54,15 @@ export function WorkspaceEditModal({
   // RENDER
   // ================================
 
-  if (!isOpen) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isOpen) return null;
+
+  return createPortal(
     <div className="dashboard-modal-overlay">
       <div
         ref={modalRef}
@@ -119,6 +126,7 @@ export function WorkspaceEditModal({
           </DashboardButton>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

@@ -21,7 +21,8 @@ class User(Base):
     google_id = Column(String, unique=True, nullable=True, index=True)
     auth_provider = Column(String(20), default="email", nullable=False)  # "email" lub "google"
     profile_picture = Column(String, nullable=True)  # URL do zdjęcia profilowego
-    
+    avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
+
     # Kod weryfikacyjny - bezpośrednio w tabeli user
     verification_code = Column(String(6), nullable=True)
     verification_code_expires = Column(DateTime, nullable=True)

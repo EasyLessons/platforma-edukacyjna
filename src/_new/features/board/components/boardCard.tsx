@@ -73,7 +73,7 @@ export function BoardCard({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-gray-900 truncate text-sm">{board.name}</h3>
+            <h3 className="font-bold text-gray-900 truncate text-sm">{board.name}</h3>
             {board.is_favourite && (
               <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 flex-shrink-0" />
             )}
@@ -120,7 +120,7 @@ export function BoardCard({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <h3 className="font-medium text-gray-900 text-sm truncate">{board.name}</h3>
+              <h3 className="font-bold text-gray-900 text-sm truncate">{board.name}</h3>
               {board.is_favourite && (
                 <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 flex-shrink-0" />
               )}
@@ -152,7 +152,7 @@ export function BoardCard({
 
         {/* Online users — col 2 */}
         <div className="col-span-2 flex justify-center">
-          <BoardOnlineUsers users={onlineUsers} />
+          <BoardOnlineUsers users={board.online_users && board.online_users.length > 0 ? board.online_users : onlineUsers} />
         </div>
 
         {/* Actions — col 2 */}
@@ -163,7 +163,7 @@ export function BoardCard({
           {canRename && (
             <button
               onClick={handleDropdownEdit}
-              className="p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
+              className="opacity-100 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
               title="Zmień nazwę"
             >
               <Pencil className="w-4 h-4" />
@@ -172,9 +172,9 @@ export function BoardCard({
 
           <button
             onClick={handleToggleFavourite}
-            className={`p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 hover:bg-gray-100 ${
+            className={`p-2 rounded-lg transition-all hover:bg-gray-100 ${
               board.is_favourite
-                ? '!opacity-100 text-yellow-400'
+                ? 'text-yellow-400'
                 : 'text-gray-400 hover:text-yellow-400'
             }`}
             title={board.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
@@ -222,7 +222,7 @@ function BoardDropdownMenu({ canRename, onEdit, onDelete }: BoardDropdownMenuPro
           e.stopPropagation();
           setOpen((p) => !p);
         }}
-        className="p-1.5 lg:p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all opacity-0 group-hover:opacity-100"
+        className="p-1.5 lg:p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
       >
         <MoreVertical size={16} />
       </button>

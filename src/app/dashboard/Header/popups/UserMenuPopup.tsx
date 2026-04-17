@@ -13,6 +13,7 @@ interface UserMenuPopupProps {
     email: string;
     avatar: string;
     avatarColorClass?: string;
+    avatar_url?: string;
     isPremium: boolean;
   };
 }
@@ -55,11 +56,19 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
       {/* Info użytkownika */}
       <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
         <div className="flex items-center gap-3">
-          <div
-            className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${user.avatarColorClass || 'bg-gray-700'}`}
-          >
-            <span className="text-white font-semibold text-base">{user.avatar}</span>
-          </div>
+          {user.avatar_url ? (
+            <img 
+              src={user.avatar_url} 
+              alt="Avatar"
+              className="w-11 h-11 rounded-full object-cover border border-[var(--dash-border)] shadow-sm"
+            />
+          ) : (
+            <div
+              className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${user.avatarColorClass || 'bg-gray-700'}`}
+            >
+              <span className="text-white font-semibold text-base">{user.avatar}</span>
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
             <div className="text-xs text-gray-500 truncate">{user.email}</div>

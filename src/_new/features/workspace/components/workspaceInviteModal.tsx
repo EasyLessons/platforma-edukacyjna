@@ -7,7 +7,8 @@
 
 'use client';
 
-import { useRef } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
@@ -26,6 +27,12 @@ interface WorkspaceInviteModalProps {
 export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceInviteModalProps) {
   // STATE
   // ================================
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const {
     searchQuery,
     setSearchQuery,
@@ -77,9 +84,9 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
 
   // RENDER
   // ================================
-  if (!isOpen || !workspace) return null;
+  if (!mounted || !isOpen || !workspace) return null;
 
-  return (
+  return createPortal(
     <div className="dashboard-modal-overlay" onClick={onClose}>
       <div className="dashboard-modal-surface max-w-lg" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
@@ -162,7 +169,8 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
                       variant={justInvited ? 'secondary' : 'primary'}
                       onClick={() => invite(user.id)}
                       disabled={isInviting || justInvited || !canInvite}
-                      className={`flex-shrink-0 ml-3 ${
+                      leftIcon={justInvited ? <Check size={16} /> : <UserPlus size={16} />}
+                      className={`flex-shrink-0 ml-3 whitespace-nowrap ${
                         !justInvited && canInvite
                           ? 'h-10 min-w-[128px] px-4 text-sm font-medium'
                           : ''
@@ -172,17 +180,7 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
                           : ''
                       }`}
                     >
-                      {justInvited ? (
-                        <>
-                          <Check size={16} />
-                          <span>Wysłano!</span>
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus size={16} />
-                          <span>Zaproś</span>
-                        </>
-                      )}
+                      {justInvited ? 'Wysłano!' : 'Zaproś'}
                     </DashboardButton>
                   </div>
                 );
@@ -213,6 +211,7 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
           </p>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

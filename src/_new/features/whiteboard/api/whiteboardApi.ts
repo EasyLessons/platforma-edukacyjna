@@ -11,6 +11,7 @@ import { apiClient } from "@/_new/lib/api";
 export interface OnlineUser {
   user_id: number;
   username: string;
+  avatar_url?: string | null;
 }
 
 export interface BoardElement {

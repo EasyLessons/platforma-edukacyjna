@@ -110,7 +110,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
 
   return (
     <>
-      <header className="bg-[var(--dash-panel)] sticky top-0 z-50">
+      <header className="bg-[var(--dash-panel)] border-b border-[var(--dash-border)] sticky top-0 z-50">
         <div className="w-full px-4 lg:px-6 py-3">
           {/* DESKTOP */}
           <div className="hidden min-[1640px]:flex items-center justify-between gap-4">
@@ -175,11 +175,19 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                     tabIndex={0}
                     aria-label="Otwórz ustawienia konta"
                   >
-                    <span
-                      className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColorClass(user.id)}`}
-                    >
-                      {getInitials(user.name)}
-                    </span>
+                    {(user as any).avatar_url ? (
+                      <img 
+                        src={(user as any).avatar_url} 
+                        alt="Avatar"
+                        className="h-7 w-7 rounded-full object-cover border border-gray-200"
+                      />
+                    ) : (
+                      <span
+                        className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white ${getAvatarColorClass(user.id)}`}
+                      >
+                        {getInitials(user.name)}
+                      </span>
+                    )}
                     <span className="ml-2 flex flex-col items-start leading-none">
                       <span className="max-w-[120px] truncate text-xs font-medium text-gray-800">
                         {user.name}
@@ -208,6 +216,7 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                         ...user,
                         avatar: getInitials(user.name),
                         avatarColorClass: getAvatarColorClass(user.id),
+                        avatar_url: (user as any).avatar_url,
                       }}
                     />
                   )}
@@ -251,11 +260,19 @@ export default function DashboardHeader({ refreshWorkspaces }: DashboardHeaderPr
                 {/* Info użytkownika */}
                 <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
-                    >
-                      <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
-                    </div>
+                    {(user as any).avatar_url ? (
+                      <img 
+                        src={(user as any).avatar_url} 
+                        alt="Avatar"
+                        className="w-11 h-11 rounded-full object-cover border border-[var(--dash-border)] shadow-sm"
+                      />
+                    ) : (
+                      <div
+                        className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
+                      >
+                        <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
                       <div className="text-xs text-gray-500 truncate">{user.email}</div>

@@ -233,3 +233,22 @@ async def google_callback(
         frontend_url = service.settings.frontend_url
         safe_error = quote_plus("Błąd logowania przez Google")
         return RedirectResponse(f"{frontend_url}/auth/callback?error={safe_error}")
+
+class AvatarUpdate(BaseModel):
+    avatar_url: str
+
+@router.put("/users/me", response_model=ApiResponse[UserResponse])
+async def update_user_profile(
+    update_data: AvatarUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    current_user.avatar_url = update_data.avatar_url
+    db.commit()
+    db.refresh(current_user)
+    return ApiResponse(
+        success=True,
+        data=UserResponse.model_validate(current_user)
+    )
+    )
+

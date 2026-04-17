@@ -229,7 +229,7 @@ export function WorkspaceCard({
               ? 'truncate pr-[148px]'
               : 'overflow-hidden whitespace-nowrap text-clip pr-1'
           } ${
-            isActive ? 'text-black font-semibold' : 'text-gray-700 group-hover:text-gray-900'
+            isActive ? 'text-black font-bold' : 'font-bold text-gray-600 group-hover:text-gray-900'
           }`}
         >
           {workspace.name}

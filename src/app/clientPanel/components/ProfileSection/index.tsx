@@ -2,8 +2,6 @@
 
 import { useAuth } from '../../../context/AuthContext';
 import BasicInfo from './BasicInfo';
-import SecurityInfo from './SecurityInfo';
-import LocalizationInfo from './LocalizationInfo';
 
 export default function ProfileSection() {
   const { user } = useAuth();
@@ -19,8 +17,6 @@ export default function ProfileSection() {
 
       {/* Sekcje */}
       <BasicInfo user={user} />
-      <SecurityInfo />
-      <LocalizationInfo />
     </div>
   );
 }

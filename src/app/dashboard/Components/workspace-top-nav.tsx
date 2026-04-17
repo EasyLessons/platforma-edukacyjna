@@ -120,19 +120,35 @@ export default function WorkspaceTopNav({
                       key={member.user_id}
                       className={`group relative ${index === 0 ? '' : '-ml-2'} transition-transform hover:z-20 hover:scale-105`}
                     >
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm ${getAvatarColorClass(member.user_id)}`}
-                      >
-                        {initials}
-                      </div>
+                      {(member as any).avatar_url ? (
+                        <img 
+                          src={(member as any).avatar_url}
+                          alt={displayName}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white object-cover shadow-sm"
+                        />
+                      ) : (
+                        <div
+                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm ${getAvatarColorClass(member.user_id)}`}
+                        >
+                          {initials}
+                        </div>
+                      )}
 
                       <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl group-hover:block">
                         <div className="flex min-w-[210px] items-center gap-3">
-                          <div
-                            className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getAvatarColorClass(member.user_id)}`}
-                          >
-                            {initials}
-                          </div>
+                          {(member as any).avatar_url ? (
+                            <img 
+                              src={(member as any).avatar_url}
+                              alt={displayName}
+                              className="flex h-10 w-10 items-center justify-center rounded-full object-cover shadow-sm"
+                            />
+                          ) : (
+                            <div
+                              className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getAvatarColorClass(member.user_id)}`}
+                            >
+                              {initials}
+                            </div>
+                          )}
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-gray-900">
                               {displayName}
@@ -153,7 +169,7 @@ export default function WorkspaceTopNav({
             </div>
 
             <DashboardButton
-              variant="secondary"
+              variant="primary"
               leftIcon={<UserPlus size={14} />}
               onClick={() => setInvitingWorkspace(activeWorkspace)}
               className="hidden sm:flex h-8 px-3 text-xs font-semibold"

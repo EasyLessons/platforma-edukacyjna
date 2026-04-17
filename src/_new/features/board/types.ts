@@ -26,6 +26,12 @@ export interface BoardMember {
   joined_at: string | null;
 }
 
+export interface OnlineUserInfo {
+  user_id: number;
+  username: string;
+  avatar_url?: string | null;
+}
+
 export interface Board {
   id: number;
   name: string;
@@ -41,6 +47,7 @@ export interface Board {
   last_opened: string | null;
   created_at: string;
   created_by: string;
+  online_users?: OnlineUserInfo[];
 }
 
 // FORM DATA TYPES

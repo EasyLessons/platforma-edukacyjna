@@ -58,10 +58,7 @@ class OnlineUserInfo(BaseModel):
     """Użytkownicy korzystający z danej tablicy"""
     user_id: int
     username: str
-    
-    class Config:
-        from_attributes = True
-
+    avatar_url: Optional[str] = None
 class BoardOwnerInfo(BaseModel):
     """Informacje o właścicielu tablicy"""
     user_id: int

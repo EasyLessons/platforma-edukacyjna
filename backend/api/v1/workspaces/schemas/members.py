@@ -9,6 +9,7 @@ class WorkspaceMemberResponse(BaseModel):
     username: str
     email: str
     full_name: Optional[str] = None
+    avatar_url: Optional[str] = None
     role: str
     joined_at: datetime
     is_owner: bool

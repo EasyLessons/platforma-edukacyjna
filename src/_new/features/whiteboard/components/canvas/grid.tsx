@@ -35,7 +35,8 @@ export function drawGrid(
   ctx: CanvasRenderingContext2D,
   viewport: ViewportTransform,
   width: number,
-  height: number
+  height: number,
+  showAxes: boolean = true
 ): void {
   // === ZOPTYMALIZOWANA SIATKA W TLE ===
   // Batch rendering - grupujemy wszystkie linie tego samego typu w jeden path
@@ -122,103 +123,105 @@ export function drawGrid(
   }
   ctx.stroke();
 
-  // === OSIE ===
-  const originX = worldToScreenX(0);
-  const originY = worldToScreenY(0);
+  if (showAxes) {
+    // === OSIE ===
+    const originX = worldToScreenX(0);
+    const originY = worldToScreenY(0);
 
-  // Oś X (czerwona) - pozioma
-  ctx.strokeStyle = 'rgba(220, 38, 38, 0.7)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, originY);
-  ctx.lineTo(width, originY);
-  ctx.stroke();
+    // Oś X (czerwona) - pozioma
+    ctx.strokeStyle = 'rgba(220, 38, 38, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(0, originY);
+    ctx.lineTo(width, originY);
+    ctx.stroke();
 
-  // Oś Y (niebieska) - pionowa
-  ctx.strokeStyle = 'rgba(37, 99, 235, 0.7)';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(originX, 0);
-  ctx.lineTo(originX, height);
-  ctx.stroke();
+    // Oś Y (niebieska) - pionowa
+    ctx.strokeStyle = 'rgba(37, 99, 235, 0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(originX, 0);
+    ctx.lineTo(originX, height);
+    ctx.stroke();
 
-  // === PODZIAŁKA (co 1 jednostkę = 2 kratki = 100px) ===
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  ctx.font = `${Math.max(10, 12 * scale)}px Arial`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
+    // === PODZIAŁKA (co 1 jednostkę = 2 kratki = 100px) ===
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.font = `${Math.max(10, 12 * scale)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
 
-  // Zakres podziałki - używamy już obliczonych wartości
-  const startXLabel = Math.floor(startX);
-  const endXLabel = Math.ceil(endX);
+    // Zakres podziałki - używamy już obliczonych wartości
+    const startXLabel = Math.floor(startX);
+    const endXLabel = Math.ceil(endX);
 
-  // Batch kreślenie kresek na osi X
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  for (let worldX = startXLabel; worldX <= endXLabel; worldX += 1) {
-    if (worldX === 0) continue;
-    const screenX = worldToScreenX(worldX);
-    if (screenX >= 0 && screenX <= width) {
-      ctx.moveTo(screenX, originY - 6);
-      ctx.lineTo(screenX, originY + 6);
+    // Batch kreślenie kresek na osi X
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let worldX = startXLabel; worldX <= endXLabel; worldX += 1) {
+      if (worldX === 0) continue;
+      const screenX = worldToScreenX(worldX);
+      if (screenX >= 0 && screenX <= width) {
+        ctx.moveTo(screenX, originY - 6);
+        ctx.lineTo(screenX, originY + 6);
+      }
     }
-  }
-  ctx.stroke();
+    ctx.stroke();
 
-  // Tekst dla podziałki X
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  for (let worldX = startXLabel; worldX <= endXLabel; worldX += 1) {
-    if (worldX === 0) continue;
-    const screenX = worldToScreenX(worldX);
-    if (screenX >= 0 && screenX <= width) {
-      ctx.fillText(worldX.toString(), screenX, originY + 8);
+    // Tekst dla podziałki X
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    for (let worldX = startXLabel; worldX <= endXLabel; worldX += 1) {
+      if (worldX === 0) continue;
+      const screenX = worldToScreenX(worldX);
+      if (screenX >= 0 && screenX <= width) {
+        ctx.fillText(worldX.toString(), screenX, originY + 8);
+      }
     }
-  }
 
-  // Podziałka na osi Y
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
+    // Podziałka na osi Y
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
 
-  const startYLabel = Math.floor(startY);
-  const endYLabel = Math.ceil(endY);
+    const startYLabel = Math.floor(startY);
+    const endYLabel = Math.ceil(endY);
 
-  // Batch kreślenie kresek na osi Y
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  for (let worldY = startYLabel; worldY <= endYLabel; worldY += 1) {
-    if (worldY === 0) continue;
-    const screenY = worldToScreenY(worldY);
-    if (screenY >= 0 && screenY <= height) {
-      ctx.moveTo(originX - 6, screenY);
-      ctx.lineTo(originX + 6, screenY);
+    // Batch kreślenie kresek na osi Y
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let worldY = startYLabel; worldY <= endYLabel; worldY += 1) {
+      if (worldY === 0) continue;
+      const screenY = worldToScreenY(worldY);
+      if (screenY >= 0 && screenY <= height) {
+        ctx.moveTo(originX - 6, screenY);
+        ctx.lineTo(originX + 6, screenY);
+      }
     }
-  }
-  ctx.stroke();
+    ctx.stroke();
 
-  // Tekst dla podziałki Y
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-  for (let worldY = startYLabel; worldY <= endYLabel; worldY += 1) {
-    if (worldY === 0) continue;
-    const screenY = worldToScreenY(worldY);
-    if (screenY >= 0 && screenY <= height) {
-      ctx.fillText((-worldY).toString(), originX + 10, screenY);
+    // Tekst dla podziałki Y
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    for (let worldY = startYLabel; worldY <= endYLabel; worldY += 1) {
+      if (worldY === 0) continue;
+      const screenY = worldToScreenY(worldY);
+      if (screenY >= 0 && screenY <= height) {
+        ctx.fillText((-worldY).toString(), originX + 10, screenY);
+      }
     }
+
+    // === PUNKT (0,0) ===
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.beginPath();
+    ctx.arc(originX, originY, 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Etykieta (0,0)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
+    ctx.font = `${Math.max(12, 14 * scale)}px Arial`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('(0, 0)', originX + 8, originY - 8);
   }
-
-  // === PUNKT (0,0) ===
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-  ctx.beginPath();
-  ctx.arc(originX, originY, 4, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Etykieta (0,0)
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-  ctx.font = `${Math.max(12, 14 * scale)}px Arial`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('(0, 0)', originX + 8, originY - 8);
 
   // Przywróć imageSmoothingEnabled
   ctx.imageSmoothingEnabled = true;

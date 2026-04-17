@@ -176,7 +176,7 @@ export default function WorkspaceSidebar({
       <div
         className={`${
           isCollapsed ? 'w-[72px]' : 'w-[344px]'
-        } h-[calc(100vh-64px)] bg-[var(--dash-panel)] flex flex-col sticky top-[64px] transition-all duration-300`}
+        } h-[calc(100vh-64px)] bg-[var(--dash-panel)] border-r border-[var(--dash-border)] flex flex-col sticky top-[64px] transition-all duration-300 z-10`}
       >
         <div className="p-4 bg-[var(--dash-panel)]">
           <div className="flex items-center justify-between mb-3">

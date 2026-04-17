@@ -20,6 +20,7 @@ const MAX_VISIBLE = 3;
 
 export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
   const { getAvatarColorClass, getInitials } = useUserAvatar();
+  console.log("BoardOnlineUsers render, users:", JSON.stringify(users, null, 2));
 
   if (users.length === 0) {
     return <span className="text-gray-400 text-xs font-medium">—</span>;
@@ -36,14 +37,22 @@ export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
           className={`
             w-8 h-8 rounded-full flex items-center justify-center
             text-white text-xs font-semibold
-            border-2 border-white shadow-sm
+            border-2 border-white shadow-sm overflow-hidden
             hover:scale-110 transition-transform cursor-default
-            ${getAvatarColorClass(user.user_id)}
+            ${user.avatar_url ? '' : getAvatarColorClass(user.user_id)}
           `}
           style={{ zIndex: MAX_VISIBLE - index }}
           title={user.username}
         >
-          {getInitials(user.username)}
+          {user.avatar_url ? (
+            <img 
+              src={user.avatar_url} 
+              alt={user.username} 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            getInitials(user.username)
+          )}
         </div>
       ))}
 

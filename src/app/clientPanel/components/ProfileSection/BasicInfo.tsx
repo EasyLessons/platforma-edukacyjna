@@ -1,15 +1,22 @@
 'use client';
 
-import { useState } from 'react';
-import { Edit2, User, Mail } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { Edit2, User, Mail, Upload, Calendar } from 'lucide-react';
 import type { User as UserType } from '@/_new/shared/types/user';
+import { useAuth } from '@/app/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { apiClient } from '@/_new/lib/api';
 
 interface BasicInfoProps {
   user: UserType | null;
 }
 
 export default function BasicInfo({ user }: BasicInfoProps) {
+  const { updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
     firstName: user?.username?.split(' ')[0] || '',
     lastName: user?.username?.split(' ').slice(1).join(' ') || '',
@@ -17,7 +24,7 @@ export default function BasicInfo({ user }: BasicInfoProps) {
   });
 
   const handleSave = () => {
-    // TODO: Zapisz w bazie danych
+    // TODO: Zapisywanie firstName, lastName, email (wymaga odpowiedniego endpointu)
     console.log('Saving user data:', formData);
     setIsEditing(false);
   };
@@ -29,6 +36,49 @@ export default function BasicInfo({ user }: BasicInfoProps) {
       email: user?.email || '',
     });
     setIsEditing(false);
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    try {
+      setUploading(true);
+
+      // Usunięto podwójne /avatars/, ładujemy bezpośrednio do bucketu "avatars"
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      // Pobieranie publicznego URLa
+      const { data: publicUrlData } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(uploadData.path);
+
+      const avatarUrl = publicUrlData.publicUrl;
+
+      // Aktualizacja na backendzie FastAPI
+      await apiClient.put('/api/v1/auth/users/me', {
+        avatar_url: avatarUrl
+      });
+
+      // Błyskawiczna zmiana w aplikacji (bez przeładowania)
+      updateUser({ avatar_url: avatarUrl });
+
+    } catch (error) {
+      console.error('Błąd podczas zapisywania awatara:', error);
+      alert('Nie udało się zapisać awatara');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   return (
@@ -44,6 +94,39 @@ export default function BasicInfo({ user }: BasicInfoProps) {
             Edytuj
           </button>
         )}
+      </div>
+
+      {/* Awatar */}
+      <div className="mb-6 flex items-center gap-4">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center overflow-hidden border border-gray-200 relative">
+          {(user as any)?.avatar_url ? (
+            <img 
+              src={(user as any).avatar_url} 
+              alt="Avatar" 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <User size={32} className="text-green-600" />
+          )}
+        </div>
+        <div>
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleAvatarUpload} 
+            className="hidden" 
+            id="avatar-upload"
+          />
+          <label 
+            htmlFor="avatar-upload"
+            className="cursor-pointer px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {uploading ? 'Wgrywam...' : 'Zmień zdjęcie'}
+          </label>
+          <p className="text-xs text-gray-500 mt-2">Zalecane wymiary: 1:1, max. 2MB</p>
+        </div>
       </div>
 
       <div className="space-y-6">

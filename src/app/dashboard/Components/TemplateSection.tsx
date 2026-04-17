@@ -175,14 +175,13 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
   }, []);
 
   return (
-    <section className="mb-8 rounded-2xl bg-[#f9f8f7] p-4 sm:p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg md:text-2xl font-bold text-gray-900">Szablony</h2>
-      </div>
-
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="relative" ref={subjectDropdownRef}>
+    <section className="mb-8 rounded-3xl bg-[#ffffff] border border-[var(--dash-border)] p-4 sm:p-5">
+      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+          <h2 className="text-lg md:text-2xl font-bold text-gray-900">Szablony</h2>
+          
+          <div className="flex items-center gap-2">
+            <div className="relative" ref={subjectDropdownRef}>
             <button
               onClick={() => {
                 setSubjectOpen((prev) => !prev);
@@ -251,6 +250,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
               </div>
             )}
           </div>
+        </div>
         </div>
 
         <div className="hidden items-center gap-1 md:flex">

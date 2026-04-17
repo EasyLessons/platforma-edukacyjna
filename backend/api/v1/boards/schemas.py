@@ -3,6 +3,10 @@ from datetime import datetime
 from typing import Optional, List, Any, Dict
 from pydantic import BaseModel, Field
 
+class OnlineUserInfo(BaseModel):
+    user_id: int
+    username: str
+    avatar_url: Optional[str] = None
 
 class CreateBoard(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
@@ -71,6 +75,7 @@ class BoardResponse(BaseModel):
     last_opened: Optional[datetime]
     created_at: datetime
     created_by: str
+    online_users: List[OnlineUserInfo] = []
 
     class Config:
         from_attributes = True

@@ -483,10 +483,8 @@ useMultiTouchGestures({
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    // Siatka kartezjańska (układ współrzędnych) — ukrywana gdy settings.grid_visible = false
-    if (settingsRef.current.grid_visible) {
-      drawGrid(ctx, viewport, width, height);
-    }
+    // Zawsze rysujemy siatkę w tle, ale osie (układ współrzędnych) pokazujemy tylko gdy grid_visible = true
+    drawGrid(ctx, viewport, width, height, settingsRef.current.grid_visible);
 
     // ─── 🚀 VIEWPORT CULLING (Odrzucanie niewidocznych elementów) ───
     // 1. Granice widocznego "świata"
@@ -1926,13 +1924,21 @@ useMultiTouchGestures({
           userRole={userRole}
         />
 
-        {/* ── FOLLOW MODE BANNER ────────────────────────────────────────── */}
+        {/* ── FOLLOW MODE BANNER (Minimalist Version) ────────────────────────── */}
         {vp.followingUserId && (
-          <div className="absolute top-20 right-4 z-50 bg-blue-500 text-white rounded-lg shadow-lg px-4 py-2 flex items-center gap-3 animate-pulse">
-            <span className="text-sm font-medium">👁️ Śledzisz użytkownika</span>
+          <div className="absolute top-20 right-6 z-50 flex items-center gap-4 px-4 py-2 bg-white border border-zinc-200 shadow-sm rounded-full">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-zinc-800 rounded-full" /> {/* Dyskretny wskaźnik zamiast emoji */}
+              <span className="text-[13px] font-medium text-zinc-600 tracking-tight">
+                Śledzisz użytkownika
+              </span>
+            </div>
+            
+            <div className="w-[1px] h-4 bg-zinc-200" /> {/* Separator */}
+
             <button
               onClick={handleStopFollowing}
-              className="bg-white/20 hover:bg-white/30 px-3 py-1 rounded text-sm font-medium transition-colors"
+              className="text-[13px] font-bold text-zinc-900 hover:text-red-600 transition-colors duration-200"
             >
               Przestań śledzić
             </button>

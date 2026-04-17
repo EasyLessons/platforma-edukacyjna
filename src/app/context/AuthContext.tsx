@@ -86,6 +86,9 @@ interface AuthContextType {
   // ☝️ Funkcja do WYLOGOWANIA użytkownika
   // Wywołujesz ją gdy użytkownik klika "Wyloguj": logout()
   // Usuwa token i dane użytkownika, zmienia isLoggedIn na false
+
+  updateUser: (updates: Partial<User>) => void;
+  // ☝️ Aktualizuje dane bez przeładowywania i bez konieczności robienia "logout" i "login".
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -309,6 +312,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // console.log('🚪 Wylogowano użytkownika');
   };
 
+  const updateUser = (updates: Partial<User>) => {
+    if (!user) return;
+    const updatedUser = { ...user, ...updates };
+    setUser(updatedUser);
+    saveUser(updatedUser);
+  };
+
   // ───────────────────────────────────────────────────────────────────────
   // 📤 UDOSTĘPNIENIE DANYCH (PROVIDER)
   // ───────────────────────────────────────────────────────────────────────
@@ -326,7 +336,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * {children} - Wszystkie komponenty które są "owinięte" w AuthProvider
    */
   return (
-    <AuthContext.Provider value={{ isLoggedIn, user, loading, login, logout }}>
+    <AuthContext.Provider value={{ isLoggedIn, user, loading, login, logout, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

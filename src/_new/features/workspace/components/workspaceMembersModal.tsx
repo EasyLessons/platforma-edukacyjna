@@ -8,7 +8,8 @@
 
 'use client';
 
-import { useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Crown, Users as UsersIcon, Loader2, Trash2, Eye, Edit3 } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
 import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
@@ -106,9 +107,15 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
   // RENDER
   // ================================
 
-  if (!isOpen || !workspace) return null;
+  const [mounted, setMounted] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted || !isOpen || !workspace) return null;
+
+  return createPortal(
     <div className="dashboard-modal-overlay">
       <div
         ref={modalRef}
@@ -255,6 +262,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
           </DashboardButton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

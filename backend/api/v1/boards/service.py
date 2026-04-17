@@ -23,14 +23,14 @@ from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse, BoardSettings,
     ToggleFavouriteResponse, BoardMember, BoardMembersResponse,
-    UpdateBoardSettings, JoinBoardResponse
+    UpdateBoardSettings, JoinBoardResponse, OnlineUserInfo
 )
 
 logger = get_logger(__name__)
 
 
 def _build_board_response(
-    db: Session, board: Board, user_id: int
+    db: Session, board: Board, user_id: int, online_users: list[OnlineUserInfo] = None
 ) -> BoardResponse:
     """Helper — buduje BoardResponse z ORM obiektu."""
     owner = db.query(User).filter(User.id == board.created_by).first()
@@ -58,6 +58,7 @@ def _build_board_response(
         last_opened=board_user.last_opened if board_user else None,
         created_at=board.created_at,
         created_by=owner.username if owner else "Unknown",
+        online_users=online_users or []
     )
 
 
@@ -111,14 +112,34 @@ class BoardService:
         self.db.add(board_user)
         self.db.commit()
         self.db.refresh(board)
+        
+        # Pusty albo z jednym tworzącym jako online. Dla pewności zwracamy twórce
+        owner = self.db.query(User).filter(User.id == user_id).first()
+        online_users = [OnlineUserInfo(user_id=user_id, username=owner.username)] if owner else []
 
         logger.info(f"✅ Tablica utworzona: {board.id} przez {user_id}")
-        return _build_board_response(self.db, board, user_id)
+        return _build_board_response(self.db, board, user_id, online_users)
 
     async def get_board(self, board_id: int, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
         self._check_access(board, user_id)
-        return _build_board_response(self.db, board, user_id)
+        
+        from datetime import timedelta
+        active_threshold = datetime.utcnow() - timedelta(minutes=2)
+
+        online_records = (
+            self.db.query(User.id, User.username, User.avatar_url)
+            .join(BoardUsers, User.id == BoardUsers.user_id)
+            .filter(
+                BoardUsers.board_id == board.id, 
+                BoardUsers.is_online == True,
+                BoardUsers.last_opened >= active_threshold
+            )
+            .all()
+        )
+        online_users = [OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url) for uid, uname, av_url in online_records]
+
+        return _build_board_response(self.db, board, user_id, online_users)
 
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0
@@ -127,10 +148,31 @@ class BoardService:
         total = query.count()
         boards = query.order_by(Board.last_modified.desc()).offset(offset).limit(limit).all()
 
+        # Gather online users for all boards in one query
+        board_ids = [b.id for b in boards]
+        online_map = {}
+        if board_ids:
+            from datetime import timedelta
+            active_threshold = datetime.utcnow() - timedelta(minutes=2)
+            online_records = (
+                self.db.query(BoardUsers.board_id, User.id, User.username)
+                .join(User, User.id == BoardUsers.user_id)
+                .filter(
+                    BoardUsers.board_id.in_(board_ids), 
+                    BoardUsers.is_online == True,
+                    BoardUsers.last_opened >= active_threshold
+                )
+                .all()
+            )
+            for bid, uid, uname in online_records:
+                if bid not in online_map:
+                    online_map[bid] = []
+                online_map[bid].append(OnlineUserInfo(user_id=uid, username=uname))
+
         responses = []
         for board in boards:
             try:
-                responses.append(_build_board_response(self.db, board, user_id))
+                responses.append(_build_board_response(self.db, board, user_id, online_map.get(board.id, [])))
             except Exception as e:
                 logger.error(f"❌ Błąd budowania BoardResponse dla {board.id}: {e}")
                 continue
@@ -154,9 +196,18 @@ class BoardService:
         board.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(board)
+        
+        online_records = (
+            self.db.query(User.id, User.username, User.avatar_url)
+            .join(BoardUsers, User.id == BoardUsers.user_id)
+            .filter(BoardUsers.board_id == board.id, BoardUsers.is_online == True)
+            .all()
+        )
+        online_users = [OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url) for uid, uname, av_url in online_records]
+
 
         logger.info(f"✅ Tablica zaktualizowana: {board_id}")
-        return _build_board_response(self.db, board, user_id)
+        return _build_board_response(self.db, board, user_id, online_users)
 
     async def delete_board(self, board_id: int, user_id: int) -> dict:
         board = self._get_board_or_404(board_id)

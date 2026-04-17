@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 class OnlineUserInfo(BaseModel):
     user_id: int
     username: str
+    avatar_url: Optional[str] = None
 
     class Config:
         from_attributes = True

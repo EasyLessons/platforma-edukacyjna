@@ -36,14 +36,17 @@ export default function Dashboard() {
       return;
     }
 
+    const firstFavourite = workspaces.find((w) => w.is_favourite);
+    const defaultWorkspaceId = firstFavourite ? firstFavourite.id : workspaces[0].id;
+
     if (!activeWorkspaceId) {
-      setActiveWorkspaceId(workspaces[0].id);
+      setActiveWorkspaceId(defaultWorkspaceId);
       return;
     }
 
     const exists = workspaces.some((workspace) => workspace.id === activeWorkspaceId);
     if (!exists) {
-      setActiveWorkspaceId(workspaces[0].id);
+      setActiveWorkspaceId(defaultWorkspaceId);
     }
   }, [workspaces, activeWorkspaceId]);
 
@@ -94,7 +97,7 @@ export default function Dashboard() {
           toggleFavourite={toggleFavourite}
         />
 
-        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white md:rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)] md:mr-6 md:mb-6">
+        <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white md:rounded-tl-[3.5rem] shadow-[0_1px_2px_rgba(0,0,0,0.05)]  md:mr-6 md:mb-6">
           <div className="flex flex-col w-full min-h-full">
             <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-[var(--dash-panel)]">
               <WorkspaceTopNav
