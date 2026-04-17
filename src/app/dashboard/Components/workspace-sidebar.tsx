@@ -186,27 +186,23 @@ export default function WorkspaceSidebar({
                   Przestrzenie
                 </h2>
                 <div className="flex items-center gap-1 transition-opacity">
-                  <Button
-                    variant="ghost"
-                    size="iconSm"
+                  <button
                     onClick={() => setShowCreateModal(true)}
                     className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
                     title="Dodaj przestrzeń"
                   >
                     <FolderPlus size={18} strokeWidth={2.5} />
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
-            <Button
-              variant="ghost"
-              size="iconSm"
+            <button
               onClick={() => setIsCollapsed(!isCollapsed)}
               className={`h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer ${isCollapsed ? 'mx-auto' : ''}`}
               title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
               {isCollapsed ? <PanelLeftOpen size={18} strokeWidth={2.5} /> : <PanelLeftClose size={18} strokeWidth={2.5} />}
-            </Button>
+            </button>
           </div>
 
           {!isCollapsed && (

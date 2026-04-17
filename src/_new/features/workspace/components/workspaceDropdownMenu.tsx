@@ -119,9 +119,7 @@ export function WorkspaceDropdownMenu({
 
   return (
     <div ref={menuRef} className={`relative ${isOpen ? 'z-50' : 'z-10'}`}>
-      <Button
-        variant="ghost"
-        size="iconSm"
+      <button
         onClick={handleToggle}
         title="Menu"
         aria-label="Menu"
@@ -130,7 +128,7 @@ export function WorkspaceDropdownMenu({
         }`}
       >
         <MoreVertical size={iconSize} className={isOpen ? 'text-gray-600' : ''} />
-      </Button>
+      </button>
 
       {/* Dropdown Menu (Portal) */}
       {isMounted && isOpen && createPortal(
