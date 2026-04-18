@@ -73,14 +73,15 @@ export default function BoardsSection({
 
   // HANDLERS
   // ================================
-  const handleSelect = (boardId: number) => {
+  const handleSelect = (boardId: number, boardWorkspaceId?: number) => {
     const boardToSave = boards.find(b => b.id === boardId);
     if (boardToSave) {
       import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) => {
         addRecentBoard({ ...boardToSave, workspaceName: workspace_name });
       });
     }
-    router.push(`/tablica?boardId=${boardId}`);
+    const workspaceParam = boardWorkspaceId ?? workspace_id;
+    router.push(`/tablica?boardId=${boardId}&workspace=${workspaceParam}`);
   };
 
   const handleDeleteConfirm = async () => {

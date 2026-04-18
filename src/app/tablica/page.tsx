@@ -73,7 +73,13 @@ export function TablicaContent() {
   const [isJoining, setIsJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
-  const [workspaceId, setWorkspaceId] = useState<number | null>(null);
+  const [workspaceId, setWorkspaceId] = useState<number | null>(() => {
+    const workspaceParam = searchParams.get('workspace');
+    if (!workspaceParam) return null;
+
+    const parsedWorkspaceId = Number(workspaceParam);
+    return Number.isFinite(parsedWorkspaceId) && parsedWorkspaceId > 0 ? parsedWorkspaceId : null;
+  });
   const [boardSettings, setBoardSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
   const [isOwner, setIsOwner] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
@@ -86,9 +92,17 @@ export function TablicaContent() {
   useEffect(() => {
     const id = searchParams.get('boardId') || 'demo-board';
     const arkusz = searchParams.get('arkusz');
+    const workspaceParam = searchParams.get('workspace');
 
     setBoardId(id);
     setArkuszPath(arkusz);
+
+    if (workspaceParam) {
+      const parsedWorkspaceId = Number(workspaceParam);
+      if (Number.isFinite(parsedWorkspaceId) && parsedWorkspaceId > 0) {
+        setWorkspaceId(parsedWorkspaceId);
+      }
+    }
 
     console.log('📋 Board ID:', id);
     if (arkusz) {
@@ -328,6 +342,7 @@ export function TablicaContent() {
             boardIcon={boardIcon}
             boardBgColor={boardBgColor}
             boardId={boardId ?? ''}
+            workspaceId={workspaceId}
             isSidebarOpen={sidebar.isOpen}
             onSidebarToggle={sidebar.toggle}
             onSettingsClick={

@@ -21,7 +21,7 @@ interface BoardCardProps {
   onlineUsers: OnlineUser[];
   onAction: BoardCardActions;
   onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
-  onSelect: (boardId: number) => void;
+  onSelect: (boardId: number, workspaceId?: number) => void;
 }
 
 export function BoardCard({
@@ -60,7 +60,7 @@ export function BoardCard({
 
   return (
     <div
-      onClick={() => onSelect(board.id)}
+      onClick={() => onSelect(board.id, board.workspace_id)}
       className="dashboard-hover-surface group relative cursor-pointer px-3 py-1.5"
     >
       {/* MOBILE LAYOUT */}
@@ -152,7 +152,13 @@ export function BoardCard({
 
         {/* Online users — col 2 */}
         <div className="col-span-2 flex justify-center">
-          <BoardOnlineUsers users={board.online_users && board.online_users.length > 0 ? board.online_users : onlineUsers} />
+          {(() => {
+            const activeUsers = board.online_users && board.online_users.length > 0 ? board.online_users : onlineUsers;
+            
+            return activeUsers.length > 0 && (
+              <BoardOnlineUsers users={activeUsers} />
+            );
+          })()}
         </div>
 
         {/* Actions — col 2 */}

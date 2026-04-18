@@ -30,6 +30,7 @@ interface BoardHeaderProps {
   boardIcon?: string;
   boardBgColor?: string;
   boardId: string;
+  workspaceId: number | null;
   isSidebarOpen?: boolean;
   onSidebarToggle?: () => void;
   onSettingsClick?: () => void;
@@ -40,6 +41,7 @@ export function BoardHeader({
   boardIcon = 'PenTool',
   boardBgColor = 'gray-500',
   boardId,
+  workspaceId,
   isSidebarOpen = false,
   onSidebarToggle,
   onSettingsClick,
@@ -54,6 +56,7 @@ export function BoardHeader({
   const showUpgradeButton = metrics.windowWidth >= 1874;
   const BoardIcon = getBoardIconComponent(boardIcon);
   const boardGradient = getGradientClass(boardBgColor);
+  const dashboardHref = workspaceId ? `/dashboard?workspace=${workspaceId}` : '/dashboard';
 
   return (
     <>
@@ -89,7 +92,7 @@ export function BoardHeader({
             {/* Logo — link powrotu do dashboardu */}
             <Tooltip content="Wróć do panelu" position="bottom">
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(dashboardHref)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f3f4f6';
                 }}
@@ -119,22 +122,11 @@ export function BoardHeader({
               </button>
             </Tooltip>
 
-            {/* Separator przed togglem */}
-            {onSidebarToggle && (
-              <div
-                style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
-                }}
-              />
-            )}
+           
 
             {/* Sidebar toggle (po prawej stronie logo) */}
             {onSidebarToggle && (
-              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom">
+              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom" className='ml-2'>
                 <button
                   onClick={onSidebarToggle}
                   style={{
@@ -161,22 +153,11 @@ export function BoardHeader({
               </Tooltip>
             )}
 
-            {/* Separator przed ustawieniami */}
-            {onSettingsClick && (
-              <div
-                style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
-                }}
-              />
-            )}
+            
 
             {/* Przycisk ustawień tablicy */}
             {onSettingsClick && (
-              <Tooltip content="Ustawienia tablicy" position="bottom">
+              <Tooltip content="Ustawienia tablicy" position="bottom" className='ml-3 '>
                 <button
                   onClick={onSettingsClick}
                   style={{
@@ -202,16 +183,7 @@ export function BoardHeader({
               </Tooltip>
             )}
 
-            {/* Separator przed nazwą tablicy */}
-            <div
-              style={{
-                marginLeft: '8px',
-                marginRight: '8px',
-                width: '1px',
-                height: '28px',
-                backgroundColor: '#e5e7eb',
-              }}
-            />
+           
 
             {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
             <Tooltip content={boardName || 'Tablica'} position="bottom">
@@ -227,7 +199,7 @@ export function BoardHeader({
                 }}
               >
                 <div
-                  className={`w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
+                  className={`ml-3 w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
                 >
                   <BoardIcon size={13} color="white" />
                 </div>
@@ -249,23 +221,14 @@ export function BoardHeader({
 
             {showUpgradeButton && (
               <>
-                {/* Separator przed przyciskiem zmiany wersji */}
-                <div
-                  style={{
-                    marginLeft: '8px',
-                    marginRight: '8px',
-                    width: '1px',
-                    height: '28px',
-                    backgroundColor: '#e5e7eb',
-                  }}
-                />
+                
 
                 <Tooltip content="Zmień wersję na premium" position="bottom">
                   <Button
                     onClick={() => router.push('/#pricing')}
                     variant="secondary"
                     size="sm"
-                  className="font-semibold ml-1 hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700 px-3 whitespace-nowrap transition-all duration-300 ease-in-out"
+                  className="font-semibold ml-4 -mr-[5px] hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700  whitespace-nowrap transition-all duration-300 ease-in-out"
                 >
                   Zmień wersję
                 </Button>
@@ -301,13 +264,13 @@ export function BoardHeader({
               backgroundColor: 'white',
               border: '2px solid #e0e0e0',
               borderRadius: '16px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+              boxShadow: '0 4px 4px rgba(0,0,0,0.1)',
               pointerEvents: 'auto',
             }}
           >
             <Tooltip content="Wróć do panelu" position="bottom">
               <button
-                onClick={() => router.push('/dashboard')}
+                onClick={() => router.push(dashboardHref)}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.backgroundColor = '#f3f4f6';
                 }}

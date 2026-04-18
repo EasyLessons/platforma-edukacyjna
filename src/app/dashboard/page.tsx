@@ -2,6 +2,7 @@
 
 import './dashboard-theme.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import DashboardHeader from './Header/DashboardHeader';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
@@ -11,6 +12,8 @@ import RecentsView from './Components/RecentsView';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 export default function Dashboard() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const {
     workspaces,
     loading,
@@ -23,7 +26,16 @@ export default function Dashboard() {
     refreshWorkspaces,
   } = useWorkspaces();
 
+  const workspaceIdFromUrl = useMemo(() => {
+    const value = searchParams.get('workspace');
+    if (!value) return null;
+
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [searchParams]);
+
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
+  const [appliedUrlWorkspaceId, setAppliedUrlWorkspaceId] = useState<number | null>(null);
   const [currentView, setCurrentView] = useState<'workspace' | 'recent'>('workspace');
   const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);
   const workspaceTopNavRef = useRef<HTMLDivElement | null>(null);
@@ -31,12 +43,24 @@ export default function Dashboard() {
   const handleWorkspaceSelect = useCallback((id: number, _name: string) => {
     setActiveWorkspaceId(id);
     setCurrentView('workspace');
-  }, []);
+    const params = new URLSearchParams(searchParams);
+    params.set('workspace', id.toString());
+    router.replace(`/dashboard?${params.toString()}`);
+  }, [searchParams, router]);
 
   useEffect(() => {
     if (workspaces.length === 0) {
       setActiveWorkspaceId(null);
       return;
+    }
+
+    if (workspaceIdFromUrl && workspaceIdFromUrl !== appliedUrlWorkspaceId) {
+      const exists = workspaces.some((workspace) => workspace.id === workspaceIdFromUrl);
+      if (exists) {
+        setActiveWorkspaceId(workspaceIdFromUrl);
+        setAppliedUrlWorkspaceId(workspaceIdFromUrl);
+        return;
+      }
     }
 
     const firstFavourite = workspaces.find((w) => w.is_favourite);
@@ -51,7 +75,7 @@ export default function Dashboard() {
     if (!exists) {
       setActiveWorkspaceId(defaultWorkspaceId);
     }
-  }, [workspaces, activeWorkspaceId]);
+  }, [workspaces, activeWorkspaceId, workspaceIdFromUrl, appliedUrlWorkspaceId]);
 
   const activeWorkspaceName = useMemo(() => {
     if (!activeWorkspaceId) return undefined;

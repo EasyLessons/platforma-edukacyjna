@@ -22,8 +22,9 @@ export default function RecentsView() {
     setRecentBoards(getRecentBoards());
   }, []);
 
-  const handleSelect = (boardId: number) => {
-    router.push(`/tablica?boardId=${boardId}`);
+  const handleSelect = (boardId: number, workspaceId?: number) => {
+    const workspaceParam = workspaceId ? `&workspace=${workspaceId}` : '';
+    router.push(`/tablica?boardId=${boardId}${workspaceParam}`);
   };
 
   const handleToggleFavourite = async (id: number, isFavourite: boolean) => {

@@ -182,11 +182,11 @@ export function WorkspaceList({
             onClick={onCreateClick}
             className="w-full relative flex items-center gap-1.5 pr-2 pl-[18px] py-2 rounded-md transition-colors duration-100 cursor-pointer group shadow-none bg-transparent hover:bg-gray-100"
           >
-            <div className="relative flex items-center justify-center flex-shrink-0 w-[18px] h-[18px]">
-              <Plus size={16} className="text-gray-500 group-hover:text-gray-700 transition-colors stroke-[2.5]" />
+            <div className="relative flex items-center  justify-center flex-shrink-0 w-[28px] h-[28px]">
+              <Plus size={30} className="ml-2 text-gray-500 group-hover:text-gray-700 transition-colors stroke-[2.5]" />
             </div>
-            <div className="flex-1 min-w-0 flex items-center gap-1.5 pr-1">
-              <span className="text-sm font-medium text-gray-600 group-hover:text-gray-900 transition-colors truncate">
+            <div className="ml-1 flex-1 min-w-0 flex items-center gap-1.5 pr-1">
+              <span className="text-[16px] font-medium text-gray-500 group-hover:text-gray-900 transition-colors truncate">
                 Nowa przestrzeń
               </span>
             </div>

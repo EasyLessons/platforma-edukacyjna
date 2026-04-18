@@ -148,8 +148,8 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
       });
 
       const route = folder
-        ? `/tablica?boardId=${newBoard.id}&arkusz=${encodeURIComponent(folder)}`
-        : `/tablica?boardId=${newBoard.id}`;
+        ? `/tablica?boardId=${newBoard.id}&workspace=${workspaceId}&arkusz=${encodeURIComponent(folder)}`
+        : `/tablica?boardId=${newBoard.id}&workspace=${workspaceId}`;
 
       router.push(route);
     } catch (error) {

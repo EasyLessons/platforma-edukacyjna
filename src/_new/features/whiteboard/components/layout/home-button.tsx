@@ -39,7 +39,10 @@ export function HomeButton() {
       }}
     >
       <button
-        onClick={() => (window.location.href = '/dashboard')}
+        onClick={() => {
+          const workspaceParam = new URLSearchParams(window.location.search).get('workspace');
+          window.location.href = workspaceParam ? `/dashboard?workspace=${workspaceParam}` : '/dashboard';
+        }}
         onMouseEnter={() => setShowTooltip(true)}
         onMouseLeave={() => setShowTooltip(false)}
         style={{

@@ -298,12 +298,12 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
             </Button>
           </Tooltip>
 
-          <Tooltip position="bottom" content={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'}>
+          <Tooltip position="bottom" content={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'} className="mr-0 sm:-mr-3">
             <Button
               variant="dark"
               size="sm"
               onClick={handleCopyLink}
-              className={`font-semibold h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.onlineUsers.compactButtons ? 'px-3 min-w-[106px] justify-center' : 'px-4'}`}
+              className={`font-semibold h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.onlineUsers.compactButtons ? 'px-3  justify-center' : 'px-4'}`}
               leftIcon={shareIcon}
             >
               {linkCopied ? 'Skopiowano link' : 'Udostępnij'}

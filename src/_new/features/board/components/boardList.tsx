@@ -25,7 +25,7 @@ interface BoardListProps {
   sortBy: SortBy;
   filterOwner: FilterOwner;
   currentUsername: string;
-  onSelect: (boardId: number) => void;
+  onSelect: (boardId: number, workspaceId?: number) => void;
   onAction: BoardCardActions;
   onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
   onlineUsersEnabled?: boolean;

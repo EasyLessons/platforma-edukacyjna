@@ -200,7 +200,7 @@ export function WorkspaceCard({
           className={`flex-1 min-w-0 flex items-center gap-2 pr-1 group-hover:pr-[140px] transition-all`}
         >
           <span
-            className={`text-[15px] truncate leading-normal ${
+            className={`text-[16px] truncate leading-normal ${
               isActive ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'
             }`}
           >

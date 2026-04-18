@@ -186,7 +186,7 @@ export default function WorkspaceSidebar({
           <div className="flex items-center justify-between mb-4 group">
             {!isCollapsed && (
               <div className="flex items-center gap-2.5">
-                <h2 className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                <h2 className="mt-0.5 text-[14px] font-semibold text-black uppercase tracking-wide">
                   Przestrzenie
                 </h2>
                 <div className="flex items-center gap-1 transition-opacity">
@@ -195,7 +195,7 @@ export default function WorkspaceSidebar({
                     className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
                     title="Dodaj przestrzeń"
                   >
-                    <Plus size={18} strokeWidth={2.5} />
+                    <Plus size={18} strokeWidth={2.5} className='items-center'/>
                   </button>
                 </div>
               </div>
@@ -256,7 +256,7 @@ export default function WorkspaceSidebar({
                 <Clock size={20} className={`${currentView === 'recent' ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`} strokeWidth={2.5} />
               </div>
               <div className="flex-1 min-w-0 flex items-center text-left gap-2 pr-1">
-                <span className={`text-[15px] transition-colors truncate ${currentView === 'recent' ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'}`}>
+                <span className={`text-[16px] transition-colors truncate ${currentView === 'recent' ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'}`}>
                   Ostatnio używane tablice
                 </span>
               </div>

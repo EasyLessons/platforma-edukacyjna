@@ -57,7 +57,7 @@ export function WorkspaceIconStrip({ activeWorkspaceId }: WorkspaceIconStripProp
         bgColor="#6366f1"
         icon="🏠"
         isActive={false}
-        onClick={() => router.push('/dashboard')}
+        onClick={() => router.push(activeWorkspaceId ? `/dashboard?workspace=${activeWorkspaceId}` : '/dashboard')}
       />
 
       <div style={{ width: '28px', height: '1px', backgroundColor: '#e5e7eb', margin: '2px 0' }} />

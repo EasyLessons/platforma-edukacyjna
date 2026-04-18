@@ -63,6 +63,7 @@ export function WhiteboardBoardSidebar({
   const { workspaces } = useWorkspaces();
   const workspace = workspaces.find((w) => w.id === selectedWorkspaceId);
   const workspaceName = workspace?.name ?? '';
+  const dashboardHref = selectedWorkspaceId ? `/dashboard?workspace=${selectedWorkspaceId}` : '/dashboard';
 
   const filtered = boards.filter((b) =>
     b.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -70,7 +71,8 @@ export function WhiteboardBoardSidebar({
 
   const handleBoardClick = (boardId: number) => {
     // Wymuszony pełny reload jak Ctrl+R, żeby cała tablica przeładowała stan.
-    window.location.assign(`/tablica?boardId=${boardId}`);
+    const workspaceParam = selectedWorkspaceId ? `&workspace=${selectedWorkspaceId}` : '';
+    window.location.assign(`/tablica?boardId=${boardId}${workspaceParam}`);
   };
 
   return (
@@ -112,7 +114,7 @@ export function WhiteboardBoardSidebar({
           }}
         >
           <button
-            onClick={() => router.push('/dashboard')}
+            onClick={() => router.push(dashboardHref)}
             title="Przejdź do dashboardu"
             style={{
               background: 'transparent',
