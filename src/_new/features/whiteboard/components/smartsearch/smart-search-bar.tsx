@@ -621,8 +621,15 @@ export function SmartSearchBar({
         {isOpen && (query.trim() || isLoading) && !isClosing && (
           <div
             ref={resultsContainerRef}
-            onWheel={handleWheel}
-            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-[60] results-scroll overflow-y-auto"
+            onWheel={(e) => {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            onWheelCapture={(e) => {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+            }}
+            className="absolute top-full left-0 right-0 mt-3 backdrop-blur-xl bg-white/80 rounded-3xl border border-gray-200/50 shadow-lg max-h-[500px] z-[60] results-scroll overflow-y-auto overscroll-contain"
             style={{
               animation: 'slideIn 0.3s ease-out',
               width: isMobile ? smartSearch.mobileExpandedWidth : 'auto',
@@ -754,22 +761,34 @@ export function SmartSearchBar({
                       {/* Shimmer effect gdy zaznaczony */}
                       {isSelected && <div className="shimmer-overlay" />}
 
-                      {/* Icon z iskierkami */}
-                      <div
-                        className="p-3 rounded-2xl shrink-0 transition-transform duration-200 hover:scale-110 relative"
-                        style={{
-                          backgroundColor: `${color}20`,
-                          boxShadow: `0 4px 12px ${color}15`,
-                        }}
-                      >
-                        <div style={{ color }}>
-                          <Icon className="w-6 h-6" />
+                      {/* Miniaturka (Thumbnail) po lewej stronie - tylko dla wzorów */}
+                      {!isCard && 'path' in result && (
+                        <div className="shrink-0 mr-4 w-32 h-20 bg-white rounded-lg border-2 border-gray-100 flex items-center justify-center p-2 shadow-sm relative overflow-hidden group-hover:border-blue-300 transition-colors">
+                          <img
+                            src={result.path}
+                            alt={result.title}
+                            className="max-w-full max-h-full object-contain pointer-events-none"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/resources/placeholder.svg';
+                            }}
+                          />
                         </div>
-                      </div>
+                      )}
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                      {/* Content - zajmuje resztę miejsca */}
+                      <div className="flex-1 min-w-0 flex flex-col justify-center h-full">
+                        <div className="flex flex-wrap items-center gap-2 mb-1">
+                          {isCard && (
+                            <div
+                              className="p-1.5 rounded-lg shrink-0"
+                              style={{
+                                backgroundColor: `${color}20`,
+                                color: color,
+                              }}
+                            >
+                              <Icon className="w-5 h-5" />
+                            </div>
+                          )}
                           <span className="font-semibold text-gray-900 truncate text-base">
                             {result.title}
                           </span>
@@ -782,24 +801,24 @@ export function SmartSearchBar({
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-600 truncate mb-2">{result.description}</p>
-                        <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-600 truncate mb-3">{result.description}</p>
+                        <div className="flex items-center flex-wrap gap-2 mt-auto">
                           <span
-                            className="text-xs px-2 py-1 rounded-lg font-medium"
+                            className="text-[11px] px-2 py-1 rounded-sm font-bold uppercase tracking-wider"
                             style={{ backgroundColor: `${color}15`, color }}
                           >
                             {getTypeLabel(result.type)}
                           </span>
                           {!isCard && 'subcategory' in result && (
-                            <span className="text-xs text-gray-400 font-medium">
+                            <span className="text-xs text-gray-400 font-medium bg-gray-100 px-2 py-1 rounded-sm">
                               {result.subcategory}
                             </span>
                           )}
                         </div>
                       </div>
 
-                      {/* Action hint */}
-                      <div className="flex items-center gap-1 text-sm text-gray-400 shrink-0 self-center font-medium">
+                      {/* Action hint - po prawej stronie */}
+                      <div className="flex items-center justify-end w-24 gap-1 text-sm text-gray-400 shrink-0 self-center font-medium ml-2">
                         {isCard ? 'Przeglądaj' : 'Dodaj'}
                         <span className="text-lg">→</span>
                       </div>
