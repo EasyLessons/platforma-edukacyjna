@@ -58,7 +58,13 @@
         { "id": "funkcje", "name": "Funkcje", "order": 6 },
         { "id": "funkcja-kwadratowa", "name": "Funkcja kwadratowa", "order": 7 },
         { "id": "logarytmy", "name": "Logarytmy", "order": 8 },
-        { "id": "inne", "name": "Inne wzory", "order": 9 }
+        { "id": "geometria-analityczna-na-plaszczyznie-kartezjanskiej", "name": "Geometria analityczna na płaszczyźnie kartezjańskiej", "order": 9 },
+        { "id": "kombinatoryka", "name": "Kombinatoryka", "order": 10 },
+        { "id": "rachunek-prawdopodobienstwa", "name": "Rachunek prawdopodobieństwa", "order": 11 },
+        { "id": "parametry-danych-statystycznych", "name": "Parametry danych statystycznych", "order": 12 },
+        { "id": "pochodna-funkcji", "name": "Pochodna funkcji", "order": 13 },
+        { "id": "potegi-i-pierwiastki", "name": "Potęgi i pierwiastki", "order": 14 },
+        { "id": "inne", "name": "Inne wzory", "order": 15 }
       ]
     }
   ],
@@ -862,6 +868,390 @@
       "path": "/resources/matematyka/wzory/stereometria/twierdzenie_o_trzech_prostych_prostopadlych_stereometria.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 66
+    },
+    {
+      "id": "dlugosc-odcinka-i-wspolrzedne-srodka-odcinka",
+      "type": "formula",
+      "title": "Długość odcinka i Współrzędne środka odcinka",
+      "description": "Wzór na długośc odcinka AB oraz wzór na współrzędne środka S odcinka AB",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["długość odcinka", "współrzędne środka odcinka", "geometria analityczna", "odcinek AB", "punkt S"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/1-dlugosc-odcinka-i-wspolrzedne-srodka-odcinka.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 67
+    },
+    {
+      "id": "geo-analit-2-rownanie-kierunkowe",
+      "type": "formula",
+      "title": "Równanie kierunkowe prostej",
+      "description": "y = ax + b",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["równanie kierunkowe", "prosta", "współczynnik kierunkowy"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/2-rownanie-kierunkowe-prostej.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 68
+    },
+    {
+      "id": "geo-analit-3-rownanie-ogolne",
+      "type": "formula",
+      "title": "Równanie ogólne prostej",
+      "description": "Ax + By + C = 0",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["równanie ogólne", "prosta", "Ax+By+C=0"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/3-rownanie-ogolne-prostej.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 69
+    },
+    {
+      "id": "geo-analit-4-proste-rownolegle",
+      "type": "formula",
+      "title": "Proste równoległe",
+      "description": "Warunek równoległości dwóch prostych",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["proste równoległe", "równoległość", "współczynniki"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/4-proste-rownolegle.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 70
+    },
+    {
+      "id": "geo-analit-5-proste-prostopadle",
+      "type": "formula",
+      "title": "Proste prostopadłe",
+      "description": "Warunek prostopadłości dwóch prostych",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["proste prostopadłe", "prostopadłość", "współczynniki"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/5-proste-prostopadle.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 71
+    },
+    {
+      "id": "geo-analit-6-odleglosc-punktu-od-prostej",
+      "type": "formula",
+      "title": "Odległość punktu od prostej",
+      "description": "Wzór na odległość punktu od prostej w postaci ogólnej",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["odległość", "punkt", "prosta", "d"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/6-odleglosc-punktu-od-prostej.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 72
+    },
+    {
+      "id": "geo-analit-7-rownanie-okregu",
+      "type": "formula",
+      "title": "Równanie okręgu",
+      "description": "Równanie okręgu w postaci kanonicznej i ogólnej",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["równanie okręgu", "środek okręgu", "promień"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/7-rownanie-okregu.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 73
+    },
+    {
+      "id": "geo-analit-8-wektory",
+      "type": "formula",
+      "title": "Współrzędne wektora, długość i działania",
+      "description": "Działania na wektorach na płaszczyźnie",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["wektory", "współrzędne wektora", "długość wektora"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/8-wspolrzedne-wektora-dlugosc-wektora-dzialania-na-wektorach.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 74
+    },
+    {
+      "id": "geo-analit-9-przeksztalcenia",
+      "type": "formula",
+      "title": "Przekształcenia geometryczne",
+      "description": "Przesunięcie, symetria osiowa i środkowa",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["przekształcenia geometryczne", "symetria osiowa", "symetria środkowa", "przesunięcie"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/9-przeksztalcenia-geometryczne.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 75
+    },
+    {
+      "id": "geo-analit-10-pole-trojkata",
+      "type": "formula",
+      "title": "Pole trójkąta (ze współrzędnych)",
+      "description": "Wzór na pole trójkąta na płaszczyźnie kartezjańskiej",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["pole trójkąta", "geometria analityczna", "współrzędne wierzchołków"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/10-pole-trojkata.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 76
+    },
+    {
+      "id": "geo-analit-11-srodek-ciezkosci",
+      "type": "formula",
+      "title": "Współrzędne środka ciężkości trójkąta",
+      "description": "Punkt przecięcia środkowych z danych współrzędnych",
+      "category": "matematyka",
+      "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+      "tags": ["środek ciężkości", "trójkąt", "współrzędne środka"],
+      "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/11-wspolrzedne-srodka-ciezkosci-trojkata.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 77
+    },
+    {
+      "id": "kombinatoryka-1-metody",
+      "type": "formula",
+      "title": "Kombinatoryka",
+      "description": "Permutacje, kombinacje, wariacje z powtórzeniami i bez powtórzeń",
+      "category": "matematyka",
+      "subcategory": "kombinatoryka",
+      "tags": ["kombinatoryka", "permutacje", "kombinacje", "wariacje z powtórzeniami", "wariacje bez powtórzeń"],
+      "path": "/resources/matematyka/wzory/kombinatoryka/1-kombinatoryka-permutacje-kombinacje-wariacje-z-powtorzeniami-wariacje-bez-powtorzen.webp",
+      "dimensions": { "width": 700, "height": 500 },
+      "order": 78
+    },
+    {
+      "id": "stat-1-srednia-arytmetyczna",
+      "type": "formula",
+      "title": "Średnia arytmetyczna",
+      "description": "Wzór na średnią arytmetyczną",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["średnia arytmetyczna", "statystyka", "dane statystyczne"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/1-srednia-arytmetyczna.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 79
+    },
+    {
+      "id": "stat-2-srednia-geometryczna",
+      "type": "formula",
+      "title": "Średnia geometryczna",
+      "description": "Wzór na średnią geometryczną liczb nieujemnych",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["średnia geometryczna", "statystyka", "iloraz"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/2-srednia-geometryczna.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 80
+    },
+    {
+      "id": "stat-3-srednia-kwadratowa",
+      "type": "formula",
+      "title": "Średnia kwadratowa",
+      "description": "Wzór na średnią kwadratową",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["średnia kwadratowa", "statystyka"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/3-srednia-kwadratowa.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 81
+    },
+    {
+      "id": "stat-4-nierownosci-srednich",
+      "type": "formula",
+      "title": "Nierówności między średnimi liczbowymi",
+      "description": "Śr. kwadratowa ≥ Śr. arytmetyczna ≥ Śr. geometryczna",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["nierówności średnich", "statystyka"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/4-nierownosci-miedzy-srednimi-liczbami.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 82
+    },
+    {
+      "id": "stat-5-srednia-wazona",
+      "type": "formula",
+      "title": "Średnia ważona",
+      "description": "Wzór na średnią ważoną",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["średnia ważona", "statystyka", "waga"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/5-srednia-wazona.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 83
+    },
+    {
+      "id": "stat-6-mediana",
+      "type": "formula",
+      "title": "Mediana",
+      "description": "Mediana dla parzystej i nieparzystej liczby danych",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["mediana", "statystyka", "wartość środkowa"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/6-mediana.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 84
+    },
+    {
+      "id": "stat-7-wariancja-odchylenie",
+      "type": "formula",
+      "title": "Wariancja i odchylenie standardowe",
+      "description": "Miary rozrzutu danych statystycznych",
+      "category": "matematyka",
+      "subcategory": "parametry-danych-statystycznych",
+      "tags": ["wariancja", "odchylenie standardowe", "statystyka", "rozrzut"],
+      "path": "/resources/matematyka/wzory/parametry danych statystycznych/7-wariancja-i-odchylenie-standardowe.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 85
+    },
+    {
+      "id": "pochodna-1-dzialania",
+      "type": "formula",
+      "title": "Pochodna sumy, różnicy, iloczynu, ilorazu oraz złożenia",
+      "description": "Zasady różniczkowania",
+      "category": "matematyka",
+      "subcategory": "pochodna-funkcji",
+      "tags": ["pochodna", "różniczkowanie", "pochodna sumy", "pochodna iloczynu", "pochodna ilorazu", "funkcja złożona"],
+      "path": "/resources/matematyka/wzory/pochodna funkcji/1-pochodna-sumy-roznicy-iloczynu-ilorazu-funkcji-pochodna-funkcji-zlozonej.webp",
+      "dimensions": { "width": 700, "height": 500 },
+      "order": 86
+    },
+    {
+      "id": "pochodna-2-wybrane-funkcje",
+      "type": "formula",
+      "title": "Pochodne wybranych funkcji",
+      "description": "Tabela podstawowych wzorów na pochodne",
+      "category": "matematyka",
+      "subcategory": "pochodna-funkcji",
+      "tags": ["pochodne", "wzory pochodnych", "wybrane funkcje"],
+      "path": "/resources/matematyka/wzory/pochodna funkcji/2-pochodne-wybranych-funkcji.webp",
+      "dimensions": { "width": 600, "height": 600 },
+      "order": 87
+    },
+    {
+      "id": "pochodna-3-rownanie-stycznej",
+      "type": "formula",
+      "title": "Równanie stycznej",
+      "description": "Równanie stycznej do wykresu funkcji w punkcie",
+      "category": "matematyka",
+      "subcategory": "pochodna-funkcji",
+      "tags": ["pochodna", "styczna", "równanie stycznej"],
+      "path": "/resources/matematyka/wzory/pochodna funkcji/3-rownanie-stycznej.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 88
+    },
+    {
+      "id": "potegi-1-potega",
+      "type": "formula",
+      "title": "Potęga",
+      "description": "Potęgowanie i wykładniki",
+      "category": "matematyka",
+      "subcategory": "potegi-i-pierwiastki",
+      "tags": ["potęga", "wykładnik całkowity", "wykładnik wymierny"],
+      "path": "/resources/matematyka/wzory/potegi i pierwiastki/1-potega.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 89
+    },
+    {
+      "id": "potegi-2-pierwiastek",
+      "type": "formula",
+      "title": "Pierwiastek arytmetyczny",
+      "description": "Definicja i własności pierwiastków n-tego stopnia",
+      "category": "matematyka",
+      "subcategory": "potegi-i-pierwiastki",
+      "tags": ["pierwiastek", "arytmetyczny", "stopień pierwiastka"],
+      "path": "/resources/matematyka/wzory/potegi i pierwiastki/2-pierwiastek-arytmetyczny-n-tego-stopnia.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 90
+    },
+    {
+      "id": "potegi-3-dzialania",
+      "type": "formula",
+      "title": "Działania na potęgach",
+      "description": "Wzory na iloczyn, iloraz potęg itd.",
+      "category": "matematyka",
+      "subcategory": "potegi-i-pierwiastki",
+      "tags": ["potęgi", "działania na potęgach", "wzory"],
+      "path": "/resources/matematyka/wzory/potegi i pierwiastki/3-dzialania-na-potegach.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 91
+    },
+    {
+      "id": "prawdopodobienstwo-1-wlasnosci",
+      "type": "formula",
+      "title": "Własności prawdopodobieństwa",
+      "description": "Prawdopodobieństwo zdarzeń, zdarzenie przeciwne",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["prawdopodobieństwo", "własności", "zdarzenie przeciwne"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/1-wlasnosci-prawdopodobienstwa.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 92
+    },
+    {
+      "id": "prawdopodobienstwo-2-klasyczna",
+      "type": "formula",
+      "title": "Klasyczna definicja prawdopodobieństwa",
+      "description": "Wzór na prawdopodobieństwo ze zdarzeń jednakowo prawdopodobnych",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["prawdopodobieństwo", "klasyczna definicja", "wzór podstawowy"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/2-twierdzenie-klasyczna-definicja-prawdopodobienstwa.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 93
+    },
+    {
+      "id": "prawdopodobienstwo-3-bernoulli",
+      "type": "formula",
+      "title": "Schemat Bernoulliego",
+      "description": "Ciąg niezależnych powtórzeń prób Bernoullego",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["prawdopodobieństwo", "Bernoulli", "schemat Bernoullego", "sukces", "porażka"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/3-schemat-bernoullego.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 94
+    },
+    {
+      "id": "prawdopodobienstwo-4-warunkowe",
+      "type": "formula",
+      "title": "Prawdopodobieństwo warunkowe",
+      "description": "Prawdopodobieństwo pod warunkiem zajścia innego zdarzenia",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["prawdopodobieństwo warunkowe"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/4-prawdopodobienstwa-warunkowe.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 95
+    },
+    {
+      "id": "prawdopodobienstwo-5-calkowite",
+      "type": "theorem",
+      "title": "Twierdzenie o prawdopodobieństwie całkowitym",
+      "description": "Zdarzenia parami rozłączne",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["prawdopodobieństwo całkowite", "twierdzenie"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/5-twierdzenie-o-prawdopodobienstwie-calkowitym.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 96
+    },
+    {
+      "id": "prawdopodobienstwo-6-bayesa",
+      "type": "theorem",
+      "title": "Twierdzenie Bayesa",
+      "description": "Prawdopodobieństwo przyczyn",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["Twierdzenie Bayesa", "prawdopodobieństwo", "bayes"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/6-twierdzenie-bayesa.webp",
+      "dimensions": { "width": 600, "height": 400 },
+      "order": 97
+    },
+    {
+      "id": "prawdopodobienstwo-7-wartosc-oczekiwana",
+      "type": "formula",
+      "title": "Wartość oczekiwana zmiennej losowej",
+      "description": "Wzór na nadzieję matematyczną",
+      "category": "matematyka",
+      "subcategory": "rachunek-prawdopodobienstwa",
+      "tags": ["wartość oczekiwana", "zmienna losowa", "prawdopodobieństwo"],
+      "path": "/resources/matematyka/wzory/rachunek prawdopodobienstwa/7-wartosc-oczekiwana-zmiennej-losowej.webp",
+      "dimensions": { "width": 600, "height": 300 },
+      "order": 98
     }
   ],
 
@@ -870,9 +1260,9 @@
       "id": "karta-matura-podstawowa",
       "type": "card",
       "title": "Karta wzorów - Matura podstawowa",
-      "description": "Oficjalna karta wzorów CKE (trygonometria)",
+      "description": "Oficjalna karta wzorów CKE",
       "category": "matematyka",
-      "tags": ["karta wzorów", "matura", "podstawowa", "CKE", "trygonometria"],
+      "tags": ["karta wzorów", "matura", "podstawowa", "CKE"],
       "sections": [
         {
           "id": "karta-tryg",
@@ -888,7 +1278,179 @@
             { "ref": "tryg-podwojony-kat" },
             { "ref": "tryg-wzory-redukcyjne" },
             { "ref": "tryg-sumy-iloczyny" },
-            { "ref": "tryg-okresowosc" }
+            { "ref": "tryg-okresowosc" },
+            { "ref": "tryg-tablica-wartosci" }
+          ]
+        },
+        {
+          "id": "karta-ciagi",
+          "name": "Ciągi",
+          "order": 2,
+          "items": [
+            { "ref": "ciag-arytm-n-ty-wyraz" },
+            { "ref": "ciag-geo-n-ty-wyraz" },
+            { "ref": "ciag-arytm-suma" },
+            { "ref": "ciag-geo-suma" },
+            { "ref": "ciag-arytm-sasiednie" },
+            { "ref": "ciag-geo-sasiednie" },
+            { "ref": "ciag-geo-nieskonczona-suma" },
+            { "ref": "ciag-procent-skladany" },
+            { "ref": "ciag-granice-zbiezne" },
+            { "ref": "ciag-trzy-ciagi" },
+            { "ref": "ciag-wybrane-granice" }
+          ]
+        },
+        {
+          "id": "karta-funkcja-kwadratowa",
+          "name": "Funkcja kwadratowa",
+          "order": 3,
+          "items": [
+            { "ref": "fkw-delta" },
+            { "ref": "fkw-miejsca-zerowe" },
+            { "ref": "fkw-postac-ogolna" },
+            { "ref": "fkw-postac-kanoniczna" },
+            { "ref": "fkw-postac-iloczynowa" },
+            { "ref": "fkw-wykres" },
+            { "ref": "fkw-viete" }
+          ]
+        },
+        {
+          "id": "karta-logarytmy",
+          "name": "Logarytmy",
+          "order": 4,
+          "items": [
+            { "ref": "log-wzory" },
+            { "ref": "log-zamiana-podstawy" }
+          ]
+        },
+        {
+          "id": "karta-inne",
+          "name": "Silnia, Wartość Bezwzględna i Dwumian",
+          "order": 5,
+          "items": [
+            { "ref": "silnia-dwumian" },
+            { "ref": "wartosc-bezwzgledna" },
+            { "ref": "wzory-skroconego-mnozenia" },
+            { "ref": "dwumian-newtona" }
+          ]
+        },
+        {
+          "id": "karta-planimetria",
+          "name": "Planimetria",
+          "order": 6,
+          "items": [
+            { "ref": "plan-pitagoras" },
+            { "ref": "plan-talesa" },
+            { "ref": "plan-sinusow" },
+            { "ref": "plan-cosinusow" },
+            { "ref": "plan-cechy-przystawania" },
+            { "ref": "plan-cechy-podobienstwa" },
+            { "ref": "plan-pola-podobnych" },
+            { "ref": "plan-zwiazki-prostokat" },
+            { "ref": "plan-zwiazki-rownoboczny" },
+            { "ref": "plan-wlasciwosci-trojkata" },
+            { "ref": "plan-pole-trojkata" },
+            { "ref": "plan-dwusieczna" },
+            { "ref": "plan-kolo-pole" },
+            { "ref": "plan-wycinek-kola" },
+            { "ref": "plan-katy-okregu" },
+            { "ref": "plan-styczna-cieciwa" },
+            { "ref": "plan-sieczna-styczna" },
+            { "ref": "plan-styczne" },
+            { "ref": "plan-okrag-opisany" },
+            { "ref": "plan-okrag-wpisany" },
+            { "ref": "plan-rownoleglobok" },
+            { "ref": "plan-romb" },
+            { "ref": "plan-trapez" },
+            { "ref": "plan-deltoid" }
+          ]
+        },
+        {
+          "id": "karta-stereometria",
+          "name": "Stereometria",
+          "order": 7,
+          "items": [
+            { "ref": "ster-graniastoslup" },
+            { "ref": "ster-prostopadloscian" },
+            { "ref": "ster-ostroslup" },
+            { "ref": "ster-walec" },
+            { "ref": "ster-stozek" },
+            { "ref": "ster-kula" },
+            { "ref": "ster-trzy-prostopadle" }
+          ]
+        },
+        {
+          "id": "karta-potegi-i-pierwiastki",
+          "name": "Potęgi i pierwiastki",
+          "order": 8,
+          "items": [
+            { "ref": "potegi-1-potega" },
+            { "ref": "potegi-2-pierwiastek" },
+            { "ref": "potegi-3-dzialania" }
+          ]
+        },
+        {
+          "id": "karta-geometria-analityczna",
+          "name": "Geometria analityczna na płaszczyźnie kartezjańskiej",
+          "order": 9,
+          "items": [
+            { "ref": "dlugosc-odcinka-i-wspolrzedne-srodka-odcinka" },
+            { "ref": "geo-analit-2-rownanie-kierunkowe" },
+            { "ref": "geo-analit-3-rownanie-ogolne" },
+            { "ref": "geo-analit-4-proste-rownolegle" },
+            { "ref": "geo-analit-5-proste-prostopadle" },
+            { "ref": "geo-analit-6-odleglosc-punktu-od-prostej" },
+            { "ref": "geo-analit-7-rownanie-okregu" },
+            { "ref": "geo-analit-8-wektory" },
+            { "ref": "geo-analit-9-przeksztalcenia" },
+            { "ref": "geo-analit-10-pole-trojkata" },
+            { "ref": "geo-analit-11-srodek-ciezkosci" }
+          ]
+        },
+        {
+          "id": "karta-kombinatoryka",
+          "name": "Kombinatoryka",
+          "order": 10,
+          "items": [
+            { "ref": "kombinatoryka-1-metody" }
+          ]
+        },
+        {
+          "id": "karta-rachunek-prawdopodobienstwa",
+          "name": "Rachunek prawdopodobieństwa",
+          "order": 11,
+          "items": [
+            { "ref": "prawdopodobienstwo-1-wlasnosci" },
+            { "ref": "prawdopodobienstwo-2-klasyczna" },
+            { "ref": "prawdopodobienstwo-3-bernoulli" },
+            { "ref": "prawdopodobienstwo-4-warunkowe" },
+            { "ref": "prawdopodobienstwo-5-calkowite" },
+            { "ref": "prawdopodobienstwo-6-bayesa" },
+            { "ref": "prawdopodobienstwo-7-wartosc-oczekiwana" }
+          ]
+        },
+        {
+          "id": "karta-parametry-danych-statystycznych",
+          "name": "Parametry danych statystycznych",
+          "order": 12,
+          "items": [
+            { "ref": "stat-1-srednia-arytmetyczna" },
+            { "ref": "stat-2-srednia-geometryczna" },
+            { "ref": "stat-3-srednia-kwadratowa" },
+            { "ref": "stat-4-nierownosci-srednich" },
+            { "ref": "stat-5-srednia-wazona" },
+            { "ref": "stat-6-mediana" },
+            { "ref": "stat-7-wariancja-odchylenie" }
+          ]
+        },
+        {
+          "id": "karta-pochodna-funkcji",
+          "name": "Pochodna funkcji",
+          "order": 13,
+          "items": [
+            { "ref": "pochodna-1-dzialania" },
+            { "ref": "pochodna-2-wybrane-funkcje" },
+            { "ref": "pochodna-3-rownanie-stycznej" }
           ]
         }
       ]

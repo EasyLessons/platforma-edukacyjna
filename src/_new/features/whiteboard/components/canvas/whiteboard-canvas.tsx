@@ -1154,7 +1154,7 @@ useMultiTouchGestures({
     img.src = formula.path;
     img.onload = () => {
       const aspectRatio = img.naturalHeight / img.naturalWidth;
-      const worldWidth = 3.5;
+      const worldWidth = 6.0;
       const worldHeight = worldWidth * aspectRatio;
       const centerWorld = inverseTransformPoint(
         { x: canvasWidth / 2, y: canvasHeight / 2 },
@@ -1212,7 +1212,7 @@ useMultiTouchGestures({
   }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
 
   const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
-    const COLS = 2, WORLD_WIDTH = 3.5, WORLD_PADDING = 0.5;
+    const COLS = 2, WORLD_WIDTH = 6.0, WORLD_PADDING = 0.5;
     const centerWorld = inverseTransformPoint(
       { x: canvasWidth / 2, y: canvasHeight / 2 },
       vp.viewportRef.current,
@@ -1227,8 +1227,14 @@ useMultiTouchGestures({
         img.onerror = () => reject(new Error(`Failed to load: ${formula.path}`));
       })
     );
-    Promise.all(imagePromises)
-      .then((loaded) => {
+    Promise.allSettled(imagePromises)
+      .then((results) => {
+        const loaded = results
+          .filter((res): res is PromiseFulfilledResult<{ formula: FormulaResource; img: HTMLImageElement; index: number }> => res.status === 'fulfilled')
+          .map(res => res.value);
+        
+        if (loaded.length === 0) return; // all failed
+
         const newImages = loaded.map(({ formula, img, index }) => {
           const aspectRatio = img.naturalHeight / img.naturalWidth;
           const worldHeight = WORLD_WIDTH * aspectRatio;
@@ -1306,7 +1312,7 @@ useMultiTouchGestures({
           canvasHeight
         );
         const aspectRatio = imgH / Math.max(imgW, 1);
-        const worldWidth = 3;
+        const worldWidth = 5.0;
         const worldHeight = worldWidth * aspectRatio;
         const newImage: ImageElement = {
           id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
@@ -1815,7 +1821,7 @@ useMultiTouchGestures({
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
             
-            const worldWidth = 3;
+            const worldWidth = 5.0;
             const padding = 0.5; // Odstęp między wygenerowanymi stronami
             let currentY = worldPos.y; // Zaczynamy dokładnie tam, gdzie upuszczono plik
 
@@ -1869,7 +1875,7 @@ useMultiTouchGestures({
             const img = new Image();
             img.onload = () => {
               const aspectRatio = img.naturalHeight / Math.max(img.naturalWidth, 1);
-              const worldWidth = 3;
+              const worldWidth = 5.0;
               const worldHeight = worldWidth * aspectRatio;
               
               const newImage: ImageElement = {

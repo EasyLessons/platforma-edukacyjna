@@ -33,6 +33,7 @@ import {
   CalculationResult,
 } from './types';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 interface SmartSearchBarProps {
   onFormulaSelect: (formula: FormulaResource) => void;
@@ -274,10 +275,25 @@ export function SmartSearchBar({
     return manifest?.resourceTypes[type]?.label || type;
   };
 
-  const openCardsBrowse = () => {
-    setIsOpen(true);
-    setQuery('karty wzorów');
-    setTimeout(() => inputRef.current?.focus(), 50);
+  const openCardsBrowse = async () => {
+    let currentManifest = manifest;
+    if (!currentManifest) {
+      try {
+        currentManifest = await loadManifest();
+        setManifest(currentManifest);
+      } catch (error) {
+        console.error("Nie udało się załadować manifestu:", error);
+        return;
+      }
+    }
+    
+    if (currentManifest && currentManifest.cards?.length > 0) {
+      // Zawsze wybieramy główną kartę CKE dla Matury Podstawowej
+      const ckeCard = currentManifest.cards.find(c => c.id === 'karta-matura-podstawowa') || currentManifest.cards[0];
+      if (ckeCard) {
+        onCardSelect(ckeCard);
+      }
+    }
   };
 
   return (
@@ -462,90 +478,72 @@ export function SmartSearchBar({
               className={`flex items-center gap-2 ${showFullHeader ? 'mx-auto' : ''}`}
               style={{ width: isMobile ? `${smartSearch.collapsedWidth}px` : '100%' }}
             >
-            <button
-              onClick={() => {
-                setIsOpen(true);
-                setTimeout(() => inputRef.current?.focus(), 50);
-              }}
-              className="flex items-center gap-3 backdrop-blur-xl bg-white/85 rounded-3xl border border-gray-300/80 hover:border-gray-300 hover:bg-gradient-to-r hover:from-blue-50/70 hover:to-purple-50/70 shadow-[0_4px_12px_rgba(0,0,0,0.1)] hover:shadow-[0_6px_14px_rgba(0,0,0,0.12)] hover:scale-[1.02] hover:cursor-pointer relative"
+            <div
+              className="flex items-center backdrop-blur-xl bg-white/85 rounded-full border border-gray-200/80 shadow-sm hover:shadow-md transition-shadow relative z-10"
               style={{
                 width: isMobile ? `${smartSearch.collapsedWidth}px` : '100%',
                 maxWidth: isMobile ? `${smartSearch.collapsedWidth}px` : '1000px',
                 height: '56px',
-                padding: isMobile ? '0' : '16px 24px',
-                justifyContent: isMobile ? 'center' : 'flex-start',
-                transition: 'all 0.3s ease-out',
               }}
-              title="Szukaj wzorów (Ctrl+K)"
             >
-              <Search className="w-5 h-5 text-gray-400" />
+              {/* Lewa strona - fake input (przycisk otwierający wyszukiwarkę) */}
+              <button
+                onClick={() => {
+                  setIsOpen(true);
+                  setTimeout(() => inputRef.current?.focus(), 50);
+                }}
+                className="flex flex-1 items-center gap-3 h-full px-5 hover:bg-gray-50/50 rounded-l-full transition-colors outline-none border-none group"
+                style={{
+                  justifyContent: isMobile ? 'center' : 'flex-start',
+                }}
+                title="Szukaj wzorów (Ctrl+K)"
+              >
+                <Search className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors" />
 
-              {/* Tekst i przyciski ukrywane przy 760px */}
-              {!isMobile && (
+                {!isMobile && (
+                  <>
+                    <span className="text-base text-gray-500 flex-1 text-left select-none">
+                      Szukaj wzorów matematycznych...
+                    </span>
+
+                    {/* Ctrl+K badge */}
+                    <kbd className="hidden sm:inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gray-400 bg-gray-100 rounded-md border border-gray-200/50 mr-1 select-none">
+                      Ctrl+K
+                    </kbd>
+                  </>
+                )}
+              </button>
+
+              {!isMobile && windowWidth > 822 && (
                 <>
-                  <span className="text-base text-gray-500 flex-1 text-left">
-                    Szukaj wzorów matematycznych...
-                  </span>
+                  {/* Pionowy Separator */}
+                  <div className="w-px h-6 bg-gray-200 mx-1 shrink-0" />
 
-                  {/* Ctrl+K badge - WEWNĄTRZ buttona */}
-                  <kbd className="hidden sm:inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-gray-400 bg-white/60 rounded-lg border border-gray-200/50 backdrop-blur-sm">
-                    Ctrl+K
-                  </kbd>
-
-                  {browseButtonPlacement !== 'outside-right' && (
-                    <>
-                      {/* Separator - WEWNĄTRZ buttona */}
-                      <div className="w-px h-8 bg-gray-200/50 mx-2" />
-
-                      {/* Ikonka wzorów - WEWNĄTRZ głównego buttona */}
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openCardsBrowse();
-                        }}
-                        className="p-2 bg-blue-100/80 hover:bg-blue-100/99 rounded-xl transition-all duration-200 hover:scale-110 group relative"
-                        title="Przeglądaj karty wzorów CKE"
-                      >
-                        <Library className="w-5 h-5 text-blue-500 hover:cursor-pointer" />
-
-                        {/* Tooltip */}
-                        <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                          <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                            Przeglądaj karty wzorów CKE
-                            <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  {/* Prawa strona - Przycisk Kart Wzorów (W stylu secondary button) */}
+                  <Tooltip content="Karty Wzorów CKE" position="bottom" tooltipClassName="mt-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openCardsBrowse();
+                      }}
+                      className={`cursor-pointer font-semibold hover-shine flex items-center justify-center h-10 mx-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-all duration-300 ease-in-out shrink-0 group ${
+                        windowWidth > 884 ? 'gap-2 px-4' : 'w-10 px-0'
+                      }`}
+                    >
+                      <Library className="w-4 h-4 shrink-0" />
+                      {windowWidth > 884 && (
+                        <span className="hidden sm:inline-block text-[13px]">Wzory</span>
+                      )}
+                    </button>
+                  </Tooltip>
                 </>
               )}
-            </button>
-
-            {smartSearch.showOutsideBrowseButton && browseButtonPlacement === 'outside-right' && (
-              <div className="group relative">
-                <button
-                  onClick={openCardsBrowse}
-                  className="hover-shine hover:cursor-pointer flex items-center justify-center text-gray-500 hover:text-gray-700 bg-white/90 hover:bg-white transition-colors rounded-3xl border border-gray-300/80 shadow-[0_4px_12px_rgba(0,0,0,0.1)]"
-                  style={{ height: '56px', width: '56px' }}
-                  title="Przeglądaj karty wzorów CKE"
-                >
-                  <Library className="w-4 h-4" />
-                </button>
-
-                <div className="absolute top-full right-0 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50">
-                  <div className="bg-gray-900 text-white text-xs px-3 py-1.5 rounded-lg whitespace-nowrap shadow-lg">
-                    Przeglądaj karty wzorów CKE
-                    <div className="absolute -top-1 right-4 w-2 h-2 bg-gray-900 transform rotate-45" />
-                  </div>
-                </div>
-              </div>
-            )}
+            </div>
             </div>
           </>
         ) : (
           <div
-            className={`flex items-center gap-3 backdrop-blur-xl bg-white/80 rounded-3xl border-2 border-blue-400/50 shadow-lg px-6 ${showFullHeader ? 'mx-auto' : ''}`}
+            className={`flex items-center backdrop-blur-xl bg-white/95 rounded-full border border-blue-400/50 shadow-md ${showFullHeader ? 'mx-auto' : ''}`}
             style={{
               height: '56px',
               width: isMobile ? smartSearch.mobileExpandedWidth : '100%',
@@ -574,22 +572,47 @@ export function SmartSearchBar({
                       : 'expandSearch 0.3s ease-out forwards',
             }}
           >
-            <Search className="w-5 h-5 text-blue-500 animate-pulse" />
-            <input
-              ref={inputRef}
-              type="text"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
-              className="text-black flex-1 py-4 text-base bg-transparent outline-none placeholder:text-gray-400"
-              autoFocus
-            />
+            {/* Input (Lewa Strona) */}
+            <div className="flex flex-1 items-center gap-3 px-5 h-full rounded-l-full bg-transparent overflow-hidden w-full">
+              <Search className="w-5 h-5 text-blue-500 animate-pulse shrink-0" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Wpisz np. jedynka, sinus, karta wzorów..."
+                className="text-black flex-1 h-full py-4 text-base bg-transparent border-none outline-none placeholder:text-gray-400 min-w-0"
+                autoFocus
+              />
+            </div>
+            
+            {/* Pionowy Separator */}
+            {windowWidth > 822 && (
+              <div className="w-px h-6 bg-gray-200 mx-1 shrink-0" />
+            )}
+
+            {/* Przycisk Kart Wzorów (W stylu secondary button - mała, okrągła ikona w aktywnym / mniejszym ekranie) */}
+            {windowWidth > 822 && (
+              <Tooltip content="Karty Wzorów CKE" position="bottom" className="cursor-pointer" tooltipClassName="mt-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openCardsBrowse();
+                  }}
+                  className="cursor-pointer hover-shine flex items-center justify-center w-10 h-10 mx-1.5 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 transition-all duration-300 ease-in-out shrink-0 group"
+                >
+                  <Library className="w-4 h-4" />
+                </button>
+              </Tooltip>
+            )}
+
+            {/* Przycisk Zamykania (Skrajnie po prawej) */}
             <button
               onClick={handleClose}
-              className="p-2 hover:bg-gray-100/80 rounded-xl transition-all duration-200 hover:scale-110"
+              className="flex items-center justify-center w-12 h-full rounded-r-full hover:bg-red-50/70 transition-colors text-gray-400 hover:text-red-500 shrink-0"
             >
-              <X className="w-5 h-5 text-gray-400" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         )}

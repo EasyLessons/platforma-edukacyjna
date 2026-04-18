@@ -12,7 +12,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { X, Check, Plus, ChevronRight, ChevronDown } from 'lucide-react';
+import { X, Check, Plus, ChevronRight, ChevronDown, GripVertical, GripHorizontal } from 'lucide-react';
 import { CardResource, FormulaResource, ResourceManifest, CardSection } from './types';
 import { loadManifest, getFormulaById, getResourceTypeColor } from './search-service';
 
@@ -57,7 +57,8 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   // Rozwiń wszystkie sekcje domyślnie
   useEffect(() => {
     if (card.sections) {
-      setExpandedSections(new Set(card.sections.map((s) => s.id)));
+      // Zmieniono na puste domyślnie, aby spis treści był schowany na początku
+      setExpandedSections(new Set());
     }
   }, [card]);
 
@@ -80,9 +81,18 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
   // Obsługa scrolla myszką - DOKADNIE JAK W CHATBOCIE
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
+    e.nativeEvent.stopImmediatePropagation();
   }, []);
 
-  const toggleSection = (sectionId: string) => {
+  const handleSectionClick = (sectionId: string) => {
+    const el = document.getElementById(`section-${sectionId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const toggleSection = (sectionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
     setExpandedSections((prev) => {
       const next = new Set(prev);
       if (next.has(sectionId)) {
@@ -119,6 +129,17 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
       }
       return next;
     });
+  };
+
+  const allFormulasList = useMemo(() => Array.from(sectionFormulas.values()).flat(), [sectionFormulas]);
+  const isAllSelectedGlobal = allFormulasList.length > 0 && selectedIds.size === allFormulasList.length;
+
+  const toggleAll = () => {
+    if (isAllSelectedGlobal) {
+      setSelectedIds(new Set()); // odznacz wszystkie
+    } else {
+      setSelectedIds(new Set(allFormulasList.map(f => f.id))); // zaznacz wszystkie
+    }
   };
 
   const handleAddSelected = () => {
@@ -173,10 +194,34 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
             onClose();
           }
         }}
+        onDragOver={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault(); // Pozwala na upuszczenie "na tło" (czarne rozmycie)
+          }
+        }}
+        onDrop={(e) => {
+          if (e.target === e.currentTarget) {
+            e.preventDefault();
+            const formulaId = e.dataTransfer.getData('formula/id');
+            const formulaPath = e.dataTransfer.getData('text/plain');
+            if (formulaId && manifest) {
+              const formula = getFormulaById(manifest, formulaId);
+              if (formula) {
+                onAddFormulas([formula]);
+                onClose(); // po przeciągnięciu zamknij modal by od razu widzieć tablicę
+              }
+            }
+          }
+        }}
         onWheel={(e) => {
           // Blokuj scroll tablicy w tle
           e.stopPropagation();
+          e.nativeEvent.stopImmediatePropagation();
           e.preventDefault();
+        }}
+        onWheelCapture={(e) => {
+          e.stopPropagation();
+          e.nativeEvent.stopImmediatePropagation();
         }}
       >
         <div
@@ -184,16 +229,16 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-red-50 to-orange-50">
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-white z-10">
             <div>
               <h2 className="text-xl font-bold text-gray-900">{card.title}</h2>
               <p className="text-sm text-gray-500">{card.description}</p>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-white/50 rounded-lg transition-colors cursor-pointer"
+              className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-full transition-colors cursor-pointer"
             >
-              <X className="w-6 h-6 text-gray-500" />
+              <X className="w-5 h-5" />
             </button>
           </div>
 
@@ -217,26 +262,33 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
 
                     return (
                       <li key={section.id}>
-                        <button
-                          onClick={() => toggleSection(section.id)}
+                        <div
+                          onClick={() => handleSectionClick(section.id)}
                           className={`
-                            w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left cursor-pointer
-                            hover:bg-white transition-colors
-                            ${selectedInSection > 0 ? 'bg-green-50 text-green-700' : 'text-gray-700'}
+                            group w-full flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer
+                            transition-all
+                            ${selectedInSection > 0 ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-100'}
                           `}
                         >
-                          {isExpanded ? (
-                            <ChevronDown className="w-4 h-4 shrink-0" />
-                          ) : (
-                            <ChevronRight className="w-4 h-4 shrink-0" />
-                          )}
-                          <span className="flex-1 font-medium truncate">{section.name}</span>
-                          {selectedInSection > 0 && (
-                            <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded-full">
-                              {selectedInSection}
-                            </span>
-                          )}
-                        </button>
+                          <span className="flex-1 truncate text-sm select-none">{section.name}</span>
+                          <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {selectedInSection > 0 && (
+                              <span className="text-[10px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full">
+                                {selectedInSection}
+                              </span>
+                            )}
+                            <button
+                              onClick={(e) => toggleSection(section.id, e)}
+                              className="p-1 hover:bg-gray-200/50 rounded"
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4 shrink-0" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4 shrink-0" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
 
                         {/* Lista wzorów w sekcji */}
                         {isExpanded && (
@@ -246,27 +298,27 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                                 <button
                                   onClick={() => toggleFormula(formula.id)}
                                   className={`
-                                    w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-sm cursor-pointer
-                                    transition-colors
+                                    w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-left text-[13px] cursor-pointer
+                                    transition-colors font-medium
                                     ${
                                       selectedIds.has(formula.id)
-                                        ? 'bg-green-100 text-green-700'
-                                        : 'text-gray-600 hover:bg-white'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : 'text-gray-600 hover:bg-gray-200'
                                     }
                                   `}
                                 >
                                   <div
                                     className={`
-                                    w-4 h-4 rounded border-2 flex items-center justify-center shrink-0
+                                    w-[14px] h-[14px] rounded-[4px] border-2 flex items-center justify-center shrink-0 transition-colors
                                     ${
                                       selectedIds.has(formula.id)
-                                        ? 'bg-green-500 border-green-500'
-                                        : 'border-gray-300'
+                                        ? 'bg-blue-600 border-blue-600'
+                                        : 'border-gray-300 bg-white'
                                     }
                                   `}
                                   >
                                     {selectedIds.has(formula.id) && (
-                                      <Check className="w-3 h-3 text-white" />
+                                      <Check className="w-2.5 h-2.5 text-white stroke-[3]" />
                                     )}
                                   </div>
                                   <span className="truncate">{formula.title}</span>
@@ -301,19 +353,18 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                     const allSelected = formulas.every((f) => selectedIds.has(f.id));
 
                     return (
-                      <div key={section.id} className="space-y-4">
+                      <div id={`section-${section.id}`} key={section.id} className="space-y-4 scroll-mt-6">
                         {/* Section header */}
-                        <div className="flex items-center justify-between">
-                          <h3 className="text-lg font-semibold text-gray-800">{section.name}</h3>
+                        <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                          <h3 className="text-xl font-bold text-gray-900">{section.name}</h3>
                           <button
                             onClick={() => toggleAllInSection(section)}
                             className={`
-                              flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium cursor-pointer
-                              transition-colors
+                              flex items-center gap-1.5 text-sm py-1.5 px-3 cursor-pointer rounded-lg border font-medium transition-colors
                               ${
-                                allSelected
-                                  ? 'bg-green-500 text-white hover:bg-green-600'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                allSelected 
+                                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
+                                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                               }
                             `}
                           >
@@ -331,8 +382,8 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                           </button>
                         </div>
 
-                        {/* Formulas grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Formulas list */}
+                        <div className="flex flex-col gap-5 items-stretch">
                           {formulas.map((formula) => {
                             const isSelected = selectedIds.has(formula.id);
                             const color = manifest
@@ -343,48 +394,55 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                               <div
                                 key={formula.id}
                                 onClick={() => toggleFormula(formula.id)}
+                                draggable={true}
+                                onDragStart={(e) => {
+                                  e.dataTransfer.effectAllowed = 'copy';
+                                  e.dataTransfer.setData('text/plain', formula.path);
+                                  e.dataTransfer.setData('formula/id', formula.id);
+                                }}
                                 className={`
                                   relative rounded-xl overflow-hidden cursor-pointer
-                                  border-2 transition-all
+                                  border transition-all flex flex-col bg-white hover:shadow-md group
                                   ${
                                     isSelected
-                                      ? 'border-green-500 ring-2 ring-green-200'
-                                      : 'border-gray-200 hover:border-gray-300'
+                                      ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/10'
+                                      : 'border-gray-200 hover:border-blue-300'
                                   }
                                 `}
                               >
-                                {/* Selection indicator */}
-                                {isSelected && (
-                                  <div className="absolute top-2 right-2 z-10 bg-green-500 text-white p-1 rounded-full">
-                                    <Check className="w-4 h-4" />
-                                  </div>
-                                )}
-
-                                {/* Image preview */}
-                                <div className="bg-gray-50 p-4 flex items-center justify-center min-h-[150px]">
+                                {/* Image preview (100% width) */}
+                                <div className="relative w-full flex items-center justify-center p-4 bg-white group-hover:bg-gray-50/50 transition-colors">
                                   <img
                                     src={formula.path}
                                     alt={formula.title}
-                                    className="max-w-full max-h-[200px] object-contain"
+                                    className="w-full h-auto object-contain pointer-events-none"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src =
                                         '/resources/placeholder.svg';
                                     }}
                                   />
+                                  {/* Stylizowany uchwyt przeciągania na zdjęciu (wizualna ikona w lewym górnym) */}
+                                  <div className="absolute top-2 left-2 flex items-center justify-center w-8 h-8 rounded-lg bg-gray-100/80 backdrop-blur-sm text-gray-500 opacity-60 group-hover:opacity-100 transition-opacity cursor-grab shadow-sm">
+                                    <GripVertical className="w-5 h-5" />
+                                  </div>
                                 </div>
 
-                                {/* Info */}
-                                <div className="p-3 bg-white border-t border-gray-100">
-                                  <div className="flex items-center gap-2">
+                                {/* Bottom thin bar: Info + Checkbox */}
+                                <div className="flex items-center justify-between px-3 py-2 bg-gray-50 border-t border-gray-100">
+                                  <div className="flex items-center gap-3 overflow-hidden">
                                     <span
-                                      className="text-xs px-2 py-0.5 rounded-full text-white"
+                                      className="shrink-0 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 text-white rounded-full"
                                       style={{ backgroundColor: color }}
                                     >
                                       {manifest?.resourceTypes[formula.type]?.label || formula.type}
                                     </span>
-                                    <span className="text-sm font-medium text-gray-900 truncate">
+                                    <span className="text-sm font-medium text-gray-900 truncate flex-1">
                                       {formula.title}
                                     </span>
+                                  </div>
+                                  
+                                  <div className={`shrink-0 ml-3 w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
+                                     {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
                                   </div>
                                 </div>
                               </div>
@@ -400,37 +458,43 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-white z-10 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
             <div className="text-sm text-gray-500">
               {selectedCount > 0 ? (
-                <span className="text-green-600 font-medium">
+                <span className="text-blue-600 font-medium">
                   Wybrano {selectedCount}{' '}
                   {selectedCount === 1 ? 'wzór' : selectedCount < 5 ? 'wzory' : 'wzorów'}
                 </span>
               ) : (
-                'Kliknij na wzór lub użyj checkboxów, aby wybrać'
+                'Kliknij na wzór, aby wybrać (lub przeciągnij na tablicę)'
               )}
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-end gap-3 flex-wrap">
+              <button
+                onClick={toggleAll}
+                className="px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer text-sm"
+              >
+                {isAllSelectedGlobal ? 'Odznacz wszystko' : 'Zaznacz wszystko'}
+              </button>
               <button
                 onClick={onClose}
-                className="px-4 py-2 text-gray-700 hover:bg-gray-200 rounded-lg transition-colors cursor-pointer"
+                className="px-4 py-2 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-lg transition-colors cursor-pointer text-sm"
               >
-                Anuluj
+                Zamknij
               </button>
               <button
                 onClick={handleAddSelected}
                 disabled={selectedCount === 0}
                 className={`
-                  flex items-center gap-2 px-5 py-2 rounded-lg font-medium transition-colors
+                  flex items-center gap-2 px-6 py-2 rounded-lg font-semibold transition-all shadow-sm text-sm
                   ${
                     selectedCount > 0
-                      ? 'bg-green-500 text-white hover:bg-green-600 cursor-pointer'
-                      : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                      ? 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
+                      : 'bg-blue-300 text-white cursor-not-allowed'
                   }
                 `}
               >
-                <Check className="w-5 h-5" />
+                <Check className="w-4 h-4 text-white stroke-[3]" />
                 Dodaj na tablicę ({selectedCount})
               </button>
             </div>

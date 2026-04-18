@@ -81,25 +81,43 @@ export function tryCalculate(query: string): CalculationResult | null {
   }
 }
 
+function normalizeText(text: string): string {
+  const map: Record<string, string> = {
+    'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'
+  };
+  return text.toLowerCase().replace(/[ąćęłńóśźż]/g, match => map[match]);
+}
+
 export function searchResources(manifest: ResourceManifest, query: string): SearchResult[] {
-  const normalizedQuery = query.toLowerCase().trim();
+  const rawQuery = query.trim();
+  const normalizedQuery = normalizeText(rawQuery);
 
   if (!normalizedQuery) return [];
 
-  const results: SearchResult[] = [];
+  // Pokaż tylko karty wzorów dla polecenia docelowego
+  if (normalizedQuery === 'karty wzorow') {
+    return manifest.cards.map(card => ({ ...card, resultType: 'card' } as SearchResult))
+      .sort((a, b) => {
+        const orderA = 'order' in a ? (a.order as number) : 0;
+        const orderB = 'order' in b ? (b.order as number) : 0;
+        return orderA - orderB;
+      });
+  }
+
+  const resultsWithScore: { item: SearchResult; score: number }[] = [];
   const queryWords = normalizedQuery.split(/\s+/);
 
   // 🆕 QUICK MATH - spróbuj obliczyć wyrażenie
   const calculation = tryCalculate(query);
   if (calculation) {
-    results.push(calculation);
+    resultsWithScore.push({ item: calculation, score: 999999 });
   }
 
   // Szukaj w wzorach/twierdzeniach/tabelach/diagramach
   for (const formula of manifest.formulas) {
     const score = calculateScore(formula, queryWords);
     if (score > 0) {
-      results.push({ ...formula, resultType: 'formula' } as SearchResult);
+      resultsWithScore.push({ item: { ...formula, resultType: 'formula' } as SearchResult, score });
     }
   }
 
@@ -107,48 +125,69 @@ export function searchResources(manifest: ResourceManifest, query: string): Sear
   for (const card of manifest.cards) {
     const score = calculateCardScore(card, queryWords);
     if (score > 0) {
-      results.push({ ...card, resultType: 'card' } as SearchResult);
+      resultsWithScore.push({ item: { ...card, resultType: 'card' } as SearchResult, score });
     }
   }
 
-  // Sortuj: obliczenia najpierw, potem karty, potem reszta
-  return results.sort((a, b) => {
+  // Sortuj według wyniku (i po kategoriach)
+  resultsWithScore.sort((a, b) => {
     // Obliczenia ZAWSZE na samej górze
-    if (a.resultType === 'calculation') return -1;
-    if (b.resultType === 'calculation') return 1;
+    if (a.item.resultType === 'calculation') return -1;
+    if (b.item.resultType === 'calculation') return 1;
 
-    // Karty wzorów na drugim miejscu
-    if (a.resultType === 'card' && b.resultType !== 'card') return -1;
-    if (a.resultType !== 'card' && b.resultType === 'card') return 1;
-
-    // Następnie po order
-    if ('order' in a && 'order' in b) {
-      return a.order - b.order;
+    // Najważniejszy jest wynik dopasowania robiony przez algorytm (punkty)
+    if (b.score !== a.score) {
+      return b.score - a.score;
     }
-    return 0;
+
+    // Jeśli wynik (score) jest idealnie Taki Sam, jako drugi priorytet weź typ "karta"
+    if (a.item.resultType === 'card' && b.item.resultType !== 'card') return -1;
+    if (a.item.resultType !== 'card' && b.item.resultType === 'card') return 1;
+
+    // Jeśli wszystko jest to samo, sortuj po naturalnym polu 'order'
+    const orderA = 'order' in a.item ? (a.item.order as number) : 0;
+    const orderB = 'order' in b.item ? (b.item.order as number) : 0;
+    return orderA - orderB;
   });
+
+  return resultsWithScore.map(r => r.item);
 }
 
 function calculateScore(formula: FormulaResource, queryWords: string[]): number {
   let score = 0;
 
-  const searchText = [formula.title, formula.description, formula.subcategory, ...formula.tags]
-    .join(' ')
-    .toLowerCase();
+  const normalizedTitle = normalizeText(formula.title);
+  const normalizedDesc = normalizeText(formula.description);
+  const normalizedTags = formula.tags.map(normalizeText);
+  const normalizedSubcat = normalizeText(formula.subcategory);
 
   for (const word of queryWords) {
-    if (searchText.includes(word)) {
+    let wordMatched = false;
+
+    // Przeszukujemy pola z RÓŻNYMI WAGAMI
+
+    // Tytuł - super priorytet (+10 punktów)
+    if (normalizedTitle.includes(word)) {
+      score += 10;
+      wordMatched = true;
+    }
+
+    // Tagi - wysoki priorytet (+5 punktów)
+    if (normalizedTags.some(t => t.includes(word))) {
+      score += 5;
+      wordMatched = true;
+    }
+
+    // Kategoria/Podkategoria - średni priorytet (+2 punkty)
+    if (normalizedSubcat.includes(word)) {
+      score += 2;
+      wordMatched = true;
+    }
+
+    // Opis - niski priorytet (+1 punkt) - dopiero gdy zgadza się cokolwiek
+    if (normalizedDesc.includes(word)) {
       score += 1;
-
-      // Bonus za dokładne dopasowanie w tytule
-      if (formula.title.toLowerCase().includes(word)) {
-        score += 2;
-      }
-
-      // Bonus za tag
-      if (formula.tags.some((t) => t.toLowerCase().includes(word))) {
-        score += 1;
-      }
+      wordMatched = true;
     }
   }
 
@@ -158,21 +197,20 @@ function calculateScore(formula: FormulaResource, queryWords: string[]): number 
 function calculateCardScore(card: CardResource, queryWords: string[]): number {
   let score = 0;
 
-  const searchText = [
+  const searchText = normalizeText([
     card.title,
     card.description,
     ...card.tags,
     ...card.sections.map((s) => s.name),
   ]
-    .join(' ')
-    .toLowerCase();
+    .join(' '));
 
   for (const word of queryWords) {
     if (searchText.includes(word)) {
       score += 1;
 
       // Bonus za "karta" w query
-      if (word === 'karta' || word === 'wzorów' || word === 'matura') {
+      if (word === 'karta' || word === 'wzorow' || word === 'matura') {
         score += 3;
       }
     }
