@@ -1154,7 +1154,7 @@ useMultiTouchGestures({
     img.src = formula.path;
     img.onload = () => {
       const aspectRatio = img.naturalHeight / img.naturalWidth;
-      const worldWidth = 6.0;
+      const worldWidth = 12.0; // 2x większe niż 6.0
       const worldHeight = worldWidth * aspectRatio;
       const centerWorld = inverseTransformPoint(
         { x: canvasWidth / 2, y: canvasHeight / 2 },
@@ -1212,7 +1212,7 @@ useMultiTouchGestures({
   }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
 
   const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
-    const COLS = 2, WORLD_WIDTH = 6.0, WORLD_PADDING = 0.5;
+    const COLS = 2, WORLD_WIDTH = 12.0, WORLD_PADDING = 1.0; // 2x większe niż poprzednie 6.0
     const centerWorld = inverseTransformPoint(
       { x: canvasWidth / 2, y: canvasHeight / 2 },
       vp.viewportRef.current,
