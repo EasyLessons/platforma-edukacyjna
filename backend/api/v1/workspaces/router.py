@@ -17,10 +17,16 @@ from .schemas import (
 from .service import (
     get_user_workspaces, get_workspace_by_id, create_workspace,
     update_workspace, delete_workspace, toggle_workspace_favourite,
-    leave_workspace, set_active_workspace,
+    leave_workspace, set_active_workspace, get_dashboard_init_data
 )
 
 router = APIRouter(tags=["Workspaces"])
+
+@router.get("/init", response_model=ApiResponse[dict])
+async def get_dashboard_initial_data(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Pobiera bootstrap całego dasha z 1 strzałem SQL (złączone tabele Workspaces i Boards)"""
+    init_data = await get_dashboard_init_data(db, current_user.id)
+    return ApiResponse(success=True, data=init_data)
 
 @router.get("", response_model=ApiResponse[WorkspaceListResponse])
 async def get_workspaces(db=Depends(get_db), current_user=Depends(get_current_user)):

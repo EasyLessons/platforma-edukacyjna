@@ -144,12 +144,25 @@ class BoardService:
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0
     ) -> BoardListResponse:
-        query = self.db.query(Board).filter(Board.workspace_id == workspace_id)
-        total = query.count()
-        boards = query.order_by(Board.last_modified.desc()).offset(offset).limit(limit).all()
+        base_query = self.db.query(Board).filter(Board.workspace_id == workspace_id)
+        total = base_query.count()
+
+        boards_data = (
+            self.db.query(Board, BoardUsers.is_favourite, BoardUsers.last_opened)
+            .outerjoin(BoardUsers, (Board.id == BoardUsers.board_id) & (BoardUsers.user_id == user_id))
+            .options(
+                joinedload(Board.creator),
+                joinedload(Board.last_modifier)
+            )
+            .filter(Board.workspace_id == workspace_id)
+            .order_by(Board.last_modified.desc())
+            .offset(offset)
+            .limit(limit)
+            .all()
+        )
 
         # Gather online users for all boards in one query
-        board_ids = [b.id for b in boards]
+        board_ids = [b[0].id for b in boards_data]
         online_map = {}
         if board_ids:
             from datetime import timedelta
@@ -170,9 +183,28 @@ class BoardService:
                 online_map[bid].append(OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url))
 
         responses = []
-        for board in boards:
+        for board, is_favourite, last_opened in boards_data:
             try:
-                responses.append(_build_board_response(self.db, board, user_id, online_map.get(board.id, [])))
+                owner = board.creator
+                modifier = board.last_modifier or owner
+                
+                responses.append(BoardResponse(
+                    id=board.id,
+                    name=board.name,
+                    icon=board.icon,
+                    bg_color=board.bg_color,
+                    workspace_id=board.workspace_id,
+                    owner_id=board.created_by,
+                    owner_username=owner.username if owner else "Unknown",
+                    is_favourite=is_favourite or False,
+                    settings=BoardSettings(**(board.settings or {})),
+                    last_modified=board.last_modified,
+                    last_modified_by=modifier.username if modifier else None,
+                    last_opened=last_opened,
+                    created_at=board.created_at,
+                    created_by=owner.username if owner else "Unknown",
+                    online_users=online_map.get(board.id, [])
+                ))
             except Exception as e:
                 logger.error(f"❌ Błąd budowania BoardResponse dla {board.id}: {e}")
                 continue

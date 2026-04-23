@@ -49,15 +49,87 @@ def _build_workspace_response(
         is_favourite=membership.is_favourite,
     )
 
+from sqlalchemy import func, select as sa_select
+from api.v1.boards.service import BoardService
+
 def get_user_workspaces(db: Session, user_id: int) -> List[WorkspaceResponse]:
-    """Pobiera wszystkie workspace'y do których user ma dostęp."""
-    memberships = (
-        db.query(WorkspaceMember)
+    """Pobiera wszystkie workspace'y w 1 zapytaniu SQL."""
+    member_count_sq = (
+        sa_select(func.count(WorkspaceMember.id))
+        .where(WorkspaceMember.workspace_id == Workspace.id)
+        .correlate(Workspace)
+        .scalar_subquery()
+    )
+
+    board_count_sq = (
+        sa_select(func.count(Board.id))
+        .where(Board.workspace_id == Workspace.id)
+        .correlate(Workspace)
+        .scalar_subquery()
+    )
+
+    rows = (
+        db.query(
+            WorkspaceMember,
+            Workspace,
+            User,
+            member_count_sq.label("member_count"),
+            board_count_sq.label("board_count"),
+        )
+        .join(Workspace, WorkspaceMember.workspace_id == Workspace.id)
+        .join(User, Workspace.created_by == User.id)
         .filter(WorkspaceMember.user_id == user_id)
-        .options(joinedload(WorkspaceMember.workspace).joinedload(Workspace.creator))
         .all()
     )
-    return [_build_workspace_response(db, m.workspace, user_id, m) for m in memberships]
+
+    workspaces_data = []
+    for membership, workspace, creator, member_count, board_count in rows:
+        is_owner = (workspace.created_by == user_id)
+        workspaces_data.append(WorkspaceResponse(
+            id=workspace.id,
+            name=workspace.name,
+            icon=workspace.icon,
+            bg_color=workspace.bg_color,
+            created_by=workspace.created_by,
+            creator=UserBasic(
+                id=creator.id,
+                username=creator.username,
+                email=creator.email,
+                full_name=creator.full_name,
+            ),
+            member_count=member_count,
+            board_count=board_count,
+            is_owner=is_owner,
+            role="owner" if is_owner else membership.role,
+            is_favourite=membership.is_favourite,
+        ))
+
+    return workspaces_data
+
+async def get_dashboard_init_data(db: Session, user_id: int) -> dict:
+    """Bootstrap endpoint - wszystko w jednym requeście"""
+    # 1. Fetch workspaces in one go
+    workspaces = get_user_workspaces(db, user_id)
+    
+    user = db.query(User).filter(User.id == user_id).first()
+    active_workspace_id = user.active_workspace_id if user else None
+
+    # If active workspace is null or not in user's workspaces, default to the first one
+    user_workspace_ids = [ws.id for ws in workspaces]
+    if active_workspace_id not in user_workspace_ids:
+        active_workspace_id = workspaces[0].id if workspaces else None
+        
+    active_workspace_boards = []
+    if active_workspace_id:
+        board_service = BoardService(db)
+        board_list_resp = await board_service.list_boards(workspace_id=active_workspace_id, user_id=user_id, limit=50)
+        active_workspace_boards = board_list_resp.boards
+        
+    return {
+        "workspaces": workspaces,
+        "active_workspace_boards": active_workspace_boards,
+        "active_workspace_id": active_workspace_id,
+    }
 
 def get_workspace_by_id(db: Session, workspace_id: int, user_id: int) -> WorkspaceResponse:
     """Pobiera jeden workspace — tylko jeśli user jest członkiem."""

@@ -9,11 +9,33 @@ import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
 import RecentsView from './Components/RecentsView';
-import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
+import { useWorkspaces, useDashboardInit } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 export default function Dashboard() {
+  // --- 1. BOOTSTRAP DASHBOARD ---
+  // To zapewnia tylko jeden call do /init na starcie.
+  const { isLoading: initLoading } = useDashboardInit();
+
+  if (initLoading) {
+    // Globalny loader na całą stronę dopóki Megabundle ładuje dane z init.
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-gray-50/50">
+        <div className="flex flex-col items-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+          <span className="mt-4 text-gray-500 font-medium">Inicjalizacja środowiska...</span>
+        </div>
+      </div>
+    );
+  }
+
+  return <DashboardContent />;
+}
+
+function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  // Zaciągną dane prosto z cache zasiane przez useDashboardInit
   const {
     workspaces,
     loading,

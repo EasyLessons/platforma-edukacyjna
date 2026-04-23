@@ -1,10 +1,11 @@
 
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/app/context/AuthContext';
 import {
   fetchWorkspaces,
+  getDashboardInit,
   createWorkspace as apiCreateWorkspace,
   updateWorkspace as apiUpdateWorkspace,
   deleteWorkspace as apiDeleteWorkspace,
@@ -13,11 +14,49 @@ import {
 } from '../api/workspaceApi';
 import type { Workspace, WorkspaceCreateRequest, WorkspaceListResponse, WorkspaceUpdateRequest } from '../types';
 
-
 export const workspaceKeys = {
   all: ['workspaces'] as const,
   list: () => ['workspaces', 'list'] as const,
+  init: () => ['dashboard', 'init'] as const,
 };
+
+export function useDashboardInit() {
+  const { isLoggedIn } = useAuth();
+  const queryClient = useQueryClient();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: workspaceKeys.init(),
+    queryFn: getDashboardInit,
+    enabled: !!isLoggedIn,
+    staleTime: 5 * 60 * 1000, // 5 min
+  });
+
+  useEffect(() => {
+    if (data) {
+      // Seed workspaces
+      queryClient.setQueryData<WorkspaceListResponse>(workspaceKeys.list(), {
+        workspaces: data.workspaces,
+        total: data.workspaces.length,
+      });
+
+      // Seed boards for active workspace if available
+      if (data.active_workspace_id && data.active_workspace_boards) {
+        queryClient.setQueryData(['boards', data.active_workspace_id], {
+          boards: data.active_workspace_boards,
+          total: data.active_workspace_boards.length,
+          limit: 50,
+          offset: 0,
+        });
+      }
+    }
+  }, [data, queryClient]);
+
+  return {
+    data,
+    isLoading,
+    error,
+  };
+}
 
 export function useWorkspaces() {
   const { isLoggedIn } = useAuth();

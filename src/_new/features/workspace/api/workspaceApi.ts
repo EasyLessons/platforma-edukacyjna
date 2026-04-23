@@ -23,6 +23,9 @@ import type {
 export const fetchWorkspaces = (): Promise<WorkspaceListResponse> =>
   apiClient.get<WorkspaceListResponse>('/api/v1/workspaces').then((res) => res.data);
 
+export const getDashboardInit = (): Promise<any> =>
+  apiClient.get<any>('/api/v1/workspaces/init').then((res) => res.data);
+
 export const fetchWorkspaceById = (id: number): Promise<Workspace> =>
   apiClient.get<Workspace>('/api/v1/workspaces/${id}').then((res) => res.data);
 
