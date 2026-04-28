@@ -24,6 +24,7 @@ ENV/
 .idea/
 *.swp
 *.swo
+.claude/worktrees/
 
 # Next.js
 .next/
