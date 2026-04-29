@@ -11,6 +11,7 @@ from passlib.context import CryptContext
 import secrets
 import string
 import resend
+import hashlib
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -115,3 +116,12 @@ async def send_password_reset_email(email: str, username: str, code: str,
         from_email=from_email,
         email_type="password_reset"
     )
+
+# === REFRESH TOKENY ===
+def generate_refresh_token() -> str:
+    """Generuje bezpieczny, losowy refresh token"""
+    return secrets.token_hex(32)
+
+def hash_refresh_token(token: str) -> str:
+    """Hashuje refresh token przed zapisaniem w bazie (dla bezpieczeństwa)"""
+    return hashlib.sha256(token.encode()).hexdigest()

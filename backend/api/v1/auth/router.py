@@ -3,7 +3,7 @@ AUTH ROUTES - /api/v1/auth/*
 Endpointy dotyczące autentykacji i autoryzacji
 Wszystkie endpointy zwracają ApiResponse[T] z timestamp i metadata
 """
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -23,13 +23,25 @@ from .schemas import (
     UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
-    UserResponse
+    UserResponse, RefreshResponse, MeResponse
 )
 from .service import AuthService
 from core.models import User
 
 router = APIRouter(tags=["Authentication"])
 logger = get_logger(__name__)
+
+def _set_refresh_cookie(response: Response, token: str, settings) -> None:
+    """Ustawia HttpOnly refresh cookie na odpowiedzi."""
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        max_age=settings.refresh_token_expire_days * 24 * 3600,
+        path="/api/v1/auth",
+    )
 
 # === REGISTRATION & EMAIL VERIFICATION ===
 
@@ -55,10 +67,11 @@ async def register(user_data: RegisterUser, db: Session = Depends(get_db)):
     description="Weryfikuje email użytkownika za pomocą 6-znakowego kodu",
     responses={400: {"description": "Invalid or expired code"}, 404: {"description": "User not found"}}
 )
-async def verify_email(verify_data: VerifyEmail, db: Session = Depends(get_db)):
-    """Weryfikacja emaila - aktywuje konto i zwraca token JWT"""
+async def verify_email(verify_data: VerifyEmail, response: Response, db: Session = Depends(get_db)):
+    """Weryfikacja emaila - aktywuje konto i zwraca token JWT + ustawia refresh cookie"""
     service = AuthService(db)
-    result = await service.verify_email(verify_data)
+    result, refresh_token = await service.verify_email(verify_data)
+    _set_refresh_cookie(response, refresh_token, service.settings)
     return ApiResponse(success=True, data=result)
 
 
@@ -84,10 +97,11 @@ async def resend_code(resend_data: ResendCode, db: Session = Depends(get_db)):
     description="Loguje użytkownika za pomocą nazwy użytkownika/emaila i hasła",
     responses={401: {"description": "Invalid email/username or password"}, 403: {"description": "Account not verified"}}
 )
-async def login(login_data: LoginData, db: Session = Depends(get_db)):
-    """Logowanie użytkownika - zwraca token JWT"""
+async def login(login_data: LoginData, response: Response, db: Session = Depends(get_db)):
+    """Logowanie użytkownika - zwraca token JWT i ustawia refresh cookie"""
     service = AuthService(db)
-    result = await service.login_user(login_data)
+    result, refresh_token = await service.login_user(login_data)
+    _set_refresh_cookie(response, refresh_token, service.settings)
     return ApiResponse(success=True, data=result)
 
 # === USER CHECKS & SEARCH ===
@@ -219,15 +233,17 @@ async def google_callback(
         raise AuthenticationError("Brak kodu autoryzacji Google")
 
     try:
-        result = await service.google_login(code)
+        result, refresh_token = await service.google_login(code)
 
         # Zakoduj dane użytkownika do base64 (dla przesłania w URL)
         user_json = json.dumps(result.user.model_dump(mode="json"), default=str)
         user_encoded = base64.b64encode(user_json.encode()).decode()
 
-        # Przekieruj na frontend z tokenem i danymi
+        # Przekieruj na frontend z tokenem i danymi + ustaw refresh cookie
         frontend_url = service.settings.frontend_url
-        return RedirectResponse(f"{frontend_url}/auth/callback?token={result.access_token}&user={user_encoded}")
+        redirect_resp = RedirectResponse(f"{frontend_url}/auth/callback?token={result.access_token}&user={user_encoded}")
+        _set_refresh_cookie(redirect_resp, refresh_token, service.settings)
+        return redirect_resp
     except AppException:
         raise
     except Exception as exc:
@@ -253,3 +269,57 @@ async def update_user_profile(
         data=UserResponse.model_validate(current_user)
     )
 
+# === SESJA / REFRESH / ME / LOGOUT ===
+
+@router.post(
+    "/refresh",
+    response_model=ApiResponse[RefreshResponse],
+    summary="Refresh access token",
+    description="Rotuje refresh token i zwraca nowy access token. Wymaga ważnego refresh tokena w HttpOnly cookie",
+    responses={401: {"description": "Invalid or expired refresh token"}}
+)
+async def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Odświeżenie sesji - wymaga ważnego refresh cookie"""
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise AuthenticationError("Brak refresh tokena")
+    
+    service = AuthService(db)
+    result, new_refresh_token = await service.refresh_session(refresh_token)
+    _set_refresh_cookie(response, new_refresh_token, service.settings)
+
+    return ApiResponse(success=True, data=RefreshResponse(
+        access_token=result.access_token,
+        expires_in=service.settings.access_token_expire_minutes * 60,
+    ))
+
+
+@router.get(
+    "/me",
+    response_model=ApiResponse[MeResponse],
+    summary="Get current user",
+    description="Zwraca dane aktualnie zalogowanego użytkownika na podstawie access tokenu.",
+    responses={401: {"description": "Invalid or expired access token"}}
+)
+async def me(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Dane zalogowanego użytkownika"""
+    service = AuthService(db)
+    return ApiResponse(success=True, data=service.get_me(current_user))
+
+
+@router.post(
+    "/logout",
+    response_model=ApiResponse[MessageResponse],
+    summary="Logout user",
+    description="Unieważnia refresh token i czyści cookie.",
+)
+async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Wylogowanie użytkownika - unieważnia refresh token i czyści cookie"""
+    refresh_token = request.cookies.get("refresh_token")
+
+    service = AuthService(db)
+    if refresh_token:
+        await service.logout_session(refresh_token)
+    
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    return ApiResponse(success=True, data=MessageResponse(message="Wylogowano"))

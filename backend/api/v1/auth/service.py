@@ -13,17 +13,19 @@ from typing import List
 import httpx
 from sqlalchemy.exc import OperationalError
 
-from core.models import User, Workspace, WorkspaceMember
+from core.models import User, Workspace, WorkspaceMember, RefreshToken
 from .schemas import (
     RegisterUser, LoginData, VerifyEmail, UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     RegisterResponse, AuthResponse, UserResponse,
-    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse
+    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
+    RefreshResponse, MeResponse
 )
 from .utils import (
     hash_password, verify_password, create_access_token,
     generate_verification_code, send_verification_email,
-    send_password_reset_email
+    send_password_reset_email,
+    generate_refresh_token, hash_refresh_token
 )
 
 logger = get_logger(__name__)
@@ -35,6 +37,38 @@ class AuthService:
     def __init__(self, db: Session):
         self.db = db
         self.settings = get_settings()
+
+    def _create_session(self, user: User) -> tuple[AuthResponse, str]:
+        """
+        Tworzy sesję (access + refresh token) dla użytkownika
+        
+        Returns:
+            tuple[AuthResponse, str]: AuthResponse z access tokenem i plaintext refresh token
+        """
+        access_token = create_access_token(
+            data={"sub": str(user.id)},
+            secret_key=self.settings.secret_key,
+            algorithm=self.settings.algorithm,
+            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
+        )
+
+        refresh_token_plain = generate_refresh_token()
+        refresh_token_hash = hash_refresh_token(refresh_token_plain)
+        expires_at = datetime.utcnow() + timedelta(days=self.settings.refresh_token_expire_days)
+
+        db_refresh = RefreshToken(
+            user_id=user.id,
+            token_hash=refresh_token_hash,
+            expires_at=expires_at,
+        )
+        self.db.add(db_refresh)
+        self.db.commit()
+
+        return AuthResponse(
+            access_token=access_token,
+            token_type="bearer",
+            user=UserResponse.model_validate(user)
+        ), refresh_token_plain
 
     async def register_user(self, user_data: RegisterUser) -> RegisterResponse:
         """Rejestracja nowego użytkownika"""
@@ -154,18 +188,7 @@ class AuthService:
 
         logger.info(f"✅ User zweryfikowany: {user.username}")
 
-        access_token = create_access_token(
-            data={"sub": str(user.id)},
-            secret_key=self.settings.secret_key,
-            algorithm=self.settings.algorithm,
-            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
-        )
-
-        return AuthResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user=UserResponse.model_validate(user)
-        )
+        return self._create_session(user)
 
     async def login_user(self, login_data: LoginData) -> AuthResponse:
         """Logowanie"""
@@ -183,20 +206,9 @@ class AuthService:
             logger.warning(f"⚠️ Niezweryfikowane konto: {user.username}")
             raise AppException("Konto niezweryfikowane", code="AUTH_ERROR", status_code=403)
 
-        access_token = create_access_token(
-            data={"sub": str(user.id)},
-            secret_key=self.settings.secret_key,
-            algorithm=self.settings.algorithm,
-            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
-        )
-
         logger.info(f"✅ User zalogowany: {user.username}")
 
-        return AuthResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user=UserResponse.model_validate(user)
-        )
+        return self._create_session(user)
 
     async def resend_code(self, user_id: int) -> ResendCodeResponse:
         """Ponowne wysłanie kodu"""
@@ -395,6 +407,50 @@ class AuthService:
         logger.info(f"✅ Hasło zresetowane: {user.username}")
 
         return MessageResponse(message="Hasło zostało zmienione")
+    
+    # === SESJA / REFRESH ===
+
+    async def refresh_session(self, refresh_token_plain: str) -> tuple[AuthResponse, str]:
+        """Rotuje refresh token i zwraca nową parę tokenów"""
+        token_hash = hash_refresh_token(refresh_token_plain)
+
+        db_token = self.db.query(RefreshToken).filter(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked == False,    
+        ).first()
+
+        if not db_token:
+            raise AuthenticationError("Nieprawidłowy refresh token")
+        
+        if datetime.utcnow() > db_token.expires_at:
+            raise AuthenticationError("Refresh token wygasł")
+        
+        # Unieważnij stary token
+        db_token.revoked = True
+        self.db.commit()
+
+        user = self.db.query(User).filter(User.id == db_token.user_id).first()
+        if not user or not user.is_active:
+            raise AuthenticationError("Użytkownik nieaktywny")
+        
+        logger.info(f"🔄 Refresh sesji: {user.username}")
+        return self._create_session(user)
+    
+    def get_me(self, user: User) -> MeResponse:
+        """Zwraca dane aktualnie zalogowanego użytkownika"""
+        return MeResponse(user=UserResponse.model_validate(user))
+    
+    async def logout_session(self, refresh_token_plain: str) -> None:
+        token_hash = hash_refresh_token(refresh_token_plain)
+
+        db_token = self.db.query(RefreshToken).filter(
+            RefreshToken.token_hash == token_hash,
+            RefreshToken.revoked == False,
+        ).first()
+
+        if db_token:
+            db_token.revoked = True
+            self.db.commit()
 
     # === GOOGLE OAUTH ===
 
@@ -535,17 +591,6 @@ class AuthService:
                 status_code=503,
             )
 
-        jwt_token = create_access_token(
-            data={"sub": str(user.id)},
-            secret_key=self.settings.secret_key,
-            algorithm=self.settings.algorithm,
-            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
-        )
-
         logger.info(f"🎟️ Token wygenerowany dla {user.username}")
 
-        return AuthResponse(
-            access_token=jwt_token,
-            token_type="bearer",
-            user=UserResponse.model_validate(user)
-        )
+        return self._create_session(user)

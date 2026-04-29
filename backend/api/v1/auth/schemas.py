@@ -102,3 +102,13 @@ class VerifyResetCodeResponse(BaseModel):
     """Response weryfikacji kodu resetu hasła"""
     message: str
     valid: bool
+
+class RefreshResponse(BaseModel):
+    """Response odświeżenia tokenu"""
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int  # Czas do wygaśnięcia tokenu w sekundach
+
+class MeResponse(BaseModel):
+    """Response z danymi aktualnie zalogowanego użytkownika"""
+    user: UserResponse

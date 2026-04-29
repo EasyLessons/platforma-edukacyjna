@@ -100,11 +100,10 @@ class Settings(BaseSettings):
     # HS512 = HMAC-SHA512 (wolniejszy, mocniejszy)
     # RS256 = RSA (klucze publiczny/prywatny, dla mikroserwisów)
     
-    access_token_expire_minutes: int = 1440  # Opcjonalne - czas życia tokenu (24h)
-    # 15 = Więcej bezpieczeństwa, gorsze UX (częste logowania)
-    # 30 = Standard (balans)
-    # 360 = 6h (dla długich sesji pracy na tablicy)
-    # 1440 = 24h (wygodne, ale jeśli token wycieknie → szkody przez 24h)
+    access_token_expire_minutes: int = 15   # Krótki czas życia - refresh token odnawia sesję
+    refresh_token_expire_days: int = 7  # Dłuższy czas życia - użytkownik nie musi się logować przez tydzień
+    cookie_secure: bool = False  # Ustaw na True w produkcji (HTTPS)
+    cookie_samesite: str = "lax"  # "strict" | "lax" | "none"
     
     # === EMAIL (RESEND) ===
     resend_api_key: str  # WYMAGANE - klucz API z resend.com
