@@ -13,18 +13,19 @@ class TestLoginSuccess:
     @pytest.mark.asyncio
     async def test_login_with_username(self, db_session, test_user):
         """Logowanie przez username zwraca AuthResponse"""
-        result = await AuthService(db_session).login_user(
+        result, refresh_token = await AuthService(db_session).login_user(
             LoginData(login=test_user.username, password="testpassword")
         )
 
         assert isinstance(result, AuthResponse)
         assert result.user.username == test_user.username
         assert result.token_type == "bearer"
+        assert len(refresh_token) == 64
 
     @pytest.mark.asyncio
     async def test_login_with_email(self, db_session, test_user):
         """Logowanie przez email działa tak samo jak przez username"""
-        result = await AuthService(db_session).login_user(
+        result, _ = await AuthService(db_session).login_user(
             LoginData(login=test_user.email, password="testpassword")
         )
 
@@ -33,7 +34,7 @@ class TestLoginSuccess:
     @pytest.mark.asyncio
     async def test_returns_valid_jwt(self, db_session, test_user):
         """Token ma format JWT (3 segmenty)"""
-        result = await AuthService(db_session).login_user(
+        result, _ = await AuthService(db_session).login_user(
             LoginData(login=test_user.username, password="testpassword")
         )
 
@@ -42,7 +43,7 @@ class TestLoginSuccess:
     @pytest.mark.asyncio
     async def test_response_contains_user_data(self, db_session, test_user):
         """Response zawiera pełne dane usera"""
-        result = await AuthService(db_session).login_user(
+        result, _ = await AuthService(db_session).login_user(
             LoginData(login=test_user.username, password="testpassword")
         )
 

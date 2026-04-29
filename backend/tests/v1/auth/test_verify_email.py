@@ -36,7 +36,7 @@ class TestVerifyEmailSuccess:
     async def test_returns_auth_response(self, db_session):
         """Zwraca AuthResponse z tokenem i danymi usera"""
         user = make_unverified_user(db_session)
-        result = await AuthService(db_session).verify_email(
+        result, refresh_token = await AuthService(db_session).verify_email(
             VerifyEmail(user_id=user.id, code=VALID_CODE)
         )
 
@@ -44,6 +44,7 @@ class TestVerifyEmailSuccess:
         assert result.access_token
         assert result.token_type == "bearer"
         assert result.user.id == user.id
+        assert len(refresh_token) == 64
 
     @pytest.mark.asyncio
     async def test_activates_user(self, db_session):
@@ -51,7 +52,7 @@ class TestVerifyEmailSuccess:
         user = make_unverified_user(db_session)
         await AuthService(db_session).verify_email(
             VerifyEmail(user_id=user.id, code=VALID_CODE)
-        )
+        )  # tuple ignorujemy — testujemy efekt uboczny
 
         db_session.refresh(user)
         assert user.is_active is True
@@ -62,7 +63,7 @@ class TestVerifyEmailSuccess:
         user = make_unverified_user(db_session)
         await AuthService(db_session).verify_email(
             VerifyEmail(user_id=user.id, code=VALID_CODE)
-        )
+        )  # tuple ignorujemy — testujemy efekt uboczny
 
         db_session.refresh(user)
         assert user.verification_code is None
@@ -71,7 +72,7 @@ class TestVerifyEmailSuccess:
     async def test_token_is_valid_jwt(self, db_session):
         """Token ma format JWT (3 segmenty oddzielone kropką)"""
         user = make_unverified_user(db_session)
-        result = await AuthService(db_session).verify_email(
+        result, _ = await AuthService(db_session).verify_email(
             VerifyEmail(user_id=user.id, code=VALID_CODE)
         )
 

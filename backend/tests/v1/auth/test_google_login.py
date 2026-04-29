@@ -59,11 +59,12 @@ class TestGoogleLoginNewUser:
     async def test_returns_auth_response(self, db_session):
         """Zwraca AuthResponse z tokenem"""
         with patch("api.v1.auth.service.httpx.AsyncClient", return_value=mock_httpx_success()):
-            result = await AuthService(db_session).google_login("auth-code")
+            result, refresh_token = await AuthService(db_session).google_login("auth-code")
 
         assert isinstance(result, AuthResponse)
         assert result.access_token
         assert result.user.email == "google@example.com"
+        assert len(refresh_token) == 64
 
     @pytest.mark.asyncio
     async def test_creates_starter_workspace(self, db_session):
@@ -93,7 +94,7 @@ class TestGoogleLoginNewUser:
 
         info = {**GOOGLE_USER_INFO, "email": "google@gmail.com"}
         with patch("api.v1.auth.service.httpx.AsyncClient", return_value=mock_httpx_success(info)):
-            result = await AuthService(db_session).google_login("auth-code")
+            result, _ = await AuthService(db_session).google_login("auth-code")
 
         assert result.user.username != "google"
         assert result.user.username.startswith("google")
@@ -110,7 +111,7 @@ class TestGoogleLoginExistingUser:
         with patch("api.v1.auth.service.httpx.AsyncClient", return_value=mock_httpx_success(
             {**GOOGLE_USER_INFO, "email": test_user.email}
         )):
-            result = await AuthService(db_session).google_login("auth-code")
+            result, _ = await AuthService(db_session).google_login("auth-code")
 
         assert isinstance(result, AuthResponse)
         assert result.user.id == test_user.id

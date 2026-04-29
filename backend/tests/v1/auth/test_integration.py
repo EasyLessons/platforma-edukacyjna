@@ -37,7 +37,7 @@ class TestRegistrationToLoginFlow:
         code = db_user.verification_code
 
         # 3. Weryfikacja
-        verify_result = await service.verify_email(
+        verify_result, _ = await service.verify_email(
             VerifyEmail(user_id=db_user.id, code=code)
         )
         assert verify_result.access_token
@@ -46,7 +46,7 @@ class TestRegistrationToLoginFlow:
         assert db_user.is_active is True
 
         # 4. Logowanie
-        login_result = await service.login_user(
+        login_result, _ = await service.login_user(
             LoginData(login="flowuser", password="SecurePass1")
         )
         assert login_result.user.username == "flowuser"
@@ -116,7 +116,7 @@ class TestPasswordResetFlow:
         ))
 
         # 4. Logowanie nowym hasłem
-        login_result = await service.login_user(
+        login_result, _ = await service.login_user(
             LoginData(login=test_user.username, password="BrandNewPass1")
         )
         assert login_result.user.id == test_user.id

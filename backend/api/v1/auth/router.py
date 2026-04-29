@@ -40,7 +40,7 @@ def _set_refresh_cookie(response: Response, token: str, settings) -> None:
         secure=settings.cookie_secure,
         samesite=settings.cookie_samesite,
         max_age=settings.refresh_token_expire_days * 24 * 3600,
-        path="/api/v1/auth",
+        path="/",
     )
 
 # === REGISTRATION & EMAIL VERIFICATION ===

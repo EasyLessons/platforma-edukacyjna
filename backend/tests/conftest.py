@@ -39,7 +39,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
-from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers
+from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers, RefreshToken
 from api.v1.auth.utils import hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
