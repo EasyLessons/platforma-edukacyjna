@@ -14,7 +14,6 @@ export {
   isTokenExpired,
   getTokenUserId,
   isCurrentTokenValid,
-  isRefreshAvailable,
   refreshAccessToken,
   logoutAndRedirect,
 } from './tokenService';

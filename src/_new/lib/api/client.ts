@@ -24,7 +24,6 @@ import {
   getAccessToken,
   setAccessToken,
   clearSession,
-  isRefreshAvailable,
   refreshAccessToken,
   logoutAndRedirect,
 } from '../auth';
@@ -86,35 +85,29 @@ apiClient.interceptors.response.use(
 
     // 401 - próba odświeżenia tokenu
     if (status === 401 && !isHandling401) {
-      if (isRefreshAvailable) {
-        isHandling401 = true;
-        try {
-          const newToken = await refreshAccessToken();
-          setAccessToken(newToken);
+      isHandling401 = true;
+      try {
+        const newToken = await refreshAccessToken();
+        setAccessToken(newToken);
 
-          // Ponów oryginalny request
-          const originalRequest = error.config as AxiosRequestConfig & {
-            _retried?: boolean;
-          };
-          if (!originalRequest._retried) {
-            originalRequest._retried = true;
-            if (originalRequest.headers) {
-              (originalRequest.headers as Record<string, string>)['Authorization'] =
-                `Bearer ${newToken}`;
-            }
-            return apiClient(originalRequest);
+        // Ponów oryginalny request
+        const originalRequest = error.config as AxiosRequestConfig & {
+          _retried?: boolean;
+        };
+        if (!originalRequest._retried) {
+          originalRequest._retried = true;
+          if (originalRequest.headers) {
+            (originalRequest.headers as Record<string, string>)['Authorization'] =
+              `Bearer ${newToken}`;
           }
-        } catch {
-          // Refresh nie powiódł się - wyloguj
-          clearSession();
-          logoutAndRedirect();
-        } finally {
-          isHandling401 = false;
+          return apiClient(originalRequest);
         }
-      } else {
-        // Refresh niedostępny - wyloguj od razu
+      } catch {
+        // Refresh nie powiódł się - wyloguj
         clearSession();
         logoutAndRedirect();
+      } finally {
+        isHandling401 = false;
       }
     }
 

@@ -79,3 +79,11 @@ export const searchUsers = (query: string, limit = 10): Promise<UserSearchResult
       params: { query, limit },
     })
     .then((res) => res.data);
+
+// SESJA
+
+export const getCurrentUser = (): Promise<User> =>
+  apiClient.get<User>('/api/v1/auth/me').then((res) => res.data);
+
+export const logoutUser = (): Promise<void> =>
+  apiClient.post('/api/v1/auth/logout').then((res) => res.data);

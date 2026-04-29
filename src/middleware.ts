@@ -13,18 +13,13 @@
  * - Jeśli NIE → redirect do /login
  * - Jeśli TAK → przepuszcza
  *
- * Powiązane pliki:
- * - src/auth_api/api.ts (getToken, saveToken)
- * - src/app/login/page.tsx (zapisuje token)
- * - src/app/rejestracja/page.tsx (zapisuje token po weryfikacji)
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  // Pobierz token z cookies lub localStorage (przez header)
-  const token = request.cookies.get('access_token')?.value;
+  const token = request.cookies.get('refresh_token')?.value;
 
   const { pathname } = request.nextUrl;
 

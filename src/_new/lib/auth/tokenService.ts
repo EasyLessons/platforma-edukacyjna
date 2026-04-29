@@ -11,10 +11,6 @@
  *
  * Jeśli refresh się nie powiedzie (refresh token wygasł) → clearSession() + redirect.
  *
- * UWAGA: refresh endpoint jeszcze nie istnieje w backendzie.
- * tokenService.refresh() jest przygotowany na przyszłość —
- * dopóki endpoint nie istnieje, isRefreshAvailable() zwraca false
- * i interceptor od razu robi logout zamiast próbować refreshu.
  */
 import { getAccessToken, setAccessToken, clearSession } from './tokenStore';
 
@@ -70,12 +66,6 @@ export function isCurrentTokenValid(): boolean {
 
 // REFRESH
 
-/**
- * Czy refresh token endpoint jest dostępny.
- * Ustaw na true gdy backend zaimplementuje POST /api/v1/auth/refresh.
- */
-export const isRefreshAvailable = false;
-
 let refreshPromise: Promise<string> | null = null;
 
 /**
@@ -87,7 +77,8 @@ export async function refreshAccessToken(): Promise<string> {
 
   refreshPromise = (async () => {
     try {
-      const response = await fetch('/api/v1/auth/refresh', {
+      const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
         method: 'POST',
         credentials: 'include', // wysyła HttpOnly cookie
       });

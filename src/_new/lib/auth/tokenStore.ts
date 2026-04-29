@@ -10,31 +10,21 @@
  *     przed renderowaniem chronionych stron — nie ma dostępu do localStorage
  */
 
-const ACCESS_TOKEN_KEY = 'access_token';
-const COOKIE_MAX_AGE = 7 * 24 * 60 * 60;
+// Access token - in-memory only
+// Przy odświeżeniu strony bootstrap AuthContext odtwarza token przez /me + /refresh
 
-// Access token
+let _accessToken: string | null = null;
 
 export function getAccessToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return _accessToken;
 }
 
 export function setAccessToken(token: string): void {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(ACCESS_TOKEN_KEY, token);
-  document.cookie = [
-    `${ACCESS_TOKEN_KEY}=${token}`,
-    'path=/',
-    `max-age=${COOKIE_MAX_AGE}`,
-    'SameSite=Strict',
-  ].join('; ');
+  _accessToken = token;
 }
 
 export function removeAccessToken(): void {
-  if (typeof window === 'undefined') return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  document.cookie = `${ACCESS_TOKEN_KEY}=; path=/; max-age=0`;
+  _accessToken = null;
 }
 
 // User data
