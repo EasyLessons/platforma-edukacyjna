@@ -12,6 +12,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef } from 'react';
 import { ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@new/shared/ui/button';
 import { FcGoogle } from 'react-icons/fc';
 import { useAuth } from '@/app/context/AuthContext';
@@ -36,6 +37,7 @@ export function AuthLayout({
   autoStartGoogle = false,
 }: AuthLayoutProps) {
   const { login: authLogin } = useAuth();
+  const router = useRouter();
   const autoStartRef = useRef(false);
 
   const getGoogleAuthUrl = () => {
@@ -85,11 +87,11 @@ export function AuthLayout({
         
         // Użyj AuthContext.login() - to robi wszystko prawidłowo!
         authLogin(token, userData);
-        
+
         console.log('✅ authLogin() wywołany! Przekierowuję na /dashboard...');
-        
-        // Przekieruj natychmiast
-        window.location.href = '/dashboard';
+
+        // SPA navigation — zachowuje in-memory token (nie czyści pamięci jak hard reload)
+        router.push('/dashboard');
       } else if (event.data.type === 'GOOGLE_AUTH_ERROR') {
         console.error('❌ auth-layout: GOOGLE_AUTH_ERROR:', event.data.error);
         alert('Błąd logowania przez Google. Spróbuj ponownie.');

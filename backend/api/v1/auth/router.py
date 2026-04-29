@@ -322,5 +322,9 @@ async def logout(request: Request, response: Response, db: Session = Depends(get
     if refresh_token:
         await service.logout_session(refresh_token)
     
-    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    response.delete_cookie(
+        "refresh_token",
+        path="/",
+        domain=service.settings.cookie_domain or None,
+    )
     return ApiResponse(success=True, data=MessageResponse(message="Wylogowano"))
