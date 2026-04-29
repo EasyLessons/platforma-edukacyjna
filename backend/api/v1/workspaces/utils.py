@@ -10,23 +10,8 @@ async def send_workspace_invite_email(
     from_email: str,
     frontend_url: str = "https://easylesson.app"
 ) -> bool:
-    """
-    Wysyła email z zaproszeniem do workspace'a
-    
-    PARAMETRY:
-    - invited_email: Email zaproszonego
-    - invited_name: Imię zaproszonego
-    - inviter_name: Imię zapraszającego
-    - workspace_name: Nazwa workspace'a
-    - invite_token: Token zaproszenia
-    - resend_api_key: Klucz API Resend
-    - from_email: Email nadawcy
-    - frontend_url: URL frontendu (domyślnie easylesson.app)
-    """
-    
     resend.api_key = resend_api_key
     
-    # Link do akceptacji zaproszenia
     invite_link = f"{frontend_url}/invite/{invite_token}"
     
     try:
@@ -129,9 +114,7 @@ async def send_workspace_invite_email(
         }
         
         response = resend.Emails.send(params)
-        print(f"✅ Email wysłany do {invited_email}! Response: {response}")
         return True
         
     except Exception as e:
-        print(f"❌ Błąd wysyłania emaila do {invited_email}: {e}")
         raise

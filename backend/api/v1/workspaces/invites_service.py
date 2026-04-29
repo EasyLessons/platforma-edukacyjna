@@ -13,8 +13,8 @@ from core.config import get_settings
 from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import User, Workspace, WorkspaceInvite, WorkspaceMember
 from api.v1.notifications.service import create_notification
-from dashboard.workspaces.realtime import broadcast_notification
-from dashboard.workspaces.utils import send_workspace_invite_email
+from .realtime import broadcast_notification
+from .utils import send_workspace_invite_email
 from .schemas import (
     InviteResponse, PendingInviteResponse,
     InviteStatusResponse, AcceptInviteResponse,

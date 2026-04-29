@@ -15,7 +15,7 @@ from core.database import get_db
 from core.responses import ApiResponse
 from core.exceptions import AppException, AuthenticationError
 from core.logging import get_logger
-from auth.dependencies import get_current_user
+from .dependencies import get_current_user
 from .schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
