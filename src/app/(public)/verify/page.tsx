@@ -1,24 +1,28 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-
 import { EmailVerificationForm } from "@/_new/features/auth/components/emailVerificationForm";
 import { AuthLayout } from "@/_new/features/auth/components/authLayout";
 
-export default function EmailVerificationPage() {
+function VerifyContent() {
   const searchParams = useSearchParams();
-
-  // Pobierz dane z URL
   const userId = searchParams.get('userId');
   const email = searchParams.get('email');
 
-  if (!userId || !email) {
-    return;
-  }
-  
+  if (!userId || !email) return null;
+
   return (
     <AuthLayout title="Weryfikacja" showBackToLogin showGoogle={false}>
       <EmailVerificationForm userId={userId} email={email} />
     </AuthLayout>
+  );
+}
+
+export default function EmailVerificationPage() {
+  return (
+    <Suspense>
+      <VerifyContent />
+    </Suspense>
   );
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import './dashboard-theme.css';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
@@ -27,7 +27,17 @@ export default function Dashboard() {
     );
   }
 
-  return <DashboardContent />;
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen w-full flex items-center justify-center bg-gray-50/50">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
+  );
 }
 
 function DashboardContent() {
@@ -61,13 +71,16 @@ function DashboardContent() {
   const [workspaceTopNavHeight, setWorkspaceTopNavHeight] = useState(72);
   const workspaceTopNavRef = useRef<HTMLDivElement | null>(null);
 
-  const handleWorkspaceSelect = useCallback((id: number, _name: string) => {
-    setActiveWorkspaceId(id);
-    setCurrentView('workspace');
-    const params = new URLSearchParams(searchParams);
-    params.set('workspace', id.toString());
-    router.replace(`/dashboard?${params.toString()}`);
-  }, [searchParams, router]);
+  const handleWorkspaceSelect = useCallback(
+    (id: number, _name: string) => {
+      setActiveWorkspaceId(id);
+      setCurrentView('workspace');
+      const params = new URLSearchParams(searchParams);
+      params.set('workspace', id.toString());
+      router.replace(`/dashboard?${params.toString()}`);
+    },
+    [searchParams, router]
+  );
 
   useEffect(() => {
     if (workspaces.length === 0) {
