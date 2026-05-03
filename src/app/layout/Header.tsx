@@ -165,7 +165,7 @@ export default function Header() {
             <Link href="/" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
               Aktualności
             </Link>
-            <Link href="/rejestracja" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
+            <Link href="/register" onClick={() => setMobileMenuOpen(false)} className="rounded-md px-3 py-2 text-sm font-semibold text-black">
               Zarejestruj się
             </Link>
           </nav>
@@ -197,7 +197,7 @@ export default function Header() {
                 onMouseEnter={() => setShowProductMenu(true)}
                 onMouseLeave={() => setShowProductMenu(false)}
               >
-                <Link href="/produkt" className={getMenuButtonClass(showProductMenu)}>
+                <Link href="/product" className={getMenuButtonClass(showProductMenu)}>
                   Produkt
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -252,7 +252,7 @@ export default function Header() {
           {/* Prawa strona */}
           <div className="flex items-center gap-2">
             {/* Kontakt z działem sprzedaży */}
-            <Link href="/kontakt" className={`px-4 py-2 hover:cursor-pointer hover-shine text-sm font-medium transition-colors flex items-center gap-2 group ${isHeroSectionActive ? 'text-gray-200 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>
+            <Link href="/contact" className={`px-4 py-2 hover:cursor-pointer hover-shine text-sm font-medium transition-colors flex items-center gap-2 group ${isHeroSectionActive ? 'text-gray-200 hover:text-white' : 'text-gray-500 hover:text-gray-700'}`}>
               Kontakt z działem sprzedaży
               <svg className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transform group-hover:translate-x-0.5 transition-all duration-300" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
@@ -267,7 +267,7 @@ export default function Header() {
             </Link>
 
             {/* Zarejestruj się */}
-            <Link href="/rejestracja">
+            <Link href="/register">
               <button 
                 className="hover-shine hover:cursor-pointer flex items-center gap-1 px-4 py-2 text-gray-100 hover:text-white hover:bg-gray-200 transition-colors text-sm font-medium rounded-md"
 
@@ -333,7 +333,7 @@ export default function Header() {
               </h3>
               <div className="space-y-1">
                 <Link 
-                  href="/produkt#dashboard" 
+                  href="/product#dashboard" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-blue-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -347,7 +347,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#dashboard" 
+                  href="/product#dashboard" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -370,7 +370,7 @@ export default function Header() {
               </h3>
               <div className="space-y-1">
                 <Link 
-                  href="/produkt#tutoring-board" 
+                  href="/product#tutoring-board" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-purple-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -384,7 +384,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#tools" 
+                  href="/product#tools" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -398,7 +398,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#smart-search" 
+                  href="/product#smart-search" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -412,7 +412,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#voice-chat" 
+                  href="/product#voice-chat" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-pink-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -426,7 +426,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#ai-tutor" 
+                  href="/product#ai-tutor" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-indigo-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -440,7 +440,7 @@ export default function Header() {
                   </div>
                 </Link>
                 <Link 
-                  href="/produkt#collaboration" 
+                  href="/product#collaboration" 
                   className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                 >
                   <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -1006,7 +1006,7 @@ export default function Header() {
                     </div>
                   </div>
                   <Link 
-                    href="/aktualnosci" 
+                    href="/news" 
                     className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm group"
                   >
                     Zobacz wszystkie aktualności
@@ -1025,7 +1025,7 @@ export default function Header() {
                   >
                     <div className="aspect-video relative overflow-hidden">
                       <img 
-                        src="/resources/Aktualnosci/Nowosc.jpg" 
+                        src="/resources/news/Nowosc.jpg" 
                         alt="Nowe narzędzia matematyczne"
                         className="parallax-image w-full h-full object-cover"
                       />
@@ -1051,7 +1051,7 @@ export default function Header() {
                   >
                     <div className="aspect-video relative overflow-hidden">
                       <img 
-                        src="/resources/Aktualnosci/Nauczyciel.jpg" 
+                        src="/resources/news/Nauczyciel.jpg" 
                         alt="AI Tutor - lepsze odpowiedzi"
                         className="parallax-image w-full h-full object-cover"
                       />
@@ -1077,7 +1077,7 @@ export default function Header() {
                   >
                     <div className="aspect-video relative overflow-hidden">
                       <img 
-                        src="/resources/Aktualnosci/Wspolbieznosc.jpg" 
+                        src="/resources/news/Wspolbieznosc.jpg" 
                         alt="Współpraca w czasie rzeczywistym"
                         className="parallax-image w-full h-full object-cover"
                       />

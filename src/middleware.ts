@@ -24,7 +24,7 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Chronione trasy - wymagają logowania
-  const protectedPaths = ['/dashboard', '/tablica'];
+  const protectedPaths = ['/dashboard', '/whiteboard'];
   const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
 
   // Jeśli użytkownik próbuje wejść na chronioną trasę bez tokenu
@@ -32,7 +32,7 @@ export function middleware(request: NextRequest) {
     // Sprawdź czy to nie tryb demo dla tablicy
     const isDemoMode = request.cookies.get('demo_mode')?.value === 'true';
 
-    if (pathname === '/tablica' && isDemoMode) {
+    if (pathname === '/whiteboard' && isDemoMode) {
       // Przepuść - tryb demo
       return NextResponse.next();
     }
@@ -46,5 +46,5 @@ export function middleware(request: NextRequest) {
 
 // Konfiguracja - na jakich ścieżkach middleware ma działać
 export const config = {
-  matcher: ['/dashboard/:path*', '/tablica/:path*'],
+  matcher: ['/dashboard/:path*', '/whiteboard/:path*'],
 };

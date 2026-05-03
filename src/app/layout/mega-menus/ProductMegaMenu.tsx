@@ -41,7 +41,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/produkt#dashboard" 
+                    href="/product#dashboard" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-green-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -64,7 +64,7 @@ export default function ProductMegaMenu({
                 </h3>
                 <div className="space-y-1">
                   <Link 
-                    href="/tablica#board" 
+                    href="/whiteboard#board" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-purple-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -78,7 +78,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica#tools" 
+                    href="/whiteboard#tools" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-orange-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -92,7 +92,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica#smart-search" 
+                    href="/whiteboard#smart-search" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-cyan-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -106,7 +106,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica#voice-chat" 
+                    href="/whiteboard#voice-chat" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-pink-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -120,7 +120,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica#ai-tutor" 
+                    href="/whiteboard#ai-tutor" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-indigo-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">
@@ -134,7 +134,7 @@ export default function ProductMegaMenu({
                     </div>
                   </Link>
                   <Link 
-                    href="/tablica#collaboration" 
+                    href="/whiteboard#collaboration" 
                     className="hover-shine flex items-start gap-3 px-3 py-2 text-gray-700 hover:text-black hover:bg-gray-200/70 rounded-md transition-all group"
                   >
                     <div className="w-6 h-6 bg-emerald-500 rounded flex items-center justify-center flex-shrink-0 mt-0.5">

@@ -88,7 +88,7 @@ export function RegisterForm() {
         <span className="text-sm text-gray-600 font-light">
           Akceptuję{' '}
           <Link
-            href="/regulamin"
+            href="/terms"
             className="text-blue-600 hover:text-blue-700 hover:underline"
             target="_blank"
           >
@@ -96,7 +96,7 @@ export function RegisterForm() {
           </Link>{' '}
           i{' '}
           <Link
-            href="/polityka-prywatnosci"
+            href="/privacy-policy"
             className="text-blue-600 hover:text-blue-700 hover:underline"
             target="_blank"
           >

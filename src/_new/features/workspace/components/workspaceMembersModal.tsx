@@ -12,7 +12,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Crown, Users as UsersIcon, Loader2, Trash2, Eye, Edit3 } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { useWorkspaceMembers } from '../hooks/useWorkspaceMember';
 import { ROLE_LABELS, ROLE_COLORS } from '../utils/constants';

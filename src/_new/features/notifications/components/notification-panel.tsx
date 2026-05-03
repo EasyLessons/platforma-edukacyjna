@@ -14,7 +14,7 @@ import { X, Clock, Building, Check, Trash2, Bell } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Notification, InviteNotification } from '../types';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
 import { useState } from 'react';
 
 interface NotificationPanelProps {

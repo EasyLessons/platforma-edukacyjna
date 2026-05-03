@@ -99,7 +99,7 @@ const Footer = () => {
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Produkt</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/produkt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/product" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   O produkcie
                 </Link>
               </li>
@@ -109,7 +109,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/aktualnosci" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/news" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Aktualności
                 </Link>
               </li>
@@ -121,17 +121,17 @@ const Footer = () => {
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Firma</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/aktualnosci" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/news" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Blog
                 </Link>
               </li>
               <li>
-                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/contact" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Kariera
                 </Link>
               </li>
               <li>
-                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/contact" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Kontakt
                 </Link>
               </li>
@@ -143,12 +143,12 @@ const Footer = () => {
             <h3 className="font-semibold mb-4" style={{ color: '#FFFFFF' }}>Pomoc</h3>
             <ul className="space-y-3">
               <li>
-                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/contact" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Centrum pomocy
                 </Link>
               </li>
               <li>
-                <Link href="/podrecznik-uzytkownika" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/docs" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Podręcznik użytkownika
                 </Link>
               </li>
@@ -158,7 +158,7 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link href="/kontakt" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
+                <Link href="/contact" className="transition-colors hover:text-white" style={{ color: '#C5C5C5' }}>
                   Wsparcie
                 </Link>
               </li>
@@ -177,23 +177,23 @@ const Footer = () => {
             {/* Linki prawne */}
             <div className="flex flex-wrap justify-center gap-6 text-sm">
               <Link
-                href="/polityka-prywatnosci"
+                href="/privacy-policy"
                 className="transition-colors hover:text-white"
                 style={{ color: '#B1B1B1' }}
               >
                 Polityka prywatności
               </Link>
               <Link
-                href="/polityka-cookies"
+                href="/cookies-policy"
                 className="transition-colors hover:text-white"
                 style={{ color: '#B1B1B1' }}
               >
                 Polityka cookies
               </Link>
-              <Link href="/regulamin" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
+              <Link href="/terms" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
                 Regulamin
               </Link>
-              <Link href="/rodo" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
+              <Link href="/gdpr" className="transition-colors hover:text-white" style={{ color: '#B1B1B1' }}>
                 RODO
               </Link>
             </div>

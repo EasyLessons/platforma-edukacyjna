@@ -1,14 +1,7 @@
-'use client';
-
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
-import Ad from './layout/ad';
-import Header from './layout/Header';
-import Footer from './layout/Footer';
-import AuthHeader from './layout/AuthHeader';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { QueryProvider } from '@/_new/lib/query-provider';
-import { usePathname } from 'next/navigation';
 import Script from 'next/script';
 
 const plusJakarta = Plus_Jakarta_Sans({
@@ -24,54 +17,10 @@ const playfair = Playfair_Display({
   preload: false,
 });
 
-function LayoutContent({ children }: { children: React.ReactNode }) {
-  const { isLoggedIn, loading } = useAuth();
-  const pathname = usePathname();
-
-  // 🔥 ROZSZERZONA LOGIKA - headery na więcej stronach
-  const showHeader =
-    pathname === '/' ||
-    pathname === '/login' ||
-    pathname === '/rejestracja' ||
-    pathname === '/weryfikacja' ||
-    pathname === '/produkt' ||
-    pathname?.startsWith('/aktualnosci') ||
-    pathname?.startsWith('/podrecznik-uzytkownika') ||
-    pathname?.startsWith('/dokumentacja');
-
-  // Footer na homepage niezależnie od stanu logowania
-  const showFooter =
-    pathname === '/' ||
-    pathname === '/produkt' ||
-    pathname?.startsWith('/aktualnosci') ||
-    pathname?.startsWith('/podrecznik-uzytkownika') ||
-    pathname?.startsWith('/dokumentacja');
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-xl text-gray-600">Ładowanie...</div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      {/* 🔥 Headery pokazują się na: /, /login, /rejestracja, /weryfikacja */}
-      {showHeader && (
-        <>
-          <Ad />
-          {isLoggedIn ? <AuthHeader /> : <Header />}
-        </>
-      )}
-
-      <main className={isLoggedIn ? '' : 'min-h-screen'}>{children}</main>
-
-      {/* Footer tylko na homepage */}
-      {showFooter && <Footer />}
-    </>
-  );
-}
+export const metadata = {
+  title: 'EasyLesson - Korepetycje online z AI',
+  description: 'Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online',
+};
 
 export default function RootLayout({
   children,
@@ -112,7 +61,7 @@ export default function RootLayout({
         
         <QueryProvider>
           <AuthProvider>
-            <LayoutContent>{children}</LayoutContent>
+            {children}
           </AuthProvider>
         </QueryProvider>
       </body>

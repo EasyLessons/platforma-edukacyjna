@@ -33,7 +33,7 @@ export default function NewsMegaMenu({
           </div>
         </div>
         <Link
-          href="/aktualnosci"
+          href="/news"
           className="flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-medium text-sm group"
         >
           Zobacz wszystkie aktualności
@@ -47,13 +47,13 @@ export default function NewsMegaMenu({
       <div className="grid grid-cols-3 gap-6">
         {/* Artykuł 1 */}
         <Link
-          href="/aktualnosci/nowe-narzedzia-matematyczne"
+          href="/news/nowe-narzedzia-matematyczne"
           className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200"
          
         >
           <div className="aspect-video relative overflow-hidden">
             <img
-              src="/resources/Aktualnosci/Nowosc.jpg"
+              src="/resources/news/Nowosc.jpg"
               alt="Nowe narzędzia matematyczne"
               className="parallax-image w-full h-full object-cover"
             />
@@ -74,13 +74,13 @@ export default function NewsMegaMenu({
 
         {/* Artykuł 2 */}
         <Link
-          href="/aktualnosci/ai-tutor-ulepszenia"
+          href="/news/ai-tutor-ulepszenia"
           className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200"
          
         >
           <div className="aspect-video relative overflow-hidden">
             <img
-              src="/resources/Aktualnosci/Nauczyciel.jpg"
+              src="/resources/news/Nauczyciel.jpg"
               alt="AI Tutor - lepsze odpowiedzi"
               className="parallax-image w-full h-full object-cover"
             />
@@ -101,13 +101,13 @@ export default function NewsMegaMenu({
 
         {/* Artykuł 3 */}
         <Link
-          href="/aktualnosci/wspolpraca-realtime"
+          href="/news/wspolpraca-realtime"
           className="parallax-container group bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all border border-gray-200"
          
         >
           <div className="aspect-video relative overflow-hidden">
             <img
-              src="/resources/Aktualnosci/Wspolbieznosc.jpg"
+              src="/resources/news/Wspolbieznosc.jpg"
               alt="Współpraca w czasie rzeczywistym"
               className="parallax-image w-full h-full object-cover"
             />

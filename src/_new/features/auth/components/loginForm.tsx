@@ -51,7 +51,7 @@ export function LoginForm() {
       {/* Forgot Password Link */}
       <div className="text-right">
         <Link
-          href="/odzyskiwanie-hasla"
+          href="/reset-password"
           className="hover-shine text-sm text-blue-600 font-light hover:text-blue-700 hover:underline transition-colors hover:cursor-pointer"
         >
           Zapomniałeś hasła?
@@ -62,7 +62,7 @@ export function LoginForm() {
       <p className="text-center text-gray-600 font-light mt-5">
         Nie masz konta?{' '}
         <Link
-          href="/rejestracja"
+          href="/register"
           className="hover-shine text-blue-600 font-normal hover:text-blue-700 hover:underline transition-colors hover:cursor-pointer"
         >
           Zarejestruj się

@@ -37,7 +37,7 @@ export function useLogin() {
         const checkData = await checkUser(formData.login);
         if (!checkData.verified && checkData.user_id) {
           router.push(
-            `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.login)}`
+            `/verify?userId=${checkData.user_id}&email=${encodeURIComponent(formData.login)}`
           );
           return;
         }

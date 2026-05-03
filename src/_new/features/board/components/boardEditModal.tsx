@@ -11,7 +11,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { DashboardButton } from '@/app/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
 import { BoardIconPicker } from './boardIconPicker';
 import { BoardColorPicker } from './boardColorPicker';
 import { useEditBoardForm } from '../hooks/useEditBoardForm';

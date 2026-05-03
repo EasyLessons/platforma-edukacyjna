@@ -101,7 +101,7 @@ export function useRegister() {
         setGeneralError('To konto już istnieje. Przejdź do logowania.');
       } else {
         router.push(
-          `/weryfikacja?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
+          `/verify?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
         );
       }
     } catch {
@@ -119,7 +119,7 @@ export function useRegister() {
     try {
       const response = await registerUser(formData);
       router.push(
-        `/weryfikacja?userId=${response.user_id}&email=${encodeURIComponent(formData.email)}`
+        `/verify?userId=${response.user_id}&email=${encodeURIComponent(formData.email)}`
       );
     } catch (err) {
       setIsLoading(false);

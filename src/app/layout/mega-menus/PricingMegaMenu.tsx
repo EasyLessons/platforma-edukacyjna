@@ -205,7 +205,7 @@ export default function PricingMegaMenu({
           </div>
 
           {/* CTA Button */}
-          <Link href="/rejestracja?plan=premium">
+          <Link href="/register?plan=premium">
             <button
               className="hover-shine hover:cursor-pointer w-full flex items-center justify-center gap-2 px-6 py-4 text-white hover:text-white transition-all text-base font-semibold rounded-lg shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
               style={{ backgroundColor: '#212224' }}
