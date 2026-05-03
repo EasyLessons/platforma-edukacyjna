@@ -20,6 +20,9 @@ const playfair = Playfair_Display({
 export const metadata = {
   title: 'EasyLesson - Korepetycje online z AI',
   description: 'Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online',
+  verification: {
+    google: 'VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y',
+  },
 };
 
 export default function RootLayout({
@@ -29,17 +32,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pl">
-      <head>
-        <meta
-          name="google-site-verification"
-          content="VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y"
-        />
-        <title>EasyLesson - Korepetycje online z AI</title>
-        <meta
-          name="description"
-          content="Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online"
-        />
-      </head>
       <body
         className={`${plusJakarta.className} ${plusJakarta.variable} ${playfair.variable} antialiased`}
       >
