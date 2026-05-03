@@ -1,6 +1,6 @@
 'use client';
 
-import { useAuth } from '../../../context/AuthContext';
+import { useAuth } from '@/app/context/AuthContext';
 import BasicInfo from './BasicInfo';
 
 export default function ProfileSection() {
