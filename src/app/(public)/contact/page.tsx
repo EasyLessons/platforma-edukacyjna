@@ -2,8 +2,6 @@
 
 import React, { useState } from 'react';
 import Image from 'next/image';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
 
 export default function ContactPage() {
   const [name, setName] = useState('');
@@ -41,8 +39,6 @@ export default function ContactPage() {
     <div className="min-h-screen bg-[#F6F6F6] text-[#212224] flex flex-col relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>
-
-      <Header />
       
       <main className="mt-40  flex-grow max-w-4xl mx-auto px-6 py-24 pb-40 w-full z-10">
         <div className="flex flex-col items-center justify-center mb-12">
@@ -154,8 +150,6 @@ export default function ContactPage() {
           </form>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }

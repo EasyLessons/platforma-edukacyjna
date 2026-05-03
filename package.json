@@ -51,6 +51,7 @@
     "dependency-cruiser": "^17.3.9",
     "eslint": "^9.39.2",
     "eslint-config-next": "^16.1.6",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "tailwindcss": "^4",

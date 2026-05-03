@@ -1,15 +1,7 @@
-'use client';
-
-import React from 'react';
-import Header from '../layout/Header';
-import Footer from '../layout/Footer';
-
 export default function CookiePolicyPage() {
   return (
     <div className="min-h-screen bg-[#F6F6F6] text-[#212224] flex flex-col relative overflow-hidden">
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>
-      
-      <Header />
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>      
       
       <main className="flex-grow max-w-4xl mx-auto px-6 py-24 pb-40 w-full z-10">
         <h1 className="text-4xl md:text-5xl font-bold mb-10 tracking-tight text-center text-[#212224]">
@@ -54,8 +46,6 @@ export default function CookiePolicyPage() {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 }
