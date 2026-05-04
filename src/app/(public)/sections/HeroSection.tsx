@@ -13,6 +13,7 @@ const jakartaSans = Plus_Jakarta_Sans({
 export default function HeroSection() {
   return (
     <section
+      id="hero"
       className={`${jakartaSans.className} relative w-full overflow-hidden`}
       style={{
         height: '100vh',

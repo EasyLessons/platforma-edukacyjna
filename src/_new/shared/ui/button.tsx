@@ -35,8 +35,8 @@ const buttonVariants = cva(
       variant: {
         // czarny przycisk w auth (MOŻNA DODAĆ PO PROSTU NOWY TYP)
         dark: [
-          'bg-gray-900 text-white',
-          'hover:bg-gray-800',
+          'bg-[#212224] text-white',
+          'hover:bg-[#37383c]',
           'focus:ring-gray-400',
           'hover-shine',
         ],
@@ -48,8 +48,8 @@ const buttonVariants = cva(
         ],
         // szary przycisk drugorzędny (anuluj, zamknij, ikony)
         secondary: [
-          'bg-transparent text-gray-700',
-          'hover:bg-gray-200',
+          'bg-gray-200 text-gray-700',
+          'hover:bg-gray-300 hover:text-black',
           'focus-visible:ring-gray-100',
         ],
         // Outline (dla Google button)

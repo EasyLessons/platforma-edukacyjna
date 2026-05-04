@@ -1,9 +1,8 @@
-import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Youtube, Instagram, Facebook, Mail, Phone } from 'lucide-react';
-import { Button } from '@/_new/shared/ui/button';
-import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
+import { Plus_Jakarta_Sans } from 'next/font/google';
+import NewsletterSection from './mega-menus/NewsletterSectionProps';
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -201,49 +200,14 @@ const Footer = () => {
         </div>
       </div>
 
-      {/* Newsletter/CTA Section - opcjonalny */}
+      {/* Newsletter/CTA Section */}
       <div style={{ backgroundColor: '#0b0b0b', borderTop: '1px solid #2A2A2A' }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            <div className="lg:col-span-5">
-              <h4 className="text-2xl italic mb-2" style={{ color: '#F3F4F6', fontFamily: 'var(--font-playfair)' }}>
-                Chcesz być na bieżąco?
-              </h4>
-              <p className="text-sm leading-relaxed" style={{ color: '#B6B8BE' }}>
-                Otrzymuj wiadomości o nowych funkcjach, poradnikach i najlepszych praktykach prowadzenia korepetycji online.
-              </p>
-            </div>
-
-            <div className="lg:col-span-7">
-              <div className="flex flex-col sm:flex-row gap-3">
-                <input
-                  type="text"
-                  placeholder="Imię"
-                  className="flex-1 px-4 py-2.5 rounded-lg text-sm text-[#F9FAFB] placeholder-[#8F939C] focus:outline-none"
-                  style={{ backgroundColor: '#1F232B', border: '1px solid #343A45' }}
-                />
-                <input
-                  type="email"
-                  placeholder="Adres e-mail"
-                  className="flex-1 px-4 py-2.5 rounded-lg text-sm text-[#F9FAFB] placeholder-[#8F939C] focus:outline-none"
-                  style={{ backgroundColor: '#1F232B', border: '1px solid #343A45' }}
-                />
-                <button
-                  className="px-6 py-2.5 rounded-lg text-sm font-medium text-white cursor-pointer transition-colors"
-                  style={{ backgroundColor: '#4bffab', color: '#032515' }}
-                >
-                  Subskrybuj
-                </button>
-              </div>
-
-              <div className="flex items-start gap-2 mt-3">
-                <input type="checkbox" id="footer-newsletter-privacy" className="mt-0.5 cursor-pointer" />
-                <label htmlFor="footer-newsletter-privacy" className="text-xs cursor-pointer" style={{ color: '#AEB2BC' }}>
-                  Akceptuję politykę prywatności i wyrażam zgodę na otrzymywanie informacji handlowych.
-                </label>
-              </div>
-            </div>
-          </div>
+          <NewsletterSection
+            variant="dark"
+            title="Chcesz być na bieżąco?"
+            description="Otrzymuj wiadomości o nowych funkcjach, poradnikach i najlepszych praktykach prowadzenia korepetycji online."
+          />
         </div>
       </div>
     </footer>
