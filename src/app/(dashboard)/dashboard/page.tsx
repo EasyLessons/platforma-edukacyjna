@@ -141,7 +141,7 @@ function DashboardContent() {
   }, [activeWorkspaceId, workspaces.length]);
 
   return (
-    <div className="dashboard-shell h-screen flex flex-col overflow-hidden bg-[var(--dash-panel)]">
+    <div className="dashboard-shell h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-[var(--dash-panel)]">
       <div className="flex flex-1 min-h-0 overflow-hidden ">
         <WorkspaceSidebar
           activeWorkspaceId={activeWorkspaceId}
