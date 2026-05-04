@@ -6,14 +6,15 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Plus_Jakarta_Sans } from 'next/font/google';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 import ProductMegaMenu from './mega-menus/ProductMegaMenu';
-import CoursesMegaMenu from './mega-menus/CoursesMegaMenu';
-import PricingMegaMenu from './mega-menus/PricingMegaMenu';
+import CoursesMegaMenu from './/mega-menus/CoursesMegaMenu';
+import PricingMegaMenu from './/mega-menus/PricingMegaMenu';
 import NewsMegaMenu from './mega-menus/NewsMegaMenu';
 
 import { Button } from '@/_new/shared/ui/button';
+import { LanguageSwitcher } from '@/_new/shared/ui/language-switcher';
 
 const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
@@ -38,37 +39,11 @@ export default function Header() {
     return () => observer.disconnect();
   }, []);
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const lang = e.target.value;
-    const domain = window.location.hostname;
-
-    if (lang === 'pl') {
-      document.cookie = `googtrans=/pl/pl; path=/; domain=${domain};`;
-      document.cookie = `googtrans=/pl/pl; path=/; domain=.${domain};`;
-      document.cookie = `googtrans=/pl/pl; path=/;`;
-    } else {
-      const cookieValue = `/pl/${lang}`;
-      document.cookie = `googtrans=${cookieValue}; path=/; domain=${domain};`;
-      document.cookie = `googtrans=${cookieValue}; path=/; domain=.${domain};`;
-      document.cookie = `googtrans=${cookieValue}; path=/;`;
-    }
-    window.location.reload();
-  };
-
   const handleLogout = () => {
     logout();
     router.push('/');
   };
 
-  useEffect(() => {
-    const cookies = document.cookie.split(';');
-    const googtrans = cookies.find((c) => c.trim().startsWith('googtrans='));
-    if (googtrans) {
-      const lang = googtrans.split('/').pop() || 'pl';
-      const select = document.getElementById('lang-select') as HTMLSelectElement;
-      if (select) select.value = lang === 'pl' ? 'pl' : lang;
-    }
-  }, []);
 
   const [showProductMenu, setShowProductMenu] = useState(false);
   const [showCoursesMenu, setShowCoursesMenu] = useState(false);
@@ -307,20 +282,7 @@ export default function Header() {
               )}
 
               {/* Wersja językowa */}
-              <div className="flex items-center gap-1 ml-2">
-                <Globe
-                  className={`w-4 h-4 transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-500'}`}
-                />
-                <select
-                  id="lang-select"
-                  className={`bg-transparent text-sm font-medium cursor-pointer border-none outline-none transition-colors ${isHeroSectionActive ? 'text-white' : 'text-gray-700'}`}
-                  defaultValue="pl"
-                  onChange={handleLanguageChange}
-                >
-                  <option value="pl">PL</option>
-                  <option value="en">EN</option>
-                </select>
-              </div>
+              <LanguageSwitcher />
             </div>
           </div>
         </div>
