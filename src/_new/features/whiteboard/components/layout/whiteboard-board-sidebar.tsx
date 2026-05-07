@@ -72,7 +72,7 @@ export function WhiteboardBoardSidebar({
   const handleBoardClick = (boardId: number) => {
     // Wymuszony pełny reload jak Ctrl+R, żeby cała tablica przeładowała stan.
     const workspaceParam = selectedWorkspaceId ? `&workspace=${selectedWorkspaceId}` : '';
-    window.location.assign(`/tablica?boardId=${boardId}${workspaceParam}`);
+    window.location.assign(`/whiteboard?boardId=${boardId}${workspaceParam}`);
   };
 
   return (
