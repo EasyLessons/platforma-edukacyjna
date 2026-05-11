@@ -58,7 +58,7 @@ function generateId(): string {
   return Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9);
 }
 
-function offsetElement(el: DrawingElement, dx: number, dy: number): DrawingElement {
+export function offsetElement(el: DrawingElement, dx: number, dy: number): DrawingElement {
   switch (el.type) {
     case 'path':
       return { ...el, id: generateId(), points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as DrawingPath;

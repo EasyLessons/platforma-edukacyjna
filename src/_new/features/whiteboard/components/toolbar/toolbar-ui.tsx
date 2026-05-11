@@ -58,6 +58,7 @@ import {
   FileText,
   MoreVertical,
   Highlighter,
+  FolderHeart,
 } from 'lucide-react';
 import { Tool, ShapeType } from '@/_new/features/whiteboard/types';
 import { Tooltip } from '@/_new/shared/ui/tooltip';
@@ -77,6 +78,8 @@ interface ToolbarUIProps {
   // 🆕 Kalkulator state
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
+
+  onToggleAssetsLibrary?: () => void;
 
   // History state
   canUndo: boolean;
@@ -194,6 +197,7 @@ export function ToolbarUI({
   onPDFUpload,
   isCalculatorOpen,
   onCalculatorToggle,
+  onToggleAssetsLibrary,
   isReadOnly = false,
 }: ToolbarUIProps) {
   // 🆕 Wykrywanie wysokości ekranu
@@ -358,12 +362,20 @@ export function ToolbarUI({
           )}
 
           {!isCompactHeight && (
-            <ToolButton
-              icon={Calculator}
-              active={isCalculatorOpen ?? false}
-              onClick={() => onCalculatorToggle?.()}
-              title="Kalkulator (zawsze dostępny)"
-            />
+            <>
+              <ToolButton
+                icon={Calculator}
+                active={isCalculatorOpen ?? false}
+                onClick={() => onCalculatorToggle?.()}
+                title="Kalkulator (zawsze dostępny)"
+              />
+              <ToolButton
+                icon={FolderHeart}
+                active={false}
+                onClick={() => onToggleAssetsLibrary?.()}
+                title="Moje Szablony"
+              />
+            </>
           )}
 
           <Divider />
@@ -515,6 +527,16 @@ export function ToolbarUI({
               }}
               title="Kalkulator"
               disabled={isReadOnly}
+            />
+
+            <ToolButton
+              icon={FolderHeart}
+              active={false}
+              onClick={() => {
+                onToggleAssetsLibrary?.();
+                setIsMoreMenuOpen(false);
+              }}
+              title="Moje Szablony"
             />
 
             <ToolButton

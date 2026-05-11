@@ -11,7 +11,7 @@ from core.database import get_db
 from core.models import User
 from core.config import get_settings
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 settings = get_settings()
 
 
@@ -23,13 +23,16 @@ def get_current_user(
     Sprawdza JWT token i zwraca zalogowanego użytkownika.
     """
 
-    token = credentials.credentials
-        
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Nieprawidłowy token autoryzacyjny",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not credentials:
+        raise credentials_exception
+
+    token = credentials.credentials
     
     try:        
         payload = jwt.decode(

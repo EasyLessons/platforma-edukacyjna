@@ -35,7 +35,7 @@ import { flushSync } from 'react-dom';
 import { useViewport } from '../../hooks/use-viewport';
 import { useElements } from '../../hooks/use-elements';
 import { useHistory } from '../../hooks/use-history';
-import { useClipboard } from '../../hooks/use-clipboard';
+import { useClipboard, offsetElement } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 
@@ -57,6 +57,10 @@ import { CalculatorTool } from '../toolbar/calculator-tool';
 import { ActivityHistory } from '../toolbar/activity-history';
 import { OnlineUsers } from './online-users';
 import { RemoteCursorsContainer } from './remote-cursors';
+import { SavedAssetsPanel } from '../panels/saved-assets-panel';
+import { normalizeElementsForAsset, generateElementsSvgThumbnail } from '../../utils/asset-helpers';
+import { saveUserAsset } from '../../api/assets-api';
+import { FolderPlus } from 'lucide-react';
 
 // ─── Nowe komponenty UI ───────────────────────────────────────────────────────
 import { LoadingOverlay } from './loading-overlay';
@@ -239,6 +243,13 @@ export default function WhiteboardCanvasNew({
   const [canvasWidth, setCanvasWidth] = useState(0);
   const [canvasHeight, setCanvasHeight] = useState(0);
 
+  // Asset template save states
+  const [assetModalOpen, setAssetModalOpen] = useState(false);
+  const [assetName, setAssetName] = useState('');
+  const [frozenElementsForAsset, setFrozenElementsForAsset] = useState<DrawingElement[]>([]);
+  const [showAssetsLibrary, setShowAssetsLibrary] = useState(false);
+  const [assetsRefreshKey, setAssetsRefreshKey] = useState(0);
+
   // Viewer = tylko pan (nie może rysować)
   useEffect(() => {
     if (userRole === 'viewer') setTool('pan');
@@ -385,8 +396,113 @@ export default function WhiteboardCanvasNew({
     onPushUserAction: hist.pushUserAction,
   });
 
+  // ─── OBSŁUGA SZABLONÓW (Assets) ─────────────────────────────────────────────
+  const handleSaveGroupTemplate = useCallback((selectedElements: DrawingElement[]) => {
+    setFrozenElementsForAsset(selectedElements);
+    setAssetModalOpen(true);
+    setAssetName('');
+  }, []);
 
-const handleViewportChange = useCallback((newVp: ViewportTransform) => {
+  const submitSaveAsset = async () => {
+    if (!assetName.trim()) return;
+    try {
+      const normalizedElements = normalizeElementsForAsset(frozenElementsForAsset);
+      const thumbnail = generateElementsSvgThumbnail(normalizedElements);
+      await saveUserAsset({
+        name: assetName,
+        elements_data: normalizedElements,
+        thumbnail
+      });
+      setAssetModalOpen(false);
+      setFrozenElementsForAsset([]);
+      setShowAssetsLibrary(true);
+      setAssetsRefreshKey(k => k + 1);
+    } catch (err) {
+      console.error(err);
+      alert("Wystąpił błąd podczas zapisywania szablonu");
+    }
+  };
+
+  const handleAssetDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    if (e.dataTransfer.types.includes('application/x-whiteboard-asset')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  };
+
+  const handleAssetDropCenter = (e: React.DragEvent<HTMLDivElement>) => {
+    const data = e.dataTransfer.getData('application/x-whiteboard-asset');
+    if (data) {
+      e.preventDefault();
+      try {
+        const parsedElements = JSON.parse(data) as DrawingElement[];
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const dropScreenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+        const dropWorldPt = inverseTransformPoint(dropScreenPt, vp.viewportRef.current, rect.width, rect.height);
+
+        const now = Date.now();
+        const insertedElements = parsedElements.map(el => {
+          // Tworzymy głęboką kopię elementu, aby nie referować do starych danych
+          const copy = structuredClone(el) as any;
+
+          copy.id = crypto.randomUUID();
+          copy.created_at = now;
+          copy.updated_at = now;
+          
+          if (copy.type === 'path') {
+            copy.points = copy.points.map((p: any) => ({
+              x: p.x + dropWorldPt.x,
+              y: p.y + dropWorldPt.y,
+            }));
+          } else if (copy.type === 'shape') {
+            copy.startX += dropWorldPt.x;
+            copy.startY += dropWorldPt.y;
+            copy.endX += dropWorldPt.x;
+            copy.endY += dropWorldPt.y;
+          } else if (copy.type === 'arrow') {
+            copy.startX += dropWorldPt.x;
+            copy.startY += dropWorldPt.y;
+            copy.endX += dropWorldPt.x;
+            copy.endY += dropWorldPt.y;
+            if (copy.controlPoints) {
+              copy.controlPoints = copy.controlPoints.map((p: any) => ({
+                x: p.x + dropWorldPt.x,
+                y: p.y + dropWorldPt.y,
+              }));
+            }
+          } else if ('x' in copy && 'y' in copy) {
+            (copy as any).x += dropWorldPt.x;
+            (copy as any).y += dropWorldPt.y;
+          }
+          
+          return copy as DrawingElement;
+        });
+
+        el.addElements(insertedElements);
+        el.markUnsaved(insertedElements.map(e => e.id));
+        sel.selectElements(insertedElements.map(e => e.id));
+        hist.pushUserAction({
+          type: 'batch',
+          actions: insertedElements.map(elem => ({ type: 'create', element: elem }))
+        });
+        
+        rt.broadcastElementsBatch(insertedElements);
+
+        // Load images if there are any
+        insertedElements.forEach(item => {
+          if (item.type === 'image' && (item as ImageElement).src) {
+            el.loadImage(item.id, (item as ImageElement).src);
+          }
+        });
+
+      } catch (err) {
+        console.error("Błąd podczas upuszczania zasobu:", err);
+      }
+    }
+  };
+
+  const handleViewportChange = useCallback((newVp: ViewportTransform) => {
     const constrained = constrainViewport(newVp);
     
     // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
@@ -1920,7 +2036,11 @@ useMultiTouchGestures({
         ref={containerRef}
         tabIndex={-1}
         className="absolute inset-0 overflow-hidden touch-none overscroll-none outline-none"
-        onContextMenu={(e) => e.preventDefault()}       
+        onContextMenu={(e) => e.preventDefault()}
+        onDragOver={handleAssetDragOver}
+        onDrop={(e) => {
+          handleAssetDropCenter(e);
+        }}       
         style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
       >
 
@@ -2061,6 +2181,7 @@ useMultiTouchGestures({
             onDeleteSelected={deleteSelectedElements}
             onImagePaste={handleImageToolPaste}
             onImageUpload={handleImageToolUpload}
+            onToggleAssetsLibrary={() => setShowAssetsLibrary(v => !v)}
             onPDFUpload={handleImageToolUpload}
             isCalculatorOpen={isCalculatorOpen}
             onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
@@ -2119,6 +2240,7 @@ useMultiTouchGestures({
               onDeleteSelected={deleteSelectedElements}
               onCopySelected={clip.handleCopy}
               onDuplicateSelected={clip.handleDuplicate}
+              onSaveGroupTemplate={handleSaveGroupTemplate}
               isGestureActive={isGestureActive}
             />
           </div>
@@ -2449,6 +2571,57 @@ useMultiTouchGestures({
               <p className="text-sm text-gray-600">
                 Aby korzystać z aplikacji, zwiększ okno przeglądarki.
               </p>
+            </div>
+          </div>
+        )}
+
+        {/* ── PANEL BIBLIOTEKI SZABLONÓW ──────────────────────────────────── */}
+        {showAssetsLibrary && (
+          <SavedAssetsPanel onClose={() => setShowAssetsLibrary(false)} refreshKey={assetsRefreshKey} />
+        )}
+
+        {/* ── MODAL ZAPISU SZABLONU ────────────────────────────────────────── */}
+        {assetModalOpen && (
+          <div className="fixed inset-0 bg-black/40 z-[9999] flex items-center justify-center pointer-events-auto">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3 p-4 border-b">
+                <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                  <FolderPlus size={20} />
+                </div>
+                <h3 className="font-bold text-gray-900">Zapisz jako szablon</h3>
+              </div>
+              <div className="p-4">
+                <p className="text-sm text-gray-600 mb-4">
+                  Nazwij ten szablon ({frozenElementsForAsset.length} elementów), aby zapisać go do szybciej biblioteki i używać na innych tablicach.
+                </p>
+                <input
+                  autoFocus
+                  type="text"
+                  value={assetName}
+                  onChange={(e) => setAssetName(e.target.value)}
+                  placeholder="Np. Wykres z fizyki..."
+                  className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-gray-900 bg-white"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') submitSaveAsset();
+                    if (e.key === 'Escape') setAssetModalOpen(false);
+                  }}
+                />
+              </div>
+              <div className="p-4 bg-gray-50 border-t flex justify-end gap-2">
+                <button
+                  onClick={() => setAssetModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Anuluj
+                </button>
+                <button
+                  onClick={submitSaveAsset}
+                  disabled={!assetName.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Zapisz szablon
+                </button>
+              </div>
             </div>
           </div>
         )}

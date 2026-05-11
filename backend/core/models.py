@@ -45,6 +45,7 @@ class User(Base):
     )
     board_users = relationship("BoardUsers", back_populates="user")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    saved_assets = relationship("SavedAsset", back_populates="user", cascade="all, delete-orphan")
 
 class Workspace(Base):
     __tablename__ = "workspaces"
@@ -198,4 +199,20 @@ class RefreshToken(Base):
     revoked = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
-    user = relationship("User", backref="refresh_tokens")
+
+class SavedAsset(Base):
+    """
+    Zapisane szablony (assety) użytkownika.
+    Przechowuje zgrupowane elementy płótna w formacie JSONB.
+    """
+    __tablename__ = "saved_assets"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(100), nullable=False)
+    elements_data = Column(JSONB, nullable=False)
+    thumbnail = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+    user = relationship("User", back_populates="saved_assets")

@@ -83,8 +83,9 @@ apiClient.interceptors.response.use(
   async (error) => {
     const status = error?.response?.status;
 
-    // 401 - próba odświeżenia tokenu
-    if (status === 401 && !isHandling401) {
+    // 401/403 - próba odświeżenia tokenu (403 gdy brak headera Authorization)
+    const isAuthError = status === 401 || (status === 403 && error?.response?.data?.detail === 'Not authenticated');
+    if (isAuthError && !isHandling401) {
       isHandling401 = true;
       try {
         const newToken = await refreshAccessToken();

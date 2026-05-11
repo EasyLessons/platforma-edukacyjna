@@ -78,6 +78,7 @@ interface ToolbarProps {
   isReadOnly?: boolean;
   /** Offset od lewej krawędzi (px) — przesuwa toolbar gdy sidebar jest otwarty */
   leftOffset?: number;
+  onToggleAssetsLibrary?: () => void;
 }
 
 function Toolbar({
@@ -112,6 +113,7 @@ function Toolbar({
   onCalculatorToggle,
   isReadOnly = false,
   leftOffset = 0,
+  onToggleAssetsLibrary,
 }: ToolbarProps) {
   return (
     <div
@@ -151,6 +153,7 @@ function Toolbar({
         isCalculatorOpen={isCalculatorOpen}
         onCalculatorToggle={onCalculatorToggle}
         isReadOnly={isReadOnly}
+        onToggleAssetsLibrary={onToggleAssetsLibrary}
       />
     </div>
   );

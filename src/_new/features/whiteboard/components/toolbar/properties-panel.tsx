@@ -18,7 +18,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { X as XIcon, Copy, Files } from 'lucide-react';
+import { X as XIcon, Copy, Files, FolderPlus } from 'lucide-react';
 import { DrawingElement, DrawingPath, Shape, MarkdownNote, ImageElement, TableElement } from '@/_new/features/whiteboard/types';
 import { resizeTableCells, calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 
@@ -30,6 +30,7 @@ interface SelectionPropertiesPanelProps {
   onDeleteSelected?: () => void;
   onCopySelected?: () => void;
   onDuplicateSelected?: () => void;
+  onSaveGroupTemplate?: (elements: DrawingElement[]) => void;
 }
 
 // Szybkie presety skali — reszta przez wpisanie wartości
@@ -48,6 +49,7 @@ export function SelectionPropertiesPanel({
   onDeleteSelected,
   onCopySelected,
   onDuplicateSelected,
+  onSaveGroupTemplate,
 }: SelectionPropertiesPanelProps) {
   // Ref dla input koloru
   const colorInputRef = useRef<HTMLInputElement>(null);
@@ -594,6 +596,21 @@ export function SelectionPropertiesPanel({
           )}
         </div>
       )}
+      <div className="w-px h-6 bg-gray-200 ml-1" />
+      <div className="relative group flex items-center justify-center">
+        <button
+          onClick={() => {
+            if (onSaveGroupTemplate && selectedElements.length > 0) {
+              onSaveGroupTemplate(selectedElements);
+            }
+          }}
+          className="p-1 px-2 rounded cursor-pointer hover:bg-black/10 flex items-center gap-1 text-sm bg-blue-50 text-blue-600"
+          title="Zapisz do biblioteki szablonów"
+        >
+          <FolderPlus size={16} /> Zapisz szablon
+        </button>
+      </div>
+
     </div>
   );
 }

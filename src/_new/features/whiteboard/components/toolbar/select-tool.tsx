@@ -47,6 +47,7 @@ interface SelectToolProps {
   onDeleteSelected?: () => void;
   onCopySelected?: () => void;
   onDuplicateSelected?: () => void;
+  onSaveGroupTemplate?: (elements: DrawingElement[]) => void;
 }
 
 type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | 'e' | 'w' | null;
@@ -78,6 +79,7 @@ export function SelectTool({
   onDeleteSelected,
   onCopySelected,
   onDuplicateSelected,
+  onSaveGroupTemplate,
 }: SelectToolProps) {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectionStart, setSelectionStart] = useState<Point | null>(null);
@@ -1807,6 +1809,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         onDeleteSelected={onDeleteSelected}
         onCopySelected={onCopySelected}
         onDuplicateSelected={onDuplicateSelected}
+        onSaveGroupTemplate={onSaveGroupTemplate}
       />
     );
   };

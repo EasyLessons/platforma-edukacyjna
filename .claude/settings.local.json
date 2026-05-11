@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Remove-Item \"c:\\\\Users\\\\Patryk\\\\Desktop\\\\Projekty\\\\Portfolio\\\\platforma-edukacyjna\\\\src\\\\app\\\\dashboard\\\\page.tsx\")"
+    ]
+  }
+}
