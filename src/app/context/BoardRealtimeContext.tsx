@@ -43,6 +43,11 @@ import { markUserOnline } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { apiClient } from '@/_new/lib/api';
 import { DrawingElement } from '@/_new/features/whiteboard/types';
 
+const DEBUG = process.env.NODE_ENV === 'development';
+const log = DEBUG ? console.log.bind(console) : () => {};
+const logWarn = DEBUG ? console.warn.bind(console) : () => {};
+const logDebug = DEBUG ? console.debug.bind(console) : () => {};
+
 // ═══════════════════════════════════════════════════════════════════════════
 // 📝 TYPY
 // ═══════════════════════════════════════════════════════════════════════════
@@ -231,8 +236,8 @@ export function BoardRealtimeProvider({
   // Ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
   const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
   const presenceSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const presenceHeartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
-  const maxReconnectAttempts = 5;
 
   const { user } = useAuth();
 
@@ -331,7 +336,7 @@ export function BoardRealtimeProvider({
       isSubscribedRef.current = false;
     }
 
-    console.log(`🔌 Łączenie z kanałem tablicy: board:${boardId}`);
+    log(`🔌 Łączenie z kanałem tablicy: board:${boardId}`);
     currentBoardIdRef.current = boardId;
 
     // Reset reconnect counter przy nowym połączeniu
@@ -388,7 +393,7 @@ export function BoardRealtimeProvider({
           const users = Array.from(usersMap.values());
           previousUsersRef.current = usersMap;
           setOnlineUsers(users);
-          console.log(
+          log(
             `👥 Użytkownicy online (${users.length}):`,
             users.map((u) => u.username)
           );
@@ -402,7 +407,7 @@ export function BoardRealtimeProvider({
         // Filtruj własne joiny i loguj tylko rzeczywiste nowe joiny
         const realNewUsers = newPresences.filter((p: any) => p.user_id !== user.id);
         if (realNewUsers.length > 0) {
-          console.log('🟢 Użytkownik dołączył:', realNewUsers.map((p: any) => p.username));
+          log('🟢 Użytkownik dołączył:', realNewUsers.map((p: any) => p.username));
         }
       })
       .on('presence', { event: 'leave' }, ({ leftPresences }) => {
@@ -420,7 +425,7 @@ export function BoardRealtimeProvider({
         });
 
         if (realLeftUsers.length > 0) {
-          console.log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
+          log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
           // Usuń kursory tylko naprawdę wychodzących użytkowników
           const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
           remoteCursorsRef.current = remoteCursorsRef.current.filter(
@@ -441,7 +446,7 @@ export function BoardRealtimeProvider({
         // Ignoruj własne eventy (już mamy lokalnie)
         if (userId === user.id) return;
 
-        console.log(
+        log(
           `📥 Otrzymano element-created od ${username}:`,
           element.id,
           `(typ: ${element.type})`
@@ -457,7 +462,7 @@ export function BoardRealtimeProvider({
 
         if (userId === user.id) return;
 
-        console.log(`📥 Otrzymano element-updated od ${username}:`, element.id);
+        log(`📥 Otrzymano element-updated od ${username}:`, element.id);
 
         if (elementUpdatedHandlerRef.current) {
           elementUpdatedHandlerRef.current(element, userId, username);
@@ -468,7 +473,7 @@ export function BoardRealtimeProvider({
 
         if (userId === user.id) return;
 
-        console.log(`📥 Otrzymano element-deleted od ${username}:`, elementId);
+        log(`📥 Otrzymano element-deleted od ${username}:`, elementId);
 
         if (elementDeletedHandlerRef.current) {
           elementDeletedHandlerRef.current(elementId, userId, username);
@@ -479,7 +484,7 @@ export function BoardRealtimeProvider({
 
         if (userId === user.id) return;
 
-        console.log(`📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów`);
+        log(`📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów`);
 
         if (elementsBatchHandlerRef.current) {
           elementsBatchHandlerRef.current(elements, userId, username);
@@ -517,7 +522,7 @@ export function BoardRealtimeProvider({
       .on('broadcast', { event: 'typing-started' }, ({ payload }) => {
         const { elementId, userId, username } = payload as BoardEvent & { type: 'typing-started' };
 
-        console.log(`✏️ [TYPING] ${username} zaczął edytować element ${elementId}`);
+        log(`✏️ [TYPING] ${username} zaczął edytować element ${elementId}`);
 
         if (userId === user.id) return;
 
@@ -527,7 +532,7 @@ export function BoardRealtimeProvider({
         );
         if (!exists) {
           typingUsersRef.current = [...typingUsersRef.current, { userId, username, elementId }];
-          console.log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current);
+          log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current);
           notifyTypingSubscribers();
         }
       })
@@ -535,7 +540,7 @@ export function BoardRealtimeProvider({
       .on('broadcast', { event: 'typing-stopped' }, ({ payload }) => {
         const { elementId, userId } = payload as BoardEvent & { type: 'typing-stopped' };
 
-        console.log(`✏️ [TYPING] User ${userId} skończył edytować element ${elementId}`);
+        log(`✏️ [TYPING] User ${userId} skończył edytować element ${elementId}`);
 
         if (userId === user.id) return;
 
@@ -543,7 +548,7 @@ export function BoardRealtimeProvider({
         typingUsersRef.current = typingUsersRef.current.filter(
           (t) => !(t.userId === userId && t.elementId === elementId)
         );
-        console.log(`✏️ [TYPING] Aktualna lista po usunięciu:`, typingUsersRef.current);
+        log(`✏️ [TYPING] Aktualna lista po usunięciu:`, typingUsersRef.current);
         notifyTypingSubscribers();
       })
       // 🆕 VIEWPORT CHANGED - ktoś zmienił swój viewport (dla Follow Mode)
@@ -588,11 +593,11 @@ export function BoardRealtimeProvider({
         const isHost = user.id === minId;
 
         if (!isHost) {
-          console.log(`📡 [SYNC] ${username} prosi o sync — nie jestem hostem, pomijam`);
+          log(`📡 [SYNC] ${username} prosi o sync — nie jestem hostem, pomijam`);
           return;
         }
 
-        console.log(`📡 [SYNC] ${username} prosi o sync — jestem hostem, odpowiadam`);
+        log(`📡 [SYNC] ${username} prosi o sync — jestem hostem, odpowiadam`);
         if (syncRequestHandlerRef.current) syncRequestHandlerRef.current(userId, username);
       })
       .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
@@ -608,13 +613,13 @@ export function BoardRealtimeProvider({
         buffer.chunks[chunkIndex] = elements;
 
         const received = buffer.chunks.filter(Boolean).length;
-        console.log(`📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`);
+        log(`📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`);
 
         if (received >= totalChunks) {
           // Wszystkie paczki dotarły — połącz i przekaż
           const allElements = (buffer.chunks as DrawingElement[][]).flat();
           syncChunkBufferRef.current = null;
-          console.log(`📥 [SYNC] Kompletny stan od ${username}: ${allElements.length} elementów`);
+          log(`📥 [SYNC] Kompletny stan od ${username}: ${allElements.length} elementów`);
           if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(allElements, userId, username);
         }
       });
@@ -622,8 +627,6 @@ export function BoardRealtimeProvider({
     // ═══════════════════════════════════════════════════════════════════════
     // 🚀 SUBSKRYPCJA
     // ═══════════════════════════════════════════════════════════════════════
-
-    let presenceHeartbeat: NodeJS.Timeout | null = null;
 
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
@@ -633,10 +636,10 @@ export function BoardRealtimeProvider({
         
         // Loguj tylko pierwsze połączenie, nie reconnecty
         if (!isSubscribedRef.current) {
-          console.log('✅ Połączono z kanałem tablicy');
+          log('✅ Połączono z kanałem tablicy');
           isSubscribedRef.current = true;
         } else {
-          console.log('🔄 Reconnect do kanału tablicy');
+          log('🔄 Reconnect do kanału tablicy');
         }
         
         // KLUCZOWE: Rozwiąż Promise - kanał jest gotowy do broadcast!
@@ -664,7 +667,7 @@ export function BoardRealtimeProvider({
             await channel.track(presenceData);
           } catch (err) {
             // Ignoruj błędy track - kanał może być w trakcie reconnect
-            console.debug('Track presence skipped - channel reconnecting');
+            logDebug('Track presence skipped - channel reconnecting');
           }
         };
 
@@ -679,8 +682,8 @@ export function BoardRealtimeProvider({
         markUserOnline(Number(boardId)).catch(() => {});
 
         // Heartbeat co 60 sekund - Supabase ma własny heartbeat, dla Backend DB potrzebujemy własny
-        if (presenceHeartbeat) clearInterval(presenceHeartbeat);
-        presenceHeartbeat = setInterval(() => {
+        if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
+        presenceHeartbeatRef.current = setInterval(() => {
           trackPresence();
           markUserOnline(Number(boardId)).catch(() => {}); // Odśwież ping w PostgreSQL
         }, 60000);
@@ -688,20 +691,20 @@ export function BoardRealtimeProvider({
         // 🛡️ Supabase ma auto-reconnect - nie panikuj
         // Loguj tylko przy pierwszym błędzie w serii
         if (reconnectAttemptRef.current === 0) {
-          console.debug('⚠️ Tymczasowy błąd kanału - Supabase reconnecting...');
+          logDebug('⚠️ Tymczasowy błąd kanału - Supabase reconnecting...');
         }
         reconnectAttemptRef.current++;
-        
+
         // Ustaw isConnected na false tylko po wielu nieudanych próbach
         if (reconnectAttemptRef.current >= 10) {
           setIsConnected(false);
-          console.warn('⚠️ Niestabilne połączenie realtime - używam fallback');
+          logWarn('⚠️ Niestabilne połączenie realtime - używam fallback');
         }
       } else if (status === 'TIMED_OUT') {
-        console.debug('⏰ Timeout - Supabase reconnecting...');
+        logDebug('⏰ Timeout - Supabase reconnecting...');
         reconnectAttemptRef.current++;
       } else if (status === 'CLOSED') {
-        console.log('🔒 Kanał zamknięty');
+        log('🔒 Kanał zamknięty');
         setIsConnected(false);
       }
     });
@@ -725,7 +728,7 @@ export function BoardRealtimeProvider({
     // ═══════════════════════════════════════════════════════════════════════
 
     return () => {
-      console.log('🔌 Rozłączanie z kanału tablicy');
+      log('🔌 Rozłączanie z kanału tablicy');
       try {
         // Ignorujemy błędy w catch() - przy zamykaniu okna przeglądarki (np. w Edge) żądanie fetch jest przerywane
         apiClient.delete(`/api/v1/whiteboard/${boardId}/online`).catch(() => {});
@@ -733,7 +736,7 @@ export function BoardRealtimeProvider({
         console.error('Cleanup error:', e);
       }
       
-      if (presenceHeartbeat) clearInterval(presenceHeartbeat);
+      if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
       if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
       channel.unsubscribe();
@@ -760,7 +763,7 @@ export function BoardRealtimeProvider({
   const safeBroadcast = useCallback(async (event: string, payload: any): Promise<boolean> => {
     const channel = channelRef.current;
     if (!channel) {
-      console.warn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
+      logWarn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
       return false;
     }
 
@@ -791,7 +794,7 @@ export function BoardRealtimeProvider({
             setTimeout(async () => {
               const retry2 = await sendMessage();
               if (!retry2) {
-                console.warn(`📤 [BROADCAST] ❌ Nie udało się wysłać ${event} po 3 próbach`);
+                logWarn(`📤 [BROADCAST] ❌ Nie udało się wysłać ${event} po 3 próbach`);
               }
             }, 200);
           }
@@ -806,7 +809,7 @@ export function BoardRealtimeProvider({
     async (element: DrawingElement) => {
       if (!user) return;
 
-      console.log(`📤 [BROADCAST] Wysyłam element-created: ${element.id} (typ: ${element.type})`);
+      log(`📤 [BROADCAST] Wysyłam element-created: ${element.id} (typ: ${element.type})`);
 
       const success = await safeBroadcast('element-created', {
         element,
@@ -815,7 +818,7 @@ export function BoardRealtimeProvider({
       });
 
       if (!success) {
-        console.warn(`📤 [BROADCAST] ❌ Nie udało się wysłać element-created: ${element.id}`);
+        logWarn(`📤 [BROADCAST] ❌ Nie udało się wysłać element-created: ${element.id}`);
       }
     },
     [user, safeBroadcast]

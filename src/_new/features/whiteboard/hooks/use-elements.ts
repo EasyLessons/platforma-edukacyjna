@@ -185,7 +185,8 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
           return;
         }
 
-        let loaded_ = 0;
+        let loadedCount = 0;
+        const total = imageEls.length;
         await Promise.all(
           imageEls.map(
             (el: DrawingElement) =>
@@ -195,12 +196,12 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
                   img.src = (el as ImageElement).src;
                   img.onload = () => {
                     setLoadedImages((prev) => new Map(prev).set(el.id, img));
-                    loaded_++;
-                    setLoadingProgress(90 + (loaded_ / imageEls.length) * 10);
+                    loadedCount += 1;
+                    setLoadingProgress(90 + (loadedCount / total) * 10);
                     resolve();
                   };
                   img.onerror = () => {
-                    loaded_++;
+                    loadedCount += 1;
                     resolve();
                   };
                 } else {

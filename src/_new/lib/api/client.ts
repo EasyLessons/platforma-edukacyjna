@@ -59,8 +59,8 @@ apiClient.interceptors.request.use(
 
 // RESPONSE INTERCEPTOR
 
-// Flaga zapobiegająca pętli redirect gdy refresh też zwróci 401
-let isHandling401 = false;
+// Jeden współdzielony promise refresh — równoczesne 401 czekają na ten sam wynik
+let refreshPromise: Promise<string> | null = null;
 
 apiClient.interceptors.response.use(
   // Success: rozpakuj ApiResponse<T> -> T
@@ -85,30 +85,30 @@ apiClient.interceptors.response.use(
 
     // 401/403 - próba odświeżenia tokenu (403 gdy brak headera Authorization)
     const isAuthError = status === 401 || (status === 403 && error?.response?.data?.detail === 'Not authenticated');
-    if (isAuthError && !isHandling401) {
-      isHandling401 = true;
+    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
+
+    if (isAuthError && !originalRequest._retried) {
+      originalRequest._retried = true;
+
       try {
-        const newToken = await refreshAccessToken();
+        // Jeśli refresh już trwa — dołącz do istniejącego promise zamiast tworzyć nowy
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        const newToken = await refreshPromise;
         setAccessToken(newToken);
 
-        // Ponów oryginalny request
-        const originalRequest = error.config as AxiosRequestConfig & {
-          _retried?: boolean;
-        };
-        if (!originalRequest._retried) {
-          originalRequest._retried = true;
-          if (originalRequest.headers) {
-            (originalRequest.headers as Record<string, string>)['Authorization'] =
-              `Bearer ${newToken}`;
-          }
-          return apiClient(originalRequest);
+        if (originalRequest.headers) {
+          (originalRequest.headers as Record<string, string>)['Authorization'] =
+            `Bearer ${newToken}`;
         }
+        return apiClient(originalRequest);
       } catch {
         // Refresh nie powiódł się - wyloguj
         clearSession();
         logoutAndRedirect();
-      } finally {
-        isHandling401 = false;
       }
     }
 
