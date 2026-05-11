@@ -86,6 +86,7 @@ import {
   panViewportWithMouse,
   inverseTransformPoint,
   transformPoint,
+  computePathBbox,
 } from '../../navigation/viewport-math';
 
 // ─── Typy ─────────────────────────────────────────────────────────────────────
@@ -324,9 +325,17 @@ export default function WhiteboardCanvasNew({
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({
     onRemoteElementAdded: (element) => {
+      // Uzupełnij bbox dla ścieżek przychodzących przez realtime (nie mają cache)
+      if (element.type === 'path' && !element.bbox) {
+        (element as DrawingPath).bbox = computePathBbox(element);
+      }
       el.addElements([element]);
     },
     onRemoteElementUpdated: (element) => {
+      // Przy update ścieżki unieważnij cache — punkty mogły się zmienić
+      if (element.type === 'path') {
+        (element as DrawingPath).bbox = computePathBbox(element);
+      }
       el.updateElement(element);
     },
     onRemoteElementDeleted: (elementId) => {
@@ -358,10 +367,14 @@ export default function WhiteboardCanvasNew({
       const toUpdate: DrawingElement[] = [];
 
       incomingElements.forEach(incoming => {
+        // Uzupełnij bbox dla ścieżek z sync (przyszły z sieci, nie mają cache)
+        if (incoming.type === 'path' && !incoming.bbox) {
+          (incoming as DrawingPath).bbox = computePathBbox(incoming);
+        }
         if (currentMap.has(incoming.id)) {
-          toUpdate.push(incoming); // Mamy to, ale aktualizujemy z pamięci drugiego gracza
+          toUpdate.push(incoming);
         } else {
-          toAdd.push(incoming); // Nie mamy tego (baza jeszcze nie zapisała) - dodajemy!
+          toAdd.push(incoming);
         }
       });
 
@@ -549,9 +562,12 @@ useMultiTouchGestures({
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     },
     onGestureEnd: () => {
-      setIsGestureActive(false);     // Odblokowuje narzędzia
+      setIsGestureActive(false);     // Odblokowuje narzędzia rysowania
+      // isPanningRef zostaje true — momentum kontynuuje pan bez setViewport per klatka
+    },
+    onMomentumEnd: () => {
+      // Momentum wygasło — synchronizuj stan React i przywróć overlaye
       isPanningRef.current = false;
-      // Synchronizujemy stan Reacta dopiero po zakończeniu gestu (eliminujemy skakanie)
       vp.setViewport(vp.viewportRef.current);
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
     },
@@ -586,113 +602,123 @@ useMultiTouchGestures({
   // Ref do editingTextId — canvas zawsze ma aktualną wartość bez przechwytywania
   const editingTextIdRef = useRef<string | null>(sel.editingTextId);
 
+  // Cache przeskalowanych obrazów — klucz: `${id}@${roundedScale}`, wartość: OffscreenCanvas.
+  // Eliminuje kosztowne skalowanie dużych obrazów przy każdej klatce renderowania.
+  const imageScaleCacheRef = useRef<Map<string, OffscreenCanvas>>(new Map());
+
+  // Wszystkie wartości runtime potrzebne w redrawCanvas trzymamy w jednym stabilnym ref.
+  // Dzięki temu useCallback ma puste deps i nigdy nie jest rekreowany — zero zbędnych
+  // re-renderów i efektów wynikających ze zmiany referencji funkcji.
+  const renderStateRef = useRef({
+    elementsRef: el.elementsRef,
+    loadedImages: el.loadedImages,
+    spatialIndex: el.spatialIndex,
+    viewportRef: vp.viewportRef,
+    imageScaleCache: imageScaleCacheRef,
+    handleElementUpdate: null as unknown as (id: string, updates: Partial<DrawingElement>) => void,
+  });
+
+  // Aktualizuj renderStateRef przy każdej zmianie wartości — bez rekracji redrawCanvas
+  useEffect(() => {
+    renderStateRef.current.elementsRef = el.elementsRef;
+  }, [el.elementsRef]);
+  useEffect(() => {
+    renderStateRef.current.loadedImages = el.loadedImages;
+  }, [el.loadedImages]);
+  useEffect(() => {
+    renderStateRef.current.spatialIndex = el.spatialIndex;
+  }, [el.spatialIndex]);
+  useEffect(() => {
+    renderStateRef.current.viewportRef = vp.viewportRef;
+  }, [vp.viewportRef]);
+
+  // redrawCanvas — stabilna przez cały czas życia komponentu, nigdy nie rekreowana
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const { elementsRef, loadedImages, spatialIndex, viewportRef, imageScaleCache, handleElementUpdate: handleElUpdate } = renderStateRef.current;
+
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
     const height = canvas.height / dpr;
-    const viewport = vp.viewportRef.current;
+    const viewport = viewportRef.current;
 
     ctx.save();
     ctx.scale(dpr, dpr);
     ctx.clearRect(0, 0, width, height);
 
-    // Zawsze rysujemy siatkę w tle, ale osie (układ współrzędnych) pokazujemy tylko gdy grid_visible = true
     drawGrid(ctx, viewport, width, height, settingsRef.current.grid_visible);
 
-    // ─── 🚀 VIEWPORT CULLING (Odrzucanie niewidocznych elementów) ───
-    // 1. Granice widocznego "świata"
-    const visibleMinX = -viewport.x / viewport.scale;
-    const visibleMinY = -viewport.y / viewport.scale;
-    const visibleMaxX = (width - viewport.x) / viewport.scale;
-    const visibleMaxY = (height - viewport.y) / viewport.scale;
+    // ─── 🚀 VIEWPORT CULLING — R-Tree spatial index O(log n + k) ───
+    const CULL_MARGIN_PX = 150;
+    const scale100 = viewport.scale * 100;
+    const worldMargin = CULL_MARGIN_PX / scale100;
+    const worldMinX = viewport.x - (width / 2) / scale100 - worldMargin;
+    const worldMinY = viewport.y - (height / 2) / scale100 - worldMargin;
+    const worldMaxX = viewport.x + (width / 2) / scale100 + worldMargin;
+    const worldMaxY = viewport.y + (height / 2) / scale100 + worldMargin;
 
-    // 2. Margines błędu — elementy nie znikają nagle przy krawędzi ekranu
-    const padding = 100 / viewport.scale;
+    const visibleIds = spatialIndex.query(worldMinX, worldMinY, worldMaxX, worldMaxY);
 
-    // Markdown renderowana jako HTML overlay — canvas pomija.
-    // Tabela rysowana na canvas przez drawElement → drawTable.
-    for (const element of el.elementsRef.current) {
-      if (element.type === 'markdown') continue;
-      // Pomiń rysowanie tekstu jeśli jest aktualnie edytowany (textarea go zastępuje)
-      if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
+    // ─── 🖼️ OFFSCREEN IMAGE CACHE — buduj przeskalowane kopie raz per skala ───
+    // Zaokrąglamy skalę do 0.25 żeby nie generować nowego offscreen przy każdej klatce zoom.
+    const scaleKey = Math.round(viewport.scale * 4) / 4;
+    const scaledImagesMap = new Map<string, OffscreenCanvas>();
+    if (typeof OffscreenCanvas !== 'undefined') {
+      const cache = imageScaleCache.current;
+      for (const element of elementsRef.current) {
+        if (element.type !== 'image') continue;
+        if (!visibleIds.has(element.id)) continue;
+        const htmlImg = loadedImages.get(element.id);
+        if (!htmlImg || !htmlImg.complete) continue;
 
-      // 3. Bounding Box elementu
-      let minX = 0, minY = 0, maxX = 0, maxY = 0;
-
-      if (element.type === 'shape') {
-        minX = Math.min(element.startX, element.endX);
-        maxX = Math.max(element.startX, element.endX);
-        minY = Math.min(element.startY, element.endY);
-        maxY = Math.max(element.startY, element.endY);
-      } else if (element.type === 'path') {
-        if (element.points.length > 0) {
-          minX = element.points[0].x; maxX = minX;
-          minY = element.points[0].y; maxY = minY;
-          const step = Math.max(1, Math.floor(element.points.length / 10));
-          for (let i = 1; i < element.points.length; i += step) {
-            const p = element.points[i];
-            if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+        const cacheKey = `${element.id}@${scaleKey}`;
+        let offscreen = cache.get(cacheKey);
+        if (!offscreen) {
+          // Wyczyść stare wpisy dla tego id przy innej skali
+          for (const k of cache.keys()) {
+            if (k.startsWith(`${element.id}@`)) cache.delete(k);
           }
+          const imgEl = element as ImageElement;
+          const sw = Math.max(1, Math.round(imgEl.width * scaleKey * 100));
+          const sh = Math.max(1, Math.round(imgEl.height * scaleKey * 100));
+          offscreen = new OffscreenCanvas(sw, sh);
+          const offCtx = offscreen.getContext('2d');
+          offCtx?.drawImage(htmlImg, 0, 0, sw, sh);
+          cache.set(cacheKey, offscreen);
         }
-      } else if (element.type === 'arrow') {
-        minX = Math.min(element.startX, element.endX);
-        maxX = Math.max(element.startX, element.endX);
-        minY = Math.min(element.startY, element.endY);
-        maxY = Math.max(element.startY, element.endY);
-      } else if (element.type === 'function') {
-        // Funkcje rysują się na całą szerokość ekranu — nigdy nie cullujemy
-        minX = visibleMinX; maxX = visibleMaxX;
-        minY = visibleMinY; maxY = visibleMaxY;
-      } else if ('x' in element && 'y' in element) {
-        // Obrazki, teksty, tabele
-        minX = element.x;
-        minY = element.y;
-        maxX = element.x + ((element as any).width || 0);
-        maxY = element.y + ((element as any).height || 0);
+        scaledImagesMap.set(element.id, offscreen);
       }
-
-      // 4. Test widoczności — pomiń jeśli poza ekranem
-      if (
-        minX > visibleMaxX + padding ||
-        maxX < visibleMinX - padding ||
-        minY > visibleMaxY + padding ||
-        maxY < visibleMinY - padding
-      ) {
-        continue;
-      }
-
-      drawElement(
-              ctx,
-              element,
-              viewport,
-              width,
-              height,
-              el.loadedImages,
-              false,
-              (id: string, newHeight: number) => {
-                setTimeout(() => {
-                  const current = el.elementsRef.current.find((e) => e.id === id);
-                  if (current && 'height' in current) {
-                    if (Math.abs((current.height ?? 0) - newHeight) > 0.05) {
-                      handleElementUpdate(id, { height: newHeight });
-                    }
-                  }
-                }, 0);
-              },
-              el.elementsRef.current
-            );
     }
 
-    // Aktualizuj transform HTML overlaysów synchronicznie z rysowaniem canvasa.
-    // Wzór: translate(w/2, h/2) scale(s) translate(-vp.x×100, -vp.y×100)
-    // Nota/kursor w world-punkcie (wx,wy) z CSS left=wx×100 ląduje na dokładnie
-    // tym samym pikselu co drawElement — zero lagu podczas panu/zooma.
+    // Jeśli OffscreenCanvas niedostępny (np. Safari < 16.4), używamy loadedImages bezpośrednio
+    const effectiveImages = scaledImagesMap.size > 0
+      ? new Map<string, HTMLImageElement | OffscreenCanvas>([...loadedImages, ...scaledImagesMap])
+      : loadedImages as Map<string, HTMLImageElement | OffscreenCanvas>;
+
+    for (const element of elementsRef.current) {
+      if (!visibleIds.has(element.id)) continue;
+      if (element.type === 'markdown') continue;
+      if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
+
+      const onAutoExpand = (id: string, newHeight: number) => {
+        setTimeout(() => {
+          const current = elementsRef.current.find((e) => e.id === id);
+          if (current && 'height' in current) {
+            if (Math.abs((current.height ?? 0) - newHeight) > 0.05) {
+              handleElUpdate?.(id, { height: newHeight });
+            }
+          }
+        }, 0);
+      };
+
+      drawElement(ctx, element, viewport, width, height, effectiveImages as Map<string, HTMLImageElement>, false, onAutoExpand, elementsRef.current);
+    }
+
+    // Overlay transform — synchronicznie z canvasem, zero lagu przy pan/zoom
     const overlayTransform =
       `translate(${width / 2}px, ${height / 2}px) ` +
       `scale(${viewport.scale}) ` +
@@ -700,16 +726,13 @@ useMultiTouchGestures({
     if (mdTableOverlaysRef.current) mdTableOverlaysRef.current.style.transform = overlayTransform;
     if (remoteCursorsRef.current) remoteCursorsRef.current.style.transform = overlayTransform;
 
-// Imperatywny update edytora tekstu — ta sama ramka co canvas, zero lagu przy pan/zoom
+    // Imperatywny update edytora tekstu
     if (editingTextIdRef.current && textEditorDivRef.current) {
       const d = textEditorDivRef.current;
-      // Pobieramy absolutne pozycje świata ukryte w atrybutach HTML (omijając Reacta!)
       const wx = parseFloat(d.getAttribute('data-world-x') || '0');
       const wy = parseFloat(d.getAttribute('data-world-y') || '0');
       const ww = parseFloat(d.getAttribute('data-world-w') || '0');
       const wh = parseFloat(d.getAttribute('data-world-h') || '0');
-      
-      // Przeliczamy i nakładamy styl natychmiast (synchronicznie z Canvasem)
       const tl = transformPoint({ x: wx, y: wy }, viewport, width, height);
       d.style.left   = `${tl.x}px`;
       d.style.top    = `${tl.y}px`;
@@ -717,13 +740,13 @@ useMultiTouchGestures({
       d.style.height = `${wh * viewport.scale * 100}px`;
     }
 
-    // Imperatywny update edytora komórki tabeli — ta sama ramka co canvas, zero lagu
+    // Imperatywny update edytora komórki tabeli
     if (editingTableCellRef.current && cellEditorInputRef.current) {
       const editing = editingTableCellRef.current;
-      const table = el.elementsRef.current.find((e) => e.id === editing.tableId);
+      const table = elementsRef.current.find((e) => e.id === editing.tableId);
       if (table && table.type === 'table') {
         const t = table as TableElement;
-        const cellW = t.width  / t.cols;
+        const cellW = t.width / t.cols;
         const cellH = t.height / t.rows;
         const tl = transformPoint(
           { x: t.x + editing.col * cellW, y: t.y + editing.row * cellH },
@@ -743,13 +766,12 @@ useMultiTouchGestures({
     }
 
     ctx.restore();
-  }, [el.elementsRef, el.loadedImages, vp.viewportRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Stabilna — wszystkie wartości runtime przez renderStateRef
 
-  // Przechowuj redrawCanvas w ref żeby był dostępny w event handlerach bez przechwycenia
+  // Przechowuj redrawCanvas w ref — teraz zbędne bo jest już stabilna, ale zostawiamy
+  // dla kompatybilności z event handlerami które odwołują się do redrawCanvasRef
   const redrawCanvasRef = useRef(redrawCanvas);
-  useEffect(() => {
-    redrawCanvasRef.current = redrawCanvas;
-  }, [redrawCanvas]);
 
   // Aktualizuj editingTextIdRef i przerysuj canvas gdy zmienia się edytowany element
   useEffect(() => {
@@ -1234,7 +1256,11 @@ useMultiTouchGestures({
   }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction]);
 
   const handlePathCreate = useCallback(
-    (path: DrawingPath) => createElement(path),
+    (path: DrawingPath) => {
+      // Oblicz bbox raz przy zakończeniu rysowania — pętla renderowania użyje cache
+      const withBbox: DrawingPath = { ...path, bbox: computePathBbox(path) };
+      createElement(withBbox);
+    },
     [createElement]
   );
 
@@ -1495,7 +1521,6 @@ useMultiTouchGestures({
     if (userRole === 'viewer') return;
     const current = el.elementsRef.current.find((e) => e.id === id);
     if (!current) return;
-    console.log('📝 Handle text update dla ID:', id, 'Updates:', updates);
     const updated = { ...current, ...updates } as DrawingElement;
     el.updateElement(updated);
     el.markUnsaved([id]);
@@ -1541,6 +1566,11 @@ useMultiTouchGestures({
     if (!current) return;
     el.updateElement({ ...current, ...updates } as DrawingElement);
   }, [userRole, el.elementsRef, el.updateElement]);
+
+  // Podpina handleElementUpdate do renderStateRef żeby redrawCanvas miał zawsze świeżą wersję
+  useEffect(() => {
+    renderStateRef.current.handleElementUpdate = handleElementUpdate;
+  }, [handleElementUpdate]);
 
   /** Update z historią (po zakończeniu przeciągania / zmianie rozmiaru) */
   const handleElementUpdateWithHistory = useCallback(

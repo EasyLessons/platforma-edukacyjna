@@ -25,6 +25,7 @@ import {
 } from '../api/elements-api';
 import type { DrawingElement, ImageElement } from '../types';
 import { BoardElementWithAuthor } from '../api/whiteboardApi';
+import { ElementSpatialIndex } from '../navigation/spatial-index';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -45,6 +46,8 @@ export interface UseElementsReturn {
   // Stabilne referencje (do odczytu w event handlerach bez closures)
   elementsRef: React.RefObject<DrawingElement[]>;
   unsavedElementsRef: React.RefObject<Set<string>>;
+  /** R-Tree spatial index — O(log n) culling zamiast O(n) iteracji przez wszystkie elementy */
+  spatialIndex: ElementSpatialIndex;
 
   // Mutatory — używane przez inne hooki i canvas
   setElements: React.Dispatch<React.SetStateAction<DrawingElement[]>>;
@@ -59,14 +62,23 @@ export interface UseElementsReturn {
   removeElement: (id: string) => void;
   /** Zaktualizuj element w tablicy */
   updateElement: (updated: DrawingElement) => void;
-  /** Zapisz element do bazy danych bezpośrednio (dla undo/redo) */
   /** Zaktualizuj wiele elementów naraz (Bulk Update) */
   updateElements: (updates: DrawingElement[]) => void;
+  /** Zapisz element do bazy danych bezpośrednio (dla undo/redo) */
   saveElementDirectly: (boardIdNum: number, element: DrawingElement) => Promise<void>;
   /** Usuń element z bazy danych bezpośrednio (dla undo/redo) */
   deleteElementDirectly: (boardIdNum: number, elementId: string) => Promise<void>;
   /** Załaduj obraz do cache */
   loadImage: (id: string, src: string) => void;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+/** Buduje Map z tablicy — używane przy inicjalizacji i merge */
+function toMap(elements: DrawingElement[]): Map<string, DrawingElement> {
+  const m = new Map<string, DrawingElement>();
+  for (const el of elements) m.set(el.id, el);
+  return m;
 }
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
@@ -82,15 +94,25 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   const [isSaving, setIsSaving] = useState(false);
   const [unsavedElements, setUnsavedElements] = useState<Set<string>>(new Set());
 
-  // Stabilne referencje
+  // Stabilna tablica — używana przez canvas, clipboard, sync, rendering
   const elementsRef = useRef<DrawingElement[]>(elements);
+  // Mapa id→element — O(1) lookup dla updateElement/removeElement/find
+  const elementsMapRef = useRef<Map<string, DrawingElement>>(new Map());
+  // R-Tree spatial index — O(log n) culling w pętli renderowania
+  const spatialIndex = useRef(new ElementSpatialIndex()).current;
+
   const unsavedElementsRef = useRef<Set<string>>(new Set());
   const isSavingRef = useRef(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    elementsRef.current = elements;
-  }, [elements]);
+  /** Synchronizuje refe, mapę, indeks i stan Reacta z jednej tablicy źródłowej */
+  const applyElements = useCallback((next: DrawingElement[]) => {
+    elementsRef.current = next;
+    elementsMapRef.current = toMap(next);
+    spatialIndex.rebuild(next);
+    setElements(next);
+  }, [spatialIndex]);
+
   useEffect(() => {
     unsavedElementsRef.current = unsavedElements;
   }, [unsavedElements]);
@@ -120,39 +142,37 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
           (e: BoardElementWithAuthor) => e.data as unknown as DrawingElement
         );
 
-        // 🔥 INTELIGENTNE ŁĄCZENIE ELEMENTÓW
-        setElements((prev) => {
-          const currentRamMap = new Map(prev.map((e) => [e.id, e]));
+        // INTELIGENTNE ŁĄCZENIE: RAM > DB (elementy z WebSocket mają pierwszeństwo)
+        const currentRamMap = elementsMapRef.current;
 
-          // Krok 1: Wersja RAM > Wersja DB. Jeśli element jest już w pamięci z WebSocket, ignoruj bazę!
-          const merged = dbElements.map((dbEl) =>
-            currentRamMap.has(dbEl.id) ? currentRamMap.get(dbEl.id)! : dbEl
-          );
+        const merged = dbElements.map((dbEl) =>
+          currentRamMap.has(dbEl.id) ? currentRamMap.get(dbEl.id)! : dbEl
+        );
 
-          // Krok 2: Kreski z RAM, których baza jeszcze w ogóle nie zna
-          const dbMap = new Map(dbElements.map((e) => [e.id, e]));
-          prev.forEach((ramEl) => {
-            if (!dbMap.has(ramEl.id)) merged.push(ramEl);
-          });
+        // Elementy z RAM których baza jeszcze nie zna
+        const dbMap = toMap(dbElements);
+        for (const ramEl of elementsRef.current) {
+          if (!dbMap.has(ramEl.id)) merged.push(ramEl);
+        }
 
-          elementsRef.current = merged; // Natychmiastowa synchronizacja refa
-          return merged;
-        });
+        applyElements(merged);
 
-        // 🔥 INTELIGENTNE ŁĄCZENIE AUTORÓW (żeby panele boczne nie wariowały)
+        // INTELIGENTNE ŁĄCZENIE AUTORÓW
         setElementsWithAuthor((prev) => {
-          const currentRamMap = new Map(prev.map((e) => [e.element_id, e]));
+          const currentRamAuthorMap = new Map(prev.map((e) => [e.element_id, e]));
 
-          const merged = rawElements.map((dbEl) =>
-            currentRamMap.has(dbEl.element_id) ? currentRamMap.get(dbEl.element_id)! : dbEl
+          const mergedAuthors = rawElements.map((dbEl) =>
+            currentRamAuthorMap.has(dbEl.element_id)
+              ? currentRamAuthorMap.get(dbEl.element_id)!
+              : dbEl
           );
 
-          const dbMap = new Map(rawElements.map((e) => [e.element_id, e]));
+          const dbAuthorMap = new Map(rawElements.map((e) => [e.element_id, e]));
           prev.forEach((ramEl) => {
-            if (!dbMap.has(ramEl.element_id)) merged.push(ramEl);
+            if (!dbAuthorMap.has(ramEl.element_id)) mergedAuthors.push(ramEl);
           });
 
-          return merged;
+          return mergedAuthors;
         });
 
         setLoadingProgress(70);
@@ -199,42 +219,58 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     };
 
     load();
-  }, [boardId]);
+  }, [boardId, applyElements]);
 
   // ─── Debounced save ────────────────────────────────────────────────────
+  const idleCallbackRef = useRef<number | null>(null);
+
   const debouncedSave = useCallback((boardIdStr: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(async () => {
+    saveTimeoutRef.current = setTimeout(() => {
       const boardIdNum = parseInt(boardIdStr);
       if (isNaN(boardIdNum)) return;
       if (isSavingRef.current || unsavedElementsRef.current.size === 0) return;
 
-      try {
-        setIsSaving(true);
-        isSavingRef.current = true;
+      const doSave = async () => {
+        try {
+          setIsSaving(true);
+          isSavingRef.current = true;
 
-        const toSave = elementsRef.current.filter((el) => unsavedElementsRef.current.has(el.id));
-        if (toSave.length === 0) return;
+          // O(1) lookup per element zamiast filter() przez całą tablicę
+          const toSave: DrawingElement[] = [];
+          for (const id of unsavedElementsRef.current) {
+            const el = elementsMapRef.current.get(id);
+            if (el) toSave.push(el);
+          }
+          if (toSave.length === 0) return;
 
-        // 🔥 POPRAWKA: Chunkowanie elementów do zapisu (max 100 na request)
-        const BATCH_SIZE = 100;
-        for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
-          const chunk = toSave.slice(i, i + BATCH_SIZE);
-          await saveBoardElementsBatch(boardIdNum, toSaveFormat(chunk));
+          const BATCH_SIZE = 100;
+          for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+            const chunk = toSave.slice(i, i + BATCH_SIZE);
+            await saveBoardElementsBatch(boardIdNum, toSaveFormat(chunk));
+          }
+
+          const savedIds = new Set(toSave.map((e) => e.id));
+          setUnsavedElements((prev) => {
+            const next = new Set(prev);
+            savedIds.forEach((id) => next.delete(id));
+            return next;
+          });
+        } catch (err) {
+          console.error('Błąd zapisu:', err);
+        } finally {
+          setIsSaving(false);
+          isSavingRef.current = false;
         }
+      };
 
-        const savedIds = new Set(toSave.map((e) => e.id));
-        setUnsavedElements((prev) => {
-          const next = new Set(prev);
-          savedIds.forEach((id) => next.delete(id));
-          return next;
-        });
-      } catch (err) {
-        console.error('Błąd zapisu:', err);
-      } finally {
-        setIsSaving(false);
-        isSavingRef.current = false;
+      // Odpal zapis gdy przeglądarka jest idle — nie blokuje animacji rysowania
+      if (typeof requestIdleCallback !== 'undefined') {
+        if (idleCallbackRef.current) cancelIdleCallback(idleCallbackRef.current);
+        idleCallbackRef.current = requestIdleCallback(() => doSave(), { timeout: 5000 });
+      } else {
+        doSave();
       }
     }, SAVE_DEBOUNCE_MS);
   }, []);
@@ -254,7 +290,13 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   );
 
   const addElements = useCallback((newEls: DrawingElement[]) => {
-    setElements((prev) => [...prev, ...newEls]);
+    // Dodaj do Mapy i indeksu — O(1) per element
+    for (const el of newEls) elementsMapRef.current.set(el.id, el);
+    spatialIndex.insert(newEls);
+    const next = [...elementsRef.current, ...newEls];
+    elementsRef.current = next;
+    setElements(next);
+
     setElementsWithAuthor((prev) => [
       ...prev,
       ...newEls.map((el) => ({
@@ -266,15 +308,33 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
         created_at: new Date().toISOString(),
       })),
     ]);
-  }, []);
+  }, [spatialIndex]);
 
   const removeElement = useCallback((id: string) => {
-    setElements((prev) => prev.filter((el) => el.id !== id));
+    if (!elementsMapRef.current.has(id)) return;
+    elementsMapRef.current.delete(id);
+    spatialIndex.remove(id);
+    const next = elementsRef.current.filter((el) => el.id !== id);
+    elementsRef.current = next;
+    setElements(next);
     setElementsWithAuthor((prev) => prev.filter((el) => el.element_id !== id));
-  }, []);
+  }, [spatialIndex]);
 
   const updateElement = useCallback((updated: DrawingElement) => {
-    setElements((prev) => prev.map((el) => (el.id === updated.id ? updated : el)));
+    elementsMapRef.current.set(updated.id, updated);
+    spatialIndex.update(updated);
+
+    if (!elementsRef.current.some((e) => e.id === updated.id)) {
+      // Nieznany element — dodaj jako nowy
+      const next = [...elementsRef.current, updated];
+      elementsRef.current = next;
+      setElements(next);
+    } else {
+      const next = elementsRef.current.map((el) => (el.id === updated.id ? updated : el));
+      elementsRef.current = next;
+      setElements(next);
+    }
+
     setElementsWithAuthor((prev) =>
       prev.map((el) =>
         el.element_id === updated.id
@@ -282,42 +342,39 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
           : el
       )
     );
-  }, []);
+  }, [spatialIndex]);
 
   const updateElements = useCallback((updates: DrawingElement[]) => {
-    const updateMap = new Map(updates.map((u) => [u.id, u]));
     const newElements: DrawingElement[] = [];
 
-    // 1. Zaktualizuj istniejące (szybki Ref)
-    elementsRef.current = elementsRef.current.map((e) => {
-      if (updateMap.has(e.id)) {
-        const updated = updateMap.get(e.id)!;
-        updateMap.delete(e.id);
-        return updated;
+    // O(1) per update — podmień w mapie i indeksie, zbierz nieznane jako nowe
+    for (const u of updates) {
+      if (elementsMapRef.current.has(u.id)) {
+        elementsMapRef.current.set(u.id, u);
+        spatialIndex.update(u);
+      } else {
+        elementsMapRef.current.set(u.id, u);
+        spatialIndex.insert([u]);
+        newElements.push(u);
       }
-      return e;
-    });
-
-    // 2. Pozostałe w mapie to NOWE elementy (wklejone z paczki od innego użytkownika)
-    updateMap.forEach((newEl) => newElements.push(newEl));
-    if (newElements.length > 0) {
-      elementsRef.current = [...elementsRef.current, ...newElements];
     }
 
-    // 3. Zaktualizuj widok Canvasa
-    setElements([...elementsRef.current]);
+    // Przebuduj tablicę — istniejące biorą zaktualizowane wartości z mapy
+    const updateIds = new Set(updates.map((u) => u.id));
+    const updateMap = new Map(updates.map((u) => [u.id, u]));
 
-    // 4. Aktualizacja panelu historii aktywności (zawsze — też przy zwykłym przesunięciu)
+    const next = elementsRef.current.map((e) =>
+      updateIds.has(e.id) ? updateMap.get(e.id)! : e
+    );
+    if (newElements.length > 0) next.push(...newElements);
+
+    elementsRef.current = next;
+    setElements([...next]);
+
     setElementsWithAuthor((prev) => {
-      const authorUpdateMap = new Map(updates.map((u) => [u.id, u]));
       const updatedAuthors = prev.map((authorEl) => {
-        if (authorUpdateMap.has(authorEl.element_id)) {
-          return {
-            ...authorEl,
-            data: authorUpdateMap.get(authorEl.element_id)! as unknown as Record<string, unknown>,
-          };
-        }
-        return authorEl;
+        const u = updateMap.get(authorEl.element_id);
+        return u ? { ...authorEl, data: u as unknown as Record<string, unknown> } : authorEl;
       });
       const newAuthors = newElements.map((el) => ({
         element_id: el.id,
@@ -329,7 +386,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
       }));
       return [...updatedAuthors, ...newAuthors];
     });
-  }, []);
+  }, [spatialIndex]);
 
   const saveElementDirectly = useCallback(async (boardIdNum: number, element: DrawingElement) => {
     await saveBoardElementsBatch(boardIdNum, toSaveFormat([element]));
@@ -349,6 +406,7 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     unsavedElements,
     elementsRef,
     unsavedElementsRef,
+    spatialIndex,
     setElements,
     setElementsWithAuthor,
     setLoadedImages,

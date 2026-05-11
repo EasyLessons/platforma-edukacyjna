@@ -1,7 +1,15 @@
 {
   "permissions": {
     "allow": [
-      "Bash(Remove-Item \"c:\\\\Users\\\\Patryk\\\\Desktop\\\\Projekty\\\\Portfolio\\\\platforma-edukacyjna\\\\src\\\\app\\\\dashboard\\\\page.tsx\")"
+      "Bash(Remove-Item \"c:\\\\Users\\\\Patryk\\\\Desktop\\\\Projekty\\\\Portfolio\\\\platforma-edukacyjna\\\\src\\\\app\\\\dashboard\\\\page.tsx\")",
+      "Bash(npx tsc *)",
+      "Bash(npm install *)",
+      "Bash(npm info *)",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['dist-tags']['latest'], d['description']\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['dist-tags']['latest']\\)\")",
+      "Bash(npm list *)",
+      "Bash(node -e \"const g = require\\('@use-gesture/react'\\); console.log\\(Object.keys\\(g\\)\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

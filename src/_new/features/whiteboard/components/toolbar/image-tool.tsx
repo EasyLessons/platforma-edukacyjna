@@ -111,10 +111,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
 
     // Expose ref methods (for toolbar buttons)
     useImperativeHandle(ref, () => ({
-      handlePasteFromClipboard: () => {
-        // ✅ Deleguje do globalnej funkcji w WhiteboardCanvas
-        console.log('📋 Paste handled by global function (Ctrl+V)');
-      },
+      handlePasteFromClipboard: () => {},
       triggerFileUpload: () => {
         fileInputRef.current?.click();
       },
@@ -149,7 +146,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
         images.push(canvas.toDataURL('image/jpeg', 0.9));
       }
 
-      console.log(`✅ Skonwertowano ${images.length} stron PDF`);
       return images;
     };
 
@@ -169,7 +165,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
       try {
         // 🆕 Obsługa PDF → konwersja wszystkich stron
         if (isPDF) {
-          console.log('📄 Converting PDF to images...');
           const images = await convertPDFToImages(file);
 
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
@@ -208,7 +203,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
               alt: `${file.name} - Strona ${i + 1}/${images.length}`,
             };
 
-            console.log(`✅ Creating page ${i + 1}/${images.length}, ID: ${newImage.id}`);
             onImageCreate(newImage);
             currentY += worldHeight + padding; // Następna strona niżej
 
@@ -216,7 +210,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
 
-          console.log(`✅ Dodano ${images.length} stron z PDF`);
         } else {
           // Obsługa zwykłego obrazka
           const reader = new FileReader();
@@ -265,7 +258,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           onImageCreate(newImage);
         }
 
-        console.log('✅ Image created from', isPDF ? 'PDF' : 'image');
       } catch (err) {
         console.error('File upload error:', err);
       }

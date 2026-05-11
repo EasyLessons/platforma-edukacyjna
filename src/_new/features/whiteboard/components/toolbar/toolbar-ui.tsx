@@ -221,10 +221,6 @@ export function ToolbarUI({
   const highlighterGreenInputRef = useRef<HTMLInputElement>(null);
   const highlighterYellowInputRef = useRef<HTMLInputElement>(null);
 
-  // Debug isReadOnly
-  useEffect(() => {
-    console.log('🛠️ ToolbarUI - isReadOnly:', isReadOnly, '| tool:', tool);
-  }, [isReadOnly, tool]);
 
   useEffect(() => {
     const updateHeight = () => setViewportHeight(window.innerHeight);

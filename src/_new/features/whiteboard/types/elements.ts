@@ -42,6 +42,8 @@ export interface DrawingPath {
   width: number;
   widths?: number[];  // grubość dla każdego punktu osobno (pressure-sensitive)
   opacity?: number;   // 0–1, domyślnie 1
+  /** Cache bounding boxa — obliczany raz przy zakończeniu rysowania, nie co klatkę */
+  bbox?: { minX: number; minY: number; maxX: number; maxY: number };
 }
 
 /** Kształt geometryczny (narzędzie: shape) */

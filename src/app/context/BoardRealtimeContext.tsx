@@ -163,6 +163,7 @@ onRemoteCursorMove: (
   
   // 🔥 DODANE [SYNC]
   broadcastSyncRequest: () => Promise<void>;
+  /** Wysyła elementy do targetUserId paczkami po SYNC_CHUNK_SIZE — omija limit 1MB Supabase */
   broadcastSyncResponse: (elements: DrawingElement[], targetUserId: number) => Promise<void>;
   onRemoteSyncRequest: (handler: (userId: number, username: string) => void) => void;
   onRemoteSyncResponse: (handler: (elements: DrawingElement[], userId: number, username: string) => void) => void;
@@ -265,6 +266,11 @@ export function BoardRealtimeProvider({
     VIEWPORT_CHANGE: 200, // Max 5 viewport updates/s
   };
 
+  // Rozmiar paczki sync-response — max ~100 elementów żeby nie przekroczyć 1MB Supabase
+  const SYNC_CHUNK_SIZE = 100;
+  // Odstęp między paczkami (ms) — daje czas Supabase na przepuszczenie poprzedniej
+  const SYNC_CHUNK_DELAY_MS = 80;
+
   // Funkcja do notyfikacji subscriberów o zmianie kursorów
   const notifyCursorSubscribers = useCallback(() => {
     cursorSubscribersRef.current.forEach((callback) => {
@@ -302,9 +308,10 @@ export function BoardRealtimeProvider({
   const cursorMoveHandlerRef = useRef<
     ((x: number, y: number, userId: number, username: string) => void) | null
   >(null);
-// 🔥 DODANE [SYNC] - Pamięć dla handlerów
   const syncRequestHandlerRef = useRef<((userId: number, username: string) => void) | null>(null);
   const syncResponseHandlerRef = useRef<((elements: DrawingElement[], userId: number, username: string) => void) | null>(null);
+  // Bufor składania chunków sync-response od jednego sendera
+  const syncChunkBufferRef = useRef<{ chunks: DrawingElement[][]; totalChunks: number; fromUserId: number } | null>(null);
   // ───────────────────────────────────────────────────────────────────────
   // POŁĄCZENIE Z SUPABASE
   // ───────────────────────────────────────────────────────────────────────
@@ -564,19 +571,52 @@ export function BoardRealtimeProvider({
 
         notifyViewportSubscribers();
       })
-      // 🔥 DODANE [SYNC] - Nasłuchiwanie
       .on('broadcast', { event: 'sync-request' }, ({ payload }) => {
         const { userId, username } = payload as any;
         if (userId === user.id) return;
-        console.log(`📡 [SYNC] Gracz ${username} dołączył i prosi o najświeższy stan tablicy`);
+
+        // Odpowiada tylko "host" — user z najniższym ID spośród obecnych w kanale.
+        // Gwarantuje że tylko jeden user wyśle sync-response, nie wszyscy naraz.
+        const presenceState = channel.presenceState();
+        const onlineIds: number[] = [];
+        Object.values(presenceState).forEach((presences: any) => {
+          presences.forEach((p: any) => {
+            if (p.user_id != null) onlineIds.push(Number(p.user_id));
+          });
+        });
+        const minId = onlineIds.length > 0 ? Math.min(...onlineIds) : user.id;
+        const isHost = user.id === minId;
+
+        if (!isHost) {
+          console.log(`📡 [SYNC] ${username} prosi o sync — nie jestem hostem, pomijam`);
+          return;
+        }
+
+        console.log(`📡 [SYNC] ${username} prosi o sync — jestem hostem, odpowiadam`);
         if (syncRequestHandlerRef.current) syncRequestHandlerRef.current(userId, username);
       })
       .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
-        const { elements, targetUserId, userId, username } = payload as any;
-        // KRYTYCZNE: Odrzucamy odpowiedź, jeśli to nie my o nią prosiliśmy!
-        if (targetUserId !== user.id) return; 
-        console.log(`📥 [SYNC] Otrzymano świeżą pamięć podręczną od gracza ${username}`);
-        if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(elements, userId, username);
+        const { elements, targetUserId, userId, username, chunkIndex = 0, totalChunks = 1 } = payload as any;
+        if (targetUserId !== user.id) return;
+
+        // Składamy paczki — inicjalizuj bufor na pierwszej paczce od danego sendera
+        if (chunkIndex === 0 || syncChunkBufferRef.current?.fromUserId !== userId) {
+          syncChunkBufferRef.current = { chunks: [], totalChunks, fromUserId: userId };
+        }
+
+        const buffer = syncChunkBufferRef.current!;
+        buffer.chunks[chunkIndex] = elements;
+
+        const received = buffer.chunks.filter(Boolean).length;
+        console.log(`📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`);
+
+        if (received >= totalChunks) {
+          // Wszystkie paczki dotarły — połącz i przekaż
+          const allElements = (buffer.chunks as DrawingElement[][]).flat();
+          syncChunkBufferRef.current = null;
+          console.log(`📥 [SYNC] Kompletny stan od ${username}: ${allElements.length} elementów`);
+          if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(allElements, userId, username);
+        }
       });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -931,7 +971,25 @@ export function BoardRealtimeProvider({
 
   const broadcastSyncResponse = useCallback(async (elements: DrawingElement[], targetUserId: number) => {
     if (!user) return;
-    await safeBroadcast('sync-response', { elements, targetUserId, userId: user.id, username: user.username });
+
+    const totalChunks = Math.ceil(elements.length / SYNC_CHUNK_SIZE) || 1;
+
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = elements.slice(i * SYNC_CHUNK_SIZE, (i + 1) * SYNC_CHUNK_SIZE);
+      await safeBroadcast('sync-response', {
+        elements: chunk,
+        targetUserId,
+        userId: user.id,
+        username: user.username,
+        chunkIndex: i,
+        totalChunks,
+      });
+
+      // Pauza między paczkami — nie bombarduj kanału
+      if (i < totalChunks - 1) {
+        await new Promise<void>((resolve) => setTimeout(resolve, SYNC_CHUNK_DELAY_MS));
+      }
+    }
   }, [user, safeBroadcast]);
 
   const onRemoteSyncRequest = useCallback((handler: (userId: number, username: string) => void) => {

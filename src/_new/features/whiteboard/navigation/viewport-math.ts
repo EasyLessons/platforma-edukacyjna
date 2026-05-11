@@ -15,6 +15,7 @@
  */
 
 import { Point, ViewportTransform, MomentumState } from '../types';
+import type { DrawingPath } from '../types';
 
 // ─── STAŁE FIZYKI ────────────────────────────────────────────────────────────
 
@@ -254,4 +255,32 @@ export function isElementInViewport(
   if (topLeft.y > canvasHeight + margin) return false;
 
   return true;
+}
+
+// ─── BOUNDING BOX ŚCIEŻEK ─────────────────────────────────────────────────────
+
+/**
+ * Oblicza bounding box ścieżki i zapisuje wynik w path.bbox.
+ * Wywołuj raz — po zakończeniu rysowania i przy wczytaniu z bazy.
+ * W pętli renderowania używaj path.bbox zamiast przeliczać.
+ */
+export function computePathBbox(
+  path: DrawingPath
+): { minX: number; minY: number; maxX: number; maxY: number } {
+  if (path.points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+
+  let minX = path.points[0].x;
+  let maxX = minX;
+  let minY = path.points[0].y;
+  let maxY = minY;
+
+  for (let i = 1; i < path.points.length; i++) {
+    const p = path.points[i];
+    if (p.x < minX) minX = p.x;
+    else if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    else if (p.y > maxY) maxY = p.y;
+  }
+
+  return { minX, minY, maxX, maxY };
 }

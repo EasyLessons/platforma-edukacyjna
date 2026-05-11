@@ -321,7 +321,6 @@ const handlePointerUp = (e: React.PointerEvent) => {
           finalWidths = sortedIndices.map(i => finalWidths![i]);
         }
 
-        console.log(`🧹 Uproszczono linię: z ${pointsRef.current.length} do ${finalPoints.length} punktów!`);
       }
 
       const finalPath: DrawingPath = {
