@@ -3,19 +3,20 @@
 import { useRef, useEffect } from 'react';
 import { ViewportTransform } from '@/_new/features/whiteboard/types';
 
+interface TouchPointer {
+  id: number;
+  x: number;
+  y: number;
+}
+
 interface UseMultiTouchGesturesProps {
   containerRef: React.RefObject<HTMLDivElement | null>;
   viewportRef: React.RefObject<ViewportTransform>;
   onViewportChange: (viewport: ViewportTransform) => void;
   onGestureStart?: () => void;
   onGestureEnd?: () => void;
-  /** Wołany gdy momentum dobiegnie końca — sygnał do synchronizacji stanu React */
   onMomentumEnd?: () => void;
 }
-
-const MIN_SCALE = 0.1;
-const MAX_SCALE = 5.0;
-const MOMENTUM_FRICTION = 0.88;
 
 export function useMultiTouchGestures({
   containerRef,
@@ -25,195 +26,133 @@ export function useMultiTouchGestures({
   onGestureEnd,
   onMomentumEnd,
 }: UseMultiTouchGesturesProps) {
-  const gestureActiveRef = useRef(false);
-  const momentumRafRef = useRef<number | null>(null);
-
-  // Śledzenie aktywnych pointerów (tylko touch, nie pen/mouse)
-  const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const activePointersRef = useRef<Map<number, TouchPointer>>(new Map());
   const lastCenterRef = useRef<{ x: number; y: number } | null>(null);
   const lastDistanceRef = useRef<number | null>(null);
+  const isGestureActiveRef = useRef(false);
 
-  const stopMomentum = () => {
-    if (momentumRafRef.current !== null) {
-      cancelAnimationFrame(momentumRafRef.current);
-      momentumRafRef.current = null;
-    }
+  const isZoomingRef = useRef(false);
+  const initialDistanceRef = useRef<number | null>(null);
+
+  const ZOOM_START_THRESHOLD = 35;
+  const ZOOM_SMOOTHING = 0.7;
+
+  const getCenter = (pointers: TouchPointer[]): { x: number; y: number } => {
+    const sum = pointers.reduce((acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }), { x: 0, y: 0 });
+    return { x: sum.x / pointers.length, y: sum.y / pointers.length };
   };
 
-  const startGesture = () => {
-    stopMomentum();
-    if (!gestureActiveRef.current) {
-      gestureActiveRef.current = true;
-      onGestureStart?.();
-    }
-  };
-
-  const endGesture = (withMomentum = false) => {
-    if (!withMomentum) onMomentumEnd?.();
-    if (gestureActiveRef.current) {
-      gestureActiveRef.current = false;
-      onGestureEnd?.();
-    }
+  const getDistance = (p1: TouchPointer, p2: TouchPointer): number => {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    return Math.sqrt(dx * dx + dy * dy);
   };
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    const getCenter = (pts: { x: number; y: number }[]) => ({
-      x: pts.reduce((s, p) => s + p.x, 0) / pts.length,
-      y: pts.reduce((s, p) => s + p.y, 0) / pts.length,
-    });
+    const handlePointerMove = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || !activePointersRef.current.has(e.pointerId)) return;
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
 
-    const getDistance = (a: { x: number; y: number }, b: { x: number; y: number }) =>
-      Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+      const pointers = Array.from(activePointersRef.current.values());
+      if (pointers.length >= 2 && isGestureActiveRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const newCenter = getCenter(pointers);
+        const viewport = viewportRef.current;
+        if (!viewport || !lastCenterRef.current || !lastDistanceRef.current) return;
+
+        const currentDistance = getDistance(pointers[0], pointers[1]);
+        let targetScale = viewport.scale;
+
+        if (!isZoomingRef.current && initialDistanceRef.current !== null) {
+          const totalDistChange = Math.abs(currentDistance - initialDistanceRef.current);
+          if (totalDistChange > ZOOM_START_THRESHOLD) {
+            isZoomingRef.current = true;
+            lastDistanceRef.current = currentDistance;
+          }
+        }
+
+        if (isZoomingRef.current) {
+          const ratio = currentDistance / lastDistanceRef.current;
+          const smoothedRatio = 1 + (ratio - 1) * ZOOM_SMOOTHING;
+          targetScale = Math.max(0.1, Math.min(5, viewport.scale * smoothedRatio));
+        }
+
+        const deltaX = newCenter.x - lastCenterRef.current.x;
+        const deltaY = newCenter.y - lastCenterRef.current.y;
+
+        const rect = container.getBoundingClientRect();
+        const centerX = newCenter.x - rect.left;
+        const centerY = newCenter.y - rect.top;
+        const scaleFactor = viewport.scale * 100;
+
+        const worldX = viewport.x + (centerX - rect.width / 2) / scaleFactor;
+        const worldY = viewport.y + (centerY - rect.height / 2) / scaleFactor;
+
+        onViewportChange({
+          scale: targetScale,
+          x: worldX - (centerX - rect.width / 2) / (targetScale * 100) - (deltaX / (targetScale * 100)),
+          y: worldY - (centerY - rect.height / 2) / (targetScale * 100) - (deltaY / (targetScale * 100)),
+        });
+
+        lastCenterRef.current = newCenter;
+        lastDistanceRef.current = currentDistance;
+      }
+    };
 
     const handlePointerDown = (e: PointerEvent) => {
-      // Tylko palce — ignoruj Apple Pencil (pen) i mysz (mouse)
       if (e.pointerType !== 'touch') return;
+      activePointersRef.current.set(e.pointerId, { id: e.pointerId, x: e.clientX, y: e.clientY });
 
-      container.setPointerCapture(e.pointerId);
-      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const pts = Array.from(pointersRef.current.values());
-      if (pts.length >= 2) {
-        startGesture();
-        lastCenterRef.current = getCenter(pts);
-        lastDistanceRef.current = getDistance(pts[0], pts[1]);
-        e.preventDefault();
-      }
-    };
-
-    const handlePointerMove = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-      if (!pointersRef.current.has(e.pointerId)) return;
-
-      pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-
-      const pts = Array.from(pointersRef.current.values());
-      if (pts.length < 2 || !gestureActiveRef.current) return;
-
-      e.preventDefault();
-
-      const [p0, p1] = pts;
-      const newCenter = getCenter(pts);
-      const newDistance = getDistance(p0, p1);
-
-      const prevCenter = lastCenterRef.current!;
-      const prevDistance = lastDistanceRef.current!;
-
-      const viewport = viewportRef.current;
-      const rect = container.getBoundingClientRect();
-
-      // Pan delta w pikselach ekranu
-      const dx = newCenter.x - prevCenter.x;
-      const dy = newCenter.y - prevCenter.y;
-
-      // Zoom: ratio odległości palców (poprawna matematyka, bez smoothing)
-      const distRatio = prevDistance > 0 ? newDistance / prevDistance : 1;
-      const newScale = Math.min(MAX_SCALE, Math.max(MIN_SCALE, viewport.scale * distRatio));
-
-      // Środek gestu względem kontenera
-      const centerX = newCenter.x - rect.left;
-      const centerY = newCenter.y - rect.top;
-
-      // Punkt świata pod środkiem gestu musi pozostać stały
-      const oldScaleFactor = viewport.scale * 100;
-      const newScaleFactor = newScale * 100;
-      const worldX = viewport.x + (centerX - rect.width / 2) / oldScaleFactor;
-      const worldY = viewport.y + (centerY - rect.height / 2) / oldScaleFactor;
-
-      onViewportChange({
-        scale: newScale,
-        // Nowa pozycja: korekta za zoom + korekta za pan (dx/dy w nowej skali)
-        x: worldX - (centerX - rect.width / 2) / newScaleFactor - dx / newScaleFactor,
-        y: worldY - (centerY - rect.height / 2) / newScaleFactor - dy / newScaleFactor,
-      });
-
-      lastCenterRef.current = newCenter;
-      lastDistanceRef.current = newDistance;
-    };
-
-    // Śledzimy prędkość do momentum
-    const velocityRef = { x: 0, y: 0 };
-    const lastMoveTimeRef = { t: 0 };
-
-    const handlePointerMoveVelocity = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
-      const now = performance.now();
-      const dt = now - lastMoveTimeRef.t;
-      if (dt > 0 && dt < 100) {
-        const prev = pointersRef.current.get(e.pointerId);
-        if (prev) {
-          velocityRef.x = (e.clientX - prev.x) / dt;
-          velocityRef.y = (e.clientY - prev.y) / dt;
+      const pointers = Array.from(activePointersRef.current.values());
+      if (pointers.length >= 2) {
+        if (!isGestureActiveRef.current) {
+          isGestureActiveRef.current = true;
+          isZoomingRef.current = false;
+          onGestureStart?.();
         }
+        lastCenterRef.current = getCenter(pointers);
+        const dist = getDistance(pointers[0], pointers[1]);
+        lastDistanceRef.current = dist;
+        initialDistanceRef.current = dist;
+        e.stopPropagation();
       }
-      lastMoveTimeRef.t = now;
     };
 
     const handlePointerUp = (e: PointerEvent) => {
-      if (e.pointerType !== 'touch') return;
+      activePointersRef.current.delete(e.pointerId);
+      const pointers = Array.from(activePointersRef.current.values());
 
-      pointersRef.current.delete(e.pointerId);
-      const pts = Array.from(pointersRef.current.values());
-
-      if (pts.length < 2 && gestureActiveRef.current) {
-        // Koniec gestu — uruchom momentum jeśli była prędkość
-        const speed = Math.sqrt(velocityRef.x ** 2 + velocityRef.y ** 2);
-
-        if (speed > 0.2) {
-          let velX = -velocityRef.x * 12;
-          let velY = -velocityRef.y * 12;
-
-          const tick = () => {
-            velX *= MOMENTUM_FRICTION;
-            velY *= MOMENTUM_FRICTION;
-            if (Math.sqrt(velX ** 2 + velY ** 2) < 0.05) {
-              momentumRafRef.current = null;
-              onMomentumEnd?.();
-              return;
-            }
-            const vp = viewportRef.current;
-            onViewportChange({
-              ...vp,
-              x: vp.x + velX / (vp.scale * 100),
-              y: vp.y + velY / (vp.scale * 100),
-            });
-            momentumRafRef.current = requestAnimationFrame(tick);
-          };
-          momentumRafRef.current = requestAnimationFrame(tick);
-          endGesture(true);
-        } else {
-          endGesture(false);
-        }
-
+      if (pointers.length < 2 && isGestureActiveRef.current) {
+        isGestureActiveRef.current = false;
+        isZoomingRef.current = false;
+        onGestureEnd?.();
+        onMomentumEnd?.();
         lastCenterRef.current = null;
         lastDistanceRef.current = null;
-        velocityRef.x = 0;
-        velocityRef.y = 0;
-      } else if (pts.length >= 2) {
-        // Zmiana liczby palców — reset bazy bez kończenia gestu
-        lastCenterRef.current = getCenter(pts);
-        lastDistanceRef.current = getDistance(pts[0], pts[1]);
+        initialDistanceRef.current = null;
+      } else if (pointers.length >= 2) {
+        lastCenterRef.current = getCenter(pointers);
+        const dist = getDistance(pointers[0], pointers[1]);
+        lastDistanceRef.current = dist;
+        initialDistanceRef.current = dist;
       }
     };
 
-    // capture: true — przechwytujemy przed narzędziami rysowania
-    container.addEventListener('pointerdown', handlePointerDown, { passive: false, capture: true });
-    container.addEventListener('pointermove', handlePointerMoveVelocity, { passive: true, capture: true });
-    window.addEventListener('pointermove', handlePointerMove, { passive: false, capture: true });
+    container.addEventListener('pointerdown', handlePointerDown, { capture: true, passive: false });
+    window.addEventListener('pointermove', handlePointerMove, { capture: true, passive: false });
     window.addEventListener('pointerup', handlePointerUp, { capture: true });
     window.addEventListener('pointercancel', handlePointerUp, { capture: true });
 
     return () => {
       container.removeEventListener('pointerdown', handlePointerDown, { capture: true });
-      container.removeEventListener('pointermove', handlePointerMoveVelocity, { capture: true });
       window.removeEventListener('pointermove', handlePointerMove, { capture: true });
       window.removeEventListener('pointerup', handlePointerUp, { capture: true });
       window.removeEventListener('pointercancel', handlePointerUp, { capture: true });
-      stopMomentum();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [containerRef, onViewportChange, viewportRef, onGestureStart, onGestureEnd, onMomentumEnd]);
 }
