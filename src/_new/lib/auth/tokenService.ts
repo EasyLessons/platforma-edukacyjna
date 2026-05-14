@@ -109,6 +109,11 @@ export async function refreshAccessToken(): Promise<string> {
 export function logoutAndRedirect(): void {
   clearSession();
   if (typeof window !== 'undefined') {
+    // Nie rób redirect jeśli już jesteśmy na /login lub /rejestracja — zapobiega pętli
+    const { pathname } = window.location;
+    if (pathname === '/login' || pathname.startsWith('/rejestracja') || pathname.startsWith('/auth')) {
+      return;
+    }
     window.location.href = '/login';
   }
 }

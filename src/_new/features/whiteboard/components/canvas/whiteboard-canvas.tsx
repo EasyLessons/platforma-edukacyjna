@@ -602,10 +602,6 @@ useMultiTouchGestures({
   // Ref do editingTextId — canvas zawsze ma aktualną wartość bez przechwytywania
   const editingTextIdRef = useRef<string | null>(sel.editingTextId);
 
-  // Cache przeskalowanych obrazów — klucz: `${id}@${roundedScale}`, wartość: OffscreenCanvas.
-  // Eliminuje kosztowne skalowanie dużych obrazów przy każdej klatce renderowania.
-  const imageScaleCacheRef = useRef<Map<string, OffscreenCanvas>>(new Map());
-
   // Wszystkie wartości runtime potrzebne w redrawCanvas trzymamy w jednym stabilnym ref.
   // Dzięki temu useCallback ma puste deps i nigdy nie jest rekreowany — zero zbędnych
   // re-renderów i efektów wynikających ze zmiany referencji funkcji.
@@ -614,7 +610,6 @@ useMultiTouchGestures({
     loadedImages: el.loadedImages,
     spatialIndex: el.spatialIndex,
     viewportRef: vp.viewportRef,
-    imageScaleCache: imageScaleCacheRef,
     handleElementUpdate: null as unknown as (id: string, updates: Partial<DrawingElement>) => void,
   });
 
@@ -639,7 +634,7 @@ useMultiTouchGestures({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { elementsRef, loadedImages, spatialIndex, viewportRef, imageScaleCache, handleElementUpdate: handleElUpdate } = renderStateRef.current;
+    const { elementsRef, loadedImages, spatialIndex, viewportRef, handleElementUpdate: handleElUpdate } = renderStateRef.current;
 
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
@@ -663,42 +658,6 @@ useMultiTouchGestures({
 
     const visibleIds = spatialIndex.query(worldMinX, worldMinY, worldMaxX, worldMaxY);
 
-    // ─── 🖼️ OFFSCREEN IMAGE CACHE — buduj przeskalowane kopie raz per skala ───
-    // Zaokrąglamy skalę do 0.25 żeby nie generować nowego offscreen przy każdej klatce zoom.
-    const scaleKey = Math.round(viewport.scale * 4) / 4;
-    const scaledImagesMap = new Map<string, OffscreenCanvas>();
-    if (typeof OffscreenCanvas !== 'undefined') {
-      const cache = imageScaleCache.current;
-      for (const element of elementsRef.current) {
-        if (element.type !== 'image') continue;
-        if (!visibleIds.has(element.id)) continue;
-        const htmlImg = loadedImages.get(element.id);
-        if (!htmlImg || !htmlImg.complete) continue;
-
-        const cacheKey = `${element.id}@${scaleKey}`;
-        let offscreen = cache.get(cacheKey);
-        if (!offscreen) {
-          // Wyczyść stare wpisy dla tego id przy innej skali
-          for (const k of cache.keys()) {
-            if (k.startsWith(`${element.id}@`)) cache.delete(k);
-          }
-          const imgEl = element as ImageElement;
-          const sw = Math.max(1, Math.round(imgEl.width * scaleKey * 100));
-          const sh = Math.max(1, Math.round(imgEl.height * scaleKey * 100));
-          offscreen = new OffscreenCanvas(sw, sh);
-          const offCtx = offscreen.getContext('2d');
-          offCtx?.drawImage(htmlImg, 0, 0, sw, sh);
-          cache.set(cacheKey, offscreen);
-        }
-        scaledImagesMap.set(element.id, offscreen);
-      }
-    }
-
-    // Jeśli OffscreenCanvas niedostępny (np. Safari < 16.4), używamy loadedImages bezpośrednio
-    const effectiveImages = scaledImagesMap.size > 0
-      ? new Map<string, HTMLImageElement | OffscreenCanvas>([...loadedImages, ...scaledImagesMap])
-      : loadedImages as Map<string, HTMLImageElement | OffscreenCanvas>;
-
     for (const element of elementsRef.current) {
       if (!visibleIds.has(element.id)) continue;
       if (element.type === 'markdown') continue;
@@ -715,7 +674,7 @@ useMultiTouchGestures({
         }, 0);
       };
 
-      drawElement(ctx, element, viewport, width, height, effectiveImages as Map<string, HTMLImageElement>, false, onAutoExpand, elementsRef.current);
+      drawElement(ctx, element, viewport, width, height, loadedImages, false, onAutoExpand, elementsRef.current);
     }
 
     // Overlay transform — synchronicznie z canvasem, zero lagu przy pan/zoom

@@ -106,9 +106,10 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch {
-        // Refresh nie powiódł się - wyloguj
+        // Refresh nie powiódł się - wyloguj i przerwij łańcuch (nie propaguj błędu dalej)
         clearSession();
         logoutAndRedirect();
+        return new Promise(() => {}); // zawieś promise — redirect jest w toku
       }
     }
 
