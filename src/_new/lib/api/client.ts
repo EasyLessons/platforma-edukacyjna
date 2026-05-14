@@ -59,8 +59,9 @@ apiClient.interceptors.request.use(
 
 // RESPONSE INTERCEPTOR
 
-// Jeden współdzielony promise refresh — równoczesne 401 czekają na ten sam wynik
-let refreshPromise: Promise<string> | null = null;
+// Flaga modułowa — blokuje ponowny refresh gdy jeden już trwa lub właśnie się skończył.
+// Działa jako mutex: ponowiony request po refresh też dostaje 401? flaga=true → nie próbuj znowu.
+let isHandling401 = false;
 
 apiClient.interceptors.response.use(
   // Success: rozpakuj ApiResponse<T> -> T
@@ -85,31 +86,26 @@ apiClient.interceptors.response.use(
 
     // 401/403 - próba odświeżenia tokenu (403 gdy brak headera Authorization)
     const isAuthError = status === 401 || (status === 403 && error?.response?.data?.detail === 'Not authenticated');
-    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
 
-    if (isAuthError && !originalRequest._retried) {
-      originalRequest._retried = true;
-
+    if (isAuthError && !isHandling401) {
+      isHandling401 = true;
       try {
-        // Jeśli refresh już trwa — dołącz do istniejącego promise zamiast tworzyć nowy
-        if (!refreshPromise) {
-          refreshPromise = refreshAccessToken().finally(() => {
-            refreshPromise = null;
-          });
-        }
-        const newToken = await refreshPromise;
+        const newToken = await refreshAccessToken();
         setAccessToken(newToken);
 
+        const originalRequest = error.config as AxiosRequestConfig;
         if (originalRequest.headers) {
           (originalRequest.headers as Record<string, string>)['Authorization'] =
             `Bearer ${newToken}`;
         }
         return apiClient(originalRequest);
       } catch {
-        // Refresh nie powiódł się - wyloguj i przerwij łańcuch (nie propaguj błędu dalej)
+        // Refresh nie powiódł się — wyloguj i zawieś promise (redirect jest w toku)
         clearSession();
         logoutAndRedirect();
-        return new Promise(() => {}); // zawieś promise — redirect jest w toku
+        return new Promise(() => {});
+      } finally {
+        isHandling401 = false;
       }
     }
 
