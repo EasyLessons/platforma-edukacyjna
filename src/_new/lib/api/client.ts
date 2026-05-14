@@ -90,7 +90,11 @@ apiClient.interceptors.response.use(
 
     const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
 
-    if (isAuthError && !originalRequest._retried) {
+    // Na endpointach auth (login, register) 401 zawsze znaczy złe dane — nie próbuj refresha
+    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+      originalRequest.url?.includes('/auth/register');
+
+    if (isAuthError && !originalRequest._retried && !isAuthEndpoint) {
       originalRequest._retried = true;
 
       try {
@@ -111,9 +115,14 @@ apiClient.interceptors.response.use(
         }
         return apiClient(originalRequest);
       } catch {
-        // Refresh nie powiódł się — wyloguj i zawieś promise (redirect jest w toku)
+        // Refresh nie powiódł się — wyloguj
         clearSession();
         logoutAndRedirect();
+        // Gdy logoutAndRedirect nie przekieruje (jesteśmy już na /login),
+        // przepuść oryginalny błąd żeby UI mogło go wyświetlić
+        if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+          return Promise.reject(mapAxiosError(error));
+        }
         return new Promise(() => {});
       }
     }

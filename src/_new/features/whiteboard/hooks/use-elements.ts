@@ -26,6 +26,7 @@ import {
 import type { DrawingElement, ImageElement } from '../types';
 import { BoardElementWithAuthor } from '../api/whiteboardApi';
 import { ElementSpatialIndex } from '../navigation/spatial-index';
+import { getAccessToken } from '@/_new/lib/auth/tokenStore';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ function toMap(elements: DrawingElement[]): Map<string, DrawingElement> {
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
-const SAVE_DEBOUNCE_MS = 2000;
+const SAVE_DEBOUNCE_MS = 800;
 
 export function useElements({ boardId }: UseElementsOptions): UseElementsReturn {
   const [elements, setElements] = useState<DrawingElement[]>([]);
@@ -222,58 +223,114 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     load();
   }, [boardId, applyElements]);
 
-  // ─── Debounced save ────────────────────────────────────────────────────
-  const idleCallbackRef = useRef<number | null>(null);
+  // ─── Core save logic ──────────────────────────────────────────────────
+  const boardIdRef = useRef<string>(boardId);
+  useEffect(() => { boardIdRef.current = boardId; }, [boardId]);
 
+  const doSave = useCallback(async (boardIdNum: number) => {
+    if (isSavingRef.current || unsavedElementsRef.current.size === 0) return;
+
+    const toSave: DrawingElement[] = [];
+    for (const id of unsavedElementsRef.current) {
+      const el = elementsMapRef.current.get(id);
+      if (el) toSave.push(el);
+    }
+    if (toSave.length === 0) return;
+
+    setIsSaving(true);
+    isSavingRef.current = true;
+
+    try {
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+        const chunk = toSave.slice(i, i + BATCH_SIZE);
+        await saveBoardElementsBatch(boardIdNum, toSaveFormat(chunk));
+      }
+
+      const savedIds = new Set(toSave.map((e) => e.id));
+      setUnsavedElements((prev) => {
+        const next = new Set(prev);
+        savedIds.forEach((id) => next.delete(id));
+        return next;
+      });
+    } catch (err) {
+      console.error('Błąd zapisu:', err);
+    } finally {
+      setIsSaving(false);
+      isSavingRef.current = false;
+    }
+  }, []);
+
+  // ─── Debounced save ────────────────────────────────────────────────────
   const debouncedSave = useCallback((boardIdStr: string) => {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
     saveTimeoutRef.current = setTimeout(() => {
       const boardIdNum = parseInt(boardIdStr);
       if (isNaN(boardIdNum)) return;
-      if (isSavingRef.current || unsavedElementsRef.current.size === 0) return;
-
-      const doSave = async () => {
-        try {
-          setIsSaving(true);
-          isSavingRef.current = true;
-
-          // O(1) lookup per element zamiast filter() przez całą tablicę
-          const toSave: DrawingElement[] = [];
-          for (const id of unsavedElementsRef.current) {
-            const el = elementsMapRef.current.get(id);
-            if (el) toSave.push(el);
-          }
-          if (toSave.length === 0) return;
-
-          const BATCH_SIZE = 100;
-          for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
-            const chunk = toSave.slice(i, i + BATCH_SIZE);
-            await saveBoardElementsBatch(boardIdNum, toSaveFormat(chunk));
-          }
-
-          const savedIds = new Set(toSave.map((e) => e.id));
-          setUnsavedElements((prev) => {
-            const next = new Set(prev);
-            savedIds.forEach((id) => next.delete(id));
-            return next;
-          });
-        } catch (err) {
-          console.error('Błąd zapisu:', err);
-        } finally {
-          setIsSaving(false);
-          isSavingRef.current = false;
-        }
-      };
-
-      // Odpal zapis gdy przeglądarka jest idle — nie blokuje animacji rysowania
-      if (typeof requestIdleCallback !== 'undefined') {
-        if (idleCallbackRef.current) cancelIdleCallback(idleCallbackRef.current);
-        idleCallbackRef.current = requestIdleCallback(() => doSave(), { timeout: 5000 });
-      } else {
-        doSave();
-      }
+      doSave(boardIdNum);
     }, SAVE_DEBOUNCE_MS);
+  }, [doSave]);
+
+  // ─── Wymuś zapis przy opuszczaniu strony ──────────────────────────────
+  useEffect(() => {
+    const flushSave = () => {
+      const boardIdNum = parseInt(boardIdRef.current);
+      if (isNaN(boardIdNum) || unsavedElementsRef.current.size === 0) return;
+
+      const toSave: DrawingElement[] = [];
+      for (const id of unsavedElementsRef.current) {
+        const el = elementsMapRef.current.get(id);
+        if (el) toSave.push(el);
+      }
+      if (toSave.length === 0) return;
+
+      const token = getAccessToken();
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      // fetch z keepalive=true działa nawet gdy strona jest zamykana i wysyła auth header
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < toSave.length; i += BATCH_SIZE) {
+        const chunk = toSave.slice(i, i + BATCH_SIZE);
+        const url = `${process.env.NEXT_PUBLIC_API_URL ?? ''}/api/v1/whiteboard/${boardIdNum}/elements/batch`;
+        fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(toSaveFormat(chunk)),
+          keepalive: true,
+        }).catch(() => undefined);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        // Anuluj debounce i zapisz od razu
+        if (saveTimeoutRef.current) {
+          clearTimeout(saveTimeoutRef.current);
+          saveTimeoutRef.current = null;
+        }
+        flushSave();
+      }
+    };
+
+    const handleBeforeUnload = () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+      flushSave();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('pagehide', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('pagehide', handleBeforeUnload);
+    };
   }, []);
 
   // ─── Mutatory ──────────────────────────────────────────────────────────

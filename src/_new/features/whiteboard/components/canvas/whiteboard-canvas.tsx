@@ -770,6 +770,13 @@ useMultiTouchGestures({
       const rect = container.getBoundingClientRect();
       const w = Math.ceil(rect.width);
       const h = Math.ceil(rect.height);
+
+      // Guard: nie aktualizuj jeśli rozmiar się nie zmienił — na DPR=2 subpikselowe
+      // oscylacje rect mogą triggerować ResizeObserver w kółko i powodować pętlę re-renderów
+      const prevW = canvas.width / dpr;
+      const prevH = canvas.height / dpr;
+      if (w === prevW && h === prevH) return;
+
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       canvas.style.width = `${w}px`;
