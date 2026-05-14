@@ -59,9 +59,9 @@ apiClient.interceptors.request.use(
 
 // RESPONSE INTERCEPTOR
 
-// Flaga modułowa — blokuje ponowny refresh gdy jeden już trwa lub właśnie się skończył.
-// Działa jako mutex: ponowiony request po refresh też dostaje 401? flaga=true → nie próbuj znowu.
-let isHandling401 = false;
+// Współdzielony promise refresha — równoczesne 401 dołączają do tego samego refresh
+// zamiast być odrzucane. null = refresh nie trwa.
+let refreshPromise: Promise<string> | null = null;
 
 apiClient.interceptors.response.use(
   // Success: rozpakuj ApiResponse<T> -> T
@@ -84,16 +84,27 @@ apiClient.interceptors.response.use(
   async (error) => {
     const status = error?.response?.status;
 
-    // 401/403 - próba odświeżenia tokenu (403 gdy brak headera Authorization)
-    const isAuthError = status === 401 || (status === 403 && error?.response?.data?.detail === 'Not authenticated');
+    const isAuthError =
+      status === 401 ||
+      (status === 403 && error?.response?.data?.detail === 'Not authenticated');
 
-    if (isAuthError && !isHandling401) {
-      isHandling401 = true;
+    const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
+
+    if (isAuthError && !originalRequest._retried) {
+      originalRequest._retried = true;
+
       try {
-        const newToken = await refreshAccessToken();
+        // Jeśli refresh już trwa — dołącz do niego zamiast tworzyć nowy.
+        // Wszystkie równoczesne 401 (np. /me, /join, /elements przy starcie tablicy)
+        // dostaną ten sam nowy token i ponowią swoje requesty.
+        if (!refreshPromise) {
+          refreshPromise = refreshAccessToken().finally(() => {
+            refreshPromise = null;
+          });
+        }
+        const newToken = await refreshPromise;
         setAccessToken(newToken);
 
-        const originalRequest = error.config as AxiosRequestConfig;
         if (originalRequest.headers) {
           (originalRequest.headers as Record<string, string>)['Authorization'] =
             `Bearer ${newToken}`;
@@ -104,8 +115,6 @@ apiClient.interceptors.response.use(
         clearSession();
         logoutAndRedirect();
         return new Promise(() => {});
-      } finally {
-        isHandling401 = false;
       }
     }
 
