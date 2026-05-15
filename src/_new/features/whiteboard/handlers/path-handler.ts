@@ -39,24 +39,21 @@ export const PathHandler: ElementHandler<DrawingPath> = {
       x: pivotX + (p.x - pivotX) * scaleX,
       y: pivotY + (p.y - pivotY) * scaleY,
     }));
-    return { points: newPoints };
+    return { points: newPoints, bbox: undefined };
   },
 
   move(el, dx, dy) {
-    return { points: el.points.map((p: Point) => ({ x: p.x + dx, y: p.y + dy })) };
+    return { points: el.points.map((p: Point) => ({ x: p.x + dx, y: p.y + dy })), bbox: undefined };
   },
 
   rotate(el, _rotationAngle, pivot, cos, sin) {
-    // Znajdź środek ścieżki
     const xs = el.points.map((p: Point) => p.x);
     const ys = el.points.map((p: Point) => p.y);
     const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
     const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
 
-    // Obróć środek wokół pivota zaznaczenia
     const newCenter = rotateAroundPivot({ x: centerX, y: centerY }, pivot, cos, sin);
 
-    // Obróć każdy punkt wokół własnego środka ścieżki
     const rotatedPoints = el.points.map((p: Point) =>
       rotateAroundPivot(p, { x: centerX, y: centerY }, cos, sin),
     );
@@ -66,6 +63,7 @@ export const PathHandler: ElementHandler<DrawingPath> = {
 
     return {
       points: rotatedPoints.map((p) => ({ x: p.x + offsetX, y: p.y + offsetY })),
+      bbox: undefined,
     };
   },
 

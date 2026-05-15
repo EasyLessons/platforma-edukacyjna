@@ -61,7 +61,7 @@ function generateId(): string {
 export function offsetElement(el: DrawingElement, dx: number, dy: number): DrawingElement {
   switch (el.type) {
     case 'path':
-      return { ...el, id: generateId(), points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })) } as DrawingPath;
+      return { ...el, id: generateId(), points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), bbox: undefined } as DrawingPath;
     case 'shape':
       return { ...el, id: generateId(), startX: el.startX + dx, startY: el.startY + dy, endX: el.endX + dx, endY: el.endY + dy } as Shape;
     case 'text':
