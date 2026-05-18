@@ -2230,7 +2230,7 @@ useMultiTouchGestures({
               onElementsUpdate={handleElementsUpdate}
               onOperationFinish={handleSelectionFinish}
               onTextEdit={handleTextEdit}
-              onMarkdownEdit={sel.setEditingMarkdownId}
+              onMarkdownEdit={handleMarkdownEditStart}
               onViewportChange={handleViewportChange}
               onActiveGuidesChange={setActiveGuides}
               onDeleteSelected={deleteSelectedElements}

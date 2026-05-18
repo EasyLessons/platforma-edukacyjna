@@ -81,11 +81,13 @@ export interface RemoteCursor {
 
 /**
  * 🆕 Użytkownik który obecnie edytuje element
+ * lastSeen: timestamp (ms) ostatniego typing-started — używany do auto-cleanup
  */
 export interface TypingUser {
   userId: number;
   username: string;
   elementId: string;
+  lastSeen: number;
 }
 
 /**
@@ -237,6 +239,7 @@ export function BoardRealtimeProvider({
   const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
   const presenceSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const presenceHeartbeatRef = useRef<NodeJS.Timeout | null>(null);
+  const typingCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttemptRef = useRef<number>(0);
 
   const { user } = useAuth();
@@ -426,12 +429,23 @@ export function BoardRealtimeProvider({
 
         if (realLeftUsers.length > 0) {
           log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
-          // Usuń kursory tylko naprawdę wychodzących użytkowników
           const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
+
+          // Usuń kursory wychodzących użytkowników
           remoteCursorsRef.current = remoteCursorsRef.current.filter(
             (c) => !leftUserIds.includes(c.userId)
           );
           notifyCursorSubscribers();
+
+          // Usuń wskaźniki pisania wychodzących użytkowników
+          // (typing-stopped nigdy nie dotrze jeśli ktoś zamknął kartę)
+          const beforeTyping = typingUsersRef.current.length;
+          typingUsersRef.current = typingUsersRef.current.filter(
+            (t) => !leftUserIds.includes(t.userId)
+          );
+          if (typingUsersRef.current.length !== beforeTyping) {
+            notifyTypingSubscribers();
+          }
         }
       });
 
@@ -526,15 +540,26 @@ export function BoardRealtimeProvider({
 
         if (userId === user.id) return;
 
-        // Dodaj do listy (jeśli jeszcze nie ma)
-        const exists = typingUsersRef.current.some(
+        const now = Date.now();
+        const existingIndex = typingUsersRef.current.findIndex(
           (t) => t.userId === userId && t.elementId === elementId
         );
-        if (!exists) {
-          typingUsersRef.current = [...typingUsersRef.current, { userId, username, elementId }];
-          log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current);
-          notifyTypingSubscribers();
+
+        if (existingIndex === -1) {
+          // Nowy wpis — dodaj z aktualnym timestampem
+          typingUsersRef.current = [
+            ...typingUsersRef.current,
+            { userId, username, elementId, lastSeen: now },
+          ];
+        } else {
+          // Już istnieje — odśwież lastSeen żeby timer nie usunął aktywnego użytkownika
+          typingUsersRef.current = typingUsersRef.current.map((t, i) =>
+            i === existingIndex ? { ...t, lastSeen: now } : t
+          );
         }
+
+        log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current);
+        notifyTypingSubscribers();
       })
       // 🆕 TYPING INDICATOR - ktoś skończył edytować
       .on('broadcast', { event: 'typing-stopped' }, ({ payload }) => {
@@ -712,6 +737,24 @@ export function BoardRealtimeProvider({
     channelRef.current = channel;
 
     // ═══════════════════════════════════════════════════════════════════════
+    // ⏰ AUTO-CLEANUP WSKAŹNIKÓW PISANIA
+    // ═══════════════════════════════════════════════════════════════════════
+    // Co 5 sekund usuwa wpisy starsze niż 10 sekund.
+    // Zabezpiecza przed "duchami" gdy użytkownik rozłączy się bez typing-stopped.
+    const TYPING_TIMEOUT_MS = 10_000;
+    typingCleanupIntervalRef.current = setInterval(() => {
+      const now = Date.now();
+      const before = typingUsersRef.current.length;
+      typingUsersRef.current = typingUsersRef.current.filter(
+        (t) => now - t.lastSeen < TYPING_TIMEOUT_MS
+      );
+      if (typingUsersRef.current.length !== before) {
+        log(`✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`);
+        notifyTypingSubscribers();
+      }
+    }, 5_000);
+
+    // ═══════════════════════════════════════════════════════════════════════
     // ⏰ CLEANUP NIEAKTYWNYCH KURSORÓW - WYŁĄCZONY
     // ═══════════════════════════════════════════════════════════════════════
     // Kursory są czyszczone tylko gdy użytkownik opuści tablicę (presence.leave)
@@ -739,12 +782,14 @@ export function BoardRealtimeProvider({
       if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
       if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
+      if (typingCleanupIntervalRef.current) clearInterval(typingCleanupIntervalRef.current);
       channel.unsubscribe();
       channelRef.current = null;
       isSubscribedRef.current = false;
       currentBoardIdRef.current = null;
       setIsConnected(false);
       remoteCursorsRef.current = [];
+      typingUsersRef.current = [];
       previousUsersRef.current = new Map();
       reconnectAttemptRef.current = 0;
       pendingElementUpdateRef.current = null;
