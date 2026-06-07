@@ -29,6 +29,54 @@ npm run dev
 
 
 # ================================================
+#   DOCKER — uruchamianie całego projektu
+# ================================================
+#
+#   Kiedy używać Dockera?
+#   → Na prezentacjach / pokazach (jedno polecenie, wszystko działa)
+#   → Gdy chcesz sprawdzić czy projekt działa "od zera" na czystej maszynie
+#   → Gdy prowadzący chce uruchomić projekt u siebie bez konfiguracji środowiska
+#
+#   Kiedy NIE musisz używać Dockera (codzienna praca)?
+#   → Przy normalnym developmencie lepiej zostać przy npm run dev + uvicorn
+#     bo są szybsze, hot-reload działa tak samo, i nie musisz czekać na build
+#
+
+# Pierwsze uruchomienie (buduje obrazy, zajmuje ~2-3 min)
+docker compose up --build
+
+# Kolejne uruchomienia (bez przebudowy, szybkie)
+docker compose up
+
+# Uruchomienie w tle (terminal wraca do dyspozycji)
+docker compose up -d
+
+# Podejrzenie logów gdy działa w tle
+docker compose logs -f
+docker compose logs -f frontend
+docker compose logs -f backend
+
+# Zatrzymanie
+docker compose down
+
+# Zatrzymanie + usunięcie wolumenów (czyste środowisko od zera)
+docker compose down -v
+
+# Przebuduj tylko jeden serwis (np. po zmianie requirements.txt lub package.json)
+docker compose build backend
+docker compose build frontend
+
+# Po uruchomieniu dostępne pod:
+#   Frontend:      http://localhost:3000
+#   Backend API:   http://localhost:8000
+#   Swagger docs:  http://localhost:8000/docs
+
+# UWAGA: Jeśli zmieniasz tylko kod (pliki .py, .ts, .tsx) — nie musisz rebuild.
+# Docker ma zamontowane foldery jako volumeny, więc --reload działa automatycznie.
+# Przebudowy wymagają tylko zmiany zależności (requirements.txt / package.json).
+
+
+# ================================================
 #   GIT — BRANCHE
 # ================================================
 
