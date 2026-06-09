@@ -16,6 +16,8 @@
 
 import { useState, useRef, useCallback } from 'react';
 import type { DrawingElement, UserAction } from '../types';
+import type { Command, CommandContext } from '../commands';
+import { commandFromUserAction } from '../commands';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -94,17 +96,33 @@ export function useHistory({
   const [historyIndex, setHistoryIndex] = useState(0);
   const historyIndexRef = useRef(0);
 
-  // Nowy system — stos akcji tylko bieżącego użytkownika
-  const userUndoStackRef = useRef<UserAction[]>([]);
-  const userRedoStackRef = useRef<UserAction[]>([]);
+  // Nowy system — stos KOMEND tylko bieżącego użytkownika (wzorzec Command).
+  // Każda komenda umie się wykonać (do) i cofnąć (undo) — undo/redo nie mają
+  // już ani jednego if/else po typie akcji.
+  const userUndoStackRef = useRef<Command[]>([]);
+  const userRedoStackRef = useRef<Command[]>([]);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
 
-  // ─── Pomocnik: parsuj boardId ───────────────────────────────────────────
-  const getBoardIdNum = useCallback((): number | null => {
-    const id = parseInt(boardIdRef.current ?? '');
-    return isNaN(id) ? null : id;
-  }, [boardIdRef]);
+  // ─── Kontekst komend ─────────────────────────────────────────────────────
+  // Opakowuje callbacki tego hooka w CommandContext. To jedyne miejsce, gdzie
+  // komendy stykają się z realnymi efektami (stan React, broadcast, baza).
+  const getContext = useCallback((): CommandContext => ({
+    addElement: onAddElement,
+    removeElement: onRemoveElement,
+    updateElement: onUpdateElement,
+    broadcastCreated: onBroadcastCreated,
+    broadcastDeleted: onBroadcastDeleted,
+    broadcastUpdated: onBroadcastUpdated,
+    saveElement: onSaveElement,
+    deleteElement: onDeleteElement,
+    boardIdRef,
+    unsavedElementsRef,
+  }), [
+    onAddElement, onRemoveElement, onUpdateElement,
+    onBroadcastCreated, onBroadcastDeleted, onBroadcastUpdated,
+    onSaveElement, onDeleteElement, boardIdRef, unsavedElementsRef,
+  ]);
 
   // ─── Zapisz snapshot stanu ──────────────────────────────────────────────
   const saveToHistory = useCallback((newElements: DrawingElement[]) => {
@@ -126,10 +144,13 @@ export function useHistory({
     });
   }, []);
 
-  // ─── Zarejestruj akcję użytkownika (po create/delete) ───────────────────
+  // ─── Zarejestruj akcję użytkownika (po create/delete/update) ────────────
+  // Sygnatura pozostaje (action: UserAction) — wywołania w whiteboard-canvas
+  // i use-clipboard działają bez zmian. Wewnętrznie akcja jest tłumaczona na
+  // Command przez adapter zgodności wstecznej. pushUserAction TYLKO rejestruje
+  // komendę (nie woła do()) — pierwsze wykonanie robią handlery w canvasie.
   const pushUserAction = useCallback((action: UserAction) => {
-    const newStack = [...userUndoStackRef.current, action];
-    userUndoStackRef.current = newStack;
+    userUndoStackRef.current = [...userUndoStackRef.current, commandFromUserAction(action)];
     // Każda nowa akcja czyści redo stack
     userRedoStackRef.current = [];
     setCanUndo(true);
@@ -137,86 +158,38 @@ export function useHistory({
   }, []);
 
   // ─── Undo ───────────────────────────────────────────────────────────────
+  // Zdejmij ostatnią komendę z undo-stacku, cofnij ją i przełóż na redo-stack.
   const undo = useCallback(() => {
     const undoStack = userUndoStackRef.current;
     if (undoStack.length === 0) return;
 
-    const lastAction = undoStack[undoStack.length - 1];
-    const newUndoStack = undoStack.slice(0, -1);
-    userUndoStackRef.current = newUndoStack;
+    const lastCommand = undoStack[undoStack.length - 1];
+    userUndoStackRef.current = undoStack.slice(0, -1);
+    userRedoStackRef.current = [...userRedoStackRef.current, lastCommand];
 
-    const newRedoStack = [...userRedoStackRef.current, lastAction];
-    userRedoStackRef.current = newRedoStack;
-
-    setCanUndo(newUndoStack.length > 0);
+    setCanUndo(userUndoStackRef.current.length > 0);
     setCanRedo(true);
 
-    const boardId = getBoardIdNum();
-
-    const applyUndo = (action: UserAction) => {
-      if (action.type === 'create') {
-        onRemoveElement(action.element.id);
-        onBroadcastDeleted(action.element.id);
-        if (boardId && !unsavedElementsRef.current?.has(action.element.id)) {
-          onDeleteElement(boardId, action.element.id).catch(console.error);
-        }
-      } else if (action.type === 'delete') {
-        onAddElement(action.element);
-        onBroadcastCreated(action.element);
-        if (boardId) onSaveElement(boardId, action.element).catch(console.error);
-      } else if (action.type === 'update') {
-        onUpdateElement(action.before);
-        onBroadcastUpdated(action.before);
-        if (boardId) onSaveElement(boardId, action.before).catch(console.error);
-      } else if (action.type === 'batch') {
-        [...action.actions].reverse().forEach(applyUndo);
-      }
-    };
-
-    applyUndo(lastAction);
+    lastCommand.undo(getContext());
     onClearSelection();
-  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onBroadcastUpdated, onRemoveElement, onAddElement, onUpdateElement, onClearSelection, unsavedElementsRef]);
+  }, [getContext, onClearSelection]);
 
   // ─── Redo ───────────────────────────────────────────────────────────────
+  // Zdejmij ostatnią komendę z redo-stacku, wykonaj ją i przełóż na undo-stack.
   const redo = useCallback(() => {
     const redoStack = userRedoStackRef.current;
     if (redoStack.length === 0) return;
 
-    const lastAction = redoStack[redoStack.length - 1];
-    const newRedoStack = redoStack.slice(0, -1);
-    userRedoStackRef.current = newRedoStack;
-
-    const newUndoStack = [...userUndoStackRef.current, lastAction];
-    userUndoStackRef.current = newUndoStack;
+    const lastCommand = redoStack[redoStack.length - 1];
+    userRedoStackRef.current = redoStack.slice(0, -1);
+    userUndoStackRef.current = [...userUndoStackRef.current, lastCommand];
 
     setCanUndo(true);
-    setCanRedo(newRedoStack.length > 0);
+    setCanRedo(userRedoStackRef.current.length > 0);
 
-    const boardId = getBoardIdNum();
-
-    const applyRedo = (action: UserAction) => {
-      if (action.type === 'create') {
-        onAddElement(action.element);
-        onBroadcastCreated(action.element);
-        if (boardId) onSaveElement(boardId, action.element).catch(console.error);
-      } else if (action.type === 'delete') {
-        onRemoveElement(action.element.id);
-        onBroadcastDeleted(action.element.id);
-        if (boardId && !unsavedElementsRef.current?.has(action.element.id)) {
-          onDeleteElement(boardId, action.element.id).catch(console.error);
-        }
-      } else if (action.type === 'update') {
-        onUpdateElement(action.after);
-        onBroadcastUpdated(action.after);
-        if (boardId) onSaveElement(boardId, action.after).catch(console.error);
-      } else if (action.type === 'batch') {
-        action.actions.forEach(applyRedo);
-      }
-    };
-
-    applyRedo(lastAction);
+    lastCommand.do(getContext());
     onClearSelection();
-  }, [getBoardIdNum, onDeleteElement, onSaveElement, onBroadcastCreated, onBroadcastDeleted, onBroadcastUpdated, onRemoveElement, onAddElement, onUpdateElement, onClearSelection, unsavedElementsRef]);
+  }, [getContext, onClearSelection]);
 
   return {
     saveToHistory,
