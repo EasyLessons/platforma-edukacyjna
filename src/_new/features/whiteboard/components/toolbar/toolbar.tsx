@@ -34,14 +34,12 @@
 import React, { useState, memo } from 'react';
 import { ToolbarUI } from './toolbar-ui';
 import { ZoomControls } from './zoom-controls';
-import type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
+import type { ShapeType } from '@/_new/features/whiteboard/types';
 
 // Re-eksportujemy żeby stare importy z './toolbar/Toolbar' nadal działały
 export type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
 
 interface ToolbarProps {
-  tool: Tool;
-  setTool: (tool: Tool) => void;
   selectedShape: ShapeType;
   setSelectedShape: (shape: ShapeType) => void;
   polygonSides: number;
@@ -82,8 +80,6 @@ interface ToolbarProps {
 }
 
 function Toolbar({
-  tool,
-  setTool,
   selectedShape,
   setSelectedShape,
   polygonSides,
@@ -124,7 +120,6 @@ function Toolbar({
       }}
     >
       <ToolbarUI
-        tool={tool}
         selectedShape={selectedShape}
         polygonSides={polygonSides}
         color={color}
@@ -134,7 +129,6 @@ function Toolbar({
         canUndo={canUndo}
         canRedo={canRedo}
         hasSelection={hasSelection}
-        onToolChange={setTool}
         onShapeChange={setSelectedShape}
         onPolygonSidesChange={setPolygonSides}
         onColorChange={setColor}
@@ -161,7 +155,6 @@ function Toolbar({
 
 const arePropsEqual = (prevProps: ToolbarProps, nextProps: ToolbarProps) => {
   return (
-    prevProps.tool === nextProps.tool &&
     prevProps.selectedShape === nextProps.selectedShape &&
     prevProps.polygonSides === nextProps.polygonSides &&
     prevProps.color === nextProps.color &&

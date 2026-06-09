@@ -28,7 +28,7 @@
 
 'use client';
 
-import { useRef, useCallback, useEffect, useState } from 'react';
+import { useRef, useCallback, useEffect, useState, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 
 // ─── Nowe hooki ───────────────────────────────────────────────────────────────
@@ -42,17 +42,11 @@ import { useRealtime } from '../../hooks/use-realtime';
 // ─── Komponenty narzędzi (przez re-exportery _new/) ──────────────────────────
 import Toolbar from '../toolbar/toolbar';
 import { ZoomControls } from '../toolbar/zoom-controls';
-import { TextTool } from '../toolbar/text-tool';
-import { SelectTool } from '../toolbar/select-tool';
-import { PenTool } from '../toolbar/pen-tool';
-import { ShapeTool } from '../toolbar/shape-tool';
-import { PanTool } from '../toolbar/pan-tool';
-import { FunctionTool } from '../toolbar/function-tool';
-import { ImageTool, ImageToolRef } from '../toolbar/image-tool';
-import { EraserTool } from '../toolbar/eraser-tool';
-import { MarkdownNoteTool, MarkdownNoteView } from '../toolbar/markdown-note-tool';
-import { TableTool } from '../toolbar/table-tool';
-import { ArrowTool } from '../toolbar/arrow-tool';
+// Komponenty narzędzi są teraz renderowane przez rejestr (tools/*.tool.tsx),
+// nie bezpośrednio w canvasie. Zostają tylko: typ refa ImageTool oraz widok
+// notatki Markdown (overlay HTML renderowany poza systemem narzędzi).
+import type { ImageToolRef } from '../toolbar/image-tool';
+import { MarkdownNoteView } from '../toolbar/markdown-note-tool';
 import { CalculatorTool } from '../toolbar/calculator-tool';
 import { ActivityHistory } from '../toolbar/activity-history';
 import { OnlineUsers } from './online-users';
@@ -102,7 +96,6 @@ import type {
   ArrowElement,
   ViewportTransform,
 } from '../../types';
-import type { Tool } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
 
@@ -112,11 +105,16 @@ import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 // ─── Gesty multi-touch (pan + zoom) ───────────────────────────────────────────────
 import { useMultiTouchGestures } from '../../hooks/use-multi-touch-gestures';
 
-// ─── Store właściwości narzędzi (zustand) ─────────────────────────────────────────
-import { useToolProperties } from '../../stores/tool-properties-store';
+// ─── Store narzędzi (zustand) ─────────────────────────────────────────────────────
+import { useToolStore } from '../../stores/tool-store';
 
 // ─── Silnik tablicy (WhiteboardEngine) ────────────────────────────────────────────
 import { useWhiteboardEngine } from '../../engine/use-whiteboard-engine';
+
+// ─── Rejestr narzędzi (wtyczki) ───────────────────────────────────────────────────
+import { ToolHostProvider, type ToolHostContextValue } from '../../tools/tool-host-context';
+import { ActiveToolOverlay } from '../../tools/active-tool-overlay';
+import { getTool, TOOL_SHORTCUTS } from '../../tools/registry';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -187,26 +185,23 @@ export default function WhiteboardCanvasNew({
     boardIdRef.current = boardId;
   }, [boardId]);
 
-  // ─── Stan paska narzędzi ────────────────────────────────────────────────────
-  const [tool, setTool] = useState<Tool>('select');
-
-  // ─── Właściwości narzędzi — store zustand (Faza 1) ──────────────────────────
-  // Zamiast useState: selektory dają granularną subskrypcję (zmiana koloru nie
-  // re-renderuje narzędzi czytających tylko grubość), a hot-path może czytać
-  // przez useToolProperties.getState() bez re-renderów. Nazwy lokalne zachowane,
-  // by Toolbar i komponenty narzędzi działały bez żadnych zmian.
-  const color = useToolProperties((s) => s.color);
-  const lineWidth = useToolProperties((s) => s.lineWidth);
-  const fontSize = useToolProperties((s) => s.fontSize);
-  const fillShape = useToolProperties((s) => s.fillShape);
-  const selectedShape = useToolProperties((s) => s.selectedShape);
-  const polygonSides = useToolProperties((s) => s.polygonSides);
-  const setColor = useToolProperties((s) => s.setColor);
-  const setLineWidth = useToolProperties((s) => s.setLineWidth);
-  const setFontSize = useToolProperties((s) => s.setFontSize);
-  const setFillShape = useToolProperties((s) => s.setFillShape);
-  const setSelectedShape = useToolProperties((s) => s.setSelectedShape);
-  const setPolygonSides = useToolProperties((s) => s.setPolygonSides);
+  // ─── Stan paska narzędzi + właściwości — store zustand (Faza 2) ─────────────
+  // activeTool i właściwości narzędzi żyją w jednym store. Selektory dają
+  // granularną subskrypcję; hot-path może czytać useToolStore.getState().
+  const tool = useToolStore((s) => s.activeTool);
+  const setTool = useToolStore((s) => s.setActiveTool);
+  const color = useToolStore((s) => s.color);
+  const lineWidth = useToolStore((s) => s.lineWidth);
+  const fontSize = useToolStore((s) => s.fontSize);
+  const fillShape = useToolStore((s) => s.fillShape);
+  const selectedShape = useToolStore((s) => s.selectedShape);
+  const polygonSides = useToolStore((s) => s.polygonSides);
+  const setColor = useToolStore((s) => s.setColor);
+  const setLineWidth = useToolStore((s) => s.setLineWidth);
+  const setFontSize = useToolStore((s) => s.setFontSize);
+  const setFillShape = useToolStore((s) => s.setFillShape);
+  const setSelectedShape = useToolStore((s) => s.setSelectedShape);
+  const setPolygonSides = useToolStore((s) => s.setPolygonSides);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
@@ -1170,18 +1165,12 @@ useMultiTouchGestures({
         return;
       }
 
-      // Skróty narzędzi (bez Ctrl/Alt/Meta)
+      // Skróty narzędzi (bez Ctrl/Alt/Meta) — z rejestru (TOOL_SHORTCUTS)
       if (!e.ctrlKey && !e.metaKey && !e.altKey && userRole !== 'viewer') {
-        switch (e.key.toLowerCase()) {
-          case 'v': e.preventDefault(); setTool('select'); break;
-          case 'h': e.preventDefault(); setTool('pan'); break;
-          case 'p': e.preventDefault(); setTool('pen'); break;
-          case 't': e.preventDefault(); setTool('text'); break;
-          case 's': e.preventDefault(); setTool('shape'); break;
-          case 'f': e.preventDefault(); setTool('function'); break;
-          case 'i': e.preventDefault(); setTool('image'); break;
-          case 'e': e.preventDefault(); setTool('eraser'); break;
-          case 'm': e.preventDefault(); setTool('markdown'); break;
+        const toolId = TOOL_SHORTCUTS.get(e.key.toLowerCase());
+        if (toolId) {
+          e.preventDefault();
+          setTool(toolId);
         }
       }
     };
@@ -1869,6 +1858,65 @@ useMultiTouchGestures({
   }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // HOST CONTEXT — gniazdko dla aktywnego narzędzia (wtyczki z rejestru)
+  // ═══════════════════════════════════════════════════════════════════════════
+  // Zbiera silnik + reaktywny stan + refy + istniejące handlery w jeden obiekt.
+  // Konsumuje go tylko zamontowany overlay (<ActiveToolOverlay/>), więc zmiany
+  // reaktywne re-renderują wyłącznie aktywne narzędzie (jak dawna drabinka).
+  const hostValue = useMemo<ToolHostContextValue>(() => ({
+    engine,
+    viewport: vp.viewport,
+    viewportRef: vp.viewportRef,
+    canvasWidth,
+    canvasHeight,
+    isGestureActive,
+    onViewportChange: handleViewportChange,
+    elements: el.elements,
+    selectedIds: sel.selectedElementIds,
+    editingTextId: sel.editingTextId,
+    overlaysVisible,
+    htmlOverlaysRef,
+    textEditorDivRef,
+    imageToolRef,
+    onPathCreate: handlePathCreate,
+    onShapeCreate: handleShapeCreate,
+    onFunctionCreate: handleFunctionCreate,
+    onImageCreate: handleImageCreate,
+    onNoteCreate: handleMarkdownNoteCreate,
+    onTableCreate: handleTableCreate,
+    onArrowCreate: handleArrowCreate,
+    onTextCreate: handleTextCreate,
+    onTextUpdate: handleTextUpdate,
+    onTextDelete: handleTextDelete,
+    onEditingComplete: handleEditingComplete,
+    onTextEdit: handleTextEdit,
+    onSelectionChange: handleSelectionChange,
+    onElementUpdate: handleElementUpdate,
+    onElementUpdateWithHistory: handleElementUpdateWithHistory,
+    onElementsUpdate: handleElementsUpdate,
+    onOperationFinish: handleSelectionFinish,
+    onMarkdownEdit: handleMarkdownEditStart,
+    onActiveGuidesChange: setActiveGuides,
+    onDeleteSelected: deleteSelectedElements,
+    onCopySelected: clip.handleCopy,
+    onDuplicateSelected: clip.handleDuplicate,
+    onSaveGroupTemplate: handleSaveGroupTemplate,
+    onElementDelete: handleElementDelete,
+    onPanStart: hideOverlaysForPan,
+    onPanEnd: restoreOverlaysAfterPan,
+  }), [
+    engine, vp.viewport, vp.viewportRef, canvasWidth, canvasHeight, isGestureActive,
+    handleViewportChange, el.elements, sel.selectedElementIds, sel.editingTextId, overlaysVisible,
+    handlePathCreate, handleShapeCreate, handleFunctionCreate, handleImageCreate,
+    handleMarkdownNoteCreate, handleTableCreate, handleArrowCreate, handleTextCreate,
+    handleTextUpdate, handleTextDelete, handleEditingComplete, handleTextEdit,
+    handleSelectionChange, handleElementUpdate, handleElementUpdateWithHistory, handleElementsUpdate,
+    handleSelectionFinish, handleMarkdownEditStart, deleteSelectedElements,
+    clip.handleCopy, clip.handleDuplicate, handleSaveGroupTemplate, handleElementDelete,
+    hideOverlaysForPan, restoreOverlaysAfterPan,
+  ]);
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -2004,8 +2052,6 @@ useMultiTouchGestures({
         {/* ── TOOLBAR ───────────────────────────────────────────────────── */}
         {settings.toolbar_visible && (
           <Toolbar
-            tool={tool}
-            setTool={setTool}
             selectedShape={selectedShape}
             setSelectedShape={setSelectedShape}
             polygonSides={polygonSides}
@@ -2046,168 +2092,14 @@ useMultiTouchGestures({
         />
 
         {/* ═══════════════════════════════════════════════════════════════
-            NARZĘDZIA — każde zarządza własnymi overlayami pointer-events
+            NARZĘDZIE AKTYWNE — jeden slot z rejestru (zastępuje drabinkę).
+            ActiveToolOverlay czyta activeTool ze store, znajduje definicję
+            w rejestrze i renderuje jej Overlay, pobierający stan/handlery
+            z ToolHostProvider. Dodanie narzędzia nie wymaga zmian tutaj.
             ═══════════════════════════════════════════════════════════════ */}
-
-        {tool === 'text' && canvasWidth > 0 && (
-          <TextTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            elements={el.elements.filter((e) => e.type === 'text') as TextElement[]}
-            editingTextId={sel.editingTextId}
-            onTextCreate={handleTextCreate}
-            onTextUpdate={handleTextUpdate}
-            onTextDelete={handleTextDelete}
-            onEditingComplete={handleEditingComplete}
-            onViewportChange={handleViewportChange}
-            editorDivRef={textEditorDivRef}
-            isGestureActive={isGestureActive}
-          />
-        )}
-
-        {tool === 'select' && canvasWidth > 0 && (
-          <div ref={htmlOverlaysRef} style={{ position: 'absolute', inset: 0 }}>
-            <SelectTool
-              viewport={vp.viewport}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-              elements={el.elements}
-              selectedIds={sel.selectedElementIds}
-              isOverlayVisible={overlaysVisible}
-              onSelectionChange={handleSelectionChange}
-              onElementUpdate={handleElementUpdate}
-              onElementUpdateWithHistory={handleElementUpdateWithHistory}
-              onElementsUpdate={handleElementsUpdate}
-              onOperationFinish={handleSelectionFinish}
-              onTextEdit={handleTextEdit}
-              onMarkdownEdit={handleMarkdownEditStart}
-              onViewportChange={handleViewportChange}
-              onActiveGuidesChange={setActiveGuides}
-              onDeleteSelected={deleteSelectedElements}
-              onCopySelected={clip.handleCopy}
-              onDuplicateSelected={clip.handleDuplicate}
-              onSaveGroupTemplate={handleSaveGroupTemplate}
-              isGestureActive={isGestureActive}
-            />
-          </div>
-        )}
-
-        {tool === 'pen' && canvasWidth > 0 && (
-          <PenTool
-            viewport={vp.viewport}
-            viewportRef={vp.viewportRef}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            color={color}
-            lineWidth={lineWidth}
-            onPathCreate={handlePathCreate}
-            onViewportChange={handleViewportChange}
-            isGestureActive={isGestureActive}
-          />
-        )}
-
-        {tool === 'shape' && canvasWidth > 0 && (
-          <ShapeTool
-            viewport={vp.viewport}
-            viewportRef={vp.viewportRef}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            selectedShape={selectedShape}
-            polygonSides={polygonSides}
-            color={color}
-            lineWidth={lineWidth}
-            fillShape={fillShape}
-            onShapeCreate={handleShapeCreate}
-            onViewportChange={handleViewportChange}
-            isGestureActive={isGestureActive}
-          />
-        )}
-
-        {tool === 'pan' && canvasWidth > 0 && (
-          <PanTool
-            viewport={vp.viewport}
-            viewportRef={vp.viewportRef}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onViewportChange={handleViewportChange}
-            onPanStart={hideOverlaysForPan}
-            onPanEnd={restoreOverlaysAfterPan}
-          />
-        )}
-
-        {tool === 'function' && canvasWidth > 0 && (
-          <FunctionTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            color={color}
-            lineWidth={lineWidth}
-            onFunctionCreate={handleFunctionCreate}
-            onColorChange={setColor}
-            onLineWidthChange={setLineWidth}
-            onViewportChange={handleViewportChange}
-            isGestureActive={isGestureActive}
-          />
-        )}
-
-        {tool === 'image' && canvasWidth > 0 && (
-          <ImageTool
-            ref={imageToolRef}
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onImageCreate={handleImageCreate}
-            onViewportChange={handleViewportChange}
-          />
-        )}
-
-        {tool === 'eraser' && canvasWidth > 0 && (
-          <EraserTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            elements={el.elements}
-            onElementDelete={handleElementDelete}
-            onViewportChange={handleViewportChange}
-            isGestureActive={isGestureActive}
-          />
-        )}
-
-        {tool === 'markdown' && canvasWidth > 0 && (
-          <MarkdownNoteTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onNoteCreate={handleMarkdownNoteCreate}
-            onViewportChange={handleViewportChange}
-          />
-        )}
-
-        {tool === 'table' && canvasWidth > 0 && (
-          <TableTool
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            onTableCreate={handleTableCreate}
-            onViewportChange={handleViewportChange}
-          />
-        )}
-
-        {tool === 'arrow' && canvasWidth > 0 && (
-          <ArrowTool
-            elements={el.elements}
-            selectedIds={sel.selectedElementIds}
-            viewport={vp.viewport}
-            canvasWidth={canvasWidth}
-            canvasHeight={canvasHeight}
-            color={color}
-            lineWidth={lineWidth}
-            onArrowCreate={handleArrowCreate}
-            onViewportChange={handleViewportChange}
-            isGestureActive={isGestureActive}
-          />
-        )}
+        <ToolHostProvider value={hostValue}>
+          <ActiveToolOverlay />
+        </ToolHostProvider>
 
         {/* ═══════════════════════════════════════════════════════════════
             HTML OVERLAY (Markdown) — notatki pozycjonowane w world-pixels (×100).
@@ -2280,7 +2172,7 @@ useMultiTouchGestures({
           onContextMenu={(e) => e.preventDefault()}
           className="absolute inset-0 w-full h-full"
           style={{
-            cursor: toolToCursor(tool),
+            cursor: getTool(tool)?.cursor ?? 'default',
             willChange: 'auto',
             imageRendering: 'crisp-edges',
             pointerEvents: 'none',
@@ -2478,21 +2370,5 @@ useMultiTouchGestures({
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Mapuje narzędzie na kursor CSS */
-function toolToCursor(tool: Tool): string {
-  switch (tool) {
-    case 'select':   return 'default';
-    case 'pan':      return 'grab';
-    case 'pen':      return 'crosshair';
-    case 'eraser':   return 'cell';
-    case 'text':     return 'text';
-    case 'shape':    return 'crosshair';
-    case 'function': return 'crosshair';
-    case 'image':    return 'copy';
-    case 'markdown': return 'crosshair';
-    case 'table':    return 'crosshair';
-    case 'arrow':    return 'crosshair';    default:         return 'default';
-  }
-}
+// Kursory narzędzi pochodzą teraz z rejestru (ToolDefinition.cursor) —
+// patrz tools/registry.ts. Stara funkcja toolToCursor została usunięta.

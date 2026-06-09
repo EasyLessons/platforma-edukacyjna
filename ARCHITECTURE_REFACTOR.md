@@ -1,6 +1,6 @@
 # Refaktoryzacja architektury tablicy — Plugin/Tool Registry + Command
 
-> **Status:** ✅ Faza 1 ukończona (silnik + store) — następna: Faza 2 (rejestr narzędzi)
+> **Status:** ✅ Faza 2 ukończona — rejestr narzędzi + dynamiczny toolbar/overlay. Następna: Faza 3 (sprzątanie + bezpośrednia subskrypcja store'a)
 > **Cel:** Dodanie nowego narzędzia ma się sprowadzać do utworzenia **jednego pliku/konfiguracji**, bez modyfikowania boskiego komponentu, toolbara i historii.
 > **Zasada nadrzędna:** każda faza jest osobno mergowalna i **nie wprowadza regresji** w działaniu tablicy (rysowanie, undo/redo, multi-touch, synchronizacja Supabase).
 
@@ -224,14 +224,36 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 - `handleAddFormulasFromCard` — wklejenie karty = **jedno** `Ctrl+Z` (było N osobnych).
 - `handleSelectionFinish` — commit tylko **realnie zmienionych** elementów (zniknął redundantny re-broadcast/markUnsaved niezmienionych zaznaczonych).
 
-### Faza 2 — Rejestr narzędzi (`ToolRegistry`)
-- [ ] `npm i zustand`
-- [ ] `tools/types.ts`, `tools/registry.ts`
-- [ ] `tools/*.tool.tsx` — adaptery wokół istniejących komponentów narzędzi
-- [ ] `components/toolbar/registry-toolbar.tsx` — toolbar sterowany danymi
-- [ ] Canvas: drabinka → 1 slot `<ActiveToolOverlay>`; switch skrótów → mapa z rejestru; kursor z rejestru
+### 🔨 Faza 2 — Rejestr narzędzi (`ToolRegistry`)  ⬅ **W TOKU**
 
-**Kryterium:** wszystkie narzędzia działają z rejestru; dodanie pliku `*.tool.tsx` + wpis w `ALL_TOOLS` wystarcza.
+> **Enabler:** `ToolHostContext` — gniazdko dostarczane przez canvas (silnik + reaktywny
+> stan + refy + callbacki-klej). Konsumuje je tylko zamontowany overlay (1 naraz),
+> Toolbar czyta wyłącznie store → pan/zoom nie re-renderują toolbara.
+
+**Krok 1–2 — store + infrastruktura wtyczek (bez dotykania canvasu):**
+- [x] `stores/tool-store.ts` (rename z `tool-properties-store.ts`) + `activeTool`/`setActiveTool`
+- [x] `stores/tool-properties-store.ts` → **tymczasowy re-export shim** (canvas kompiluje bez zmian; usuwany w Kroku 3)
+- [x] `tools/types.ts` — `ToolDefinition`, `ToolId = string`
+- [x] `tools/tool-host-context.tsx` — `ToolHostProvider` + `useToolHost`
+- [x] `tools/*.tool.tsx` — **11 adapterów** wokół istniejących komponentów (bez ich zmiany)
+- [x] `tools/registry.ts` — `ALL_TOOLS`, `toolRegistry`, `getTool`, `TOOL_SHORTCUTS`
+- [x] `tools/active-tool-overlay.tsx` — slot zastępujący drabinkę
+- [x] Weryfikacja: `tsc` 0 błędów w `src/` ✅ · `eslint tools/ stores/` czysty ✅
+
+**Krok 3 — wdrożenie do canvasu:**
+- [x] `whiteboard-canvas.tsx`: `ToolHostProvider` (`hostValue` z istniejących handlerów) + drabinka (~160 linii) → `<ActiveToolOverlay/>`
+- [x] switch skrótów → `TOOL_SHORTCUTS`; `toolToCursor` → `getTool(tool)?.cursor` (funkcja usunięta)
+- [x] `tool` z `useState` → `useToolStore`; **usunięty shim** `tool-properties-store.ts`; sprzątnięte nieużywane importy narzędzi + typ `Tool`
+
+**Krok 4 — toolbar sterowany rejestrem:**
+- [x] `components/toolbar/registry-toolbar.tsx` (`<ToolModeButtons/>`, własny `ToolButton` by uniknąć cyklu) + wpięcie do `toolbar-ui` (3 sekcje: main, „więcej" full + menu)
+- [x] `toolbar.tsx` / `toolbar-ui.tsx`: usunięte propsy `tool`/`onToolChange`; panele czytają `activeTool` ze store'a; `iconFill` zachowuje wypełnione ikony select/pen
+
+**Weryfikacja Fazy 2:** `tsc` 0 błędów ✅ · `eslint` czysty (poza znanym artefaktem `react-hooks`) ✅ · `vitest` 147/148 (1 flaky `authApi`) ✅
+
+**Kryterium spełnione:** dodanie narzędzia = 1 plik `*.tool.tsx` + wpis w `ALL_TOOLS`.
+
+**Drobny dług (→ Faza 3):** w `toolbar-ui.tsx` zostały nieużywane importy ikon (MousePointer2, Hand, Type…) i martwa `getShapeIcon` — usuną się przy migracji paneli właściwości do `PropertiesPanel`. Decyzja: select-button widoczny-disabled dla viewera (wcześniej ukryty) — drobna, spójniejsza zmiana.
 
 ### Faza 3 — Bezpośrednia subskrypcja store'a + sprzątanie
 - [ ] Narzędzia/`Toolbar` subskrybują `stores/tool-properties-store.ts` **bezpośrednio** (selektory) — usunięcie prop-drillingu właściwości przez canvas (pełny zysk z re-renderów)
@@ -274,3 +296,5 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 | 2026-06-09 | 1 | Krok 1: `zustand` + `stores/tool-properties-store.ts` + 6× `useState`→store w canvasie; tsc 0 błędów, testy 147/148 (1 flaky auth), brak nowych uwag lintera | ✅ |
 | 2026-06-09 | 1 | Krok 2–3: `recordCommand` w `use-history` + `engine/{types,use-whiteboard-engine}.ts` (intencje create/update/delete, obiekt stabilny) | ✅ |
 | 2026-06-09 | 1 | Krok 4: migracja ~16 handlerów canvasu na intencje silnika; tsc/lint/testy zielone. Faza 1 domknięta jednym commitem | ✅ |
+| 2026-06-09 | 2 | Krok 1–2: `tool-store` + shim, `tools/` (host-context, types, 11 adapterów, registry, active-tool-overlay). Canvas NIETKNIĘTY. tsc 0 błędów, eslint czysty | ✅ |
+| 2026-06-10 | 2 | Krok 3–4: drabinka→slot, skróty/kursor z rejestru, toolbar z `ALL_TOOLS`, shim usunięty. tsc/eslint/testy zielone. Faza 2 domknięta jednym commitem | ✅ |

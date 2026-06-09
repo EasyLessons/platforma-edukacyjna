@@ -60,12 +60,13 @@ import {
   Highlighter,
   FolderHeart,
 } from 'lucide-react';
-import { Tool, ShapeType } from '@/_new/features/whiteboard/types';
+import { ShapeType } from '@/_new/features/whiteboard/types';
 import { Tooltip } from '@/_new/shared/ui/tooltip';
+import { useToolStore } from '@/_new/features/whiteboard/stores/tool-store';
+import { ToolModeButtons } from './registry-toolbar';
 
 interface ToolbarUIProps {
-  // Tool state
-  tool: Tool;
+  // Tool state (activeTool czytamy ze store'a, nie z propsów)
   selectedShape: ShapeType;
   polygonSides: number;
 
@@ -92,7 +93,6 @@ interface ToolbarUIProps {
   isReadOnly?: boolean;
 
   // Handlers
-  onToolChange: (tool: Tool) => void;
   onShapeChange: (shape: ShapeType) => void;
   onPolygonSidesChange: (sides: number) => void;
   onColorChange: (color: string) => void;
@@ -169,7 +169,6 @@ const ToolButton = ({
 const Divider = () => <div className="h-px w-6 bg-gray-200 my-1" />;
 
 export function ToolbarUI({
-  tool,
   selectedShape,
   polygonSides,
   color,
@@ -179,7 +178,6 @@ export function ToolbarUI({
   canUndo,
   canRedo,
   hasSelection,
-  onToolChange,
   onShapeChange,
   onPolygonSidesChange,
   onColorChange,
@@ -200,6 +198,8 @@ export function ToolbarUI({
   onToggleAssetsLibrary,
   isReadOnly = false,
 }: ToolbarUIProps) {
+  // Aktywne narzędzie ze store'a (zastępuje dawny prop `tool`)
+  const activeTool = useToolStore((s) => s.activeTool);
   // 🆕 Wykrywanie wysokości ekranu
   const [viewportHeight, setViewportHeight] = useState(0);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
@@ -259,102 +259,21 @@ export function ToolbarUI({
   // - text: ma własny mini toolbar przy zaznaczeniu
   // - function: ma własny panel input
   // - eraser: brak właściwości do edycji
-  const hasProperties = tool === 'pen' || tool === 'shape' || tool === 'image';
+  const hasProperties = activeTool === 'pen' || activeTool === 'shape' || activeTool === 'image';
 
   return (
     <>
       {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
         <div className={`flex flex-col items-center ${isCompactHeight ? 'gap-1 p-1.5' : 'gap-1.5 p-2'}`}>
-          {/* Main Tools */}
-          {!isReadOnly && (
-            <ToolButton
-              icon={MousePointer2}
-              active={tool === 'select'}
-              onClick={() => onToolChange('select')}
-              title="Zaznacz (V)"
-              filled={true}
-              fillOpacity={1}
-            />
-          )}
-          <ToolButton
-            icon={Hand}
-            active={tool === 'pan'}
-            onClick={() => onToolChange('pan')}
-            title="Przesuwaj (H)"
-          />
-          <ToolButton
-            icon={Pencil}
-            active={tool === 'pen'}
-            onClick={() => onToolChange('pen')}
-            title="Rysuj (P)"
-            disabled={isReadOnly}
-            filled={true}
-            fillOpacity={0.3}
-          />
-          <ToolButton
-            icon={Type}
-            active={tool === 'text'}
-            onClick={() => onToolChange('text')}
-            title="Tekst (T)"
-            disabled={isReadOnly}
-          />
-          <ToolButton
-            icon={getShapeIcon()}
-            active={tool === 'shape'}
-            onClick={() => onToolChange('shape')}
-            title="Kształty (S)"
-            disabled={isReadOnly}
-          />
-          <ToolButton
-            icon={TrendingUp}
-            active={tool === 'function'}
-            onClick={() => onToolChange('function')}
-            title="Funkcja (F)"
-            disabled={isReadOnly}
-          />
-          <ToolButton
-            icon={ImageIcon}
-            active={tool === 'image'}
-            onClick={() => onToolChange('image')}
-            title="Obraz (I)"
-            disabled={isReadOnly}
-          />
-          {/* PDF tool tymczasowo wyłączony  */}
-          {/* <ToolButton
-            icon={FileText}
-            active={tool === 'pdf'}
-            onClick={() => onToolChange('pdf')}
-            title="PDF (Shift+P)"
-          /> */}
-          <ToolButton
-            icon={Eraser}
-            active={tool === 'eraser'}
-            onClick={() => onToolChange('eraser')}
-            title="Gumka (E)"
-            disabled={isReadOnly}
-          />
+          {/* Main Tools — z rejestru (ALL_TOOLS, group 'main') */}
+          <ToolModeButtons group="main" isReadOnly={isReadOnly} />
 
           <Divider />
 
-          {/* Nowe narzędzia - UKRYTE w medium height */}
+          {/* Nowe narzędzia (group 'more') — UKRYTE w medium height */}
           {!isMediumHeight && !isMobile && (
-            <>
-              <ToolButton
-                icon={StickyNote}
-                active={tool === 'markdown'}
-                onClick={() => onToolChange('markdown')}
-                title="Notatka Markdown (M)"
-                disabled={isReadOnly}
-              />
-              <ToolButton
-                icon={Table}
-                active={tool === 'table'}
-                onClick={() => onToolChange('table')}
-                title="Tabelka"
-                disabled={isReadOnly}
-              />
-            </>
+            <ToolModeButtons group="more" isReadOnly={isReadOnly} />
           )}
 
           {!isCompactHeight && (
@@ -464,25 +383,10 @@ export function ToolbarUI({
             <div className="text-xs font-semibold text-gray-600 px-2 py-1">Więcej</div>
             <Divider />
 
-            <ToolButton
-              icon={StickyNote}
-              active={tool === 'markdown'}
-              onClick={() => {
-                onToolChange('markdown');
-                setIsMoreMenuOpen(false);
-              }}
-              title="Notatka Markdown (M)"
-              disabled={isReadOnly}
-            />
-            <ToolButton
-              icon={Table}
-              active={tool === 'table'}
-              onClick={() => {
-                onToolChange('table');
-                setIsMoreMenuOpen(false);
-              }}
-              title="Tabelka"
-              disabled={isReadOnly}
+            <ToolModeButtons
+              group="more"
+              isReadOnly={isReadOnly}
+              onAfterSelect={() => setIsMoreMenuOpen(false)}
             />
 
             <Divider />
@@ -554,7 +458,7 @@ export function ToolbarUI({
         <div className="hidden md:block bg-white rounded-xl shadow-lg border border-gray-200 p-2 pointer-events-auto">
           <div className="flex flex-col items-center gap-2">
             {/* PEN */}
-            {tool === 'pen' && (
+            {activeTool === 'pen' && (
               <>
                 {/* Wybór trybu: Pen / Highlighter */}
                 <div className="flex flex-col gap-1">
@@ -832,7 +736,7 @@ export function ToolbarUI({
             )}
 
             {/* SHAPE */}
-            {tool === 'shape' && (
+            {activeTool === 'shape' && (
               <>
                 {/* Wybór kształtu - pionowo */}
                 <div className="flex flex-col gap-1.5">
@@ -1018,7 +922,7 @@ export function ToolbarUI({
             {/* 🔴 FUNCTION - usunięte z toolbara, FunctionTool ma własny panel */}
 
             {/* 🖼️ IMAGE */}
-            {tool === 'image' && (
+            {activeTool === 'image' && (
               <>
                 {/* Wklej obraz ze schowka */}
                 <button
