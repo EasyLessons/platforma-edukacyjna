@@ -6,6 +6,28 @@
 
 ---
 
+## 0. Podsumowanie zrealizowanych faz (0–2) ✅
+
+Refaktor prowadzimy przyrostowo, fazami osobno commitowanymi. Stan na 2026-06-10:
+
+| Faza | Wzorzec | Co dostarczono | Commit | Status |
+|---|---|---|---|---|
+| **0** | **Command** | `commands/` — `Command`/`CommandContext`, `Create/Delete/Update/CompositeCommand`, adapter `commandFromUserAction`. `use-history` operuje na `Command[]` zamiast `switch` po typie akcji. | `d50ee60` | ✅ |
+| **1** | **Fasada** + `zustand` | `engine/` — `WhiteboardEngine` z intencjami `createElements`/`updateElements`/`deleteElements` (zwijają rytuał stan+persist+broadcast+historia). Store `zustand` na właściwości narzędzi. ~16 handlerów canvasu przepiętych na silnik. | `9aba6b7` | ✅ |
+| **2** | **Strategia** + **Open/Closed** | `tools/` — `ToolDefinition` + `ToolRegistry` (`ALL_TOOLS`, lookup `Map` O(1)), `ToolHostContext` (gniazdko wtyczek), 11 adapterów `*.tool.tsx`. Drabinka 11 gałęzi → 1 `<ActiveToolOverlay/>`; toolbar i skróty z rejestru; `activeTool` w `zustand`. | `8706315` | ✅ |
+
+**Efekt netto:** boski komponent stracił drabinkę renderującą narzędzia, switch skrótów, mapę kursorów i rytuały mutacji. **Dodanie narzędzia = 1 plik `tools/<x>.tool.tsx` + 1 wpis w `ALL_TOOLS`** — zero zmian w canvasie/toolbarze/historii.
+
+**Dwie ortogonalne osie rejestrów (świadomie rozdzielone):**
+- `ElementRegistry` (`handlers/`) — *jak zachowuje się obiekt na tablicy* (render/resize/move/rotate/hit-test). Wzorzec Strategii per **typ elementu**. Istniał wcześniej, zachowany bez zmian.
+- `ToolRegistry` (`tools/`) — *co robi kursor, gdy narzędzie aktywne* (przycisk/overlay/skrót/kursor). Wzorzec Strategii + Open/Closed per **narzędzie**. Dodany w Fazie 2.
+
+**Każda faza zweryfikowana:** `tsc` 0 błędów (poza cache `.next`), `eslint` czysty (poza znanym artefaktem repo `react-hooks/exhaustive-deps`), `vitest` 147/148 (1 przedawniony flaky `authApi`, potwierdzony na baseline). Smoke test ręczny po Fazach 1 i 2 — bez regresji.
+
+> **Szczegóły, interfejsy i checklisty każdej fazy** znajdują się w sekcjach 2–4 poniżej. Wysokopoziomowy kontekst projektu dla sesji AI: [`AI_MENTOR_CONTEXT.md`](AI_MENTOR_CONTEXT.md).
+
+---
+
 ## 1. Analiza obecnego stanu (punkt wyjścia)
 
 ### 1.1. Główne źródło sprzężenia
