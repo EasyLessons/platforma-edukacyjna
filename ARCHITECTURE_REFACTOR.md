@@ -1,6 +1,6 @@
 # Refaktoryzacja architektury tablicy — Plugin/Tool Registry + Command
 
-> **Status:** ✅ Faza 0 ukończona — przechodzimy do Fazy 1 (Silnik)
+> **Status:** ✅ Faza 1 ukończona (silnik + store) — następna: Faza 2 (rejestr narzędzi)
 > **Cel:** Dodanie nowego narzędzia ma się sprowadzać do utworzenia **jednego pliku/konfiguracji**, bez modyfikowania boskiego komponentu, toolbara i historii.
 > **Zasada nadrzędna:** każda faza jest osobno mergowalna i **nie wprowadza regresji** w działaniu tablicy (rysowanie, undo/redo, multi-touch, synchronizacja Supabase).
 
@@ -189,13 +189,40 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 
 **Weryfikacja:** `vitest` komend 11/11 ✅ · `tsc --noEmit` 0 błędów w `src/` ✅ · `eslint` czysty ✅ · pełna suita 147/148 (1 padający to przedwcześniej istniejący flaky timeout w `auth/api/authApi.test.ts`, potwierdzony na baseline — niezwiązany).
 
-### Faza 1 — Silnik (`WhiteboardEngine`)
-- [ ] `engine/types.ts` — interfejs `WhiteboardEngine`
-- [ ] `engine/use-whiteboard-engine.ts` — montaż z istniejących hooków, implementacja `execute(command)`
-- [ ] Podmiana `createElement` i `handleX*` w canvasie na `engine.execute(new CreateElementsCommand([...]))`
-- [ ] Drabinka JSX i toolbar **jeszcze stare**
+### ✅ Faza 1 — Silnik (`WhiteboardEngine`) + store `zustand`  ⬅ **UKOŃCZONA (2026-06-09)**
 
-**Kryterium:** tworzenie/edycja przez silnik, zachowanie 1:1.
+> **Rafinacja (odkrycie z kodu):** persystencja NIE jest jednorodna — create/update
+> zapisują przez `markUnsaved` (debounced batch), a delete przez `deleteElementDirectly`
+> (natychmiast, chunki po 20). Dlatego silnik wystawia **typowane intencje**
+> (`createElements`/`updateElements`/`deleteElements`), każda zachowująca dzisiejszą
+> persystencję 1:1; generyczne `execute(command)` zostaje jako furtka „advanced".
+
+**Krok 1 — store `zustand` (ToolProperties):**
+- [x] `npm i zustand` (`zustand@^5.0.14`)
+- [x] `stores/tool-properties-store.ts` — `useToolProperties` (color/lineWidth/fontSize/fillShape/selectedShape/polygonSides + settery)
+- [x] `whiteboard-canvas.tsx` — 6× `useState` → selektory store'a (nazwy lokalne zachowane, `Toolbar`/narzędzia bez zmian); `activeTool` zostaje `useState`
+
+**Krok 2–3 — rdzeń silnika:**
+- [x] `hooks/use-history.ts` — **+ `recordCommand(command: Command)`** (addytywnie; `pushUserAction` deleguje do niego)
+- [x] `engine/types.ts` — `WhiteboardEngine` + `WhiteboardEngineDeps`
+- [x] `engine/use-whiteboard-engine.ts` — montaż z hooków + intencje + koordynaty (obiekt stabilny `useMemo []` + `depsRef`)
+
+**Krok 4 — migracja canvasu:**
+- [x] Budowa `const engine = useWhiteboardEngine({...})`
+- [x] create → `engine.createElements` (`createElement`, `handleImageCreate`, `handleChatbotAddToBoard`, `handleMarkdownNoteCreate`, `handleTableCreate`, `handleAssetDropCenter`; `handleAddFormulasFromCard` **zgrupowane w 1 cofnięcie**)
+- [x] update → `engine.updateElements` (`handleElementUpdateWithHistory`, `handleSelectionFinish`) / `engine.updateElementsLive` (`handleElementsUpdate`)
+- [x] delete → `engine.deleteElements` (`handleElementDelete`, `handleTextDelete`, `deleteSelectedElements`, `clearCanvas`)
+- [x] Usunięty martwy `lastGroupBroadcastRef` (throttle przeniesiony do silnika)
+- [x] Drabinka JSX, `Toolbar`, komponenty narzędzi — **bez zmian** (Faza 2)
+- [ ] Pozostały bez zmian (no-history live edits, odrębna semantyka broadcastu): `handleElementUpdate`, `handleTextUpdate`, `handleMarkdownContentChange`, `handleTableCellChange`
+
+**Kryterium:** tworzenie/edycja/usuwanie przez silnik, zachowanie i persystencja 1:1. ✅
+
+**Weryfikacja:** `tsc --noEmit` 0 błędów w `src/` ✅ · `eslint` tylko znane artefakty `react-hooks rule not found` (0 realnych) ✅ · testy 147/148 (1 flaky auth) ✅
+
+**Świadome uproszczenie (lepszy UX, zaakceptowane):**
+- `handleAddFormulasFromCard` — wklejenie karty = **jedno** `Ctrl+Z` (było N osobnych).
+- `handleSelectionFinish` — commit tylko **realnie zmienionych** elementów (zniknął redundantny re-broadcast/markUnsaved niezmienionych zaznaczonych).
 
 ### Faza 2 — Rejestr narzędzi (`ToolRegistry`)
 - [ ] `npm i zustand`
@@ -206,10 +233,13 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 
 **Kryterium:** wszystkie narzędzia działają z rejestru; dodanie pliku `*.tool.tsx` + wpis w `ALL_TOOLS` wystarcza.
 
-### Faza 3 — Store właściwości + sprzątanie
-- [ ] `tools/use-tool-properties.ts` (zustand)
+### Faza 3 — Bezpośrednia subskrypcja store'a + sprzątanie
+- [ ] Narzędzia/`Toolbar` subskrybują `stores/tool-properties-store.ts` **bezpośrednio** (selektory) — usunięcie prop-drillingu właściwości przez canvas (pełny zysk z re-renderów)
 - [ ] Przeniesienie paneli pen/shape/image do `PropertiesPanel` narzędzi
-- [ ] Usunięcie martwych propsów, legacy `history[][]`, typu `UserAction`
+- [ ] Usunięcie martwych propsów, legacy `history[][]`, `saveToHistory`, `pushUserAction`, typu `UserAction`
+
+> Store `zustand` (ToolProperties) powstał już w Fazie 1 — tutaj zostaje tylko
+> przepięcie konsumentów na bezpośrednie selektory zamiast propsów z canvasa.
 
 **Kryterium:** orkiestrator schudnięty do ~kilkuset linii; zero martwego kodu.
 
@@ -240,3 +270,7 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 | 2026-06-09 | — | Analiza + akceptacja architektury, utworzenie tego dokumentu | ✅ |
 | 2026-06-09 | 0 | Projekt Fazy 0 + kod do wglądu | ✅ |
 | 2026-06-09 | 0 | Implementacja: 9 plików `commands/` + refaktor `use-history.ts`; testy 11/11, tsc/eslint czyste | ✅ |
+| 2026-06-09 | 0 | Commit `d50ee60` (Faza 0) | ✅ |
+| 2026-06-09 | 1 | Krok 1: `zustand` + `stores/tool-properties-store.ts` + 6× `useState`→store w canvasie; tsc 0 błędów, testy 147/148 (1 flaky auth), brak nowych uwag lintera | ✅ |
+| 2026-06-09 | 1 | Krok 2–3: `recordCommand` w `use-history` + `engine/{types,use-whiteboard-engine}.ts` (intencje create/update/delete, obiekt stabilny) | ✅ |
+| 2026-06-09 | 1 | Krok 4: migracja ~16 handlerów canvasu na intencje silnika; tsc/lint/testy zielone. Faza 1 domknięta jednym commitem | ✅ |

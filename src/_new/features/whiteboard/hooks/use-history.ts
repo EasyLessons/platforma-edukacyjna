@@ -65,6 +65,12 @@ export interface UseHistoryReturn {
   redo: () => void;
   /** Zarejestruj akcję użytkownika (żeby undo wiedziało co cofać) */
   pushUserAction: (action: UserAction) => void;
+  /**
+   * Zarejestruj gotową komendę na stosie undo (niskopoziomowe API silnika).
+   * Komenda jest tylko zapamiętywana — NIE jest wykonywana (do() robi wywołujący
+   * przez optymistyczny update). Undo/redo wywołają jej undo()/do().
+   */
+  recordCommand: (command: Command) => void;
   /** Czy jest co cofać */
   canUndo: boolean;
   /** Czy jest co ponawiać */
@@ -144,18 +150,24 @@ export function useHistory({
     });
   }, []);
 
-  // ─── Zarejestruj akcję użytkownika (po create/delete/update) ────────────
-  // Sygnatura pozostaje (action: UserAction) — wywołania w whiteboard-canvas
-  // i use-clipboard działają bez zmian. Wewnętrznie akcja jest tłumaczona na
-  // Command przez adapter zgodności wstecznej. pushUserAction TYLKO rejestruje
-  // komendę (nie woła do()) — pierwsze wykonanie robią handlery w canvasie.
-  const pushUserAction = useCallback((action: UserAction) => {
-    userUndoStackRef.current = [...userUndoStackRef.current, commandFromUserAction(action)];
+  // ─── Zarejestruj komendę na stosie undo (niskopoziomowe API silnika) ─────
+  // Komenda jest TYLKO zapamiętywana (nie woła do()) — pierwsze wykonanie robi
+  // wywołujący przez optymistyczny update (intencje WhiteboardEngine / handlery).
+  const recordCommand = useCallback((command: Command) => {
+    userUndoStackRef.current = [...userUndoStackRef.current, command];
     // Każda nowa akcja czyści redo stack
     userRedoStackRef.current = [];
     setCanUndo(true);
     setCanRedo(false);
   }, []);
+
+  // ─── Zarejestruj akcję użytkownika (zgodność wsteczna) ───────────────────
+  // Sygnatura pozostaje (action: UserAction) — wywołania w whiteboard-canvas
+  // i use-clipboard działają bez zmian. Wewnętrznie deleguje do recordCommand
+  // przez adapter UserAction → Command.
+  const pushUserAction = useCallback((action: UserAction) => {
+    recordCommand(commandFromUserAction(action));
+  }, [recordCommand]);
 
   // ─── Undo ───────────────────────────────────────────────────────────────
   // Zdejmij ostatnią komendę z undo-stacku, cofnij ją i przełóż na redo-stack.
@@ -196,6 +208,7 @@ export function useHistory({
     undo,
     redo,
     pushUserAction,
+    recordCommand,
     canUndo,
     canRedo,
     historyLength: history.length,

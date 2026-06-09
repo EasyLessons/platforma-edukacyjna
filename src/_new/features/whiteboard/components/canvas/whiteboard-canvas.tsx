@@ -102,7 +102,7 @@ import type {
   ArrowElement,
   ViewportTransform,
 } from '../../types';
-import type { Tool, ShapeType } from '../../types';
+import type { Tool } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
 
@@ -111,6 +111,12 @@ import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
 // ─── Gesty multi-touch (pan + zoom) ───────────────────────────────────────────────
 import { useMultiTouchGestures } from '../../hooks/use-multi-touch-gestures';
+
+// ─── Store właściwości narzędzi (zustand) ─────────────────────────────────────────
+import { useToolProperties } from '../../stores/tool-properties-store';
+
+// ─── Silnik tablicy (WhiteboardEngine) ────────────────────────────────────────────
+import { useWhiteboardEngine } from '../../engine/use-whiteboard-engine';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -183,12 +189,25 @@ export default function WhiteboardCanvasNew({
 
   // ─── Stan paska narzędzi ────────────────────────────────────────────────────
   const [tool, setTool] = useState<Tool>('select');
-  const [selectedShape, setSelectedShape] = useState<ShapeType>('rectangle');
-  const [polygonSides, setPolygonSides] = useState(5);
-  const [color, setColor] = useState('#000000');
-  const [lineWidth, setLineWidth] = useState(4);
-  const [fontSize, setFontSize] = useState(70);
-  const [fillShape, setFillShape] = useState(false);
+
+  // ─── Właściwości narzędzi — store zustand (Faza 1) ──────────────────────────
+  // Zamiast useState: selektory dają granularną subskrypcję (zmiana koloru nie
+  // re-renderuje narzędzi czytających tylko grubość), a hot-path może czytać
+  // przez useToolProperties.getState() bez re-renderów. Nazwy lokalne zachowane,
+  // by Toolbar i komponenty narzędzi działały bez żadnych zmian.
+  const color = useToolProperties((s) => s.color);
+  const lineWidth = useToolProperties((s) => s.lineWidth);
+  const fontSize = useToolProperties((s) => s.fontSize);
+  const fillShape = useToolProperties((s) => s.fillShape);
+  const selectedShape = useToolProperties((s) => s.selectedShape);
+  const polygonSides = useToolProperties((s) => s.polygonSides);
+  const setColor = useToolProperties((s) => s.setColor);
+  const setLineWidth = useToolProperties((s) => s.setLineWidth);
+  const setFontSize = useToolProperties((s) => s.setFontSize);
+  const setFillShape = useToolProperties((s) => s.setFillShape);
+  const setSelectedShape = useToolProperties((s) => s.setSelectedShape);
+  const setPolygonSides = useToolProperties((s) => s.setPolygonSides);
+
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
   // ─── Stan SmartSearch ───────────────────────────────────────────────────────
@@ -409,6 +428,37 @@ export default function WhiteboardCanvasNew({
     onPushUserAction: hist.pushUserAction,
   });
 
+  // ─── SILNIK: WhiteboardEngine ────────────────────────────────────────────────
+  // Fasada nad hookami. Intencje create/update/delete zwijają rytuał
+  // (stan lokalny + persist + broadcast + zapis komendy) w jedno miejsce.
+  // Obiekt jest stabilny referencyjnie (useMemo []) — czyta runtime przez depsRef.
+  const engine = useWhiteboardEngine({
+    elementsRef: el.elementsRef,
+    loadedImages: el.loadedImages,
+    addElements: el.addElements,
+    updateElements: el.updateElements,
+    removeElement: el.removeElement,
+    markUnsaved: el.markUnsaved,
+    deleteElementDirectly: el.deleteElementDirectly,
+    selectedElementIds: sel.selectedElementIds,
+    selectElements: sel.selectElements,
+    clearSelection: sel.clearSelection,
+    viewportRef: vp.viewportRef,
+    broadcastElementCreated: rt.broadcastElementCreated,
+    broadcastElementUpdated: rt.broadcastElementUpdated,
+    broadcastElementDeleted: rt.broadcastElementDeleted,
+    broadcastElementsBatch: rt.broadcastElementsBatch,
+    recordCommand: hist.recordCommand,
+    undo: hist.undo,
+    redo: hist.redo,
+    canUndo: hist.canUndo,
+    canRedo: hist.canRedo,
+    saveToHistory: hist.saveToHistory,
+    canvasSize: { width: canvasWidth, height: canvasHeight },
+    boardIdRef,
+    userRole,
+  });
+
   // ─── OBSŁUGA SZABLONÓW (Assets) ─────────────────────────────────────────────
   const handleSaveGroupTemplate = useCallback((selectedElements: DrawingElement[]) => {
     setFrozenElementsForAsset(selectedElements);
@@ -492,15 +542,8 @@ export default function WhiteboardCanvasNew({
           return copy as DrawingElement;
         });
 
-        el.addElements(insertedElements);
-        el.markUnsaved(insertedElements.map(e => e.id));
+        engine.createElements(insertedElements);
         sel.selectElements(insertedElements.map(e => e.id));
-        hist.pushUserAction({
-          type: 'batch',
-          actions: insertedElements.map(elem => ({ type: 'create', element: elem }))
-        });
-        
-        rt.broadcastElementsBatch(insertedElements);
 
         // Load images if there are any
         insertedElements.forEach(item => {
@@ -576,7 +619,6 @@ useMultiTouchGestures({
 
   // ─── Broadcast viewport throttled ──────────────────────────────────────────
   const lastVpBroadcastRef = useRef(0);
-  const lastGroupBroadcastRef = useRef(0);
   useEffect(() => {
     // Nie broadcastuj gdy kanał WebSocket nie jest gotowy
     if (!rt.isConnected) return;
@@ -1214,12 +1256,8 @@ useMultiTouchGestures({
 
   /** Wspólna logika: dodaj element + broadcast + history */
   const createElement = useCallback((element: DrawingElement) => {
-    if (userRole === 'viewer') return;
-    el.addElements([element]);
-    el.markUnsaved([element.id]);
-    rt.broadcastElementCreated(element);
-    hist.pushUserAction({ type: 'create', element });
-  }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction]);
+    engine.createElements([element]);
+  }, [engine]);
 
   const handlePathCreate = useCallback(
     (path: DrawingPath) => {
@@ -1246,14 +1284,11 @@ useMultiTouchGestures({
   );
 
   const handleImageCreate = useCallback((image: ImageElement) => {
-    if (userRole === 'viewer') return;
-    el.addElements([image]);
-    el.markUnsaved([image.id]);
-    rt.broadcastElementCreated(image);
-    hist.pushUserAction({ type: 'create', element: image });
+    if (engine.isReadOnly) return;
+    engine.createElements([image]);
     if (image.src) el.loadImage(image.id, image.src);
     setTool('select');
-  }, [userRole, el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction, el.loadImage]);
+  }, [engine, el.loadImage]);
 
   // ─── SmartSearch handlers ──────────────────────────────────────────────────
 
@@ -1294,12 +1329,7 @@ useMultiTouchGestures({
   }, []);
 
   const handleChatbotAddToBoard = useCallback((content: string) => {
-    const centerWorld = inverseTransformPoint(
-      { x: canvasWidth / 2, y: canvasHeight / 2 },
-      vp.viewportRef.current,
-      canvasWidth,
-      canvasHeight
-    );
+    const centerWorld = engine.centerOfViewport();
     const noteWidth = 5;
     const noteHeight = 4;
     const newNote: MarkdownNote = {
@@ -1313,11 +1343,8 @@ useMultiTouchGestures({
       backgroundColor: '#ffffff',
       borderColor: '#e5e7eb',
     };
-    el.addElements([newNote]);
-    el.markUnsaved([newNote.id]);
-    rt.broadcastElementCreated(newNote);
-    hist.pushUserAction({ type: 'create', element: newNote });
-  }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
+    engine.createElements([newNote]);
+  }, [engine]);
 
   const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
     const COLS = 2, WORLD_WIDTH = 12.0, WORLD_PADDING = 1.0; // 2x większe niż poprzednie 6.0
@@ -1363,13 +1390,9 @@ useMultiTouchGestures({
           return { imageEl, img };
         });
         const elements = newImages.map(({ imageEl }) => imageEl);
-        el.addElements(elements);
-        el.markUnsaved(elements.map((e) => e.id));
-        elements.forEach((imageEl) => {
-          rt.broadcastElementCreated(imageEl);
-          hist.pushUserAction({ type: 'create', element: imageEl });
-          el.loadImage(imageEl.id, imageEl.src!);
-        });
+        // Jedno grupowe cofnięcie (Ctrl+Z usuwa całą wklejoną kartę naraz)
+        engine.createElements(elements);
+        elements.forEach((imageEl) => el.loadImage(imageEl.id, imageEl.src!));
         const toastMessage =
           loaded.length === 1
             ? `Dodano: ${loaded[0].formula.title}`
@@ -1385,7 +1408,7 @@ useMultiTouchGestures({
         console.error('❌ Błąd ładowania wzorów z karty:', err);
         setActiveCard(null);
       });
-  }, [canvasWidth, canvasHeight, vp.viewportRef, el, rt, hist]);
+  }, [canvasWidth, canvasHeight, vp.viewportRef, el, engine]);
 
   /**
    * Wklejanie obrazka ze schowka systemowego (screenshot, Ctrl+C z przeglądarki itp.).
@@ -1446,33 +1469,19 @@ useMultiTouchGestures({
   useEffect(() => { handleOsClipboardPasteRef.current = handleOsClipboardPaste; }, [handleOsClipboardPaste]);
 
   const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
-    if (userRole === 'viewer') return;
-    el.addElements([note]);
-    el.markUnsaved([note.id]);
-    rt.broadcastElementCreated(note);
-    hist.pushUserAction({ type: 'create', element: note });
+    if (engine.isReadOnly) return;
+    engine.createElements([note]);
     setTool('select');
     sel.setSelectedElementIds(new Set([note.id]));
     sel.setEditingMarkdownId(note.id);
-  }, [
-    userRole,
-    el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction,
-    sel.setSelectedElementIds, sel.setEditingMarkdownId,
-  ]);
+  }, [engine, sel.setSelectedElementIds, sel.setEditingMarkdownId]);
 
   const handleTableCreate = useCallback((table: TableElement) => {
-    if (userRole === 'viewer') return;
-    el.addElements([table]);
-    el.markUnsaved([table.id]);
-    rt.broadcastElementCreated(table);
-    hist.pushUserAction({ type: 'create', element: table });
+    if (engine.isReadOnly) return;
+    engine.createElements([table]);
     setTool('select');
     sel.setSelectedElementIds(new Set([table.id]));
-  }, [
-    userRole,
-    el.addElements, el.markUnsaved, rt.broadcastElementCreated, hist.pushUserAction,
-    sel.setSelectedElementIds,
-  ]);
+  }, [engine, sel.setSelectedElementIds]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY TextTool
@@ -1494,18 +1503,10 @@ useMultiTouchGestures({
   }, [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]);
 
   const handleTextDelete = useCallback((id: string) => {
-    if (userRole === 'viewer') return;
-    const current = el.elementsRef.current.find((e) => e.id === id);
-    el.removeElement(id);
-    rt.broadcastElementDeleted(id);
-    const boardIdNum = parseInt(boardIdRef.current);
-    if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
-    if (current) hist.pushUserAction({ type: 'delete', element: current });
-  }, [
-    userRole,
-    el.elementsRef, el.removeElement, el.deleteElementDirectly,
-    rt.broadcastElementDeleted, hist.pushUserAction,
-  ]);
+    const current = engine.getById(id);
+    if (!current) return;
+    engine.deleteElements([current]);
+  }, [engine]);
 
   const handleEditingComplete = useCallback(() => {
     sel.setEditingTextId(null);
@@ -1541,118 +1542,51 @@ useMultiTouchGestures({
   /** Update z historią (po zakończeniu przeciągania / zmianie rozmiaru) */
   const handleElementUpdateWithHistory = useCallback(
     (id: string, updates: Partial<DrawingElement>) => {
-      if (userRole === 'viewer') return;
-      const current = el.elementsRef.current.find((e) => e.id === id);
+      if (engine.isReadOnly) return;
+      const current = engine.getById(id);
       if (!current) return;
       const updated = { ...current, ...updates } as DrawingElement;
-      el.updateElement(updated);
-      el.markUnsaved([id]);
-      rt.broadcastElementUpdated(updated);
-      hist.pushUserAction({ type: 'update', before: current, after: updated });
-      hist.saveToHistory(
-        el.elementsRef.current.map((e) => (e.id === id ? updated : e))
-      );
+      engine.updateElements([current], [updated]);
     },
-    [
-      userRole,
-      el.elementsRef, el.updateElement, el.markUnsaved,
-      rt.broadcastElementUpdated, hist.pushUserAction, hist.saveToHistory,
-    ]
+    [engine]
   );
 
-/** Batch update (SelectTool przesuwa wiele elementów naraz) */
+  /** Batch update LIVE (SelectTool przesuwa wiele elementów naraz, bez historii) */
   const handleElementsUpdate = useCallback(
     (updates: Map<string, Partial<DrawingElement>>) => {
-      if (userRole === 'viewer') return;
-      
-      const updatedElements: DrawingElement[] = [];
-      updates.forEach((update, id) => {
-        const current = el.elementsRef.current.find((e) => e.id === id);
-        if (current) {
-          updatedElements.push({ ...current, ...update } as DrawingElement);
-        }
-      });
-
-      if (updatedElements.length === 0) return;
-
-      // 1. Zmiana LOKALNA grupowo (szybki update na Twoim ekranie)
-      if (el.updateElements) {
-         el.updateElements(updatedElements);
-      } else {
-         updatedElements.forEach(e => el.updateElement(e));
-      }
-      
-      el.markUnsaved(updatedElements.map(e => e.id));
-
-      // 2. WYSYŁKA DO INNYCH (Throttle + Batch)
-      // Dzięki 'rt.broadcastElementsBatch' leci 1 wiadomość, a nie 10 osobnych! Omija to Rate Limit Supabase.
-      const now = Date.now();
-      if (now - lastGroupBroadcastRef.current > 50) { 
-        lastGroupBroadcastRef.current = now;
-        if (rt.broadcastElementsBatch) {
-           rt.broadcastElementsBatch(updatedElements).catch(console.error);
-        }
-      }
+      engine.updateElementsLive(updates);
     },
-    [userRole, el, rt]
+    [engine]
   );
   
   /** Wywoływane przez SelectTool po zakończeniu operacji (mouseup) */
   const handleSelectionFinish = useCallback((originalElementsMap?: Map<string, DrawingElement>) => {
-    if (userRole === 'viewer') return;
-    const currentElements = el.elementsRef.current;
-    const selectedIds = Array.from(sel.selectedElementIdsRef.current);
-
-    if (originalElementsMap && originalElementsMap.size > 0) {
-      const batchActions = selectedIds
-        .map((id) => {
-          const before = originalElementsMap.get(id);
-          const after = currentElements.find((e) => e.id === id);
-          if (before && after && JSON.stringify(before) !== JSON.stringify(after)) {
-            return { type: 'update' as const, before, after };
-          }
-          return null;
-        })
-        .filter((a): a is NonNullable<typeof a> => a !== null);
-      if (batchActions.length === 1) {
-        hist.pushUserAction(batchActions[0]);
-      } else if (batchActions.length > 1) {
-        hist.pushUserAction({ type: 'batch', actions: batchActions });
+    if (engine.isReadOnly || !originalElementsMap || originalElementsMap.size === 0) return;
+    const current = engine.getElements();
+    const before: DrawingElement[] = [];
+    const after: DrawingElement[] = [];
+    for (const id of sel.selectedElementIdsRef.current) {
+      const b = originalElementsMap.get(id);
+      const a = current.find((e) => e.id === id);
+      if (b && a && JSON.stringify(b) !== JSON.stringify(a)) {
+        before.push(b);
+        after.push(a);
       }
     }
-
-    hist.saveToHistory(currentElements);
-    selectedIds.forEach((id) => {
-      const found = currentElements.find((e) => e.id === id);
-      if (found) rt.broadcastElementUpdated(found);
-    });
-    el.markUnsaved(selectedIds);
-  }, [
-    userRole,
-    el.elementsRef, el.markUnsaved,
-    sel.selectedElementIdsRef,
-    hist.saveToHistory, hist.pushUserAction,
-    rt.broadcastElementUpdated,
-  ]);
+    // Commit tylko realnie zmienionych elementów — silnik robi persist + broadcast
+    // + zapis komendy (UpdateElementsCommand) + legacy snapshot.
+    if (after.length > 0) engine.updateElements(before, after);
+  }, [engine, sel.selectedElementIdsRef]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER EraserTool
   // ═══════════════════════════════════════════════════════════════════════════
 
   const handleElementDelete = useCallback((id: string) => {
-    if (userRole === 'viewer') return;
-    const current = el.elementsRef.current.find((e) => e.id === id);
-    el.removeElement(id);
-    if (el.loadedImages && el.loadedImages.get(id)) el.loadedImages.delete(id);
-    rt.broadcastElementDeleted(id);
-    const boardIdNum = parseInt(boardIdRef.current);
-    if (!isNaN(boardIdNum)) el.deleteElementDirectly(boardIdNum, id).catch(console.error);
-    if (current) hist.pushUserAction({ type: 'delete', element: current });
-  }, [
-    userRole,
-    el.elementsRef, el.removeElement, el.deleteElementDirectly,
-    rt.broadcastElementDeleted, hist.pushUserAction,
-  ]);
+    const current = engine.getById(id);
+    if (!current) return;
+    engine.deleteElements([current]);
+  }, [engine]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY HTML OVERLAYS (Markdown + Table)
@@ -1732,56 +1666,13 @@ useMultiTouchGestures({
   // ═══════════════════════════════════════════════════════════════════════════
 
   const deleteSelectedElements = useCallback(() => {
-    if (userRole === 'viewer') return;
-    const ids = sel.selectedElementIdsRef.current;
-    if (ids.size === 0) return;
-    const boardIdNum = parseInt(boardIdRef.current);
-
-    const idsArray = Array.from(ids);
-    const elementsToDelete = idsArray
-      .map((id) => el.elementsRef.current.find((e) => e.id === id))
+    const elementsToDelete = Array.from(sel.selectedElementIdsRef.current)
+      .map((id) => engine.getById(id))
       .filter((e): e is DrawingElement => e !== undefined);
-
-    // 1. Natychmiastowe usunięcie lokalne
-    idsArray.forEach((id) => {
-      el.removeElement(id);
-      if (el.loadedImages && el.loadedImages.get(id)) el.loadedImages.delete(id);
-    });
-    sel.clearSelection();
-
-    // 2. Zapis w historii jako jedna paczka
-    if (elementsToDelete.length === 1) {
-      hist.pushUserAction({ type: 'delete', element: elementsToDelete[0] });
-    } else if (elementsToDelete.length > 1) {
-      hist.pushUserAction({
-        type: 'batch',
-        actions: elementsToDelete.map((e) => ({ type: 'delete' as const, element: e })),
-      });
-    }
-
-    // 3. Broadcast + baza w paczkach po 20 (ochrona przed rate limit)
-    const processInChunks = async () => {
-      for (let i = 0; i < idsArray.length; i += 20) {
-        const chunk = idsArray.slice(i, i + 20);
-        chunk.forEach((id) => rt.broadcastElementDeleted(id));
-        if (!isNaN(boardIdNum)) {
-          await Promise.all(
-            chunk.map((id) => el.deleteElementDirectly(boardIdNum, id).catch(console.error))
-          );
-        }
-        if (i + 20 < idsArray.length) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-      }
-    };
-    processInChunks();
-  }, [
-    userRole,
-    sel.selectedElementIdsRef, sel.clearSelection,
-    el.elementsRef, el.removeElement, el.deleteElementDirectly,
-    rt.broadcastElementDeleted,
-    hist.pushUserAction,
-  ]);
+    if (elementsToDelete.length === 0) return;
+    engine.deleteElements(elementsToDelete); // lokalnie + historia + broadcast/baza w chunkach
+    engine.clearSelection();
+  }, [engine, sel.selectedElementIdsRef]);
 
   // Aktualizuj ref (używany w keyDown handler)
   const deleteSelectedElementsRef = useRef<() => void>(deleteSelectedElements);
@@ -1815,52 +1706,12 @@ useMultiTouchGestures({
   // CLEAR CANVAS
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const clearCanvas = useCallback(async () => {
-    if (userRole === 'viewer') return;
-    const boardIdNum = parseInt(boardIdRef.current);
-    const snapshot = [...el.elementsRef.current];
+  const clearCanvas = useCallback(() => {
+    const snapshot = [...engine.getElements()];
     if (snapshot.length === 0) return;
-
-    // 1. Natychmiastowe usunięcie lokalne
-    snapshot.forEach((e) => {
-      el.removeElement(e.id);
-      if (el.loadedImages && el.loadedImages.get(e.id)) el.loadedImages.delete(e.id);
-    });
-    sel.clearSelection();
-
-    // 2. Zapis w historii jako jedna paczka
-    if (snapshot.length === 1) {
-      hist.pushUserAction({ type: 'delete', element: snapshot[0] });
-    } else if (snapshot.length > 1) {
-      hist.pushUserAction({
-        type: 'batch',
-        actions: snapshot.map((e) => ({ type: 'delete' as const, element: e })),
-      });
-    }
-
-    // 3. Broadcast + baza w paczkach po 20 (ochrona przed rate limit)
-    const processInChunks = async () => {
-      for (let i = 0; i < snapshot.length; i += 20) {
-        const chunk = snapshot.slice(i, i + 20);
-        chunk.forEach((e) => rt.broadcastElementDeleted(e.id));
-        if (!isNaN(boardIdNum)) {
-          await Promise.all(
-            chunk.map((e) => el.deleteElementDirectly(boardIdNum, e.id).catch(console.error))
-          );
-        }
-        if (i + 20 < snapshot.length) {
-          await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-      }
-    };
-    processInChunks();
-  }, [
-    userRole,
-    el.elementsRef, el.removeElement, el.deleteElementDirectly,
-    rt.broadcastElementDeleted,
-    sel.clearSelection,
-    hist.pushUserAction,
-  ]);
+    engine.deleteElements(snapshot); // lokalnie + historia + broadcast/baza w chunkach
+    engine.clearSelection();
+  }, [engine]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // IMAGE TOOL WRAPPERS
