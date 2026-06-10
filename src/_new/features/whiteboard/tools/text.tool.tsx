@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Type } from 'lucide-react';
 import { TextTool } from '@/_new/features/whiteboard/components/toolbar/text-tool';
 import type { TextElement } from '@/_new/features/whiteboard/types';
@@ -8,7 +9,10 @@ import type { ToolDefinition } from './types';
 
 function TextOverlay() {
   const h = useToolHost();
-  const textElements = h.elements.filter((e) => e.type === 'text') as TextElement[];
+  const textElements = useMemo(
+    () => h.elements.filter((e) => e.type === 'text') as TextElement[],
+    [h.elements],
+  );
   return (
     <TextTool
       viewport={h.viewport}

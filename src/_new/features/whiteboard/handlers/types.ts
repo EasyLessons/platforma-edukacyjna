@@ -36,8 +36,6 @@ export interface RenderExtras {
   loadedImages?: Map<string, HTMLImageElement>;
   /** Tryb debugowania – rysuje pomocnicze prostokąty */
   debug?: boolean;
-  /** Callback do automatycznego rozszerzania wysokości tekstu */
-  onAutoExpand?: (elementId: string, newHeight: number) => void;
 }
 
 // ─── INTERFACE ───────────────────────────────────────────────────────────────

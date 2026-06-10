@@ -1,4 +1,4 @@
-﻿/**
+/**
  * ============================================================================
  * PLIK: text-tool.tsx — model Miro
  * ============================================================================
@@ -17,10 +17,9 @@ import {
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { TextMiniToolbar } from './text-mini-toolbar';
 
-// Domyślne wartości dla nowego tekstu (w jednostkach świata)
-const DEFAULT_FONT_SIZE = 24; 
-const MIN_WORLD_W = 0.8;  // 80px przy scale=1
-const MIN_WORLD_H = 0.18; // 18px przy scale=1
+const DEFAULT_FONT_SIZE = 24;
+const MIN_WORLD_W = 0.8;
+const MIN_WORLD_H = 0.18;
 
 interface TextToolProps {
   viewport: ViewportTransform;
@@ -42,7 +41,7 @@ interface Draft {
   worldX:     number;
   worldY:     number;
   worldW:     number;
-  worldH:     number;
+  worldH:     number; // używany tylko przez logikę resize (proporcjonalne skalowanie)
   fontSize:   number;
   color:      string;
   fontFamily: string;
@@ -67,45 +66,52 @@ export function TextTool({
   isGestureActive = false,
 }: TextToolProps) {
 
-  const [phase, setPhase] = useState<'idle' | 'drawing' | 'editing'>('idle');
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [phase, setPhase]           = useState<'idle' | 'drawing' | 'editing'>('idle');
+  const [draft, setDraft]           = useState<Draft | null>(null);
+  // localHeight: jedyne źródło prawdy o wysokości ramki podczas edycji.
+  // Aktualizowana przez auto-expand (textarea.scrollHeight) i resize.
+  // Commit do Zustanda wyłącznie w handleSave — O(1) zapis niezależnie od długości tekstu.
+  const [localHeight, setLocalHeight] = useState(0);
 
   const drawStartWorld = useRef<Point | null>(null);
   const drawCurrWorld  = useRef<Point | null>(null);
   const [drawPreview, setDrawPreview] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
 
-  const [editText, setEditText] = useState('');
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [editText, setEditText]     = useState('');
+  const textareaRef                 = useRef<HTMLTextAreaElement>(null);
+  const overlayRef                  = useRef<HTMLDivElement>(null);
+  const editorRef                   = useRef<HTMLDivElement | null>(null);
 
   const [isResizing, setIsResizing] = useState(false);
-  const resizeHandleRef     = useRef<string>('');             
-  const resizeStartMouse    = useRef<Point>({ x: 0, y: 0 }); 
-  const resizeDraftSnapshot = useRef<Draft | null>(null);     
+  const resizeHandleRef             = useRef<string>('');
+  const resizeStartMouse            = useRef<Point>({ x: 0, y: 0 });
+  const resizeDraftSnapshot         = useRef<Draft | null>(null);
 
-  const editorRef = useRef<HTMLDivElement | null>(null);
   const viewportRef = useRef(viewport);
   useEffect(() => { viewportRef.current = viewport; }, [viewport]);
 
-  // 1. OTWIERANIE EDYCJI ISTNIEJĄCEGO TEKSTU
+  // ─── 1. Otwarcie edycji istniejącego tekstu ──────────────────────────────────
   useEffect(() => {
     if (!editingTextId) return;
     const el = elements.find((e) => e.id === editingTextId);
     if (!el) return;
 
+    const initialH = el.height ?? 0.4;
     setDraft({
       id:         el.id,
       worldX:     el.x,
       worldY:     el.y,
       worldW:     el.width  ?? 3,
-      worldH:     el.height ?? 0.4,
+      worldH:     initialH,
       fontSize:   el.fontSize,
       color:      el.color,
-      fontFamily: el.fontFamily  ?? 'Arial, sans-serif',
-      fontWeight: el.fontWeight  ?? 'normal',
-      fontStyle:  el.fontStyle   ?? 'normal',
-      textAlign:  el.textAlign   ?? 'left',
+      fontFamily: el.fontFamily ?? 'Arial, sans-serif',
+      fontWeight: el.fontWeight ?? 'normal',
+      fontStyle:  el.fontStyle  ?? 'normal',
+      textAlign:  el.textAlign  ?? 'left',
       isExisting: true,
     });
+    setLocalHeight(initialH);
     setEditText(el.text);
     setPhase('editing');
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -119,7 +125,7 @@ export function TextTool({
     });
   }, [phase]);
 
-  // 2. RESIZE (PROPORCJONALNE SKALOWANIE W STYLU MIRO)
+  // ─── 2. Resize (proporcjonalne skalowanie Miro-style) ────────────────────────
   useEffect(() => {
     if (!isResizing) return;
 
@@ -133,10 +139,8 @@ export function TextTool({
         { x: e.clientX - rect.left, y: e.clientY - rect.top },
         viewportRef.current,
         canvasWidth,
-        canvasHeight
+        canvasHeight,
       );
-      const cx = worldCursor.x;
-      const cy = worldCursor.y;
 
       const origLeft   = snap.worldX;
       const origTop    = snap.worldY;
@@ -146,34 +150,28 @@ export function TextTool({
       let newLeft = origLeft, newTop = origTop;
       let newRight = origRight, newBottom = origBottom;
 
+      const { x: cx, y: cy } = worldCursor;
       if (handle === 'tl') { newLeft = cx; newTop = cy; }
       if (handle === 'tr') { newRight = cx; newTop = cy; }
       if (handle === 'bl') { newLeft = cx; newBottom = cy; }
       if (handle === 'br') { newRight = cx; newBottom = cy; }
 
-      // Wymuś minimum szerokości
       if (newRight - newLeft < MIN_WORLD_W) {
         if (handle === 'tl' || handle === 'bl') newLeft = newRight - MIN_WORLD_W;
         else                                    newRight = newLeft + MIN_WORLD_W;
       }
 
-      const newW = newRight - newLeft;
-
-      // PROPORCJONALNE SKALOWANIE:
+      const newW       = newRight - newLeft;
       const scaleRatio = newW / snap.worldW;
       const newFontSize = snap.fontSize * scaleRatio;
-      const newH = snap.worldH * scaleRatio;
+      const newH        = snap.worldH * scaleRatio;
 
-      // Korekta pozycji Y, żeby zachować proporcje ramki
-      if (handle === 'tl' || handle === 'tr') {
-        newTop = origBottom - newH;
-      } else {
-        newBottom = origTop + newH;
-      }
+      if (handle === 'tl' || handle === 'tr') newTop    = origBottom - newH;
+      else                                    newBottom = origTop    + newH;
 
       setDraft(prev => prev ? {
         ...prev,
-        worldX: newLeft, 
+        worldX: newLeft,
         worldY: newTop,
         worldW: newW,
         worldH: newH,
@@ -183,62 +181,67 @@ export function TextTool({
 
     const onUp = () => setIsResizing(false);
     document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup',  onUp);
-    return () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+    document.addEventListener('mouseup',   onUp);
+    return () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+    };
   }, [isResizing, canvasWidth, canvasHeight]);
 
-  // 3. AUTO-EXPAND HEIGHT
+  // ─── 3. Auto-expand height — tylko lokalny stan, zero commitów do Zustanda ───
+  // Nasłuchuje na: zmiana tekstu, faza, szerokość ramki, skala viewportu.
+  // Używa funkcyjnej aktualizacji setLocalHeight, żeby uniknąć stale closure
+  // i nadmiarowych re-renderów przy stabilnej wartości.
   useEffect(() => {
     if (phase !== 'editing' || !textareaRef.current) return;
     const textarea = textareaRef.current;
-
-    // Najpierw zwijamy textarea, by poprawnie zmierzyć jeśli usunięto tekst
-    textarea.style.height = '0px'; 
-    const scrollH = textarea.scrollHeight;
+    textarea.style.height = '0px';
+    const scrollH  = textarea.scrollHeight;
     textarea.style.height = '100%';
-
-    const newWorldH = Math.max(MIN_WORLD_H, scrollH / (100 * viewportRef.current.scale));
-
-    setDraft(prev => {
-      if (!prev) return prev;
-      if (Math.abs(newWorldH - prev.worldH) < 0.005) return prev;
-      return { ...prev, worldH: newWorldH };
-    });
-  // Szerokość (worldW) w dependencies, aby po zmianie rozmiaru ponownie przeliczyć wysokość
+    const newWorldH = Math.max(MIN_WORLD_H, scrollH / (100 * viewport.scale));
+    setLocalHeight(prev => Math.abs(newWorldH - prev) < 0.005 ? prev : newWorldH);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editText, phase, draft?.worldW]);
+  }, [editText, phase, draft?.worldW, viewport.scale, draft?.fontSize, draft?.fontFamily, draft?.fontWeight, draft?.fontStyle]);
 
-  // 4. ZAPIS
+  // ─── 4. Commit — JEDEN zapis do Zustanda na zakończenie edycji ───────────────
   const handleSave = useCallback(() => {
     if (!draft) return;
     const trimmed = editText.trim();
 
     if (!trimmed) {
       if (draft.isExisting) onTextDelete(draft.id);
-      setPhase('idle'); setDraft(null); setEditText('');
+      setPhase('idle'); setDraft(null); setEditText(''); setLocalHeight(0);
       onEditingComplete?.();
       return;
     }
 
     const data: Partial<TextElement> = {
-      x: draft.worldX, y: draft.worldY, width: draft.worldW, height: draft.worldH,
-      text: editText, fontSize: draft.fontSize,
-      color: draft.color, fontFamily: draft.fontFamily,
-      fontWeight: draft.fontWeight, fontStyle: draft.fontStyle, textAlign: draft.textAlign,
+      x:          draft.worldX,
+      y:          draft.worldY,
+      width:      draft.worldW,
+      height:     localHeight,   // ← wartość z lokalnego bufora, nie Zustanda
+      text:       editText,
+      fontSize:   draft.fontSize,
+      color:      draft.color,
+      fontFamily: draft.fontFamily,
+      fontWeight: draft.fontWeight,
+      fontStyle:  draft.fontStyle,
+      textAlign:  draft.textAlign,
     };
 
     if (draft.isExisting) onTextUpdate(draft.id, data);
-    else onTextCreate({ id: draft.id, type: 'text', ...data } as TextElement);
+    else                  onTextCreate({ id: draft.id, type: 'text', ...data } as TextElement);
 
-    setPhase('idle'); setDraft(null); setEditText('');
+    setPhase('idle'); setDraft(null); setEditText(''); setLocalHeight(0);
     onEditingComplete?.();
-  }, [draft, editText, onTextCreate, onTextUpdate, onTextDelete, onEditingComplete]);
+  }, [draft, editText, localHeight, onTextCreate, onTextUpdate, onTextDelete, onEditingComplete]);
 
   const handleCancel = useCallback(() => {
-    setPhase('idle'); setDraft(null); setEditText(''); setIsResizing(false);
+    setPhase('idle'); setDraft(null); setEditText(''); setLocalHeight(0); setIsResizing(false);
     onEditingComplete?.();
   }, [onEditingComplete]);
 
+  // Click outside → commit
   useEffect(() => {
     if (phase !== 'editing') return;
     const onDown = (e: MouseEvent) => {
@@ -250,31 +253,20 @@ export function TextTool({
     return () => { clearTimeout(t); document.removeEventListener('mousedown', onDown); };
   }, [phase, isResizing, handleSave]);
 
-  useEffect(() => {
-    if (phase !== 'editing' || !draft?.isExisting) return;
-    onTextUpdate(draft.id, {
-      x: draft.worldX, y: draft.worldY, width: draft.worldW, height: draft.worldH,
-      text: editText, fontSize: draft.fontSize,
-      color: draft.color, fontFamily: draft.fontFamily,
-      fontWeight: draft.fontWeight, fontStyle: draft.fontStyle, textAlign: draft.textAlign,
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editText, draft?.worldX, draft?.worldY, draft?.worldW, draft?.worldH,
-      draft?.fontSize, draft?.color, draft?.fontWeight, draft?.fontStyle, draft?.textAlign]);
-
-  const overlayRef = useRef<HTMLDivElement>(null);
+  // Scroll/zoom na overlayach (nie podczas edycji)
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay || !onViewportChange) return;
     const onWheel = (e: WheelEvent) => {
-      if (phase === 'editing') return; 
+      if (phase === 'editing') return;
       e.preventDefault(); e.stopPropagation();
       const vp = viewportRef.current;
       if (e.ctrlKey) {
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
+        const rect = overlay.getBoundingClientRect();
         onViewportChange(constrainViewport(zoomViewport(vp, e.deltaY, e.clientX - rect.left, e.clientY - rect.top, canvasWidth, canvasHeight)));
+      } else {
+        onViewportChange(constrainViewport(panViewportWithWheel(vp, e.deltaX, e.deltaY)));
       }
-      else           onViewportChange(constrainViewport(panViewportWithWheel(vp, e.deltaX, e.deltaY)));
     };
     overlay.addEventListener('wheel', onWheel, { passive: false });
     return () => overlay.removeEventListener('wheel', onWheel);
@@ -285,15 +277,15 @@ export function TextTool({
       setPhase('idle');
       setDrawPreview(null);
       drawStartWorld.current = null;
-      drawCurrWorld.current = null;
+      drawCurrWorld.current  = null;
     }
   }, [isGestureActive, phase]);
 
-  // 5. RYSOWANIE NOWEJ RAMKI
+  // ─── 5. Rysowanie nowej ramki ─────────────────────────────────────────────────
   const handleOverlayDown = (e: React.MouseEvent) => {
     if (isGestureActive) return;
     if (phase === 'editing' || e.button !== 0) return;
-    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const rect  = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
     const world = inverseTransformPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, viewport, canvasWidth, canvasHeight);
     drawStartWorld.current = world;
     drawCurrWorld.current  = world;
@@ -303,7 +295,7 @@ export function TextTool({
 
   const handleOverlayMove = (e: React.MouseEvent) => {
     if (phase !== 'drawing' || !drawStartWorld.current) return;
-    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const rect  = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
     const world = inverseTransformPoint({ x: e.clientX - rect.left, y: e.clientY - rect.top }, viewport, canvasWidth, canvasHeight);
     drawCurrWorld.current = world;
     setDrawPreview({
@@ -321,23 +313,18 @@ export function TextTool({
     const sx = drawStartWorld.current.x, sy = drawStartWorld.current.y;
     const ex = drawCurrWorld.current.x,  ey = drawCurrWorld.current.y;
 
-    let worldX = Math.min(sx, ex), worldY = Math.min(sy, ey);
-    let worldW = Math.abs(ex - sx);
+    const worldX = Math.min(sx, ex);
+    const worldY = Math.min(sy, ey);
+    let worldW   = Math.abs(ex - sx);
+    if (worldW < MIN_WORLD_W / viewport.scale) worldW = 3.0 / viewport.scale;
 
-    // Kiedy użytkownik tylko kliknie (lub zrobi bardzo małą ramkę)
-    if (worldW < MIN_WORLD_W) {
-      worldW = 3.0; // Domyślna szerokość
-    }
-
-    // W Miro nowa ramka zawsze ma domyślny rozmiar czcionki
-    const initialFontSize = DEFAULT_FONT_SIZE;
-    // Orientacyjna wysokość startowa - autoexpand z useEffect i tak ją zaraz poprawi
-    const worldH = (initialFontSize * 1.5) / 100;
+    const adjustedFontSize = DEFAULT_FONT_SIZE / viewport.scale;
+    const worldH = (adjustedFontSize * 1.4) / 100;
 
     setDraft({
       id: Date.now().toString(),
       worldX, worldY, worldW, worldH,
-      fontSize:   initialFontSize,
+      fontSize:   adjustedFontSize,
       color:      '#000000',
       fontFamily: 'Arial, sans-serif',
       fontWeight: 'normal',
@@ -345,6 +332,7 @@ export function TextTool({
       textAlign:  'left',
       isExisting: false,
     });
+    setLocalHeight(worldH);
     setEditText('');
     setPhase('editing');
     setDrawPreview(null);
@@ -354,23 +342,28 @@ export function TextTool({
 
   const makeResizeHandler = (handle: string) => (e: React.MouseEvent) => {
     e.preventDefault();
-    e.stopPropagation(); 
+    e.stopPropagation();
     resizeHandleRef.current     = handle;
     resizeStartMouse.current    = { x: e.clientX, y: e.clientY };
-    resizeDraftSnapshot.current = draft ? { ...draft } : null;
+    // snapshot używa localHeight jako worldH, żeby proporcje resize odpowiadały
+    // rzeczywistej wizualnej wysokości ramki, nie zapisanej wartości ze stanu
+    resizeDraftSnapshot.current = draft ? { ...draft, worldH: localHeight } : null;
     setIsResizing(true);
   };
 
+  // ─── Geometria edytora ────────────────────────────────────────────────────────
+  // edHeight pochodzi z localHeight (nie draft.worldH), dzięki czemu ramka
+  // wizualna natychmiast dopasowuje się do treści podczas wpisywania.
   let edLeft = 0, edTop = 0, edWidth = 0, edHeight = 0;
   if (draft && phase === 'editing') {
     const tl = transformPoint({ x: draft.worldX, y: draft.worldY }, viewport, canvasWidth, canvasHeight);
-    const br = transformPoint({ x: draft.worldX + draft.worldW, y: draft.worldY + draft.worldH }, viewport, canvasWidth, canvasHeight);
+    const br = transformPoint({ x: draft.worldX + draft.worldW, y: draft.worldY + localHeight }, viewport, canvasWidth, canvasHeight);
     edLeft = tl.x; edTop = tl.y; edWidth = br.x - tl.x; edHeight = br.y - tl.y;
   }
 
   const fontSizePx = draft ? Math.max(1, draft.fontSize * viewport.scale) : 14;
 
-  const HS = 10; 
+  const HS = 10;
   const handleStyle: React.CSSProperties = {
     position: 'absolute', width: HS, height: HS,
     borderRadius: '50%', background: '#fff', border: '2px solid #3b82f6',
@@ -414,9 +407,12 @@ export function TextTool({
           data-world-x={draft.worldX}
           data-world-y={draft.worldY}
           data-world-w={draft.worldW}
-          data-world-h={draft.worldH}
+          data-world-h={localHeight}
           className="absolute pointer-events-auto z-50"
-          style={{ left: edLeft, top: edTop, width: edWidth, height: edHeight, overflow: 'visible', boxShadow: '0 0 0 2px #3b82f6' }}
+          style={{
+            left: edLeft, top: edTop, width: edWidth, height: edHeight,
+            overflow: 'visible', boxShadow: '0 0 0 2px #3b82f6',
+          }}
         >
           <div className="absolute -top-12 left-0 z-50">
             <TextMiniToolbar
@@ -454,9 +450,9 @@ export function TextTool({
           </div>
 
           <div style={{ ...handleStyle, left: 0, top: 0, transform: 'translate(-50%,-50%)', cursor: 'nwse-resize' }} onMouseDown={makeResizeHandler('tl')} />
-          <div style={{ ...handleStyle, right: 0, top: 0, transform: 'translate(50%,-50%)', cursor: 'nesw-resize' }} onMouseDown={makeResizeHandler('tr')} />
+          <div style={{ ...handleStyle, right: 0, top: 0, transform: 'translate(50%,-50%)',  cursor: 'nesw-resize' }} onMouseDown={makeResizeHandler('tr')} />
           <div style={{ ...handleStyle, left: 0, bottom: 0, transform: 'translate(-50%,50%)', cursor: 'nesw-resize' }} onMouseDown={makeResizeHandler('bl')} />
-          <div style={{ ...handleStyle, right: 0, bottom: 0, transform: 'translate(50%,50%)', cursor: 'nwse-resize' }} onMouseDown={makeResizeHandler('br')} />
+          <div style={{ ...handleStyle, right: 0, bottom: 0, transform: 'translate(50%,50%)',  cursor: 'nwse-resize' }} onMouseDown={makeResizeHandler('br')} />
         </div>
       )}
     </div>

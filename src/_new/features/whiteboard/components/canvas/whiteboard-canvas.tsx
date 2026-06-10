@@ -660,7 +660,7 @@ useMultiTouchGestures({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const { elementsRef, loadedImages, spatialIndex, viewportRef, handleElementUpdate: handleElUpdate } = renderStateRef.current;
+    const { elementsRef, loadedImages, spatialIndex, viewportRef } = renderStateRef.current;
 
     const dpr = window.devicePixelRatio || 1;
     const width = canvas.width / dpr;
@@ -689,18 +689,7 @@ useMultiTouchGestures({
       if (element.type === 'markdown') continue;
       if (element.type === 'text' && element.id === editingTextIdRef.current) continue;
 
-      const onAutoExpand = (id: string, newHeight: number) => {
-        setTimeout(() => {
-          const current = elementsRef.current.find((e) => e.id === id);
-          if (current && 'height' in current) {
-            if (Math.abs((current.height ?? 0) - newHeight) > 0.05) {
-              handleElUpdate?.(id, { height: newHeight });
-            }
-          }
-        }, 0);
-      };
-
-      drawElement(ctx, element, viewport, width, height, loadedImages, false, onAutoExpand, elementsRef.current);
+      drawElement(ctx, element, viewport, width, height, loadedImages, false);
     }
 
     // Overlay transform — synchronicznie z canvasem, zero lagu przy pan/zoom

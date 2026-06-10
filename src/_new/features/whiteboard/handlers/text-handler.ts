@@ -6,7 +6,7 @@
  * Resize:  proporcjonalne skalowanie (Miro-style) – szerokość i czcionka
  *          rosną o ten sam %, układ tekstu (łamanie wierszy) nie zmienia się.
  * Rotate:  obrót środka wokół pivota + zapis kąta rotacji do elementu.
- * Render:  bez clampowania czcionki – pełne skalowanie z viewportem.
+ * Render:  czysta funkcja – brak callbacków mutujących stan (patrz text-architecture.md).
  * ============================================================================
  */
 
@@ -16,58 +16,80 @@ import { rotateAroundPivot, getRotatedAABB, getSimpleAABB } from './handler-util
 import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
 
 
+// ─── Cache per-element ────────────────────────────────────────────────────────
+//
+// Klucz główny Map: el.id (jeden wpis per element).
+// Klucz weryfikacyjny (CacheEntry.key): 6-polowa krotka rozdzielona "|".
+// Zmiana któregokolwiek z 6 pól → MISS → rekalkulacja.
+// Brak globalnego "stop-the-world" clear() — inwalidacja wyłącznie per el.id.
 
-// ─── Pomocnicza – zawijanie tekstu na canvasie z CACHE ──────────────────────
+interface CacheEntry {
+  key: string;
+  lines: string[];
+}
 
-const textWrapCache = new Map<string, string[]>();
+const textWrapCache = new Map<string, CacheEntry>();
+
+/** Wywołaj przy usunięciu elementu tekstowego, aby zwolnić pamięć cache. */
+export function invalidateTextCache(id: string): void {
+  textWrapCache.delete(id);
+}
 
 function getWrappedLines(
   ctx: CanvasRenderingContext2D,
+  el: TextElement,
+  maxWidth: number,
+): string[] {
+  const newKey = [
+    el.text,
+    maxWidth.toFixed(1),
+    el.fontSize,
+    el.fontFamily  ?? 'Arial',
+    el.fontWeight  ?? 'normal',
+    el.fontStyle   ?? 'normal',
+  ].join('|');
+
+  const cached = textWrapCache.get(el.id);
+  if (cached?.key === newKey) return cached.lines; // HIT — O(1)
+
+  const lines = computeWrappedLines(ctx, el.text, maxWidth); // MISS
+  textWrapCache.set(el.id, { key: newKey, lines });
+  return lines;
+}
+
+function computeWrappedLines(
+  ctx: CanvasRenderingContext2D,
   text: string,
   maxWidth: number,
-  fontKey: string
 ): string[] {
-  const cacheKey = `${text}_${maxWidth.toFixed(1)}_${fontKey}`;
-  if (textWrapCache.has(cacheKey)) return textWrapCache.get(cacheKey)!;
-
-  const lines = text.split('\n');
+  const paragraphs = text.split('\n');
   const result: string[] = [];
 
-  for (const line of lines) {
-    const words = line.split(' ');
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(' ');
     let current = '';
 
-    for (let i = 0; i < words.length; i++) {
-      const word = words[i];
-      
-      // KROK 1: Jeśli pojedyncze słowo (lub ciąg "asdfasdf") jest szersze niż ramka
+    for (const word of words) {
+      // Słowo szersze niż ramka → łamanie znak po znaku
       if (ctx.measureText(word).width > maxWidth) {
-        // Zrzucamy to co mieliśmy do tej pory
-        if (current) {
-          result.push(current);
-          current = '';
-        }
-        
-        // Łamiemy to gigantyczne słowo znak po znaku!
+        if (current) { result.push(current); current = ''; }
+
         let remaining = word;
         while (ctx.measureText(remaining).width > maxWidth) {
           let fit = 0;
           for (let j = 1; j <= remaining.length; j++) {
-            if (ctx.measureText(remaining.substring(0, j)).width <= maxWidth) {
-              fit = j;
-            } else {
-              break;
-            }
+            if (ctx.measureText(remaining.substring(0, j)).width <= maxWidth) fit = j;
+            else break;
           }
-          if (fit === 0) fit = 1; // Wymuszamy wejście chociaż 1 znaku
+          if (fit === 0) fit = 1; // wymuś min. 1 znak
           result.push(remaining.substring(0, fit));
           remaining = remaining.substring(fit);
         }
-        current = remaining; // Resztka uciętego słowa
+        current = remaining;
         continue;
       }
 
-      // KROK 2: Normalne słowa (sprawdzamy czy zmieszczą się z resztą linii)
+      // Normalne słowo: dodaj do bieżącej linii lub zacznij nową
       const test = current + (current ? ' ' : '') + word;
       if (ctx.measureText(test).width > maxWidth && current) {
         result.push(current);
@@ -76,16 +98,12 @@ function getWrappedLines(
         current = test;
       }
     }
-    
+
     if (current) result.push(current);
   }
 
-  if (textWrapCache.size > 1000) textWrapCache.clear();
-  textWrapCache.set(cacheKey, result);
-
   return result;
 }
-
 
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
@@ -108,7 +126,6 @@ export const TextHandler: ElementHandler<TextElement> = {
     const h = el.height ?? 1;
 
     if (el.rotation && el.rotation !== 0) {
-      // Odwróć punkt o –rotację wokół środka elementu
       const cx = el.x + w / 2;
       const cy = el.y + h / 2;
       const cos = Math.cos(-el.rotation);
@@ -120,7 +137,10 @@ export const TextHandler: ElementHandler<TextElement> = {
       return rx >= el.x && rx <= el.x + w && ry >= el.y && ry <= el.y + h;
     }
 
-    return point.x >= el.x && point.x <= el.x + w && point.y >= el.y && point.y <= el.y + h;
+    return (
+      point.x >= el.x && point.x <= el.x + w &&
+      point.y >= el.y && point.y <= el.y + h
+    );
   },
 
   resize(el, pivotX, pivotY, scaleX, scaleY) {
@@ -152,13 +172,13 @@ export const TextHandler: ElementHandler<TextElement> = {
     };
   },
 
-render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
+  render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
     const pos = transformPoint({ x: el.x, y: el.y }, viewport, canvasWidth, canvasHeight);
 
     if (el.rotation && el.rotation !== 0) {
       ctx.save();
-      const w = (el.width ?? 3) * viewport.scale * 100;
-      const h = (el.height ?? 1) * viewport.scale * 100;
+      const w  = (el.width  ?? 3) * viewport.scale * 100;
+      const h  = (el.height ?? 1) * viewport.scale * 100;
       const cx = pos.x + w / 2;
       const cy = pos.y + h / 2;
       ctx.translate(cx, cy);
@@ -169,7 +189,6 @@ render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
     const fontWeight = el.fontWeight ?? 'normal';
     const fontStyle  = el.fontStyle  ?? 'normal';
     const fontFamily = el.fontFamily ?? 'Arial, sans-serif';
-    // Brak clampowania – pełne skalowanie z viewportem
     const fontSize   = el.fontSize * viewport.scale;
 
     ctx.fillStyle    = el.color;
@@ -179,66 +198,35 @@ render(ctx, el, viewport, canvasWidth, canvasHeight, extras) {
     const textAlign = el.textAlign ?? 'left';
     ctx.textAlign   = textAlign;
 
-    const lines      = el.text.split('\n');
     const lineHeight = fontSize * 1.4;
     const paddingX   = 0;
     const paddingY   = 0;
 
     let textX = pos.x + paddingX;
+
     if (el.width) {
       const boxWidth     = el.width * viewport.scale * 100;
       const contentWidth = boxWidth - paddingX * 2;
       if (textAlign === 'center') textX = pos.x + paddingX + contentWidth / 2;
       else if (textAlign === 'right') textX = pos.x + paddingX + contentWidth;
-    }
 
-if (el.width) {
-      const boxWidth = el.width * viewport.scale * 100;
-      const maxWidth = boxWidth - paddingX * 2;
-
-      // Tworzymy klucz czcionki dla Cache'a
-      const fontKey = ctx.font;
-      
-      const wrappedLines = getWrappedLines(ctx, el.text, maxWidth, fontKey);
-
-      // 🔥 AUTOMATYCZNE WYDŁUŻANIE RAMKI: Obliczamy ile miejsca w pionie zajmuje tekst
-      const requiredLines = wrappedLines.length;
-      const reqPx = requiredLines * lineHeight + paddingY * 2;
-      
-      if (extras?.onAutoExpand) {
-        const requiredHeight = reqPx / (viewport.scale * 100);
-        const currentHeight = el.height ?? 1;
-        
-        // Jeśli tekst potrzebuje więcej (lub mniej) miejsca niż ma ramka, aktualizujemy wysokość!
-        if (Math.abs(requiredHeight - currentHeight) > 0.05) {
-          extras.onAutoExpand(el.id, requiredHeight);
-        }
-      }
+      const maxWidth     = boxWidth - paddingX * 2;
+      const wrappedLines = getWrappedLines(ctx, el, maxWidth);
 
       if (extras?.debug) {
         const curPx = (el.height ?? 0) * viewport.scale * 100;
         ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-        ctx.lineWidth = 2;
+        ctx.lineWidth   = 2;
         ctx.strokeRect(pos.x, pos.y, boxWidth, curPx);
       }
 
-      // Rysowanie zoptymalizowanych linii
       let currentY = pos.y + paddingY;
       for (const line of wrappedLines) {
         ctx.fillText(line, textX, currentY);
         currentY += lineHeight;
-      }    
-} else {
-      if (extras?.onAutoExpand) {
-        const reqPx = lines.length * lineHeight + paddingY * 2;
-        const requiredHeight = reqPx / (viewport.scale * 100);
-        const currentHeight = el.height ?? 1;
-        if (Math.abs(requiredHeight - currentHeight) > 0.05) {
-          extras.onAutoExpand(el.id, requiredHeight);
-        }
       }
-
-      lines.forEach((line, i) => {
+    } else {
+      el.text.split('\n').forEach((line, i) => {
         ctx.fillText(line, textX, pos.y + paddingY + i * lineHeight);
       });
     }

@@ -175,8 +175,6 @@ export function drawElement(
   canvasHeight: number,
   loadedImages?: Map<string, HTMLImageElement>,
   debug?: boolean,
-  onAutoExpand?: (elementId: string, newHeight: number) => void,
-  elements?: DrawingElement[]
 ): void {
   // Wykres funkcji – jedyny typ bez handlera (niezaznaczalny)
   if (element.type === 'function') {
@@ -190,7 +188,6 @@ export function drawElement(
   handler.render(ctx, element, viewport, canvasWidth, canvasHeight, {
     loadedImages,
     debug,
-    onAutoExpand,
   });
 }
 
