@@ -185,23 +185,13 @@ export default function WhiteboardCanvasNew({
     boardIdRef.current = boardId;
   }, [boardId]);
 
-  // ─── Stan paska narzędzi + właściwości — store zustand (Faza 2) ─────────────
-  // activeTool i właściwości narzędzi żyją w jednym store. Selektory dają
-  // granularną subskrypcję; hot-path może czytać useToolStore.getState().
+  // ─── Aktywne narzędzie — store zustand ──────────────────────────────────────
+  // Właściwości narzędzi (color/lineWidth/…) czytają już bezpośrednio adaptery
+  // i panele PropertiesPanel ze store'a — canvas ich nie przepycha (Faza 3).
   const tool = useToolStore((s) => s.activeTool);
   const setTool = useToolStore((s) => s.setActiveTool);
-  const color = useToolStore((s) => s.color);
-  const lineWidth = useToolStore((s) => s.lineWidth);
-  const fontSize = useToolStore((s) => s.fontSize);
-  const fillShape = useToolStore((s) => s.fillShape);
-  const selectedShape = useToolStore((s) => s.selectedShape);
-  const polygonSides = useToolStore((s) => s.polygonSides);
-  const setColor = useToolStore((s) => s.setColor);
-  const setLineWidth = useToolStore((s) => s.setLineWidth);
-  const setFontSize = useToolStore((s) => s.setFontSize);
-  const setFillShape = useToolStore((s) => s.setFillShape);
-  const setSelectedShape = useToolStore((s) => s.setSelectedShape);
-  const setPolygonSides = useToolStore((s) => s.setPolygonSides);
+  // Rejestr akcji narzędzia Obraz dla panelu ImageProperties (poniżej, w useEffect).
+  const setImageActions = useToolStore((s) => s.setImageActions);
 
   const [isCalculatorOpen, setIsCalculatorOpen] = useState(false);
 
@@ -420,7 +410,7 @@ export default function WhiteboardCanvasNew({
     onDebouncedSave: () => {},
     onSelectElements: sel.selectElements,
     onLoadImage: el.loadImage,
-    onPushUserAction: hist.pushUserAction,
+    onRecordCommand: hist.recordCommand,
   });
 
   // ─── SILNIK: WhiteboardEngine ────────────────────────────────────────────────
@@ -448,7 +438,6 @@ export default function WhiteboardCanvasNew({
     redo: hist.redo,
     canUndo: hist.canUndo,
     canRedo: hist.canRedo,
-    saveToHistory: hist.saveToHistory,
     canvasSize: { width: canvasWidth, height: canvasHeight },
     boardIdRef,
     userRole,
@@ -1714,6 +1703,16 @@ useMultiTouchGestures({
     imageToolRef.current?.triggerFileUpload();
   }, []);
 
+  // Rejestruj akcje narzędzia Obraz w store — używa ich panel ImageProperties
+  // (renderowany w toolbarze, poza zasięgiem imageToolRef). pdfUpload = upload.
+  useEffect(() => {
+    setImageActions({
+      paste: handleImageToolPaste,
+      upload: handleImageToolUpload,
+      pdfUpload: handleImageToolUpload,
+    });
+  }, [setImageActions, handleImageToolPaste, handleImageToolUpload]);
+
   // ═══════════════════════════════════════════════════════════════════════════
   // FOLLOW MODE
   // ═══════════════════════════════════════════════════════════════════════════
@@ -2052,30 +2051,14 @@ useMultiTouchGestures({
         {/* ── TOOLBAR ───────────────────────────────────────────────────── */}
         {settings.toolbar_visible && (
           <Toolbar
-            selectedShape={selectedShape}
-            setSelectedShape={setSelectedShape}
-            polygonSides={polygonSides}
-            setPolygonSides={setPolygonSides}
-            color={color}
-            setColor={setColor}
-            lineWidth={lineWidth}
-            setLineWidth={setLineWidth}
-            fontSize={fontSize}
-            setFontSize={setFontSize}
-            fillShape={fillShape}
-            setFillShape={setFillShape}
             onUndo={hist.undo}
             onRedo={hist.redo}
             onClear={clearCanvas}
-            onResetView={resetView}
             canUndo={hist.canUndo}
             canRedo={hist.canRedo}
             hasSelection={sel.selectedElementIds.size > 0}
             onDeleteSelected={deleteSelectedElements}
-            onImagePaste={handleImageToolPaste}
-            onImageUpload={handleImageToolUpload}
             onToggleAssetsLibrary={() => setShowAssetsLibrary(v => !v)}
-            onPDFUpload={handleImageToolUpload}
             isCalculatorOpen={isCalculatorOpen}
             onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
             isReadOnly={userRole === 'viewer'}

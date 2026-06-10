@@ -22,15 +22,6 @@ export interface Point {
   y: number;
 }
 
-/**
- * Akcja użytkownika zapisywana na stosie undo/redo.
- */
-export type UserAction =
-  | { type: 'create'; element: DrawingElement }
-  | { type: 'delete'; element: DrawingElement }
-  | { type: 'update'; before: DrawingElement; after: DrawingElement }
-  | { type: 'batch'; actions: UserAction[] };
-
 // ─── TYPY ELEMENTÓW ──────────────────────────────────────────────────────────
 
 /** Linia rysowana odręcznie (narzędzie: pióro) */

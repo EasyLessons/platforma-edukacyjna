@@ -83,14 +83,12 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
       updateElements: (before, after) => {
         if (isReadOnly() || after.length === 0) return;
         const {
-          updateElements, markUnsaved, broadcastElementUpdated,
-          recordCommand, saveToHistory, elementsRef,
+          updateElements, markUnsaved, broadcastElementUpdated, recordCommand,
         } = d();
         updateElements(after);
         markUnsaved(after.map((e) => e.id));
         after.forEach((e) => broadcastElementUpdated(e).catch(console.error));
         recordCommand(new UpdateElementsCommand(before, after));
-        saveToHistory(elementsRef.current); // legacy snapshot — zostaje do Fazy 3
       },
 
       // ── INTENCJA: DELETE (persystencja natychmiastowa w chunkach, jak deleteSelectedElements) ──

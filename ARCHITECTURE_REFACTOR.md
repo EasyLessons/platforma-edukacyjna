@@ -1,6 +1,6 @@
 # Refaktoryzacja architektury tablicy — Plugin/Tool Registry + Command
 
-> **Status:** ✅ Faza 2 ukończona — rejestr narzędzi + dynamiczny toolbar/overlay. Następna: Faza 3 (sprzątanie + bezpośrednia subskrypcja store'a)
+> **Status:** ✅ **Refaktor domknięty (Fazy 0–3).** Tablica stoi na: Command (historia) + Fasada `WhiteboardEngine` + `ToolRegistry` (wtyczki). Zero długu legacy, zero martwego kodu. Dalej już tylko czysta rozbudowa.
 > **Cel:** Dodanie nowego narzędzia ma się sprowadzać do utworzenia **jednego pliku/konfiguracji**, bez modyfikowania boskiego komponentu, toolbara i historii.
 > **Zasada nadrzędna:** każda faza jest osobno mergowalna i **nie wprowadza regresji** w działaniu tablicy (rysowanie, undo/redo, multi-touch, synchronizacja Supabase).
 
@@ -15,6 +15,7 @@ Refaktor prowadzimy przyrostowo, fazami osobno commitowanymi. Stan na 2026-06-10
 | **0** | **Command** | `commands/` — `Command`/`CommandContext`, `Create/Delete/Update/CompositeCommand`, adapter `commandFromUserAction`. `use-history` operuje na `Command[]` zamiast `switch` po typie akcji. | `d50ee60` | ✅ |
 | **1** | **Fasada** + `zustand` | `engine/` — `WhiteboardEngine` z intencjami `createElements`/`updateElements`/`deleteElements` (zwijają rytuał stan+persist+broadcast+historia). Store `zustand` na właściwości narzędzi. ~16 handlerów canvasu przepiętych na silnik. | `9aba6b7` | ✅ |
 | **2** | **Strategia** + **Open/Closed** | `tools/` — `ToolDefinition` + `ToolRegistry` (`ALL_TOOLS`, lookup `Map` O(1)), `ToolHostContext` (gniazdko wtyczek), 11 adapterów `*.tool.tsx`. Drabinka 11 gałęzi → 1 `<ActiveToolOverlay/>`; toolbar i skróty z rejestru; `activeTool` w `zustand`. | `8706315` | ✅ |
+| **3** | **Sprzątanie długu** | Usunięcie legacy `history[][]`/`saveToHistory` (pożeracz pamięci — kopia całej tablicy na każdy update) i typu `UserAction` (schowek → `recordCommand(new CreateElementsCommand)`). Migracja paneli pen/shape/image do `ToolDefinition.PropertiesPanel` (store-only) + slice `imageActions`. `toolbar-ui` **~970 → ~330 linii**; canvas przestał znać właściwości narzędzi. | _(ten commit)_ | ✅ |
 
 **Efekt netto:** boski komponent stracił drabinkę renderującą narzędzia, switch skrótów, mapę kursorów i rytuały mutacji. **Dodanie narzędzia = 1 plik `tools/<x>.tool.tsx` + 1 wpis w `ALL_TOOLS`** — zero zmian w canvasie/toolbarze/historii.
 
@@ -277,15 +278,22 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 
 **Drobny dług (→ Faza 3):** w `toolbar-ui.tsx` zostały nieużywane importy ikon (MousePointer2, Hand, Type…) i martwa `getShapeIcon` — usuną się przy migracji paneli właściwości do `PropertiesPanel`. Decyzja: select-button widoczny-disabled dla viewera (wcześniej ukryty) — drobna, spójniejsza zmiana.
 
-### Faza 3 — Bezpośrednia subskrypcja store'a + sprzątanie
-- [ ] Narzędzia/`Toolbar` subskrybują `stores/tool-properties-store.ts` **bezpośrednio** (selektory) — usunięcie prop-drillingu właściwości przez canvas (pełny zysk z re-renderów)
-- [ ] Przeniesienie paneli pen/shape/image do `PropertiesPanel` narzędzi
-- [ ] Usunięcie martwych propsów, legacy `history[][]`, `saveToHistory`, `pushUserAction`, typu `UserAction`
+### ✅ Faza 3 — Sprzątanie długu + panele właściwości w rejestrze  ⬅ **UKOŃCZONA (2026-06-10)**
 
-> Store `zustand` (ToolProperties) powstał już w Fazie 1 — tutaj zostaje tylko
-> przepięcie konsumentów na bezpośrednie selektory zamiast propsów z canvasa.
+**Krok 1–2 — wycięcie legacy (zero regresji):**
+- [x] `use-history.ts`: usunięte `history[][]`, `historyIndex(Ref)`, `saveToHistory`, `historyLength`, `pushUserAction`, `MAX_HISTORY_SIZE` (**217 → ~155 linii**). Koniec kopiowania całej tablicy elementów co update (do 50 snapshotów).
+- [x] Silnik: `updateElements` bez `saveToHistory`; dep usunięty z `WhiteboardEngineDeps`/`WhiteboardEngine` i z canvasu.
+- [x] Schowek: `onPushUserAction` → `onRecordCommand?.(new CreateElementsCommand(...))` (**chunkowany broadcast zachowany**). Usunięte: `from-user-action.ts`, eksport z `commands/index`, 4 kazusy adaptera w teście, typ `UserAction`.
 
-**Kryterium:** orkiestrator schudnięty do ~kilkuset linii; zero martwego kodu.
+**Krok 3–5 — panele właściwości → `PropertiesPanel` + sprzątanie:**
+- [x] `tools/{pen,shape,image}.properties.tsx` (store-only) wpięte przez `ToolDefinition.PropertiesPanel`.
+- [x] Slice `imageActions` w `tool-store` — canvas rejestruje akcje obrazu, `ImageProperties` czyta przez selektor (pełna spójność, zero prop-drillingu).
+- [x] `toolbar-ui.tsx` przepisany **~970 → ~330 linii** (−~500 linii paneli, `getShapeIcon`, 8 nieużywanych ikon, stan pędzla + 6 refów, martwe propsy). `toolbar.tsx` odchudzony do akcji/flag.
+- [x] Canvas: usunięte 12 selektorów właściwości; `<Toolbar>` dostaje już tylko akcje — **canvas nie zna właściwości narzędzi**.
+
+**Weryfikacja:** `tsc` 0 błędów ✅ · `eslint` czysty (poza znanym artefaktem `react-hooks` w canvasie) ✅ · `vitest` 143/144 (suma −4: usunięte testy adaptera `UserAction`; 1 flaky `authApi`) ✅ · smoke test (historia, schowek, panele pen/shape/image) bez regresji.
+
+**Kryterium spełnione:** zero długu legacy, zero martwego kodu; właściwości narzędzi w pełni rejestrowe (`getTool(activeTool)?.PropertiesPanel`).
 
 ---
 
@@ -320,3 +328,5 @@ Konsolidacja `color`/`lineWidth`/`fontSize`/`fillShape`/`selectedShape`/`polygon
 | 2026-06-09 | 1 | Krok 4: migracja ~16 handlerów canvasu na intencje silnika; tsc/lint/testy zielone. Faza 1 domknięta jednym commitem | ✅ |
 | 2026-06-09 | 2 | Krok 1–2: `tool-store` + shim, `tools/` (host-context, types, 11 adapterów, registry, active-tool-overlay). Canvas NIETKNIĘTY. tsc 0 błędów, eslint czysty | ✅ |
 | 2026-06-10 | 2 | Krok 3–4: drabinka→slot, skróty/kursor z rejestru, toolbar z `ALL_TOOLS`, shim usunięty. tsc/eslint/testy zielone. Faza 2 domknięta jednym commitem | ✅ |
+| 2026-06-10 | 3 | Krok 1–2: wycięcie legacy `history[][]`/`saveToHistory` + `UserAction` (schowek → `recordCommand`); tsc 0, vitest 143/144 | ✅ |
+| 2026-06-10 | 3 | Krok 3–6: panele pen/shape/image → `PropertiesPanel` + slice `imageActions`; `toolbar-ui` ~970→~330 linii. Faza 3 domknięta jednym commitem | ✅ |

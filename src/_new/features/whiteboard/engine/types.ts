@@ -4,7 +4,7 @@
  * ============================================================================
  *
  * WhiteboardEngine to FASADA, przez którą narzędzia i handlery mutują tablicę,
- * zamiast bezpośrednio wołać rt.broadcast*, el.markUnsaved, hist.pushUserAction.
+ * zamiast bezpośrednio wołać rt.broadcast*, el.markUnsaved, hist.recordCommand.
  *
  * DWIE WARSTWY API:
  *  - INTENCJE (createElements / updateElements / deleteElements) — zwijają
@@ -104,7 +104,6 @@ export interface WhiteboardEngineDeps {
   redo(): void;
   canUndo: boolean;
   canRedo: boolean;
-  saveToHistory(elements: DrawingElement[]): void;
 
   // ── kontekst ──
   canvasSize: { width: number; height: number };

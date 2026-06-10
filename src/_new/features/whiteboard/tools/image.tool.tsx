@@ -3,6 +3,7 @@
 import { Image as ImageIcon } from 'lucide-react';
 import { ImageTool } from '@/_new/features/whiteboard/components/toolbar/image-tool';
 import { useToolHost } from './tool-host-context';
+import { ImageProperties } from './image.properties';
 import type { ToolDefinition } from './types';
 
 function ImageOverlay() {
@@ -28,4 +29,5 @@ export const imageTool: ToolDefinition = {
   order: 6,
   cursor: 'copy',
   Overlay: ImageOverlay,
+  PropertiesPanel: ImageProperties,
 };

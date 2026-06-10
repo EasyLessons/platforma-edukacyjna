@@ -1,9 +1,9 @@
 /**
  * commands/_tests/commands.test.ts
  *
- * Test fidelity: każda komenda + adapter UserAction→Command musi wywoływać
- * dokładnie te same efekty (i w tej samej kolejności), co dawne
- * applyUndo / applyRedo w use-history.ts. Atrapa CommandContext zapisuje
+ * Test fidelity: każda komenda musi wywoływać dokładnie te same efekty
+ * (i w tej samej kolejności), co pierwotne applyUndo / applyRedo z historii.
+ * Atrapa CommandContext zapisuje
  * kolejność wywołań jako listę stringów i porównujemy ją 1:1.
  */
 
@@ -12,7 +12,6 @@ import { CreateElementsCommand } from '../create-elements-command';
 import { DeleteElementsCommand } from '../delete-elements-command';
 import { UpdateElementsCommand } from '../update-elements-command';
 import { CompositeCommand } from '../composite-command';
-import { commandFromUserAction } from '../from-user-action';
 import type { CommandContext } from '../types';
 import type { DrawingElement } from '@/_new/features/whiteboard/types';
 
@@ -115,41 +114,6 @@ describe('CompositeCommand', () => {
     expect(calls).toEqual([
       'remove:b', 'bcDeleted:b', 'del:b',
       'remove:a', 'bcDeleted:a', 'del:a',
-    ]);
-  });
-});
-
-describe('commandFromUserAction (adapter)', () => {
-  it('create → CreateElementsCommand', () => {
-    const { ctx, calls } = makeCtx();
-    commandFromUserAction({ type: 'create', element: el('a') }).do(ctx);
-    expect(calls).toEqual(['add:a', 'bcCreated:a', 'save:a']);
-  });
-
-  it('delete → DeleteElementsCommand', () => {
-    const { ctx, calls } = makeCtx();
-    commandFromUserAction({ type: 'delete', element: el('a') }).do(ctx);
-    expect(calls).toEqual(['remove:a', 'bcDeleted:a', 'del:a']);
-  });
-
-  it('update → UpdateElementsCommand', () => {
-    const { ctx, calls } = makeCtx();
-    commandFromUserAction({ type: 'update', before: el('x'), after: el('x') }).undo(ctx);
-    expect(calls).toEqual(['update:x', 'bcUpdated:x', 'save:x']);
-  });
-
-  it('batch → CompositeCommand', () => {
-    const { ctx, calls } = makeCtx();
-    commandFromUserAction({
-      type: 'batch',
-      actions: [
-        { type: 'create', element: el('a') },
-        { type: 'delete', element: el('b') },
-      ],
-    }).do(ctx);
-    expect(calls).toEqual([
-      'add:a', 'bcCreated:a', 'save:a',
-      'remove:b', 'bcDeleted:b', 'del:b',
     ]);
   });
 });

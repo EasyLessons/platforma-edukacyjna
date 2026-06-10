@@ -22,7 +22,8 @@ import { useState, useCallback } from 'react';
 import { inverseTransformPoint } from '../navigation/viewport-math';
 import type { DrawingElement, DrawingPath, Shape, TextElement, ImageElement,
   MarkdownNote, TableElement, FunctionPlot, PDFElement, ViewportTransform } from '../types';
-import type { UserAction } from '../types';
+import type { Command } from '../commands';
+import { CreateElementsCommand } from '../commands';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -39,8 +40,8 @@ export interface UseClipboardOptions {
   onDebouncedSave: (boardId: string) => void;
   onSelectElements: (ids: string[]) => void;
   onLoadImage?: (id: string, src: string) => void;
-  /** Rejestruje akcję w stosie undo — żeby Ctrl+Z mógł cofnąć wklejenie/duplikację */
-  onPushUserAction?: (action: UserAction) => void;
+  /** Rejestruje komendę w stosie undo (Ctrl+Z cofa wklejenie/duplikację). */
+  onRecordCommand?: (command: Command) => void;
 }
 
 export interface UseClipboardReturn {
@@ -117,7 +118,7 @@ export function useClipboard({
   onDebouncedSave,
   onSelectElements,
   onLoadImage,
-  onPushUserAction,
+  onRecordCommand,
 }: UseClipboardOptions): UseClipboardReturn {
 
   const [copiedElements, setCopiedElements] = useState<DrawingElement[]>([]);
@@ -171,13 +172,13 @@ export function useClipboard({
         }
       });
     }
-    // Zarejestruj nowe elementy jako jedną batch akcję w undo stack
+    // Zarejestruj nowe elementy jako jedną komendę w undo stack (Ctrl+Z cofa wszystkie)
     if (newElements.length > 0) {
-      onPushUserAction?.({ type: 'batch', actions: newElements.map(el => ({ type: 'create' as const, element: el })) });
+      onRecordCommand?.(new CreateElementsCommand(newElements));
     }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
+  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onRecordCommand]);
 
   // ─── Paste ─────────────────────────────────────────────────────────────
   const handlePaste = useCallback(() => {
@@ -224,13 +225,13 @@ export function useClipboard({
         }
       });
     }
-    // Zarejestruj nowe elementy jako jedną batch akcję w undo stack
+    // Zarejestruj nowe elementy jako jedną komendę w undo stack (Ctrl+Z cofa wszystkie)
     if (newElements.length > 0) {
-      onPushUserAction?.({ type: 'batch', actions: newElements.map(el => ({ type: 'create' as const, element: el })) });
+      onRecordCommand?.(new CreateElementsCommand(newElements));
     }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onPushUserAction]);
+  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onRecordCommand]);
 
   return { copiedElements, handleCopy, handleDuplicate, handlePaste };
 }

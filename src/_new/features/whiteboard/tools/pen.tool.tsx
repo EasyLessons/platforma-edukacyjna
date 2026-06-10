@@ -4,6 +4,7 @@ import { Pencil } from 'lucide-react';
 import { PenTool } from '@/_new/features/whiteboard/components/toolbar/pen-tool';
 import { useToolHost } from './tool-host-context';
 import { useToolStore } from '@/_new/features/whiteboard/stores/tool-store';
+import { PenProperties } from './pen.properties';
 import type { ToolDefinition } from './types';
 
 function PenOverlay() {
@@ -35,4 +36,5 @@ export const penTool: ToolDefinition = {
   cursor: 'crosshair',
   iconFill: 0.3,
   Overlay: PenOverlay,
+  PropertiesPanel: PenProperties,
 };

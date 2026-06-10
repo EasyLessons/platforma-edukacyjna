@@ -4,6 +4,7 @@ import { Square } from 'lucide-react';
 import { ShapeTool } from '@/_new/features/whiteboard/components/toolbar/shape-tool';
 import { useToolHost } from './tool-host-context';
 import { useToolStore } from '@/_new/features/whiteboard/stores/tool-store';
+import { ShapeProperties } from './shape.properties';
 import type { ToolDefinition } from './types';
 
 function ShapeOverlay() {
@@ -40,4 +41,5 @@ export const shapeTool: ToolDefinition = {
   order: 4,
   cursor: 'crosshair',
   Overlay: ShapeOverlay,
+  PropertiesPanel: ShapeProperties,
 };
