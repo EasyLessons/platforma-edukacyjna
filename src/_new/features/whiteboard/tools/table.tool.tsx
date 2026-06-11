@@ -14,6 +14,7 @@ function TableOverlay() {
       canvasHeight={h.canvasHeight}
       onTableCreate={h.onTableCreate}
       onViewportChange={h.onViewportChange}
+      isGestureActive={h.isGestureActive}
     />
   );
 }

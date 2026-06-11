@@ -30,10 +30,8 @@ import { Point, ViewportTransform, DrawingElement } from '@/_new/features/whiteb
 import {
   inverseTransformPoint,
   transformPoint,
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 
 interface EraserToolProps {
   viewport: ViewportTransform;
@@ -60,35 +58,7 @@ export function EraserTool({
   const overlayRef = useRef<HTMLDivElement>(null);
   const deletedDuringDrag = useRef<Set<string>>(new Set());
 
-  // Wheel events dla pan/zoom
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay || !onViewportChange) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      if (e.ctrlKey) {
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const newViewport = zoomViewport(
-          viewport,
-          e.deltaY,
-          e.clientX - rect.left,
-          e.clientY - rect.top,
-          canvasWidth,
-          canvasHeight
-        );
-        onViewportChange(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(viewport, e.deltaX, e.deltaY);
-        onViewportChange(constrainViewport(newViewport));
-      }
-    };
-
-    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil

@@ -37,13 +37,10 @@ import { Point, ViewportTransform, Shape } from '@/_new/features/whiteboard/type
 import {
   inverseTransformPoint,
   transformPoint,
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import { ShapeType } from '@/_new/features/whiteboard/types';
 import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
-import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 
 interface ShapeToolProps {
   viewport: ViewportTransform;
@@ -78,15 +75,18 @@ export function ShapeTool({
   /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
   const getViewport = () => canvasViewportRef?.current ?? viewport;
   const [isDrawing, setIsDrawing] = useState(false);
+  const isDrawingRef = useRef(false);
+  useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-useEffect(() => {
-    if (isGestureActive && isDrawing) {
+  useEffect(() => {
+    if (isGestureActive && isDrawingRef.current) {
       setIsDrawing(false);
       setCurrentShape(null);
     }
-  }, [isGestureActive, isDrawing]);
+  }, [isGestureActive]);
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -102,40 +102,7 @@ useEffect(() => {
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
-  // 🆕 Handler dla wheel event - obsługuje zoom i pan
-  // ⚠️ Używamy addEventListener({ passive: false }) bo React onWheel jest pasywny
-  const viewportRef = useRef(viewport);
-  useEffect(() => { viewportRef.current = viewport; }, [viewport]);
-  const onViewportChangeRef = useRef(onViewportChange);
-  useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
-
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay) return;
-
-    const handleWheel = (e: WheelEvent) => {
-      if (!onViewportChangeRef.current) return;
-      e.preventDefault();
-      e.stopPropagation();
-
-      // Użyj canvasViewportRef jeśli dostępny (najprecyzyjniejszy), inaczej lokalny ref
-      const vp = canvasViewportRef?.current ?? viewportRef.current;
-      if (e.ctrlKey) {
-        // Przelicz pozycję myszy względem canvas (nie względem przeglądarki)
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const newViewport = zoomViewport(vp, e.deltaY, mouseX, mouseY, canvasWidth, canvasHeight);
-        onViewportChangeRef.current(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
-        onViewportChangeRef.current(constrainViewport(newViewport));
-      }
-    };
-
-    overlay.addEventListener('wheel', handleWheel, { passive: false });
-    return () => overlay.removeEventListener('wheel', handleWheel);
-  }, [canvasWidth, canvasHeight]);
+  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, viewportRefOverride: canvasViewportRef });
 
   // Pointer down - rozpocznij rysowanie kształtu
   const handlePointerDown = (e: React.PointerEvent) => {

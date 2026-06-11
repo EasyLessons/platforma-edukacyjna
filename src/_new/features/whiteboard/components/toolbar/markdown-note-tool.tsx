@@ -10,14 +10,10 @@
 
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
+import React, { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, MarkdownNote } from '@/_new/features/whiteboard/types';
-import {
-  inverseTransformPoint,
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
-} from '@/_new/features/whiteboard/navigation/viewport-math';
+import { inverseTransformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
@@ -29,6 +25,7 @@ interface MarkdownNoteToolProps {
   canvasHeight: number;
   onNoteCreate: (note: MarkdownNote) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function MarkdownNoteTool({
@@ -37,51 +34,25 @@ export function MarkdownNoteTool({
   canvasHeight,
   onNoteCreate,
   onViewportChange,
+  isGestureActive = false,
 }: MarkdownNoteToolProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [startPoint, setStartPoint] = useState<Point | null>(null);
   const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
-  // Ref do viewport żeby uniknąć re-subscribe wheel listenera
-  const viewportRef = useRef(viewport);
   useEffect(() => {
-    viewportRef.current = viewport;
-  }, [viewport]);
+    if (isGestureActive && isCreating) {
+      setIsCreating(false);
+      setStartPoint(null);
+      setCurrentPoint(null);
+    }
+  }, [isGestureActive, isCreating]);
 
-  // Wheel events dla pan/zoom - używa viewportRef
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay || !onViewportChange) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const currentViewport = viewportRef.current;
-
-      if (e.ctrlKey) {
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const newViewport = zoomViewport(
-          currentViewport,
-          e.deltaY,
-          e.clientX - rect.left,
-          e.clientY - rect.top,
-          canvasWidth,
-          canvasHeight
-        );
-        onViewportChange(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        onViewportChange(constrainViewport(newViewport));
-      }
-    };
-
-    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [canvasWidth, canvasHeight, onViewportChange]);
+  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
 
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (isGestureActive) return;
     const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
     const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
     const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);

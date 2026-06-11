@@ -12,12 +12,8 @@
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, TableElement } from '@/_new/features/whiteboard/types';
-import {
-  inverseTransformPoint,
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
-} from '@/_new/features/whiteboard/navigation/viewport-math';
+import { inverseTransformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 import { Plus, Minus } from 'lucide-react';
 
@@ -27,6 +23,7 @@ interface TableToolProps {
   canvasHeight: number;
   onTableCreate: (table: TableElement) => void;
   onViewportChange?: (viewport: ViewportTransform) => void;
+  isGestureActive?: boolean;
 }
 
 export function TableTool({
@@ -35,6 +32,7 @@ export function TableTool({
   canvasHeight,
   onTableCreate,
   onViewportChange,
+  isGestureActive = false,
 }: TableToolProps) {
   const [showConfig, setShowConfig] = useState(false);
   const [configPosition, setConfigPosition] = useState<Point | null>(null);
@@ -46,46 +44,10 @@ export function TableTool({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  // Ref do viewport żeby uniknąć re-subscribe wheel listenera
-  const viewportRef = useRef(viewport);
-  useEffect(() => {
-    viewportRef.current = viewport;
-  }, [viewport]);
-
-  // Wheel events dla pan/zoom - używa viewportRef
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay || !onViewportChange) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      if (showConfig) return; // Nie obsługuj scroll gdy jest popup
-      e.preventDefault();
-      e.stopPropagation();
-
-      const currentViewport = viewportRef.current;
-
-      if (e.ctrlKey) {
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const newViewport = zoomViewport(
-          currentViewport,
-          e.deltaY,
-          e.clientX - rect.left,
-          e.clientY - rect.top,
-          canvasWidth,
-          canvasHeight
-        );
-        onViewportChange(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(currentViewport, e.deltaX, e.deltaY);
-        onViewportChange(constrainViewport(newViewport));
-      }
-    };
-
-    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [canvasWidth, canvasHeight, onViewportChange, showConfig]);
+  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, disabled: showConfig });
 
   const handleClick = (e: React.MouseEvent) => {
+    if (isGestureActive) return;
     if (showConfig) {
       setShowConfig(false);
       return;

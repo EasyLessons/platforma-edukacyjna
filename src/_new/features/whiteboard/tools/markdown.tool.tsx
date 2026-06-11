@@ -14,6 +14,7 @@ function MarkdownOverlay() {
       canvasHeight={h.canvasHeight}
       onNoteCreate={h.onNoteCreate}
       onViewportChange={h.onViewportChange}
+      isGestureActive={h.isGestureActive}
     />
   );
 }

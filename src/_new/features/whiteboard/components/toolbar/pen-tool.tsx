@@ -31,17 +31,14 @@
 
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Point, ViewportTransform, DrawingPath } from '@/_new/features/whiteboard/types';
 import {
   inverseTransformPoint,
   transformPoint,
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import { clampLineWidth } from '@/_new/features/whiteboard/elements/math-eval';
-import { useMultiTouchGestures } from '@/_new/features/whiteboard/hooks/use-multi-touch-gestures';
 
 interface PenToolProps {
   viewport: ViewportTransform;
@@ -67,8 +64,12 @@ export function PenTool({
   isGestureActive,
 }: PenToolProps) {
   /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
-  const getViewport = () => canvasViewportRef?.current ?? viewport;
+  const localViewportRef = useRef(viewport);
+  useEffect(() => { localViewportRef.current = viewport; }, [viewport]);
+
+  const getViewport = () => canvasViewportRef?.current ?? localViewportRef.current;
   const isDrawingRef = useRef(false);
+  const penTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
       if (isGestureActive && isDrawingRef.current) {
@@ -90,40 +91,7 @@ export function PenTool({
   const isPenModeRef = useRef(false);
 
 
-  // Wheel events dla pan/zoom - używamy native event listener dla { passive: false }
-  useEffect(() => {
-    const overlay = overlayRef.current;
-    if (!overlay || !onViewportChange) return;
-
-    const handleNativeWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      // Użyj canvasViewportRef jeśli dostępny (bez opóźnienia debounce)
-      const vp = canvasViewportRef?.current ?? viewport;
-      if (e.ctrlKey) {
-        // Przelicz pozycję myszy względem canvas (nie przeglądarki)
-        const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-        const newViewport = zoomViewport(
-          vp,
-          e.deltaY,
-          mouseX,
-          mouseY,
-          canvasWidth,
-          canvasHeight
-        );
-        onViewportChange(constrainViewport(newViewport));
-      } else {
-        const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
-        onViewportChange(constrainViewport(newViewport));
-      }
-    };
-
-    overlay.addEventListener('wheel', handleNativeWheel, { passive: false });
-    return () => overlay.removeEventListener('wheel', handleNativeWheel);
-  }, [viewport, canvasWidth, canvasHeight, onViewportChange]);
+  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, viewportRefOverride: canvasViewportRef });
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -137,6 +105,13 @@ export function PenTool({
 
     overlay.addEventListener('touchmove', handleTouchMove, { passive: false });
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
+  }, []);
+
+  // Cleanup timera pen mode przy odmontowaniu narzędzia
+  useEffect(() => {
+    return () => {
+      if (penTimeoutRef.current) clearTimeout(penTimeoutRef.current);
+    };
   }, []);
 
   // Pointer down - rozpocznij rysowanie (obsługuje mysz, tablet, touch)
@@ -336,11 +311,11 @@ const handlePointerUp = (e: React.PointerEvent) => {
     pointsRef.current = [];
     widthsRef.current = []; // 🆕 Wyczyść widths
 
-    // 🆕 Wyłącz pen mode po 1 sekundzie nieaktywości (jak Excalidraw)
-    setTimeout(() => {
-      if (!isDrawingRef.current) {
-        isPenModeRef.current = false;
-      }
+    // Wyłącz pen mode po 1 sekundzie nieaktywności (jak Excalidraw)
+    if (penTimeoutRef.current) clearTimeout(penTimeoutRef.current);
+    penTimeoutRef.current = setTimeout(() => {
+      if (!isDrawingRef.current) isPenModeRef.current = false;
+      penTimeoutRef.current = null;
     }, 1000);
   };
 
