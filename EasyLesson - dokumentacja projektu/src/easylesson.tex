@@ -43,21 +43,15 @@
     {\Large Wydział Informatyki\\}
     \vspace{0.3cm}
     {\large Kierunek: Informatyka\\}
-    {\large Rok III semestr V\\}
     \vspace{1.5cm}
     
-    {\Large Inżynieria oprogramowania 2\\}
-    \vspace{1cm}
+    \vspace{2cm}
     
     {\huge\bfseries Platforma edukacyjna EasyLesson na podstawie współdzielonej tablicy\\}
     
-    \vspace{3cm}
-    
+    \vspace{6cm}
+        
     \begin{flushleft}
-    {\large Prowadzący:\\}
-    {\large dr inż. Wiesław Półjanowicz\\}
-    \vspace{1cm}
-    
     {\large Wykonali:\\}
     
     {\large Patryk Kulesza\\}
@@ -114,12 +108,12 @@ System ma zintegrować wszystkie aspekty procesu edukacyjnego w jednej, intuicyj
     \item AI Assistant - chat z możliwością wysyłania zdjęć
     \item System autentykacji i zarządzania użytkownikami
     \item Synchronizacja w czasie rzeczywistym
+    \item Rozmowy głosowe w ramach tablicy
 \end{itemize}
 
 \subsection{Poza zakresem systemu jest}
 
 \begin{itemize}[leftmargin=*]
-    \item Wideokonferencje/rozmowy głosowe (integracja z Zoom/Teams)
     \item System płatności (bramki zewnętrzne)
     \item Automatyczne generowanie zadań przez AI
     \item Kalendarz i rezerwacja terminów
@@ -129,30 +123,6 @@ System ma zintegrować wszystkie aspekty procesu edukacyjnego w jednej, intuicyj
     \item Automatyczne nagrywanie sesji
     \item Gamifikacja dla uczniów
     \item Integracja z dziennikami elektronicznymi
-\end{itemize}
-
-\subsection{Przewidywane mierzalne korzyści z wdrożenia systemu}
-
-\begin{itemize}[leftmargin=*]
-    \item Redukcja czasu przygotowania do lekcji o 40\% dzięki centralizacji narzędzi
-    \item Eliminacja czasu na przełączanie między aplikacjami - oszczędność 5-10 minut/lekcję
-    \item Szybsze wyszukiwanie wzorów matematycznych - 10 sekund vs 2-3 minuty w Google
-    \item Eliminacja kosztów licencji na wiele narzędzi - oszczędność 150-300 zł/miesiąc
-    \item Obsługa do 20 aktywnych workspace'ów na jednego korepetytora
-    \item System wydajny dla 1,000+ użytkowników jednocześnie
-\end{itemize}
-
-\subsection{Przewidywane niemierzalne korzyści z wdrożenia systemu}
-
-\begin{itemize}[leftmargin=*]
-    \item Zwiększenie profesjonalizmu i prestiżu prowadzonych zajęć
-    \item Możliwość wyróżnienia się na tle konkurencji
-    \item Lepsza wizualizacja trudnych zagadnień matematycznych
-    \item Dostęp do AI asystenta 24/7 (możliwość zadawania pytań nawet po lekcji)
-    \item Możliwość powrotu do materiałów w dowolnym momencie
-    \item Budowanie cyfrowego archiwum wiedzy i materiałów dydaktycznych
-    \item Tworzenie społeczności korepetytorów korzystających z platformy
-    \item Przygotowanie do przyszłości edukacji cyfrowej
 \end{itemize}
 
 \section{Perspektywa wariantów użycia systemu}
@@ -1189,6 +1159,34 @@ Użytkownik zostaje automatycznie przekierowany do nowo utworzonej tablicy i mo�
 
 
 
+\subsection{Model danych (schemat bazy)}
+
+Baza danych PostgreSQL (hostowana na Neon) zawiera 10 tabel. Poniżej opis każdej encji wraz z kluczowymi polami i relacjami.
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{users} -- konta użytkowników; pola: \texttt{id}, \texttt{username}, \texttt{email}, \texttt{hashed\_password} (bcrypt), \texttt{google\_id}, \texttt{auth\_provider} (,,email'' lub ,,google''), \texttt{avatar\_url}, \texttt{active\_workspace\_id}
+    \item \textbf{workspaces} -- przestrzenie robocze; pola: \texttt{id}, \texttt{name}, \texttt{icon}, \texttt{bg\_color}, \texttt{created\_by} (FK→users)
+    \item \textbf{workspace\_members} -- relacja użytkownik$\leftrightarrow$workspace; pola: \texttt{workspace\_id}, \texttt{user\_id}, \texttt{role} (editor/admin), \texttt{is\_favourite}
+    \item \textbf{boards} -- tablice interaktywne; pola: \texttt{id}, \texttt{workspace\_id}, \texttt{name}, \texttt{icon}, \texttt{bg\_color}, \texttt{settings} (JSONB), \texttt{last\_modified}, \texttt{last\_modified\_by}
+    \item \textbf{board\_users} -- obecność i dostęp użytkownika do tablicy; pola: \texttt{board\_id}, \texttt{user\_id}, \texttt{is\_online}, \texttt{is\_favourite}, \texttt{last\_opened}
+    \item \textbf{board\_elements} -- elementy rysunkowe na tablicy; pola: \texttt{board\_id}, \texttt{element\_id} (UUID z frontendu), \texttt{type} (path/rect/text/image/\ldots), \texttt{data} (\textbf{JSONB} -- współrzędne, kolor, grubość itp.), \texttt{is\_deleted} (miękkie usunięcie dla undo/redo)
+    \item \textbf{workspace\_invites} -- zaproszenia do workspace'a; pola: \texttt{workspace\_id}, \texttt{invited\_by}, \texttt{invited\_id}, \texttt{invite\_token}, \texttt{expires\_at}, \texttt{is\_used}
+    \item \textbf{notifications} -- powiadomienia użytkownika; pola: \texttt{user\_id}, \texttt{type}, \texttt{payload} (JSONB), \texttt{is\_read}; indeks częściowy na nieprzeczytanych powiadomieniach
+    \item \textbf{refresh\_tokens} -- refresh tokeny sesji; pola: \texttt{user\_id}, \texttt{token\_hash} (SHA-256), \texttt{expires\_at} (7 dni), \texttt{revoked}
+    \item \textbf{saved\_assets} -- szablony elementów zapisane przez użytkownika; pola: \texttt{user\_id}, \texttt{name}, \texttt{elements\_data} (JSONB), \texttt{thumbnail} (base64)
+\end{itemize}
+
+\textbf{Kluczowe relacje:}
+\begin{itemize}[leftmargin=*]
+    \item \texttt{users} 1:N \texttt{workspaces} (creator), 1:N \texttt{workspace\_members}, 1:N \texttt{notifications}, 1:N \texttt{saved\_assets}
+    \item \texttt{workspaces} 1:N \texttt{boards}, 1:N \texttt{workspace\_members}, 1:N \texttt{workspace\_invites}
+    \item \texttt{boards} 1:N \texttt{board\_elements}, 1:N \texttt{board\_users}
+\end{itemize}
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=\faInfoCircle\ JSONB w board\_elements]
+Kolumna \texttt{data} w tabeli \texttt{board\_elements} używa typu \textbf{JSONB} (PostgreSQL). Przechowuje pełny stan elementu rysunkowego (punkty ścieżki, kolor, grubość linii, tekst itp.) bez stałego schematu -- co umożliwia łatwe dodawanie nowych typów elementów bez migracji bazy.
+\end{tcolorbox}
+
 \section{Wymagania niefunkcjonalne dla systemu}
 
 \subsection{Oszacowanie wielkości bazy danych}
@@ -1441,9 +1439,11 @@ System EasyLesson musi zapewniać odpowiedni poziom bezpieczeństwa danych użyt
 \subsubsection{Uwierzytelnianie}
 
 \begin{itemize}[leftmargin=*]
-    \item \textbf{Metoda:} JWT (JSON Web Tokens) z czasem wygaśnięcia
-    \item \textbf{Czas życia tokena:} 24 godziny dla tokena dostępu
-    \item \textbf{Refresh token:} 7 dni dla tokena odświeżającego
+    \item \textbf{Metoda:} JWT (JSON Web Tokens) -- dwutokenowy model sesji
+    \item \textbf{Access token:} Czas życia \textbf{15 minut}; przechowywany po stronie klienta; używany do autoryzacji żądań API
+    \item \textbf{Refresh token:} Czas życia \textbf{7 dni}; ustawiany jako \textbf{HttpOnly cookie} (niedostępny z JavaScript -- ochrona przed kradzieżą przez XSS); rotowany przy każdym odświeżeniu sesji
+    \item \textbf{Odświeżanie sesji:} Po wygaśnięciu access tokena frontend automatycznie wywołuje endpoint \texttt{/auth/refresh}, który wydaje nowy access token i nowy refresh token (rotacja)
+    \item \textbf{Wylogowanie:} Unieważnia refresh token w bazie i kasuje cookie
     \item \textbf{Uwierzytelnianie dwuskładnikowe (2FA):} Planowane w przyszłości (weryfikacja przez email)
     \item \textbf{Weryfikacja email:} Obowiązkowa dla wszystkich nowych użytkowników
 \end{itemize}
@@ -2705,11 +2705,11 @@ Panel narzędzi znajduje się po lewej stronie ekranu i zawiera następujące na
 \begin{enumerate}
     \item \textbf{Notatka (Markdown)} -- tworzenie notatek w formacie Markdown | Skrót: \textbf{M}
     \item \textbf{Tabelka (Table)} -- wstawianie i edycja tabel
-    \item \textbf{Kalkulator (Calculator)} -- wbudowany kalkulator matematyczny
+    \item \textbf{Strzałka (Arrow)} -- rysowanie strzałek kierunkowych na tablicy
 \end{enumerate}
 
 \begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Pro Tip]
-Wszystkie narzędzia mają przypisane skróty klawiszowe (pojedyncze litery) dla szybszego dostępu. Pełna lista skrótów znajduje się w rozdziale 9.
+Większość narzędzi posiada przypisane skróty klawiszowe (pojedyncze litery) dla szybszego dostępu. Wyjątkiem jest narzędzie \textbf{Strzałka}, które nie posiada skrótu ani przycisku w pasku narzędzi. Pełna lista skrótów znajduje się w rozdziale~9.
 \end{tcolorbox}
 
 \subsubsection{Podstawowe opcje narzędzi}
@@ -2724,7 +2724,7 @@ Po wybraniu narzędzia, pojawia się panel właściwości, w którym możesz dos
 
 \paragraph{Kształty (Shape):}
 \begin{itemize}
-    \item Typ kształtu: Prostokąt, Koło, Trójkąt, Linia, Strzałka, Wielokąt
+    \item Typ kształtu: Prostokąt, Koło, Trójkąt, Linia, Wielokąt
     \item Kolor obramowania
     \item Kolor wypełnienia (lub przezroczysty)
     \item Grubość obramowania
@@ -3886,13 +3886,15 @@ Skróty do szybkiego przełączania między narzędziami (nie wymagają Ctrl/Cmd
 \hline
 \texttt{M} & Notatka (Markdown) -- tworzenie notatek \\
 \hline
+\multicolumn{2}{|l|}{\textit{Strzałka (Arrow) -- brak skrótu; narzędzie dostępne bez przycisku w pasku}} \\
+\hline
 \end{tabular}
 \caption{Skróty narzędzi tablicy}
 \label{tab:tool_shortcuts}
 \end{table}
 
 \begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Wskazówka]
-Wszystkie skróty narzędzi to pojedyncze litery (bez Ctrl/Cmd). Możesz szybko przełączać się między narzędziami podczas pracy na tablicy.
+Skróty narzędzi to pojedyncze litery (bez Ctrl/Cmd). Narzędzie \textbf{Strzałka} nie posiada skrótu klawiszowego ani przycisku w pasku -- jest dostępne wyłącznie programowo.
 \end{tcolorbox}
 
 \subsubsection{Edycja i zarządzanie elementami}
@@ -4118,18 +4120,68 @@ Nauczenie się podstawowych skrótów klawiszowych (V, P, T, E, Ctrl+Z/Y) znaczn
 
 \section{Instrukcja uruchomienia aplikacji lokalnie}
 
+\subsection{Uruchomienie przez Docker (zalecane)}
+
+Najprostszy sposób uruchomienia całego środowiska -- frontend, backend i konfiguracja sieciowa -- za pomocą jednej komendy.
+
+\subsubsection{Wymagania}
+
+\begin{itemize}
+    \item \textbf{Docker Desktop} -- \url{https://www.docker.com/products/docker-desktop/}
+    \item \textbf{Git} -- system kontroli wersji
+\end{itemize}
+
+\subsubsection{Kroki}
+
+\begin{lstlisting}[language=bash]
+# 1. Sklonuj repozytorium
+git clone <URL_REPOZYTORIUM>
+cd platforma-edukacyjna
+
+# 2. Skonfiguruj zmienne srodowiskowe
+cp .env.example .env.local          # frontend
+cp backend/.env.example backend/.env  # backend
+# Uzupelnij wartosci w obu plikach (patrz sekcja o zmiennych srodowiskowych)
+
+# 3. Zbuduj i uruchom kontenery
+docker compose up --build
+\end{lstlisting}
+
+Po uruchomieniu:
+\begin{itemize}
+    \item Frontend: \url{http://localhost:3000}
+    \item Backend API: \url{http://localhost:8000}
+    \item Dokumentacja API (Swagger): \url{http://localhost:8000/docs}
+\end{itemize}
+
+Aby zatrzymać kontenery:
+\begin{lstlisting}[language=bash]
+docker compose down
+\end{lstlisting}
+
+\begin{tcolorbox}[colback=green!5!white,colframe=green!75!black,title=\faLightbulb\ Wskazówka]
+Docker automatycznie instaluje zależności i konfiguruje środowisko. Jest to zalecana metoda dla nowych deweloperów oraz do szybkiego uruchomienia projektu bez konfigurowania lokalnego środowiska Python/Node.
+\end{tcolorbox}
+
+\subsection{Uruchomienie ręczne}
+
+Alternatywna metoda dla deweloperów preferujących bezpośrednią pracę z kodem.
+
 \subsection{Wymagania Systemowe}
 
 Przed uruchomieniem aplikacji upewnij się, że na twoim urządzeniu są zainstalowane:
 
 \begin{itemize}
-    \item \textbf{Node.js} (wersja 18+) -- do uruchomienia frontendu
-    \item \textbf{npm} lub \textbf{yarn} -- menedżer pakietów JavaScript
-    \item \textbf{Python} (wersja 3.9+) -- do uruchomienia backendu
+    \item \textbf{Node.js} (wersja 20+) -- do uruchomienia frontendu
+    \item \textbf{npm} -- menedżer pakietów JavaScript
+    \item \textbf{Python} (wersja 3.12+) -- do uruchomienia backendu
     \item \textbf{pip} -- menedżer pakietów Python
-    \item \textbf{PostgreSQL} (wersja 14+) -- baza danych
     \item \textbf{Git} -- system kontroli wersji
 \end{itemize}
+
+\begin{tcolorbox}[colback=blue!5!white,colframe=blue!75!black,title=\faInfoCircle\ Baza danych]
+Baza danych PostgreSQL działa w chmurze (\textbf{Neon} -- serverless PostgreSQL). \textbf{Nie jest wymagana lokalna instalacja PostgreSQL.} Connection string do bazy konfiguruje się przez zmienną środowiskową \texttt{DATABASE\_URL} w pliku \texttt{backend/.env}.
+\end{tcolorbox}
 
 \subsubsection{Sprawdzenie Wymagań}
 
@@ -4144,9 +4196,6 @@ npm --version
 python --version
 pip --version
 
-# PostgreSQL
-psql --version
-
 # Git
 git --version
 \end{lstlisting}
@@ -4155,7 +4204,6 @@ Jeśli któreś narzędzie nie jest zainstalowane, pobierz je ze stron:
 \begin{itemize}
     \item Node.js: \url{https://nodejs.org/}
     \item Python: \url{https://www.python.org/downloads/}
-    \item PostgreSQL: \url{https://www.postgresql.org/download/}
     \item Git: \url{https://git-scm.com/downloads}
 \end{itemize}
 
@@ -4176,54 +4224,61 @@ cd platforma-edukacyjna
 
 \subsubsection{Tworzenie Pliku .env}
 
-W katalogu głównym projektu utwórz plik \texttt{.env} z następującą zawartością:
+Projekt wymaga dwóch plików ze zmiennymi środowiskowymi: \texttt{.env.local} (frontend) oraz \texttt{backend/.env} (backend).
+
+\subsubsection{Zmienne backendu (\texttt{backend/.env})}
 
 \begin{lstlisting}[language=bash]
-# Baza danych
-DATABASE_URL=postgresql://username:password@localhost:5432/platforma_db
+# Baza danych (Neon -- connection string z panelu Neon.tech)
+DATABASE_URL=postgresql://user:password@host/dbname?sslmode=require
 
 # JWT
 SECRET_KEY=your-super-secret-key-change-this-in-production
 ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+ACCESS_TOKEN_EXPIRE_MINUTES=1440
+
+# Tokeny sesji
+COOKIE_SECURE=false          # true w produkcji (HTTPS)
+COOKIE_DOMAIN=               # np. .easylesson.app w produkcji
 
 # Email (Resend)
 RESEND_API_KEY=re_xxxxxxxxxxxx
-FROM_EMAIL=onboarding@resend.dev
+FROM_EMAIL=noreply@twojadomena.pl
+FRONTEND_URL=http://localhost:3000
 
-# Supabase (Frontend)
-NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
+# Supabase
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback
+\end{lstlisting}
+
+\subsubsection{Zmienne frontendu (\texttt{.env.local})}
+
+\begin{lstlisting}[language=bash]
+# Backend API
+NEXT_PUBLIC_API_URL=http://localhost:8000
+
+# Supabase (publiczne klucze)
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Google OAuth (frontend)
+NEXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+
+# AI Chat (Gemini)
+GEMINI_API_KEY=your-gemini-api-key
+
+# WebRTC -- voice chat (Xirsys)
+NEXT_PUBLIC_XIRSYS_IDENT=your-xirsys-ident
+NEXT_PUBLIC_XIRSYS_SECRET=your-xirsys-secret
+NEXT_PUBLIC_XIRSYS_CHANNEL=your-xirsys-channel
 \end{lstlisting}
 
-\textbf{Ważne:} Zastąp wartości placeholder swoimi własnymi wartościami!
-
-\subsubsection{Konfiguracja PostgreSQL}
-
-Otwórz pgAdmin lub terminal PostgreSQL i wykonaj:
-
-\begin{lstlisting}[language=bash]
-# Polacz sie z PostgreSQL
-psql -U postgres
-
-# W powloce PostgreSQL:
-CREATE DATABASE platforma_db;
-CREATE USER platforma_user WITH PASSWORD 'your_password';
-ALTER ROLE platforma_user SET client_encoding TO 'utf8';
-ALTER ROLE platforma_user SET default_transaction_isolation TO 'read committed';
-ALTER ROLE platforma_user SET default_transaction_deferrable TO on;
-ALTER ROLE platforma_user SET default_transaction_read_only TO off;
-GRANT ALL PRIVILEGES ON DATABASE platforma_db TO platforma_user;
-\connect platforma_db
-GRANT ALL PRIVILEGES ON SCHEMA public TO platforma_user;
-\q
-\end{lstlisting}
-
-Następnie zaktualizuj \texttt{DATABASE\_URL} w pliku \texttt{.env}:
-
-\begin{lstlisting}[language=bash]
-DATABASE_URL=postgresql://platforma_user:your_password@localhost:5432/platforma_db
-\end{lstlisting}
+\textbf{Ważne:} Zastąp wartości placeholder swoimi własnymi. Nigdy nie commituj plików \texttt{.env} do repozytorium!
 
 \subsection{Krok 3: Instalacja Zależności Backend}
 
@@ -4241,12 +4296,6 @@ Wykonaj migracje Alembic, aby utworzyć strukturę tabel:
 \begin{lstlisting}[language=bash]
 # Z katalogu backend/
 alembic upgrade head
-\end{lstlisting}
-
-Alternatywnie, możesz użyć skryptu inicjalizacyjnego:
-
-\begin{lstlisting}[language=bash]
-python init_db.py
 \end{lstlisting}
 
 \subsection{Krok 5: Uruchomienie Backendu}
@@ -4294,13 +4343,14 @@ Po uruchomieniu obu serwisów:
 
 \subsection{Rozwiązywanie Problemów}
 
-\subsubsection{Błąd: \texttt{psql: command not found}}
+\subsubsection{Błąd: \texttt{DATABASE CONNECTION FAILED} (połączenie z Neon)}
 
-PostgreSQL nie jest w zmiennych systemowych. Dodaj go:
-\begin{lstlisting}[language=bash]
-# Windows - dodaj do PATH:
-C:\Program Files\PostgreSQL\16\bin
-\end{lstlisting}
+Sprawdź:
+\begin{enumerate}
+    \item Czy \texttt{DATABASE\_URL} w \texttt{backend/.env} zawiera poprawny connection string z panelu Neon.tech
+    \item Czy string zawiera parametr \texttt{sslmode=require}
+    \item Czy skopiowałeś cały string (nie obcięty)
+\end{enumerate}
 
 \subsubsection{Błąd: \texttt{Port 3000/8000 jest już w użyciu}}
 
@@ -4321,21 +4371,6 @@ cd backend
 pip install -r requirements.txt --upgrade
 \end{lstlisting}
 
-\subsubsection{Błąd: \texttt{DATABASE CONNECTION FAILED}}
-
-Sprawdź:
-\begin{enumerate}
-    \item Czy PostgreSQL jest uruchomiony
-    \item Czy \texttt{DATABASE\_URL} w \texttt{.env} jest poprawny
-    \item Czy baza danych \texttt{platforma\_db} istnieje
-    \item Czy użytkownik \texttt{platforma\_user} ma uprawnienia
-\end{enumerate}
-
-\begin{lstlisting}[language=bash]
-# Testuj polaczenie
-psql -U platforma_user -d platforma_db -h localhost
-\end{lstlisting}
-
 \subsubsection{Błąd: \texttt{npm ERR! code ERESOLVE}}
 
 Zainstaluj zależności z flagą legacy:
@@ -4348,23 +4383,41 @@ npm install --legacy-peer-deps
 \begin{lstlisting}[language=bash]
 platforma-edukacyjna/
   backend/                    # API - FastAPI + SQLAlchemy
-    main.py                   # Main app file
-    init_db.py                # Database initialization
-    requirements.txt          # Python dependencies
-    core/                     # Config, models, database
-    auth/                     # Login and authorization
-    dashboard/                # API for boards and workspaces
-  src/                        # Frontend - Next.js + React
-    app/                      # Application (Next.js 13+ routing)
-    components/               # React components
-    context/                  # React context (auth, board)
-    lib/                      # Tools (Supabase, API)
-  public/                     # Static resources
-  .env                        # Environment variables (do not commit!)
-  .env.example                # .env template
-  package.json                # Node.js dependencies
-  tsconfig.json               # TypeScript configuration
-  next.config.ts              # Next.js configuration
+    main.py                   # Punkt wejscia FastAPI
+    requirements.txt          # Zaleznosci Python
+    Dockerfile                # Kontener backendu
+    alembic/                  # Migracje bazy danych
+    core/                     # Config, models, database, logging
+    api/
+      v1/
+        auth/                 # Logowanie, rejestracja, OAuth
+        boards/               # Zarzadzanie tablicami
+        workspaces/           # Zarzadzanie workspace'ami
+        whiteboard/           # Elementy tablicy (API)
+        assets/               # Zapisane szablony
+        notifications/        # Powiadomienia
+  src/                        # Frontend - Next.js + React + TypeScript
+    app/                      # Routing (Next.js App Router)
+    _new/
+      features/
+        whiteboard/           # Tablica interaktywna (glowna funkcja)
+          commands/           # Command pattern (undo/redo)
+          engine/             # WhiteboardEngine (fasada)
+          tools/              # Rejestr narzedzi (11 narzedzi)
+          stores/             # Zustand -- stan globalny
+          hooks/              # Hooki (elementy, historia, viewport)
+          components/         # Komponenty UI tablicy
+        auth/                 # Autentykacja (frontend)
+        board/                # Zarzadzanie tablicami (frontend)
+        workspace/            # Zarzadzanie workspace'ami (frontend)
+        notifications/        # Powiadomienia (frontend)
+      shared/                 # Wspoldzielone komponenty i narzedzia
+  public/                     # Zasoby statyczne
+  Dockerfile                  # Kontener frontendu
+  docker-compose.yml          # Orchestracja kontenerow
+  .env.local                  # Zmienne srodowiskowe frontend (nie commitowac!)
+  package.json                # Zaleznosci Node.js
+  next.config.ts              # Konfiguracja Next.js
 \end{lstlisting}
 
 \subsection{Przydatne Komendy}
@@ -4372,20 +4425,20 @@ platforma-edukacyjna/
 \begin{lstlisting}[language=bash]
 # Backend
 cd backend
-pip install -r requirements.txt      # Install dependencies
-python init_db.py                    # Initialize database
-alembic upgrade head                 # Run migrations
-uvicorn main:app --reload            # Start development
+pip install -r requirements.txt      # Instalacja zaleznosci
+alembic upgrade head                 # Uruchomienie migracji
+uvicorn main:app --reload            # Start (tryb deweloperski)
 
 # Frontend
-npm install                           # Install dependencies
-npm run dev                           # Start development
-npm run build                         # Build for production
-npm start                             # Start production
+npm install                          # Instalacja zaleznosci
+npm run dev                          # Start (tryb deweloperski)
+npm run build                        # Build produkcyjny
+npm start                            # Start (tryb produkcyjny)
 
-# Database
-psql -U postgres                      # Connect to PostgreSQL
-\q                                    # Exit psql
+# Docker (cale srodowisko)
+docker compose up --build            # Buduj i uruchom
+docker compose down                  # Zatrzymaj kontenery
+docker compose logs -f               # Podglad logow
 \end{lstlisting}
 
 \subsection{Produkcja}
