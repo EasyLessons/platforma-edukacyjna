@@ -1,61 +1,33 @@
 # Specyfikacja hooka `useCanvasWheel`
 
-> Blueprint dla nowej sesji AI. Hook eliminuje duplikację wzorca `viewportRef +
-> onViewportChangeRef + addEventListener wheel` obecnego w 5 narzędziach.
+> Status: **ZAIMPLEMENTOWANY I WDROŻONY** — hook jest aktywny we wszystkich 5 narzędziach.
+> Ten plik służy jako dokumentacja projektu hooka dla przyszłych modyfikacji.
 
 ---
 
-## Problem (motywacja)
+## Problem (motywacja — rozwiązany)
 
-Aktualnie identyczny blok ~20 linii kodu istnieje w:
-- `pen-tool.tsx`
-- `eraser-tool.tsx`
-- `shape-tool.tsx`
-- `markdown-note-tool.tsx`
-- `table-tool.tsx`
-
-Każda kopia ręcznie zarządza `viewportRef`, `onViewportChangeRef` i listener
-`wheel`. Ryzyko dryfu — przyszła zmiana (np. obsługa `onPointerCapture`) musi być
-replikowana w 5 miejscach.
+Identyczny blok ~20 linii kodu (ręczne `viewportRef + onViewportChangeRef + addEventListener wheel`)
+był zduplikowany w 5 narzędziach. Hook eliminuje tę duplikację — przyszłe zmiany
+w logice wheel (np. nowe gesty) wymagają edycji jednego pliku.
 
 ---
 
-## Sygnatura
+## Sygnatura (finalna)
 
 ```ts
-// src/_new/features/whiteboard/hooks/use-canvas-wheel.ts
+interface UseCanvasWheelProps {
+  overlayRef: React.RefObject<HTMLDivElement | null>;
+  canvasWidth: number;
+  canvasHeight: number;
+  viewport: ViewportTransform;
+  onViewportChange: ((vp: ViewportTransform) => void) | undefined;
+  viewportRefOverride?: React.RefObject<ViewportTransform>; // omija debounce React
+  disabled?: boolean; // blokuje obsługę wheel (np. gdy modal otwarty)
+}
 
-export function useCanvasWheel(
-  overlayRef: React.RefObject<HTMLElement | null>,
-  canvasWidth: number,
-  canvasHeight: number,
-): void
+export function useCanvasWheel(props: UseCanvasWheelProps): void
 ```
-
-### Skąd hook pobiera viewport i onViewportChange
-
-Hook **nie przyjmuje** `viewport` ani `onViewportChange` jako argumentów.
-Czyta je bezpośrednio ze stabilnych źródeł:
-
-- `viewport` — z `canvasViewportRef` przekazywanego przez `ToolHostContext`
-  (lub lokalny `viewportRef` synchronizowany w narzędziu)
-- `onViewportChange` — ze store'a Zustand lub `ToolHostContext`
-
-Alternatywnie, jeśli zależności muszą być jawne:
-
-```ts
-export function useCanvasWheel(
-  overlayRef: React.RefObject<HTMLElement | null>,
-  canvasWidth: number,
-  canvasHeight: number,
-  getViewport: () => ViewportTransform,       // stabilna funkcja/ref getter
-  onViewportChange: (vp: ViewportTransform) => void, // stabilny callback
-): void
-```
-
-> **Decyzja do podjęcia na początku nowej sesji:** wariant ze store'em (prostszy
-> dla konsumentów) vs. jawne argumenty (łatwiejszy do testowania). Oba spełniają
-> kryterium `deps = [canvasWidth, canvasHeight]`.
 
 ---
 
@@ -97,7 +69,7 @@ Refs są zawsze stabilne i nie wymagają `useCallback` po stronie konsumenta.
 
 ---
 
-## Implementacja (finalna, zaimplementowana)
+## Implementacja
 
 Plik: [hooks/use-canvas-wheel.ts](../../../src/_new/features/whiteboard/hooks/use-canvas-wheel.ts)
 
@@ -174,23 +146,28 @@ useCanvasWheel(overlayRef, canvasWidth, canvasHeight, getViewport, onViewportCha
 
 ---
 
-## Pliki do zmiany w ramach refaktoru
+## Użycie w narzędziu (wzorzec dla nowych narzędzi)
 
-| Plik | Zmiana |
+```ts
+// Podstawowe (eraser, markdown):
+useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
+
+// Z viewportRefOverride (pen, shape — mają h.viewportRef z canvasu):
+useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange,
+                 viewportRefOverride: canvasViewportRef });
+
+// Z disabled (table — zablokuj scroll gdy popup konfiguracji otwarty):
+useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange,
+                 disabled: showConfig });
+```
+
+## Status wdrożenia
+
+| Plik | Status |
 |------|--------|
-| `hooks/use-canvas-wheel.ts` | **Nowy** — implementacja hooka |
-| `pen-tool.tsx` | Zastąpić blok wheel → `useCanvasWheel(...)` |
-| `eraser-tool.tsx` | Zastąpić blok wheel → `useCanvasWheel(...)` |
-| `shape-tool.tsx` | Zastąpić blok wheel → `useCanvasWheel(...)` |
-| `markdown-note-tool.tsx` | Zastąpić blok wheel → `useCanvasWheel(...)` |
-| `table-tool.tsx` | Zastąpić blok wheel → `useCanvasWheel(...)` |
-
----
-
-## Kryteria akceptacji
-
-- [ ] `tsc --noEmit` 0 błędów
-- [ ] `eslint` czysty (zero nowych `react-hooks/exhaustive-deps`)
-- [ ] Listener `wheel` montowany dokładnie raz przez cały cykl życia narzędzia
-      (weryfikacja: `console.count` lub React DevTools Profiler — 0 re-mount przy scrollu)
-- [ ] Zachowanie pan/zoom identyczne jak przed refaktorem (smoke test ręczny)
+| `hooks/use-canvas-wheel.ts` | ✅ zaimplementowany |
+| `pen-tool.tsx` | ✅ używa hooka |
+| `eraser-tool.tsx` | ✅ używa hooka |
+| `shape-tool.tsx` | ✅ używa hooka |
+| `markdown-note-tool.tsx` | ✅ używa hooka |
+| `table-tool.tsx` | ✅ używa hooka (`disabled: showConfig`) |

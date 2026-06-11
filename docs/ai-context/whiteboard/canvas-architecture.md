@@ -121,42 +121,31 @@ const handlePointerDown = (e: React.PointerEvent) => {
 
 ---
 
-## 5. Zamrożone referencje dla wheel listenerów — deps `[canvasWidth, canvasHeight]`
+## 5. Wheel listener przez `useCanvasWheel` — montowany raz, deps `[canvasWidth, canvasHeight]`
 
-**Zasada:** Natywne listenery `wheel` (zarejestrowane przez `addEventListener`) muszą
-być montowane **raz** przez cały cykl życia narzędzia. Listener nie może mieć
-`viewport` w tablicy zależności `useEffect`.
+**Zasada:** Natywne listenery `wheel` w narzędziach są obsługiwane wyłącznie przez
+hook `useCanvasWheel`. Listener nie może mieć `viewport` w tablicy zależności —
+`viewport` to nowy obiekt przy każdym pan/zoom → bez hooka listener byłby niszczony
+i ponownie rejestrowany 60×/s.
 
-**Dlaczego:** `viewport` to nowy obiekt przy każdym pan/zoom → listener byłby
-niszczony i ponownie rejestrowany 60×/s podczas scrollowania.
-
-**Wzorzec (identyczny w pen, eraser, shape, markdown, table):**
+**Wzorzec (obowiązuje w pen, eraser, shape, markdown, table):**
 ```ts
-// 1. Stabilna referencja do aktualnego viewportu
-const viewportRef = useRef(viewport);
-useEffect(() => { viewportRef.current = viewport; }, [viewport]);
-
-// 2. Stabilna referencja do callbacku
-const onViewportChangeRef = useRef(onViewportChange);
-useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
-
-// 3. Listener montowany raz — bez viewport w deps
-useEffect(() => {
-  const overlay = overlayRef.current;
-  if (!overlay) return;
-  const handler = (e: WheelEvent) => {
-    if (!onViewportChangeRef.current) return;
-    e.preventDefault();
-    const vp = viewportRef.current;
-    // ...
-  };
-  overlay.addEventListener('wheel', handler, { passive: false });
-  return () => overlay.removeEventListener('wheel', handler);
-}, [canvasWidth, canvasHeight]); // ← tylko rozmiar canvasu, nigdy viewport
+useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
 ```
 
-**Docelowa refaktoryzacja:** powyższy wzorzec zostanie wyciągnięty do wspólnego
-hooka `useCanvasWheel` — patrz `use-canvas-wheel-spec.md`.
+**Opcje hooka:**
+
+| Prop | Kiedy używać |
+|------|-------------|
+| `viewportRefOverride` | Narzędzia z dostępem do `h.viewportRef` z canvasu (pen, shape) — omija debounce React |
+| `disabled` | Narzędzia z modalnym popupem (table z `showConfig`) — zatrzymuje scroll gdy popup otwarty |
+
+**Implementacja hooka:** [hooks/use-canvas-wheel.ts](../../../src/_new/features/whiteboard/hooks/use-canvas-wheel.ts)
+— szczegółowa dokumentacja w `use-canvas-wheel-spec.md`.
+
+**Pułapka:** Wewnątrz hooka `useEffect` setup sprawdza **tylko** czy `overlayRef.current` istnieje.
+Nie sprawdza `onViewportChange` — callback może być `undefined` w chwili montowania,
+ale listener musi być zarejestrowany. Callback jest sprawdzany w handlerze przez `onViewportChangeRef`.
 
 ---
 
