@@ -10,7 +10,8 @@
       "Bash(npm list *)",
       "Bash(node -e \"const g = require\\('@use-gesture/react'\\); console.log\\(Object.keys\\(g\\)\\)\")",
       "Bash(node -e ' *)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "PowerShell(& \"C:\\\\platforma-edukacyjna\\\\backend\\\\.venv\\\\Scripts\\\\python.exe\" -m pytest --version 2>&1)"
     ]
   }
 }
