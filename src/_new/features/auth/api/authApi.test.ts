@@ -109,6 +109,10 @@ describe('getCurrentUser', () => {
   });
 
   it('rzuca AppError.isUnauthorized() dla 401', async () => {
+    // Interceptor po nieudanym refreshie sprawdza pathname === '/login' zanim odrzuci błąd.
+    // Mockujemy pathname żeby nie wisiał na never-resolving promise.
+    window.location.pathname = '/login';
+
     mock.onGet('/api/v1/auth/me').reply(401, {
       success: false,
       error: 'Brak tokenu',
