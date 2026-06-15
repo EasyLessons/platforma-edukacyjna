@@ -17,9 +17,8 @@ import type { TableElement } from '../types';
  */
 export function calculateTableFontSize(height: number, rows: number): number {
   const cellHeight = height / rows;
-  // cellHeight * 0.42 to dobry stosunek tekstu do wysokości komórki
-  // Minimalnie 0.08 (8px przy scale=1), maksymalnie 0.3 (30px przy scale=1) - ZWIĘKSZONE!
-  return Math.max(0.08, Math.min(cellHeight * 0.42, 0.3));
+  // 0.42× wysokości komórki — rośnie proporcjonalnie bez górnego limitu
+  return Math.max(0.08, cellHeight * 0.42);
 }
 
 /**

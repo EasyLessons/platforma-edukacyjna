@@ -49,6 +49,20 @@ export function transformPoint(
 }
 
 /**
+ * Przelicz stały rozmiar ekranowy (px) na world units przy danym zoom.
+ * Używane przy tworzeniu elementów: tabela/kształt zawsze wygląda tak samo na ekranie
+ * niezależnie od aktualnego przybliżenia.
+ *
+ * Wzór: basePixelSize / (viewportScale * 100)
+ * Przykład: scale=1   → 60px = 0.6wu  (default)
+ *           scale=0.5 → 60px = 1.2wu  (zoomed out — element większy w world units)
+ *           scale=2.0 → 60px = 0.3wu  (zoomed in  — element mniejszy w world units)
+ */
+export function getScaledWorldSize(basePixelSize: number, viewportScale: number): number {
+  return basePixelSize / (viewportScale * 100);
+}
+
+/**
  * Punkt na ekranie → punkt tablicy (screen → world).
  * Odwrotność transformPoint.
  */

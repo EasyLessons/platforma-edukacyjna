@@ -12,7 +12,7 @@
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, TableElement } from '@/_new/features/whiteboard/types';
-import { inverseTransformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { inverseTransformPoint, getScaledWorldSize } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 import { Plus, Minus } from 'lucide-react';
@@ -74,9 +74,10 @@ export function TableTool({
       cells.push(row);
     }
 
-    // Rozmiary komórek w world units (0.6 = 60px, 0.28 = 28px)
-    const cellWidth = 0.6;
-    const cellHeight = 0.28;
+    // Rozmiary komórek skalowane do aktualnego zoom: tabela zawsze wygląda
+    // tak samo na ekranie niezależnie od przybliżenia (60×28 px screen-space).
+    const cellWidth  = getScaledWorldSize(60, viewport.scale);
+    const cellHeight = getScaledWorldSize(28, viewport.scale);
     const tableWidth = cols * cellWidth;
     const tableHeight = rows * cellHeight;
     // fontSize obliczany raz przy tworzeniu

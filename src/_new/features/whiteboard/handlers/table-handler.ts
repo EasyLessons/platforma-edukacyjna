@@ -16,6 +16,100 @@ import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/tabl
 
 const MIN_SIZE = 0.1;
 
+// ─── Word-wrap cache ──────────────────────────────────────────────────────────
+//
+// Slot key  (outer): `${table.id}|${r}|${c}`   — jeden wpis per komórka
+// Content key (inner): krotka `text|maxW|fontSize|bold` — klucz weryfikacyjny
+// MISS → rekalkulacja przez computeCellWrappedLines (ctx.measureText)
+// HIT  → O(1), brak allocacji
+// Inwalidacja per-table: invalidateTableWrapCache(id) usuwa wszystkie sloty tabeli.
+
+interface CellCacheEntry {
+  key: string;
+  lines: string[];
+}
+
+const tableWrapCache = new Map<string, CellCacheEntry>();
+
+/** Wywołaj przy usunięciu tabeli, aby zwolnić pamięć cache. */
+export function invalidateTableWrapCache(tableId: string): void {
+  const prefix = tableId + '|';
+  for (const k of tableWrapCache.keys()) {
+    if (k.startsWith(prefix)) tableWrapCache.delete(k);
+  }
+}
+
+function getTableCellWrappedLines(
+  ctx: CanvasRenderingContext2D,
+  tableId: string,
+  r: number,
+  c: number,
+  cellText: string,
+  maxWidth: number,
+  fontSize: number,
+  bold: boolean,
+): string[] {
+  const slotKey    = `${tableId}|${r}|${c}`;
+  const contentKey = `${cellText}|${maxWidth.toFixed(1)}|${fontSize.toFixed(1)}|${bold ? '1' : '0'}`;
+
+  const cached = tableWrapCache.get(slotKey);
+  if (cached?.key === contentKey) return cached.lines; // HIT — O(1)
+
+  const lines = computeCellWrappedLines(ctx, cellText, maxWidth); // MISS
+  tableWrapCache.set(slotKey, { key: contentKey, lines });
+  return lines;
+}
+
+function computeCellWrappedLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+): string[] {
+  const paragraphs = text.split('\n');
+  const result: string[] = [];
+
+  for (const paragraph of paragraphs) {
+    const words = paragraph.split(' ');
+    let current = '';
+
+    for (const word of words) {
+      // Słowo szersze niż komórka → łamanie znak po znaku
+      if (ctx.measureText(word).width > maxWidth) {
+        if (current) { result.push(current); current = ''; }
+
+        let remaining = word;
+        while (ctx.measureText(remaining).width > maxWidth) {
+          let fit = 0;
+          for (let j = 1; j <= remaining.length; j++) {
+            if (ctx.measureText(remaining.substring(0, j)).width <= maxWidth) fit = j;
+            else break;
+          }
+          if (fit === 0) fit = 1;
+          result.push(remaining.substring(0, fit));
+          remaining = remaining.substring(fit);
+        }
+        current = remaining;
+        continue;
+      }
+
+      const test = current + (current ? ' ' : '') + word;
+      if (ctx.measureText(test).width > maxWidth && current) {
+        result.push(current);
+        current = word;
+      } else {
+        current = test;
+      }
+    }
+
+    if (current) result.push(current);
+  }
+
+  return result;
+}
+
+
+// ─── Handler ─────────────────────────────────────────────────────────────────
+
 export const TableHandler: ElementHandler<TableElement> = {
   canResize: true,
   canRotate: false,
@@ -39,7 +133,6 @@ export const TableHandler: ElementHandler<TableElement> = {
       y:        pivotY + (el.y - pivotY) * scaleY,
       width:    newWidth,
       height:   newHeight,
-      // Automatyczne skalowanie czcionki wraz z rozmiarem tabeli
       fontSize: calculateTableFontSize(newHeight, el.rows),
     } as any;
   },
@@ -49,7 +142,6 @@ export const TableHandler: ElementHandler<TableElement> = {
   },
 
   rotate(el, _rotationAngle, pivot, cos, sin) {
-    // Tabela nie obraca się – przesuwa środek wokół pivota zaznaczenia
     const cx = el.x + el.width  / 2;
     const cy = el.y + el.height / 2;
     const newCenter = rotateAroundPivot({ x: cx, y: cy }, pivot, cos, sin);
@@ -95,9 +187,12 @@ export const TableHandler: ElementHandler<TableElement> = {
       ctx.beginPath(); ctx.moveTo(x, topLeft.y); ctx.lineTo(x, topLeft.y + sh); ctx.stroke();
     }
 
-    // Tekst komórek – pełne skalowanie z viewportem
-    const worldFontSize  = table.fontSize ?? 0.12;
-    const fontSize       = worldFontSize * viewport.scale * 100;
+    // Tekst komórek z word-wrappingiem i cache'owaniem
+    const worldFontSize = table.fontSize ?? 0.12;
+    const fontSize      = worldFontSize * viewport.scale * 100;
+    const lineHeight    = fontSize * 1.2;
+    // Horizontal padding per side matches the clip rect inset (3px)
+    const wrapMaxWidth  = cellWidth - 8;
 
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
@@ -107,29 +202,31 @@ export const TableHandler: ElementHandler<TableElement> = {
         const cellText = table.cells[r]?.[c] ?? '';
         if (!cellText) continue;
 
-        const cx = topLeft.x + c * cellWidth  + cellWidth  / 2;
-        const cy = topLeft.y + r * cellHeight + cellHeight / 2;
+        const isBold = r === 0 && !!table.headerRow;
 
-        if (r === 0 && table.headerRow) {
-          ctx.font      = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillStyle = '#111827';
-        } else {
-          ctx.font      = `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
-          ctx.fillStyle = '#374151';
-        }
+        // Font musi być ustawiony przed getTableCellWrappedLines,
+        // bo computeCellWrappedLines używa ctx.measureText z aktualnym fontem.
+        ctx.font      = isBold
+          ? `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
+          : `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
+        ctx.fillStyle = isBold ? '#111827' : '#374151';
+
+        const wrappedLines = getTableCellWrappedLines(
+          ctx, table.id, r, c, cellText, wrapMaxWidth, fontSize, isBold,
+        );
+
+        const cx     = topLeft.x + c * cellWidth  + cellWidth  / 2;
+        const cy     = topLeft.y + r * cellHeight + cellHeight / 2;
+        const startY = cy - ((wrappedLines.length - 1) * lineHeight) / 2;
 
         ctx.save();
         ctx.beginPath();
         ctx.rect(topLeft.x + c * cellWidth + 3, topLeft.y + r * cellHeight + 2, cellWidth - 6, cellHeight - 4);
         ctx.clip();
 
-        const lines      = cellText.split('\n');
-        const lineHeight = fontSize * 1.2;
-        const startY     = cy - ((lines.length - 1) * lineHeight) / 2;
-
-        lines.forEach((line, i) => {
-          ctx.fillText(line, cx, startY + i * lineHeight, cellWidth - 8);
-        });
+        for (let i = 0; i < wrappedLines.length; i++) {
+          ctx.fillText(wrappedLines[i], cx, startY + i * lineHeight);
+        }
 
         ctx.restore();
       }

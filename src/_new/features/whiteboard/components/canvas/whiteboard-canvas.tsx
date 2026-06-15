@@ -232,11 +232,16 @@ export default function WhiteboardCanvasNew({
   /** Aktualny stan editingTableCell bez stałej closure — do użytku w handlerach */
   const editingTableCellRef = useRef(editingTableCell);
   useEffect(() => { editingTableCellRef.current = editingTableCell; }, [editingTableCell]);
-  // Autofocus + zaznaczenie całości przy otwarciu edytora
+  // Autofocus + zaznaczenie całości + inicjalizacja wysokości przy otwarciu edytora
   useEffect(() => {
-    if (editingTableCell) {
-      cellEditorInputRef.current?.focus();
-      cellEditorInputRef.current?.select();
+    if (editingTableCell && cellEditorInputRef.current) {
+      const ta = cellEditorInputRef.current;
+      // Ustaw wysokość na scrollHeight żeby textarea od razu miała właściwy rozmiar
+      // zamiast domyślnych 2 wierszy przeglądarki (wymaga uruchomienia po renederze)
+      ta.style.height = 'auto';
+      ta.style.height = `${ta.scrollHeight}px`;
+      ta.focus();
+      ta.select();
     }
   }, [editingTableCell]);
 
@@ -730,12 +735,20 @@ useMultiTouchGestures({
           { x: t.x + (editing.col + 1) * cellW, y: t.y + (editing.row + 1) * cellH },
           viewport, width, height
         );
-        const inp = cellEditorInputRef.current;
-        inp.style.left     = `${tl.x}px`;
-        inp.style.top      = `${tl.y}px`;
-        inp.style.width    = `${br.x - tl.x}px`;
-        inp.style.height   = `${br.y - tl.y}px`;
-        inp.style.fontSize = `${Math.max(10, Math.min((br.y - tl.y) * 0.42, 30))}px`;
+        // Pozycja/rozmiar → wrapper div (parentElement); typografia → textarea
+        const ta      = cellEditorInputRef.current;
+        const wrapper = ta.parentElement;
+        if (wrapper) {
+          wrapper.style.left   = `${tl.x}px`;
+          wrapper.style.top    = `${tl.y}px`;
+          wrapper.style.width  = `${br.x - tl.x}px`;
+          wrapper.style.height = `${br.y - tl.y}px`;
+        }
+        // Wzór identyczny jak w table-handler.ts render(): world fontSize × scale × 100
+        ta.style.fontSize = `${Math.max(8, (t.fontSize ?? 0.12) * viewport.scale * 100)}px`;
+        // Po zmianie rozmiaru czcionki (zoom) przelicz auto-height
+        ta.style.height = 'auto';
+        ta.style.height = `${ta.scrollHeight}px`;
       }
     }
 
@@ -2173,36 +2186,63 @@ useMultiTouchGestures({
           );
           const cellScreenW = br.x - tl.x;
           const cellScreenH = br.y - tl.y;
+          // Wrapper: flex-center w pionie — textarea nie obsługuje align-self: center
           return (
-            <textarea
-              ref={cellEditorInputRef}
-              defaultValue={cellValue}
-              onChange={(e) =>
-                handleTableCellChange(
-                  editingTableCell.tableId,
-                  editingTableCell.row,
-                  editingTableCell.col,
-                  e.target.value
-                )
-              }
-              onBlur={() => setEditingTableCell(null)}
-              onKeyDown={handleCellEditorKeyDown}
-              className="absolute z-[100] border-2 border-blue-500 outline-none px-1 resize-none no-scrollbar"
+            <div
+              className="absolute z-[100] border-2 border-blue-500"
               style={{
-                left:       tl.x,
-                top:        tl.y,
-                width:      cellScreenW,
-                height:     cellScreenH,
-                fontSize:   Math.max(10, Math.min(cellScreenH * 0.42, 30)),
-                background: isHeader ? (table.headerBgColor || '#f3f4f6') : '#fff',
-                fontWeight: isHeader ? 700 : 400,
-                color:      '#111827',
-                boxSizing:  'border-box',
-                whiteSpace: 'pre-wrap',
-                wordBreak:  'break-word',
-                lineHeight: '1.2',
+                left:           tl.x,
+                top:            tl.y,
+                width:          cellScreenW,
+                height:         cellScreenH,
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                background:     isHeader ? (table.headerBgColor || '#f3f4f6') : '#fff',
+                boxSizing:      'border-box',
+                overflow:       'hidden',
               }}
-            />
+            >
+              <textarea
+                ref={cellEditorInputRef}
+                defaultValue={cellValue}
+                onChange={(e) =>
+                  handleTableCellChange(
+                    editingTableCell.tableId,
+                    editingTableCell.row,
+                    editingTableCell.col,
+                    e.target.value
+                  )
+                }
+                onBlur={() => setEditingTableCell(null)}
+                onKeyDown={handleCellEditorKeyDown}
+                onInput={(e) => {
+                  const ta = e.target as HTMLTextAreaElement;
+                  ta.style.height = 'auto';
+                  ta.style.height = `${ta.scrollHeight}px`;
+                }}
+                className="outline-none resize-none no-scrollbar"
+                style={{
+                  width:        '100%',
+                  background:   'transparent',
+                  // Kanoniczne źródło: table.fontSize (world units) × scale × 100
+                  fontSize:     Math.max(8, (table.fontSize ?? 0.12) * vp.viewport.scale * 100),
+                  fontFamily:   '-apple-system, BlinkMacSystemFont, sans-serif',
+                  fontWeight:   isHeader ? 700 : 400,
+                  color:        isHeader ? '#111827' : '#374151',
+                  paddingLeft:  3,
+                  paddingRight: 3,
+                  // canvas: ctx.textAlign = 'center'
+                  textAlign:    'center' as const,
+                  // canvas: lineHeight = fontSize * 1.2
+                  lineHeight:   '1.2',
+                  whiteSpace:   'pre-wrap',
+                  wordBreak:    'break-word',
+                  overflow:     'hidden',
+                  boxSizing:    'border-box',
+                }}
+              />
+            </div>
           );
         })()}
 
