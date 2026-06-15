@@ -265,3 +265,14 @@
 \contentsline {subsection}{\numberline {9.15}Produkcja}{104}{subsection.9.15}%
 \contentsline {subsubsection}{\numberline {9.15.1}Backend}{104}{subsubsection.9.15.1}%
 \contentsline {subsubsection}{\numberline {9.15.2}Frontend}{104}{subsubsection.9.15.2}%
+\contentsline {section}{\numberline {10}Dokumentacja testów}{105}{section.10}%
+\contentsline {subsection}{\numberline {10.1}Cel i zakres testowania}{105}{subsection.10.1}%
+\contentsline {subsection}{\numberline {10.2}Strategia testowania}{105}{subsection.10.2}%
+\contentsline {subsection}{\numberline {10.3}Środowisko testowe}{105}{subsection.10.3}%
+\contentsline {subsection}{\numberline {10.4}Przypadki testowe}{105}{subsection.10.4}%
+\contentsline {subsection}{\numberline {10.5}Scenariusze testowe}{107}{subsection.10.5}%
+\contentsline {subsubsection}{\numberline {10.5.1}ST-01: Rejestracja i aktywacja konta użytkownika}{107}{subsubsection.10.5.1}%
+\contentsline {subsubsection}{\numberline {10.5.2}ST-02: Zarządzanie przestrzenią roboczą}{107}{subsubsection.10.5.2}%
+\contentsline {subsubsection}{\numberline {10.5.3}ST-03: Praca z~tablicą kanban}{108}{subsubsection.10.5.3}%
+\contentsline {subsubsection}{\numberline {10.5.4}ST-04: Asystent AI z~cache'owaniem i~rate limitingiem}{108}{subsubsection.10.5.4}%
+\contentsline {subsection}{\numberline {10.6}Podsumowanie pokrycia testami}{108}{subsection.10.6}%

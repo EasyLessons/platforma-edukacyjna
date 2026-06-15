@@ -12,6 +12,8 @@
 \usepackage{listings}
 \usepackage{tcolorbox}
 \usepackage{fontawesome5}
+\usepackage{longtable}
+\usepackage{booktabs}
 
 \geometry{
     a4paper,
@@ -4459,5 +4461,290 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 npm run build
 npm start
 \end{lstlisting}
+
+
+\newpage
+\section{Dokumentacja testów}
+
+\subsection{Cel i zakres testowania}
+
+Celem procesu testowania jest weryfikacja poprawności działania systemu EasyLesson na poziomie logiki biznesowej oraz warstwy komunikacji HTTP. Testy obejmują moduły autentykacji, zarządzania przestrzeniami roboczymi i tablicami, powiadomień oraz tras API obsługujących asystenta AI i formularz kontaktowy.
+
+\subsection{Strategia testowania}
+
+W projekcie zastosowano dwa poziomy testowania:
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Poziom} & Jednostkowy & Integracyjny \\
+\midrule
+\textbf{Typ} & white-box & black-box HTTP \\
+\textbf{Narzędzie} & pytest / Vitest & FastAPI TestClient / Vitest node \\
+\textbf{Zakres} & serwisy, hooki, narzędzia pomocnicze & routery REST, trasy Next.js API \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\bigskip
+
+\textbf{Wzorzec testów backendowych.} Każdy test integracyjny używa bazy SQLite in-memory z pulą \texttt{StaticPool}, wstrzykiwanej przez mechanizm \texttt{dependency\_overrides[get\_db]}. Token JWT tworzony jest bezpośrednio funkcją \texttt{create\_access\_token} bez przechodzenia przez endpoint logowania. Gwarantuje to izolację i powtarzalność każdego przypadku.
+
+\textbf{Wzorzec testów frontendowych.} Trasy Next.js API testowane są w środowisku \texttt{node} (dyrektywa \texttt{// @vitest-environment node}). Zewnętrzne zależności - SDK Gemini oraz Resend API - są mockowane przez \texttt{vi.mock}, co eliminuje opłaty i niedeterminizm sieci.
+
+\subsection{Środowisko testowe}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Warstwa} & \textbf{Narzędzie} & \textbf{Wersja} \\
+\midrule
+Backend & Python & 3.13.2 \\
+Backend & pytest & 8.4.2 \\
+Backend & FastAPI TestClient (Starlette) & 0.115.x \\
+Backend & SQLAlchemy / SQLite in-memory & 2.x \\
+Frontend & Node.js & 20.x \\
+Frontend & Vitest & 3.x \\
+Frontend & @testing-library/react & 16.x \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Przypadki testowe}
+
+Poniższa tabela zawiera reprezentatywne przypadki testowe obejmujące wszystkie główne moduły systemu. Kolumna \emph{Typ} wskazuje poziom testowania: \textbf{J} - jednostkowy, \textbf{I} - integracyjny (HTTP).
+
+\begingroup
+\scriptsize
+\setlength{\tabcolsep}{2pt}
+\begin{longtable}{p{1cm} p{3cm} p{1.4cm} p{0.7cm} p{4.5cm} p{4.5cm}}
+\toprule
+\textbf{ID} & \textbf{Nazwa} & \textbf{Moduł} & \textbf{Typ} & \textbf{Dane wejściowe / warunki} & \textbf{Oczekiwany wynik} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Nazwa} & \textbf{Moduł} & \textbf{Typ} & \textbf{Dane wejściowe / warunki} & \textbf{Oczekiwany wynik} \\
+\midrule
+\endhead
+\midrule
+\multicolumn{6}{r}{\footnotesize Kontynuacja na następnej stronie\ldots} \\
+\endfoot
+\bottomrule
+\endlastfoot
+
+TC-01 & Rejestracja - poprawne dane & Auth & I &
+  \texttt{POST /register}: username, email, hasło &
+  201; użytkownik nieaktywny (\texttt{is\_active=False}); kod weryfikacyjny w~DB \faCheck \\
+\addlinespace
+
+TC-02 & Rejestracja - duplikat e-maila & Auth & I &
+  \texttt{POST /register}: e-mail już istnieje w~DB &
+  409 Conflict; użytkownik nie zostaje utworzony \faCheck \\
+\addlinespace
+
+TC-03 & Logowanie - poprawne dane & Auth & I &
+  \texttt{POST /login}: prawidłowy username + hasło &
+  200; odpowiedź zawiera \texttt{access\_token} w~formacie JWT \faCheck \\
+\addlinespace
+
+TC-04 & Weryfikacja e-mail - poprawny kod & Auth & I &
+  \texttt{POST /verify-email}: właściwy kod dla istniejącego konta &
+  200; \texttt{is\_active=True} w~DB; kod usunięty z~rekordu \faCheck \\
+\addlinespace
+
+TC-05 & Rotacja tokenu odświeżającego & Auth & J &
+  \texttt{refresh\_token} ważny, zapisany w~DB &
+  Nowy \texttt{access\_token}; stary refresh token unieważniony; nowy zapisany \faCheck \\
+\addlinespace
+
+\midrule
+
+TC-06 & Lista przestrzeni - izolacja użytkowników & Workspace & I &
+  \texttt{GET /workspaces}; dwa konta z~oddzielnymi WS &
+  Odpowiedź zawiera wyłącznie WS zalogowanego usera \faCheck \\
+\addlinespace
+
+TC-07 & Tworzenie przestrzeni roboczej & Workspace & I &
+  \texttt{POST /workspaces}: name, icon, bg\_color &
+  201; \texttt{is\_owner=True}; rekord WorkspaceMember z~rolą \emph{owner} w~DB \faCheck \\
+\addlinespace
+
+TC-08 & Edycja WS przez nie-ownera & Workspace & I &
+  \texttt{PUT /workspaces/\{id\}}: token użytkownika z~rolą \emph{editor} &
+  403 Forbidden \faCheck \\
+\addlinespace
+
+TC-09 & Usunięcie członka przez ownera & Workspace & I &
+  \texttt{DELETE /workspaces/\{id\}/}\newline\texttt{members/\{uid\}}: token ownera &
+  200; brak rekordu WorkspaceMember w~DB \faCheck \\
+\addlinespace
+
+TC-10 & Akceptacja wygasłego zaproszenia & Workspace & I &
+  \texttt{POST /invites/accept/\{token\}}: pole \texttt{expires\_at} w~przeszłości &
+  400 / 410; użytkownik nie zostaje dodany do~WS \faCheck \\
+\addlinespace
+
+\midrule
+
+TC-11 & Lista tablic workspace & Board & I &
+  \texttt{GET /boards?workspace\_id=X}: token właściciela WS &
+  200; tablica testowa widoczna w~odpowiedzi \faCheck \\
+\addlinespace
+
+TC-12 & Tworzenie tablicy - brak nazwy & Board & I &
+  \texttt{POST /boards}: brak pola \texttt{name} &
+  422 Unprocessable Entity \faCheck \\
+\addlinespace
+
+TC-13 & Aktualizacja tablicy & Board & I &
+  \texttt{PUT /boards/\{id\}}: nowa nazwa \emph{Zmieniona nazwa} &
+  200; \texttt{data.name == "Zmieniona nazwa"} \faCheck \\
+\addlinespace
+
+TC-14 & Przełączenie flagi \emph{ulubione} & Board & I &
+  \texttt{POST /boards/\{id\}/}\newline\texttt{toggle-favourite}: \texttt{\{is\_favourite: true\}} &
+  200; \texttt{data.is\_favourite == true} \faCheck \\
+\addlinespace
+
+\midrule
+
+TC-15 & Pusta lista powiadomień & Notification & I &
+  \texttt{GET /notifications}: brak rekordów dla usera &
+  200; \texttt{data.notifications == []} \faCheck \\
+\addlinespace
+
+TC-16 & Oznaczenie powiadomienia jako przeczytane & Notification & I &
+  \texttt{PATCH /notifications/\{id\}/read} &
+  200; \texttt{is\_read=True} w~DB \faCheck \\
+\addlinespace
+
+TC-17 & Masowe oznaczenie jako przeczytane & Notification & I &
+  \texttt{PATCH /notifications/read-all}: 3 nieprzeczytane &
+  200; \texttt{data.updated == 3}; wszystkie \texttt{is\_read=True} w~DB \faCheck \\
+\addlinespace
+
+TC-18 & Usunięcie nieistniejącego powiadomienia & Notification & I &
+  \texttt{DELETE /notifications/99999} &
+  404 Not Found \faCheck \\
+\addlinespace
+
+\midrule
+
+TC-19 & Brak pola \texttt{message} w~zapytaniu & Chat API & I &
+  \texttt{POST /api/chat}: puste ciało \texttt{\{\}} &
+  400; \texttt{error: "invalid\_message"} \faCheck \\
+\addlinespace
+
+TC-20 & Poprawne zapytanie do asystenta AI & Chat API & I &
+  \texttt{POST /api/chat}: \texttt{\{message: "ile to 2+2?"\}} &
+  200; \texttt{cached: false}; \texttt{apiUsed: true}; niepusta odpowiedź \faCheck \\
+\addlinespace
+
+TC-21 & Trafienie w~pamięć podręczną & Chat API & I &
+  To samo pytanie wysłane dwukrotnie z~tego samego IP &
+  Drugie wywołanie: 200; \texttt{cached: true}; brak wywołania SDK AI \faCheck \\
+\addlinespace
+
+TC-22 & Rate limiting - przekroczenie limitu & Chat API & I &
+  21 żądań z~tego samego IP w~oknie 1~minuty &
+  21. żądanie: 429 Too Many Requests \faCheck \\
+\addlinespace
+
+\midrule
+
+TC-23 & Formularz kontaktowy - niepoprawny e-mail & Contact API & I &
+  \texttt{POST /api/contact}: e-mail bez znaku \texttt{@} lub bez kropki &
+  400 Bad Request \faCheck \\
+\addlinespace
+
+TC-24 & Formularz kontaktowy - poprawne dane & Contact API & I &
+  \texttt{POST /api/contact}: name, email, message &
+  200; Resend wywołany z~\texttt{to}, \texttt{subject}, \texttt{html} \faCheck \\
+\addlinespace
+
+TC-25 & Błąd Resend API & Contact API & I &
+  \texttt{POST /api/contact}: Resend zwraca \texttt{ok: false} &
+  500 Internal Server Error \faCheck \\
+
+\end{longtable}
+\endgroup
+
+\subsection{Scenariusze testowe}
+
+Scenariusze opisują wielokrokowe przepływy łączące powiązane przypadki testowe w~realistyczne sekwencje użycia systemu.
+
+\subsubsection{ST-01: Rejestracja i aktywacja konta użytkownika}
+
+\textbf{Cel:} weryfikacja kompletnego przepływu rejestracji od złożenia formularza do~aktywacji konta i~zalogowania.
+
+\begin{enumerate}
+  \item Użytkownik wysyła żądanie \texttt{POST /api/v1/auth/register} z~poprawnymi danymi (TC-01). \\ Oczekiwany wynik: 201, konto nieaktywne, wygenerowany kod weryfikacyjny.
+  \item System wysyła e-mail z~kodem na~podany adres.
+  \item Użytkownik wysyła \texttt{POST /api/v1/auth/verify-email} z~kodem z~e-maila (TC-04). \\ Oczekiwany wynik: 200, konto aktywne (\texttt{is\_active=True}).
+  \item Użytkownik loguje się przez \texttt{POST /api/v1/auth/login} (TC-03). \\ Oczekiwany wynik: 200, ważny JWT w~odpowiedzi.
+\end{enumerate}
+
+\textbf{Powiązane przypadki:} TC-01, TC-03, TC-04.
+
+\subsubsection{ST-02: Zarządzanie przestrzenią roboczą}
+
+\textbf{Cel:} weryfikacja tworzenia przestrzeni, zapraszania członka i~usunięcia go przez ownera.
+
+\begin{enumerate}
+  \item Zalogowany użytkownik A~tworzy WS przez \texttt{POST /api/v1/workspaces} (TC-07). \\ Oczekiwany wynik: 201, rola \emph{owner}.
+  \item Użytkownik A~wysyła zaproszenie do użytkownika B przez \texttt{POST .../workspaces/\{id\}/invite}.
+  \item Użytkownik B akceptuje zaproszenie przez \texttt{POST .../invites/accept/\{token\}}. \\ Oczekiwany wynik: 200, rekord WorkspaceMember w~DB.
+  \item Użytkownik A~usuwa użytkownika B przez \texttt{DELETE .../members/\{uid\}} (TC-09). \\ Oczekiwany wynik: 200, brak rekordu w~DB.
+  \item Próba edycji WS przez użytkownika B (TC-08). \\ Oczekiwany wynik: 403 Forbidden.
+\end{enumerate}
+
+\textbf{Powiązane przypadki:} TC-07, TC-08, TC-09, TC-10.
+
+\subsubsection{ST-03: Praca z~tablicą kanban}
+
+\textbf{Cel:} weryfikacja pełnego cyklu życia tablicy - tworzenie, edycja, zarządzanie ulubionymi.
+
+\begin{enumerate}
+  \item Użytkownik pobiera listę tablic \texttt{GET /api/v1/boards?workspace\_id=X} (TC-11). \\ Oczekiwany wynik: 200, lista tablic przestrzeni.
+  \item Użytkownik tworzy tablicę \texttt{POST /api/v1/boards} (TC-12 --- ścieżka negatywna, potem poprawna). \\ Oczekiwany wynik: 422 dla brakującej nazwy; 201 po~uzupełnieniu danych.
+  \item Użytkownik zmienia nazwę tablicy przez \texttt{PUT /api/v1/boards/\{id\}} (TC-13). \\ Oczekiwany wynik: 200, zaktualizowana nazwa.
+  \item Użytkownik dodaje tablicę do ulubionych \texttt{POST .../toggle-favourite} (TC-14). \\ Oczekiwany wynik: 200, \texttt{is\_favourite: true}.
+\end{enumerate}
+
+\textbf{Powiązane przypadki:} TC-11, TC-12, TC-13, TC-14.
+
+\subsubsection{ST-04: Asystent AI z~cache'owaniem i~rate limitingiem}
+
+\textbf{Cel:} weryfikacja walidacji wejścia, pamięci podręcznej odpowiedzi i~mechanizmu ograniczania żądań.
+
+\begin{enumerate}
+  \item Użytkownik wysyła żądanie bez pola \texttt{message} (TC-19). \\ Oczekiwany wynik: 400, \texttt{error: "invalid\_message"}.
+  \item Użytkownik wysyła poprawne pytanie (TC-20). \\ Oczekiwany wynik: 200, \texttt{cached: false}, odpowiedź modelu AI.
+  \item Użytkownik ponawia to samo pytanie (TC-21). \\ Oczekiwany wynik: 200, \texttt{cached: true}, brak wywołania SDK.
+  \item Użytkownik wysyła 21 żądań z~tego samego adresu IP w~krótkim czasie (TC-22). \\ Oczekiwany wynik: 21. żądanie zwraca 429 Too Many Requests.
+\end{enumerate}
+
+\textbf{Powiązane przypadki:} TC-19, TC-20, TC-21, TC-22.
+
+\subsection{Podsumowanie pokrycia testami}
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Moduł} & \textbf{Testy jednostkowe} & \textbf{Testy integracyjne} & \textbf{Łącznie} \\
+\midrule
+Autentykacja        & $\sim$40 & $\sim$30 & $\sim$70 \\
+Przestrzenie robocze & $\sim$15 & 12       & $\sim$27 \\
+Tablice             & $\sim$10 & 10       & $\sim$20 \\
+Powiadomienia       & $\sim$8  & 8        & $\sim$16 \\
+Asystent AI (Chat)  & -      & 9        & 9        \\
+Formularz kontaktowy & -     & 8        & 8        \\
+Narzędzia i hooki   & $\sim$50 & -      & $\sim$50 \\
+Tablica interaktywna & $\sim$15 & -     & $\sim$15 \\
+\midrule
+\textbf{Razem}      & $\sim$138 & $\sim$77 & $\sim$215 \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \end{document}
