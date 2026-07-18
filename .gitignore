@@ -49,3 +49,11 @@ yarn-error.log*
 
 # Alembic
 alembic/__pycache__/
+
+# Latex
+*.aux
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+graph.svg
