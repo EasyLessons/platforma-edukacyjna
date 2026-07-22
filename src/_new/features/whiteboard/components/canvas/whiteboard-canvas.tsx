@@ -327,6 +327,7 @@ export default function WhiteboardCanvasNew({
     onRemoveElement: (elementId) => el.removeElement(elementId),
     onAddElement: (element) => el.addElements([element]),
     onUpdateElement: (element) => el.updateElement(element),
+    onLoadImage: el.loadImage,
     onClearSelection: sel.clearSelection,
     unsavedElementsRef: el.unsavedElementsRef,
     boardIdRef,

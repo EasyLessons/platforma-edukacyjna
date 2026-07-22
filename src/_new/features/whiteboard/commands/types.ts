@@ -26,6 +26,17 @@ export interface CommandContext {
   removeElement(id: string): void;
   updateElement(element: DrawingElement): void;
 
+  /**
+   * Doładuj bitmapę obrazu do cache renderowania (loadedImages).
+   * 🛠️ FIX (known-issues.md #2, Aktualizacja 10): undo usunięcia obrazu
+   * (createEffect) przywracał element do `elements`, ale NIGDY nie ładował
+   * jego bitmapy — bo świeże wklejenie obrazu (handleImageCreate) woła
+   * `el.loadImage` OBOK silnika, nie przez komendę. Undo idzie WYŁĄCZNIE
+   * przez createEffect, więc bez tego pola obrazek wracał jako szary blok
+   * (loadedImages.get(id) → undefined → ImageHandler.render rysuje placeholder).
+   */
+  loadImage(id: string, src: string): void;
+
   // ── broadcast do innych użytkowników (Supabase Realtime) ──
   broadcastCreated(element: DrawingElement): void | Promise<void>;
   broadcastDeleted(id: string): void | Promise<void>;

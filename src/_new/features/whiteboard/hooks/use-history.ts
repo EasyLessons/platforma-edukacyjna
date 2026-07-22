@@ -36,6 +36,12 @@ export interface UseHistoryOptions {
   onAddElement: (element: DrawingElement) => void;
   /** Zaktualizuj element w lokalnym stanie React */
   onUpdateElement: (element: DrawingElement) => void;
+  /**
+   * Doładuj bitmapę obrazu do cache renderowania — patrz komentarz przy
+   * `loadImage` w commands/types.ts (known-issues.md #2, Aktualizacja 10).
+   * Bez tego undo usunięcia obrazu / redo jego utworzenia wraca jako szary blok.
+   */
+  onLoadImage: (id: string, src: string) => void;
   /** Czyszczenie zaznaczenia po undo/redo */
   onClearSelection: () => void;
   /** Ref do niezapisanych elementów (czy element jest już w bazie) */
@@ -72,6 +78,7 @@ export function useHistory({
   onRemoveElement,
   onAddElement,
   onUpdateElement,
+  onLoadImage,
   onClearSelection,
   unsavedElementsRef,
   boardIdRef,
@@ -90,6 +97,7 @@ export function useHistory({
     addElement: onAddElement,
     removeElement: onRemoveElement,
     updateElement: onUpdateElement,
+    loadImage: onLoadImage,
     broadcastCreated: onBroadcastCreated,
     broadcastDeleted: onBroadcastDeleted,
     broadcastUpdated: onBroadcastUpdated,
@@ -98,7 +106,7 @@ export function useHistory({
     boardIdRef,
     unsavedElementsRef,
   }), [
-    onAddElement, onRemoveElement, onUpdateElement,
+    onAddElement, onRemoveElement, onUpdateElement, onLoadImage,
     onBroadcastCreated, onBroadcastDeleted, onBroadcastUpdated,
     onSaveElement, onDeleteElement, boardIdRef, unsavedElementsRef,
   ]);

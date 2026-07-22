@@ -21,6 +21,10 @@ function makeCtx(boardId: string | null = '7', unsaved = new Set<string>()) {
     addElement: (e) => void calls.push(`add:${e.id}`),
     removeElement: (id) => void calls.push(`remove:${id}`),
     updateElement: (e) => void calls.push(`update:${e.id}`),
+    // 🛠️ Atrapa dla known-issues.md #2, Aktualizacja 10 — testy tu używają
+    // elementów `type: 'text'`, więc createEffect nigdy realnie tego nie woła,
+    // ale pole jest wymagane przez CommandContext.
+    loadImage: (id) => void calls.push(`loadImage:${id}`),
     broadcastCreated: (e) => void calls.push(`bcCreated:${e.id}`),
     broadcastDeleted: (id) => void calls.push(`bcDeleted:${id}`),
     broadcastUpdated: (e) => void calls.push(`bcUpdated:${e.id}`),
