@@ -6,6 +6,7 @@ Zamiast main.py, ale trzymamy main.py dla backward compat
 MAIN.PY - Entry point aplikacji
 """
 import os
+import re
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -118,9 +119,16 @@ async def app_exception_handler(request, exc: AppException):
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request, exc: Exception):
-    """Handle unhandled exceptions"""
+    """Handle unhandled exceptions
+
+    Starlette pulls handlers registered for the bare `Exception` class into
+    ServerErrorMiddleware, which sits OUTSIDE CORSMiddleware in the stack.
+    That means responses from here never get CORS headers added automatically,
+    so the browser reports a misleading "blocked by CORS" error instead of the
+    real 500. We add the header manually here to match CORSMiddleware's own logic.
+    """
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
+    response = JSONResponse(
         status_code=500,
         content=ApiResponse(
             success=False,
@@ -128,6 +136,12 @@ async def global_exception_handler(request, exc: Exception):
             code="APP_ERROR"
         ).model_dump(mode='json')
     )
+    origin = request.headers.get("origin")
+    if origin and (origin in ALLOWED_ORIGINS or re.match(ALLOWED_ORIGIN_REGEX, origin)):
+        response.headers["Access-Control-Allow-Origin"] = origin
+        response.headers["Access-Control-Allow-Credentials"] = "true"
+        response.headers["Vary"] = "Origin"
+    return response
 
 # Include routers
 app.include_router(get_v1_router())

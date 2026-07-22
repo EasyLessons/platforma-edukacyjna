@@ -74,6 +74,15 @@ def setup_logging(log_level: str = "INFO"):
     error_handler.setLevel(logging.ERROR)
     error_handler.setFormatter(file_formatter)
     root_logger.addHandler(error_handler)
+
+    # === KONSOLA: stdout (żeby Render/Docker logs pokazywały błędy aplikacji) ===
+    # Pliki logs/*.log żyją tylko na dysku kontenera (efemeryczny na Render) i
+    # nie są widoczne w panelu logów hostingu - ten handler to jedyny sposób,
+    # żeby błędy aplikacji (nie tylko uvicorn.access) trafiały do Render Logs.
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.DEBUG)
+    console_handler.setFormatter(file_formatter)
+    root_logger.addHandler(console_handler)
     
     # ========================================
     # KONFIGURUJ LOGGERY APLIKACJI
