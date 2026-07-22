@@ -23,158 +23,68 @@
  * 1. User A rysuje → wysyła event przez Broadcast
  * 2. User B odbiera event → dodaje element do swojej tablicy
  * 3. User C wchodzi → widzi listę online users (Presence)
+ *
+ * 🧩 KROK 3 ROZBIJANIA (patrz docs/migration-status.md):
+ * Samo otwieranie kanału Supabase, Presence (kto online) i reconnect
+ * przeniosły się do `useRealtimeChannel` (src/_new/features/whiteboard/realtime/).
+ * Ten plik teraz tylko REJESTRUJE, co ma się stać gdy przyjdzie dana wiadomość
+ * (broadcast elementów/kursorów/typing/viewport/sync + presence "leave") —
+ * resztę robi za nas hook. W kolejnych krokach i te rejestracje się wyprowadzi.
  */
 
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  ReactNode,
-} from 'react';
-import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from './AuthContext';
-import { markUserOnline } from '@/_new/features/whiteboard/api/whiteboardApi';
-import { apiClient } from '@/_new/lib/api';
+import { createContext, useContext, useCallback, useRef, ReactNode } from 'react';
+import { useAuth } from '@/_new/lib/auth';
 import { DrawingElement } from '@/_new/features/whiteboard/types';
 
-const DEBUG = process.env.NODE_ENV === 'development';
-const log = DEBUG ? console.log.bind(console) : () => {};
-const logWarn = DEBUG ? console.warn.bind(console) : () => {};
-const logDebug = DEBUG ? console.debug.bind(console) : () => {};
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 📝 TYPY
-// ═══════════════════════════════════════════════════════════════════════════
+// ─── Wydzielone do src/_new/features/whiteboard/realtime/ (patrz
+// docs/migration-status.md) — typy, stałe, logger i sam silnik połączenia
+// żyją teraz w jednym miejscu, współdzielonym z resztą mechanizmu realtime. ──
+import type {
+  RemoteCursor,
+  TypingUser,
+  RemoteViewport,
+  BoardEvent,
+  BoardRealtimeContextType,
+  ElementBroadcastPayload,
+} from '@/_new/features/whiteboard/realtime/types';
 
 /**
- * Użytkownik online na tablicy
+ * 🛠️ FIX (known-issues.md #2, Opcja B): usuwa z elementu pola, które są
+ * "ciężkie" i praktycznie NIGDY nie zmieniają się po utworzeniu elementu —
+ * na razie tylko `src` u zdjęć (base64, potrafi mieć setki KB). Używane
+ * TYLKO przy `element-updated`/`elements-batch` (update geometrii), NIGDY
+ * przy `element-created` (tam `src` musi dojść, bo odbiorca nie ma go jeszcze
+ * wcale). Odbiorca scala wynik z lokalną kopią zamiast nadpisywać całość —
+ * patrz `onRemoteElementUpdated`/`onElementsUpdated` w whiteboard-canvas.tsx.
  */
-interface OnlineUser {
-  user_id: number;
-  username: string;
-  avatar_url?: string;
-  online_at: string;
-  cursor_x?: number; // Opcjonalnie: pozycja kursora
-  cursor_y?: number;
-  viewport_x?: number; // 🆕 Viewport pozycja
-  viewport_y?: number;
-  viewport_scale?: number;
+function stripHeavyFields(element: DrawingElement): ElementBroadcastPayload {
+  if (element.type === 'image') {
+    const { src, ...rest } = element;
+    return rest;
+  }
+  return element;
 }
+import {
+  THROTTLE_MS,
+  SYNC_CHUNK_SIZE,
+  SYNC_CHUNK_DELAY_MS,
+  TYPING_TIMEOUT_MS,
+  TYPING_CLEANUP_INTERVAL_MS,
+  CURSOR_COLORS,
+} from '@/_new/features/whiteboard/realtime/constants';
+import { log, logWarn } from '@/_new/features/whiteboard/realtime/logger';
+import { useSafeBroadcast } from '@/_new/features/whiteboard/realtime/useSafeBroadcast';
+import {
+  useRealtimeChannel,
+  type ChannelListenerSetup,
+} from '@/_new/features/whiteboard/realtime/useRealtimeChannel';
 
-/**
- * Kursor innego użytkownika
- */
-export interface RemoteCursor {
-  userId: number;
-  username: string;
-  x: number;
-  y: number;
-  color: string;
-  lastUpdate: number;
-}
-
-/**
- * 🆕 Użytkownik który obecnie edytuje element
- * lastSeen: timestamp (ms) ostatniego typing-started — używany do auto-cleanup
- */
-export interface TypingUser {
-  userId: number;
-  username: string;
-  elementId: string;
-  lastSeen: number;
-}
-
-/**
- * 🆕 Viewport innego użytkownika (dla Follow Mode)
- */
-export interface RemoteViewport {
-  userId: number;
-  username: string;
-  x: number;
-  y: number;
-  scale: number;
-  lastUpdate: number;
-}
-
-/**
- * Typy eventów synchronizacji
- */
-type BoardEvent =
-  | { type: 'element-created'; element: DrawingElement; userId: number; username: string }
-  | { type: 'element-updated'; element: DrawingElement; userId: number; username: string }
-  | { type: 'element-deleted'; elementId: string; userId: number; username: string }
-  | { type: 'elements-batch'; elements: DrawingElement[]; userId: number; username: string }
-  | { type: 'cursor-moved'; x: number; y: number; userId: number; username: string }
-  | { type: 'typing-started'; elementId: string; userId: number; username: string }
-  | { type: 'typing-stopped'; elementId: string; userId: number; username: string }
-  | {
-      type: 'viewport-changed';
-      x: number;
-      y: number;
-      scale: number;
-      userId: number;
-      username: string;
-    };
-
-/**
- * Context Type
- */
-interface BoardRealtimeContextType {
-  // Użytkownicy online
-  onlineUsers: OnlineUser[];
-  isConnected: boolean;
-
-  // 🆕 Subskrypcja kursorów (nie powoduje re-renderów context!)
-  subscribeCursors: (callback: (cursors: RemoteCursor[]) => void) => () => void;
-
-  // Synchronizacja elementów
-  broadcastElementCreated: (element: DrawingElement) => Promise<void>;
-  broadcastElementUpdated: (element: DrawingElement) => Promise<void>;
-  broadcastElementDeleted: (elementId: string) => Promise<void>;
-  broadcastElementsBatch: (elements: DrawingElement[]) => Promise<void>;
-
-  // Kursor
-  broadcastCursorMove: (x: number, y: number) => Promise<void>;
-
-  // 🆕 Typing indicator
-  broadcastTypingStarted: (elementId: string) => Promise<void>;
-  broadcastTypingStopped: (elementId: string) => Promise<void>;
-  subscribeTyping: (callback: (typingUsers: TypingUser[]) => void) => () => void;
-
-  // 🆕 Viewport tracking (dla Follow Mode)
-  broadcastViewportChange: (x: number, y: number, scale: number) => Promise<void>;
-  subscribeViewports: (callback: (viewports: RemoteViewport[]) => void) => () => void;
-
-  // Handlery dla przychodzących eventów
-  onRemoteElementCreated: (
-    handler: (element: DrawingElement, userId: number, username: string) => void
-  ) => void;
-  onRemoteElementUpdated: (
-    handler: (element: DrawingElement, userId: number, username: string) => void
-  ) => void;
-  onRemoteElementDeleted: (
-    handler: (elementId: string, userId: number, username: string) => void
-  ) => void;
-  onRemoteElementsBatch: (
-    handler: (elements: DrawingElement[], userId: number, username: string) => void
-  ) => void;
-onRemoteCursorMove: (
-    handler: (x: number, y: number, userId: number, username: string) => void
-  ) => void;
-  
-  // 🔥 DODANE [SYNC]
-  broadcastSyncRequest: () => Promise<void>;
-  /** Wysyła elementy do targetUserId paczkami po SYNC_CHUNK_SIZE — omija limit 1MB Supabase */
-  broadcastSyncResponse: (elements: DrawingElement[], targetUserId: number) => Promise<void>;
-  onRemoteSyncRequest: (handler: (userId: number, username: string) => void) => void;
-  onRemoteSyncResponse: (handler: (elements: DrawingElement[], userId: number, username: string) => void) => void;
-}
+// Re-eksport, żeby zewnętrzne pliki importujące te typy stąd
+// (np. use-realtime.ts, remote-cursors.tsx) nie musiały się jeszcze zmieniać —
+// to zmienimy dopiero w ostatnim kroku, jak cały plik zniknie.
+export type { RemoteCursor, TypingUser, RemoteViewport };
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 🎁 CONTEXT
@@ -209,9 +119,6 @@ export function BoardRealtimeProvider({
   // STANY
   // ───────────────────────────────────────────────────────────────────────
 
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [isConnected, setIsConnected] = useState(false);
-
   // 🆕 KURSORY - używamy ref + subscribers zamiast state
   // To zapobiega re-renderom WhiteboardCanvas przy każdym ruchu kursora
   const remoteCursorsRef = useRef<RemoteCursor[]>([]);
@@ -225,36 +132,9 @@ export function BoardRealtimeProvider({
   const remoteViewportsRef = useRef<RemoteViewport[]>([]);
   const viewportSubscribersRef = useRef<Set<(viewports: RemoteViewport[]) => void>>(new Set());
 
-  const channelRef = useRef<RealtimeChannel | null>(null);
-
-  // Refs do zapobiegania wielokrotnym polaczeniom
-  const isSubscribedRef = useRef<boolean>(false);
-  const currentBoardIdRef = useRef<string | null>(null);
-  
-  // Promise do czekania na gotowość kanału (używane tylko wewnętrznie w subscribe)
-  const channelReadyPromiseRef = useRef<Promise<void> | null>(null);
-  const channelReadyResolveRef = useRef<(() => void) | null>(null);
-
-  // Ref do śledzenia poprzedniego stanu użytkowników (dla debounce)
-  const previousUsersRef = useRef<Map<number, OnlineUser>>(new Map());
-  const presenceSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const presenceHeartbeatRef = useRef<NodeJS.Timeout | null>(null);
   const typingCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptRef = useRef<number>(0);
 
   const { user } = useAuth();
-
-  // Kolory dla kursorów (cyklicznie przydzielane)
-  const cursorColors = useRef([
-    '#FF6B6B',
-    '#4ECDC4',
-    '#45B7D1',
-    '#96CEB4',
-    '#FFEAA7',
-    '#DDA0DD',
-    '#98D8C8',
-    '#F7DC6F',
-  ]);
 
   // 🛡️ THROTTLE - Ref do przechowywania ostatnich czasów broadcast
   const lastBroadcastTimeRef = useRef({
@@ -266,18 +146,6 @@ export function BoardRealtimeProvider({
   // 🛡️ TRAILING THROTTLE - przechowuj ostatnią wartość do wysłania
   const pendingElementUpdateRef = useRef<DrawingElement | null>(null);
   const pendingElementUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 🛡️ THROTTLE - Limity częstotliwości (w ms)
-  const THROTTLE_MS = {
-    ELEMENT_UPDATE: 100, // Max 10 updates/s podczas operacji
-    CURSOR_MOVE: 50, // Max 20 pozycji kursora/s
-    VIEWPORT_CHANGE: 200, // Max 5 viewport updates/s
-  };
-
-  // Rozmiar paczki sync-response — max ~100 elementów żeby nie przekroczyć 1MB Supabase
-  const SYNC_CHUNK_SIZE = 100;
-  // Odstęp między paczkami (ms) — daje czas Supabase na przepuszczenie poprzedniej
-  const SYNC_CHUNK_DELAY_MS = 80;
 
   // Funkcja do notyfikacji subscriberów o zmianie kursorów
   const notifyCursorSubscribers = useCallback(() => {
@@ -305,13 +173,13 @@ export function BoardRealtimeProvider({
     ((element: DrawingElement, userId: number, username: string) => void) | null
   >(null);
   const elementUpdatedHandlerRef = useRef<
-    ((element: DrawingElement, userId: number, username: string) => void) | null
+    ((element: ElementBroadcastPayload, userId: number, username: string) => void) | null
   >(null);
   const elementDeletedHandlerRef = useRef<
     ((elementId: string, userId: number, username: string) => void) | null
   >(null);
   const elementsBatchHandlerRef = useRef<
-    ((elements: DrawingElement[], userId: number, username: string) => void) | null
+    ((elements: ElementBroadcastPayload[], userId: number, username: string, geometryOnly: boolean) => void) | null
   >(null);
   const cursorMoveHandlerRef = useRef<
     ((x: number, y: number, userId: number, username: string) => void) | null
@@ -320,134 +188,55 @@ export function BoardRealtimeProvider({
   const syncResponseHandlerRef = useRef<((elements: DrawingElement[], userId: number, username: string) => void) | null>(null);
   // Bufor składania chunków sync-response od jednego sendera
   const syncChunkBufferRef = useRef<{ chunks: DrawingElement[][]; totalChunks: number; fromUserId: number } | null>(null);
+
   // ───────────────────────────────────────────────────────────────────────
-  // POŁĄCZENIE Z SUPABASE
+  // POŁĄCZENIE Z SUPABASE — samo łączenie i Presence robi useRealtimeChannel.
+  // My tylko mówimy MU, co ma się stać, gdy przyjdzie dana wiadomość.
   // ───────────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
-    if (!user || !boardId) return;
-    
-    // Zapobiegaj wielokrotnemu połączeniu z tym samym boardem
-    if (isSubscribedRef.current && currentBoardIdRef.current === boardId) {
-      return;
-    }
-    
-    // Jeśli zmieniamy board, zamknij poprzedni kanał
-    if (channelRef.current && currentBoardIdRef.current !== boardId) {
-      channelRef.current.unsubscribe();
-      channelRef.current = null;
-      isSubscribedRef.current = false;
-    }
-
-    log(`🔌 Łączenie z kanałem tablicy: board:${boardId}`);
-    currentBoardIdRef.current = boardId;
-
-    // Reset reconnect counter przy nowym połączeniu
-    reconnectAttemptRef.current = 0;
-    
-    // Utwórz Promise do czekania na gotowość kanału
-    channelReadyPromiseRef.current = new Promise<void>((resolve) => {
-      channelReadyResolveRef.current = resolve;
-    });
-
-    // Utwórz kanał dla tej tablicy z lepszą konfiguracją
-    const channel = supabase.channel(`board:${boardId}`, {
-      config: {
-        broadcast: { 
-          self: false,  // Nie odbieraj własnych broadcast (już mamy lokalnie)
-          ack: false,   // Bez potwierdzenia (szybsze)
-        },
-        presence: { 
-          key: user.id.toString(),
-        },
-      },
-    });
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 👥 PRESENCE - Śledzenie użytkowników online
-    // ═══════════════════════════════════════════════════════════════════════
-
-    // 🛡️ DEBOUNCED PRESENCE SYNC - zapobiega "migotaniu" przy niestabilnym połączeniu
-    const handlePresenceSync = () => {
-      // Anuluj poprzedni timeout jeśli istnieje
-      if (presenceSyncTimeoutRef.current) {
-        clearTimeout(presenceSyncTimeoutRef.current);
-      }
-
-      // Debounce 300ms - poczekaj na stabilizację
-      presenceSyncTimeoutRef.current = setTimeout(() => {
-        const state = channel.presenceState();
-        const usersMap = new Map<number, OnlineUser>();
-
-        // Konwertuj state na listę użytkowników (bez duplikatów)
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((presence: any) => {
-            const onlineUser = presence as OnlineUser;
-            usersMap.set(onlineUser.user_id, onlineUser);
-          });
-        });
-
-        // Porównaj z poprzednim stanem - aktualizuj tylko jeśli się zmienił
-        const prevUserIds = Array.from(previousUsersRef.current.keys()).sort().join(',');
-        const newUserIds = Array.from(usersMap.keys()).sort().join(',');
-
-        if (prevUserIds !== newUserIds) {
-          // Stan faktycznie się zmienił
-          const users = Array.from(usersMap.values());
-          previousUsersRef.current = usersMap;
-          setOnlineUsers(users);
-          log(
-            `👥 Użytkownicy online (${users.length}):`,
-            users.map((u) => u.username)
-          );
-        }
-      }, 300); // 300ms debounce
-    };
-
-    channel
-      .on('presence', { event: 'sync' }, handlePresenceSync)
-      .on('presence', { event: 'join' }, ({ newPresences }) => {
-        // Filtruj własne joiny i loguj tylko rzeczywiste nowe joiny
-        const realNewUsers = newPresences.filter((p: any) => p.user_id !== user.id);
-        if (realNewUsers.length > 0) {
-          log('🟢 Użytkownik dołączył:', realNewUsers.map((p: any) => p.username));
-        }
-      })
-      .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-        // 🛡️ Filtruj "ghost" leave events - sprawdź czy user naprawdę wyszedł
-        // Ghost leave może wystąpić przy reconnect kanału
-        const realLeftUsers = leftPresences.filter((p: any) => {
-          // Nie reaguj na własne leave
-          if (p.user_id === user.id) return false;
-          // Sprawdź czy user nie jest już ponownie w presence state
-          const currentState = channel.presenceState();
-          const userStillPresent = Object.values(currentState).some((presences: any) =>
-            presences.some((presence: any) => presence.user_id === p.user_id)
-          );
-          return !userStillPresent; // Tylko jeśli naprawdę wyszedł
-        });
-
-        if (realLeftUsers.length > 0) {
-          log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
-          const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
-
-          // Usuń kursory wychodzących użytkowników
-          remoteCursorsRef.current = remoteCursorsRef.current.filter(
-            (c) => !leftUserIds.includes(c.userId)
-          );
-          notifyCursorSubscribers();
-
-          // Usuń wskaźniki pisania wychodzących użytkowników
-          // (typing-stopped nigdy nie dotrze jeśli ktoś zamknął kartę)
-          const beforeTyping = typingUsersRef.current.length;
-          typingUsersRef.current = typingUsersRef.current.filter(
-            (t) => !leftUserIds.includes(t.userId)
-          );
-          if (typingUsersRef.current.length !== beforeTyping) {
-            notifyTypingSubscribers();
-          }
-        }
+  // Uwaga: ta funkcja NIE jest owinięta w useCallback. To celowe — nie
+  // dlatego, że o tym zapomnieliśmy, tylko dlatego że useCallback ma sens
+  // tylko wtedy, gdy tożsamość funkcji jest gdzieś używana jako zależność
+  // (np. w tablicy [] efektu albo jako prop do zmemoizowanego komponentu).
+  // `useRealtimeChannel` celowo NIE wrzuca tej funkcji do swojej tablicy
+  // zależności (czyta ją przez ref w środku), więc nowa "kopia" tej funkcji
+  // przy każdym renderze nikomu nie przeszkadza.
+  const registerListeners: ChannelListenerSetup = (channel, currentUser) => {
+    channel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
+      // 🛡️ Filtruj "ghost" leave events - sprawdź czy user naprawdę wyszedł
+      // Ghost leave może wystąpić przy reconnect kanału
+      const realLeftUsers = leftPresences.filter((p: any) => {
+        // Nie reaguj na własne leave
+        if (p.user_id === currentUser.id) return false;
+        // Sprawdź czy user nie jest już ponownie w presence state
+        const currentState = channel.presenceState();
+        const userStillPresent = Object.values(currentState).some((presences: any) =>
+          presences.some((presence: any) => presence.user_id === p.user_id)
+        );
+        return !userStillPresent; // Tylko jeśli naprawdę wyszedł
       });
+
+      if (realLeftUsers.length > 0) {
+        log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
+        const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
+
+        // Usuń kursory wychodzących użytkowników
+        remoteCursorsRef.current = remoteCursorsRef.current.filter(
+          (c) => !leftUserIds.includes(c.userId)
+        );
+        notifyCursorSubscribers();
+
+        // Usuń wskaźniki pisania wychodzących użytkowników
+        // (typing-stopped nigdy nie dotrze jeśli ktoś zamknął kartę)
+        const beforeTyping = typingUsersRef.current.length;
+        typingUsersRef.current = typingUsersRef.current.filter(
+          (t) => !leftUserIds.includes(t.userId)
+        );
+        if (typingUsersRef.current.length !== beforeTyping) {
+          notifyTypingSubscribers();
+        }
+      }
+    });
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🔄 BROADCAST - Synchronizacja elementów
@@ -458,7 +247,7 @@ export function BoardRealtimeProvider({
         const { element, userId, username } = payload as BoardEvent & { type: 'element-created' };
 
         // Ignoruj własne eventy (już mamy lokalnie)
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         log(
           `📥 Otrzymano element-created od ${username}:`,
@@ -466,7 +255,6 @@ export function BoardRealtimeProvider({
           `(typ: ${element.type})`
         );
 
-        // Wywołaj handler (jeśli zarejestrowany)
         if (elementCreatedHandlerRef.current) {
           elementCreatedHandlerRef.current(element, userId, username);
         }
@@ -474,7 +262,7 @@ export function BoardRealtimeProvider({
       .on('broadcast', { event: 'element-updated' }, ({ payload }) => {
         const { element, userId, username } = payload as BoardEvent & { type: 'element-updated' };
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         log(`📥 Otrzymano element-updated od ${username}:`, element.id);
 
@@ -485,7 +273,7 @@ export function BoardRealtimeProvider({
       .on('broadcast', { event: 'element-deleted' }, ({ payload }) => {
         const { elementId, userId, username } = payload as BoardEvent & { type: 'element-deleted' };
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         log(`📥 Otrzymano element-deleted od ${username}:`, elementId);
 
@@ -494,25 +282,27 @@ export function BoardRealtimeProvider({
         }
       })
       .on('broadcast', { event: 'elements-batch' }, ({ payload }) => {
-        const { elements, userId, username } = payload as BoardEvent & { type: 'elements-batch' };
+        const { elements, geometryOnly, userId, username } = payload as BoardEvent & {
+          type: 'elements-batch';
+        };
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
-        log(`📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów`);
+        log(`📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów (geometryOnly: ${!!geometryOnly})`);
 
         if (elementsBatchHandlerRef.current) {
-          elementsBatchHandlerRef.current(elements, userId, username);
+          elementsBatchHandlerRef.current(elements, userId, username, !!geometryOnly);
         }
       })
       .on('broadcast', { event: 'cursor-moved' }, ({ payload }) => {
         const { x, y, userId, username } = payload as BoardEvent & { type: 'cursor-moved' };
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         // Automatycznie aktualizuj remote cursors (używamy ref zamiast state!)
         const prev = remoteCursorsRef.current;
         const existing = prev.find((c) => c.userId === userId);
-        const color = existing?.color || cursorColors.current[userId % cursorColors.current.length];
+        const color = existing?.color || CURSOR_COLORS[userId % CURSOR_COLORS.length];
 
         if (existing) {
           remoteCursorsRef.current = prev.map((c) =>
@@ -538,7 +328,7 @@ export function BoardRealtimeProvider({
 
         log(`✏️ [TYPING] ${username} zaczął edytować element ${elementId}`);
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         const now = Date.now();
         const existingIndex = typingUsersRef.current.findIndex(
@@ -567,7 +357,7 @@ export function BoardRealtimeProvider({
 
         log(`✏️ [TYPING] User ${userId} skończył edytować element ${elementId}`);
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         // Usuń z listy
         typingUsersRef.current = typingUsersRef.current.filter(
@@ -582,7 +372,7 @@ export function BoardRealtimeProvider({
           type: 'viewport-changed';
         };
 
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         // Aktualizuj lub dodaj viewport użytkownika
         const prev = remoteViewportsRef.current;
@@ -603,7 +393,7 @@ export function BoardRealtimeProvider({
       })
       .on('broadcast', { event: 'sync-request' }, ({ payload }) => {
         const { userId, username } = payload as any;
-        if (userId === user.id) return;
+        if (userId === currentUser.id) return;
 
         // Odpowiada tylko "host" — user z najniższym ID spośród obecnych w kanale.
         // Gwarantuje że tylko jeden user wyśle sync-response, nie wszyscy naraz.
@@ -614,8 +404,8 @@ export function BoardRealtimeProvider({
             if (p.user_id != null) onlineIds.push(Number(p.user_id));
           });
         });
-        const minId = onlineIds.length > 0 ? Math.min(...onlineIds) : user.id;
-        const isHost = user.id === minId;
+        const minId = onlineIds.length > 0 ? Math.min(...onlineIds) : currentUser.id;
+        const isHost = currentUser.id === minId;
 
         if (!isHost) {
           log(`📡 [SYNC] ${username} prosi o sync — nie jestem hostem, pomijam`);
@@ -627,7 +417,7 @@ export function BoardRealtimeProvider({
       })
       .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
         const { elements, targetUserId, userId, username, chunkIndex = 0, totalChunks = 1 } = payload as any;
-        if (targetUserId !== user.id) return;
+        if (targetUserId !== currentUser.id) return;
 
         // Składamy paczki — inicjalizuj bufor na pierwszej paczce od danego sendera
         if (chunkIndex === 0 || syncChunkBufferRef.current?.fromUserId !== userId) {
@@ -650,98 +440,10 @@ export function BoardRealtimeProvider({
       });
 
     // ═══════════════════════════════════════════════════════════════════════
-    // 🚀 SUBSKRYPCJA
-    // ═══════════════════════════════════════════════════════════════════════
-
-    channel.subscribe(async (status) => {
-      if (status === 'SUBSCRIBED') {
-        // RESET licznika przy udanym połączeniu!
-        reconnectAttemptRef.current = 0;
-        setIsConnected(true);
-        
-        // Loguj tylko pierwsze połączenie, nie reconnecty
-        if (!isSubscribedRef.current) {
-          log('✅ Połączono z kanałem tablicy');
-          isSubscribedRef.current = true;
-        } else {
-          log('🔄 Reconnect do kanału tablicy');
-        }
-        
-        // KLUCZOWE: Rozwiąż Promise - kanał jest gotowy do broadcast!
-        if (channelReadyResolveRef.current) {
-          channelReadyResolveRef.current();
-        }
-
-        // Wyślij swoją obecność (Presence) z viewport
-        const trackPresence = async (viewport?: { x: number; y: number; scale: number }) => {
-          const presenceData: any = {
-            user_id: user.id,
-            username: user.username,
-            avatar_url: (user as any).avatar_url,
-            online_at: new Date().toISOString(),
-          };
-
-          // Dodaj viewport jeśli jest dostępny
-          if (viewport) {
-            presenceData.viewport_x = viewport.x;
-            presenceData.viewport_y = viewport.y;
-            presenceData.viewport_scale = viewport.scale;
-          }
-
-          try {
-            await channel.track(presenceData);
-          } catch (err) {
-            // Ignoruj błędy track - kanał może być w trakcie reconnect
-            logDebug('Track presence skipped - channel reconnecting');
-          }
-        };
-
-        await trackPresence();
-
-        // Funkcja do update viewport (może być wywołana z zewnątrz)
-        (window as any).__updateViewportPresence = (x: number, y: number, scale: number) => {
-          trackPresence({ x, y, scale });
-        };
-
-        // Ping the PostgreSQL backend to let Dashboard know we are actively on this board
-        markUserOnline(Number(boardId)).catch(() => {});
-
-        // Heartbeat co 60 sekund - Supabase ma własny heartbeat, dla Backend DB potrzebujemy własny
-        if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
-        presenceHeartbeatRef.current = setInterval(() => {
-          trackPresence();
-          markUserOnline(Number(boardId)).catch(() => {}); // Odśwież ping w PostgreSQL
-        }, 60000);
-      } else if (status === 'CHANNEL_ERROR') {
-        // 🛡️ Supabase ma auto-reconnect - nie panikuj
-        // Loguj tylko przy pierwszym błędzie w serii
-        if (reconnectAttemptRef.current === 0) {
-          logDebug('⚠️ Tymczasowy błąd kanału - Supabase reconnecting...');
-        }
-        reconnectAttemptRef.current++;
-
-        // Ustaw isConnected na false tylko po wielu nieudanych próbach
-        if (reconnectAttemptRef.current >= 10) {
-          setIsConnected(false);
-          logWarn('⚠️ Niestabilne połączenie realtime - używam fallback');
-        }
-      } else if (status === 'TIMED_OUT') {
-        logDebug('⏰ Timeout - Supabase reconnecting...');
-        reconnectAttemptRef.current++;
-      } else if (status === 'CLOSED') {
-        log('🔒 Kanał zamknięty');
-        setIsConnected(false);
-      }
-    });
-
-    channelRef.current = channel;
-
-    // ═══════════════════════════════════════════════════════════════════════
     // ⏰ AUTO-CLEANUP WSKAŹNIKÓW PISANIA
     // ═══════════════════════════════════════════════════════════════════════
-    // Co 5 sekund usuwa wpisy starsze niż 10 sekund.
+    // Co 5 sekund usuwa wpisy starsze niż TYPING_TIMEOUT_MS.
     // Zabezpiecza przed "duchami" gdy użytkownik rozłączy się bez typing-stopped.
-    const TYPING_TIMEOUT_MS = 10_000;
     typingCleanupIntervalRef.current = setInterval(() => {
       const now = Date.now();
       const before = typingUsersRef.current.length;
@@ -752,103 +454,35 @@ export function BoardRealtimeProvider({
         log(`✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`);
         notifyTypingSubscribers();
       }
-    }, 5_000);
+    }, TYPING_CLEANUP_INTERVAL_MS);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // ⏰ CLEANUP NIEAKTYWNYCH KURSORÓW - WYŁĄCZONY
-    // ═══════════════════════════════════════════════════════════════════════
-    // Kursory są czyszczone tylko gdy użytkownik opuści tablicę (presence.leave)
-    // Nie używamy timeoutu bo kursor ma być widoczny cały czas gdy user jest online
-
-    // const cursorCleanupInterval = setInterval(() => {
-    //   const now = Date.now()
-    //   const CURSOR_TIMEOUT = 600000 // 10 minut
-    //   setRemoteCursors(prev => prev.filter(c => now - c.lastUpdate < CURSOR_TIMEOUT))
-    // }, 60000)
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // 🧹 CLEANUP
-    // ═══════════════════════════════════════════════════════════════════════
-
+    // Funkcja sprzątająca — useRealtimeChannel wywoła ją przy rozłączaniu,
+    // OBOK swojego własnego sprzątania (kanał, presence, heartbeat).
     return () => {
-      log('🔌 Rozłączanie z kanału tablicy');
-      try {
-        // Ignorujemy błędy w catch() - przy zamykaniu okna przeglądarki (np. w Edge) żądanie fetch jest przerywane
-        apiClient.delete(`/api/v1/whiteboard/${boardId}/online`).catch(() => {});
-      } catch (e) {
-        console.error('Cleanup error:', e);
-      }
-      
-      if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
-      if (presenceSyncTimeoutRef.current) clearTimeout(presenceSyncTimeoutRef.current);
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
       if (typingCleanupIntervalRef.current) clearInterval(typingCleanupIntervalRef.current);
-      channel.unsubscribe();
-      channelRef.current = null;
-      isSubscribedRef.current = false;
-      currentBoardIdRef.current = null;
-      setIsConnected(false);
       remoteCursorsRef.current = [];
       typingUsersRef.current = [];
-      previousUsersRef.current = new Map();
-      reconnectAttemptRef.current = 0;
       pendingElementUpdateRef.current = null;
       // Notyfikuj subscriberów o pustej liście kursorów
       cursorSubscribersRef.current.forEach((callback) => callback([]));
     };
-  }, [boardId, user?.id, user?.username]);
+  };
+
+  const { channelRef, isConnected, onlineUsers } = useRealtimeChannel(
+    boardId,
+    user ? { id: user.id, username: user.username, avatar_url: (user as any).avatar_url } : null,
+    registerListeners
+  );
 
   // ───────────────────────────────────────────────────────────────────────
   // FUNKCJE BROADCAST (wysyłanie do innych użytkowników)
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🛡️ RESILIENT BROADCAST z automatycznym retry w tle
-  // - Wysyła natychmiast (0 latency)
-  // - Jeśli nie uda się wysłać, próbuje ponownie w tle
-  const safeBroadcast = useCallback(async (event: string, payload: any): Promise<boolean> => {
-    const channel = channelRef.current;
-    if (!channel) {
-      logWarn(`📤 [BROADCAST] ❌ Brak kanału dla ${event}`);
-      return false;
-    }
-
-    const sendMessage = async (): Promise<boolean> => {
-      try {
-        await channel.send({
-          type: 'broadcast',
-          event,
-          payload,
-        });
-        return true;
-      } catch (err) {
-        return false;
-      }
-    };
-
-    // Pierwsza próba - natychmiastowa
-    const success = await sendMessage();
-    
-    if (!success) {
-      // Retry w tle - nie blokuje, nie dodaje latency do UI
-      // Tylko dla ważnych eventów (nie cursor/viewport)
-      const isImportant = event.startsWith('element-');
-      if (isImportant) {
-        setTimeout(async () => {
-          const retry1 = await sendMessage();
-          if (!retry1) {
-            setTimeout(async () => {
-              const retry2 = await sendMessage();
-              if (!retry2) {
-                logWarn(`📤 [BROADCAST] ❌ Nie udało się wysłać ${event} po 3 próbach`);
-              }
-            }, 200);
-          }
-        }, 100);
-      }
-    }
-    
-    return success;
-  }, []);
+  // 🛡️ RESILIENT BROADCAST z automatycznym retry w tle — wydzielone do
+  // src/_new/features/whiteboard/realtime/useSafeBroadcast.ts (krok 2 rozbijania,
+  // patrz docs/migration-status.md). Zero zmian w zachowaniu.
+  const safeBroadcast = useSafeBroadcast(channelRef);
 
   const broadcastElementCreated = useCallback(
     async (element: DrawingElement) => {
@@ -876,7 +510,8 @@ export function BoardRealtimeProvider({
       const now = Date.now();
       const timeSinceLastBroadcast = now - lastBroadcastTimeRef.current.elementUpdate;
 
-      // 🛡️ TRAILING THROTTLE: zawsze zapisz ostatnią wartość
+      // 🛡️ TRAILING THROTTLE: zawsze zapisz ostatnią wartość (pełną — do historii/
+      // ewentualnego przyszłego użycia lokalnie; ucinamy dopiero PRZED wysyłką).
       pendingElementUpdateRef.current = element;
 
       // Jeśli możemy wysłać od razu (minął throttle window)
@@ -891,7 +526,9 @@ export function BoardRealtimeProvider({
         pendingElementUpdateRef.current = null;
 
         await safeBroadcast('element-updated', {
-          element,
+          // 🛠️ FIX (known-issues.md #2, Opcja B): bez `src` dla zdjęć —
+          // odbiorca ma je już z element-created, więc tu leci tylko geometria.
+          element: stripHeavyFields(element),
           userId: user.id,
           username: user.username,
         });
@@ -909,7 +546,7 @@ export function BoardRealtimeProvider({
               lastBroadcastTimeRef.current.elementUpdate = Date.now();
 
               await safeBroadcast('element-updated', {
-                element: pendingElement,
+                element: stripHeavyFields(pendingElement),
                 userId: user.id,
                 username: user.username,
               });
@@ -935,11 +572,21 @@ export function BoardRealtimeProvider({
   );
 
   const broadcastElementsBatch = useCallback(
-    async (elements: DrawingElement[]) => {
+    async (elements: DrawingElement[], geometryOnly: boolean = false) => {
       if (!user) return;
 
+      // 🛠️ FIX (known-issues.md #2, Opcja B): ta funkcja obsługuje DWIE różne
+      // sytuacje. Tworzenie kilku elementów naraz (`geometryOnly=false`,
+      // domyślne) — odbiorca ich jeszcze nie ma, więc leci pełny obiekt,
+      // łącznie z `src` dla zdjęć. Live przeciąganie WIELU już istniejących
+      // elementów (`geometryOnly=true`, wołane z updateElementsLive w
+      // use-whiteboard-engine.ts) — odbiorca już je ma, więc leci tylko
+      // geometria, bez `src`.
+      const payloadElements = geometryOnly ? elements.map(stripHeavyFields) : elements;
+
       await safeBroadcast('elements-batch', {
-        elements,
+        elements: payloadElements,
+        geometryOnly,
         userId: user.id,
         username: user.username,
       });
@@ -981,7 +628,7 @@ export function BoardRealtimeProvider({
   );
 
   const onRemoteElementUpdated = useCallback(
-    (handler: (element: DrawingElement, userId: number, username: string) => void) => {
+    (handler: (element: ElementBroadcastPayload, userId: number, username: string) => void) => {
       elementUpdatedHandlerRef.current = handler;
     },
     []
@@ -995,7 +642,14 @@ export function BoardRealtimeProvider({
   );
 
   const onRemoteElementsBatch = useCallback(
-    (handler: (elements: DrawingElement[], userId: number, username: string) => void) => {
+    (
+      handler: (
+        elements: ElementBroadcastPayload[],
+        userId: number,
+        username: string,
+        geometryOnly: boolean
+      ) => void
+    ) => {
       elementsBatchHandlerRef.current = handler;
     },
     []

@@ -96,7 +96,8 @@ export interface WhiteboardEngineDeps {
   broadcastElementCreated(element: DrawingElement): Promise<void>;
   broadcastElementUpdated(element: DrawingElement): Promise<void>;
   broadcastElementDeleted(id: string): Promise<void>;
-  broadcastElementsBatch(elements: DrawingElement[]): Promise<void>;
+  /** `geometryOnly=true` → bez `src` dla zdjęć (patrz docs/known-issues.md #2, Opcja B). */
+  broadcastElementsBatch(elements: DrawingElement[], geometryOnly?: boolean): Promise<void>;
 
   // ── historia (use-history) ──
   recordCommand(command: Command): void;

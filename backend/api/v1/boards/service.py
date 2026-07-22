@@ -248,6 +248,15 @@ class BoardService:
 
         self.db.delete(board)
         self.db.commit()
+
+        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
+        # o "zapychanie się" Storage. Bez tego obrazy skasowanej tablicy
+        # zostałyby tam na zawsze (sieroty). Best-effort, PO commicie do bazy
+        # (usunięcie tablicy z bazy jest tym co naprawdę musi się udać;
+        # nieudane sprzątnięcie plików to dużo mniejszy problem).
+        from api.v1.whiteboard.storage import delete_board_folder
+        await delete_board_folder(board_id)
+
         logger.info(f"✅ Tablica usunięta: {board_id}")
         return {"success": True, "message": "Tablica została pomyślnie usunięta."}
 

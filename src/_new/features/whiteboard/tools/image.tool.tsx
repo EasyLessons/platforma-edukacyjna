@@ -11,6 +11,7 @@ function ImageOverlay() {
   return (
     <ImageTool
       ref={h.imageToolRef}
+      boardId={h.boardId}
       viewport={h.viewport}
       canvasWidth={h.canvasWidth}
       canvasHeight={h.canvasHeight}

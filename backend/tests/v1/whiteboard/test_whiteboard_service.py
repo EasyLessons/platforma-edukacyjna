@@ -201,6 +201,14 @@ class TestLoadElements:
 
 
 class TestDeleteElement:
+    # 🛠️ delete_element zostaje sync (`def`) — sprzątanie Storage dla
+    # obrazów jest teraz zaplanowane w tle z opóźnieniem (BackgroundTasks),
+    # nie robione synchronicznie tutaj. Patrz docs/known-issues.md #2,
+    # Aktualizacja 9: natychmiastowe kasowanie pliku psuło undo (Ctrl+Z
+    # przywracał element z martwym URL-em → szary blok zamiast obrazka).
+    # Te testy nie przekazują background_tasks (domyślnie None), więc
+    # sprzątanie Storage jest w nich pomijane — testowane osobno by
+    # wymagało realnego klienta Supabase Storage.
 
     def test_deletes_element(self, db_session, test_user, test_board):
         service = WhiteboardService(db_session)

@@ -73,3 +73,32 @@ export const deleteBoardElement = (
   apiClient.delete<{ success: boolean; message: string }>(
     `/api/v1/whiteboard/${id}/elements/${element_id}`,
   ).then(res => res.data);
+
+/**
+ * Upload obrazu (po kompresji, patrz elements/image-compress.ts) do Supabase
+ * Storage przez backend — patrz docs/known-issues.md #2.
+ *
+ * NIE wysyłamy już base64 obrazka przez Realtime Broadcast (plan Free ma
+ * twardy limit 256 KB na wiadomość, prawdziwe zdjęcia/PDF-y regularnie go
+ * przekraczały). Zamiast tego: upload zwykłym HTTP POST tutaj, backend
+ * zapisuje w Storage i zwraca publiczny URL — TEN URL (kilkadziesiąt bajtów)
+ * jedzie potem przez broadcast jako element.src.
+ *
+ * `Content-Type: undefined` w headers jest celowe: axios domyślnie ustawia
+ * 'application/json' (patrz client.ts), ale FormData z plikiem potrzebuje
+ * 'multipart/form-data; boundary=...' — boundary umie dograć tylko
+ * przeglądarka, więc usuwamy nasz nagłówek i pozwalamy jej to zrobić.
+ */
+export const uploadBoardImage = (
+  id: number,
+  blob: Blob,
+  filename: string,
+): Promise<{ url: string }> => {
+  const formData = new FormData();
+  formData.append('file', blob, filename);
+  return apiClient.post<{ url: string }>(
+    `/api/v1/whiteboard/${id}/upload-image`,
+    formData,
+    { headers: { 'Content-Type': undefined } },
+  ).then(res => res.data);
+};
