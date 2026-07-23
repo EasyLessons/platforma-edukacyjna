@@ -56,7 +56,18 @@ export function useSafeBroadcast(channelRef: RefObject<RealtimeChannel | null>) 
       if (!success) {
         // Retry w tle — nie blokuje, nie dodaje latency do UI.
         // Tylko dla ważnych eventów (nie cursor/viewport).
-        const isImportant = event.startsWith('element-');
+        // 🛠️ FIX (known-issues.md #2, Audyt realtime): było `startsWith('element-')`
+        // (z myślnikiem) — to NIGDY nie łapało `elements-batch` (liczba mnoga,
+        // myślnik jest dopiero na 9. znaku, więc string nie pasował). Efekt:
+        // batch-update przy przeciąganiu wielu zaznaczonych elementów naraz
+        // (bardzo częsta operacja) nie miał ŻADNEJ ochrony przed chwilowym
+        // zerwaniem połączenia — w przeciwieństwie do pojedynczego
+        // `element-updated`. Dodajemy też `sync-response`, bo to on donosi
+        // nowemu userowi elementy jeszcze niezapisane do bazy (świeżo
+        // utworzone przez innych) — zgubiona paczka = user nie widzi ich, aż
+        // ktoś zrobi kolejny ruch. `startsWith('element')` łapie razem
+        // 'element-created'/'element-updated'/'element-deleted'/'elements-batch'.
+        const isImportant = event.startsWith('element') || event === 'sync-response';
         if (isImportant) {
           setTimeout(async () => {
             const retry1 = await sendMessage();

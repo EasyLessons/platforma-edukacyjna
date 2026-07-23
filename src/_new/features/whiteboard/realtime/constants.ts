@@ -24,7 +24,19 @@ export const THROTTLE_MS = {
   VIEWPORT_CHANGE: 200, // max 5 aktualizacji viewportu/s
 } as const;
 
-/** Rozmiar jednej paczki przy dogrywaniu całej tablicy nowemu userowi (limit: ~1MB na wiadomość w Supabase) */
+/**
+ * Rozmiar jednej paczki przy dogrywaniu całej tablicy nowemu userowi.
+ *
+ * 🛠️ FIX (known-issues.md #2, Audyt realtime): komentarz mówił o limicie
+ * "~1MB" — to była stara/błędna liczba sprzed śledztwa w tej sesji, które
+ * ustaliło, że realny twardy limit Supabase Broadcast to 256 KB na
+ * wiadomość (patrz known-issues.md #2). SYNC_CHUNK_SIZE liczy elementy,
+ * nie bajty, więc 100 "ciężkich" elementów w jednej paczce nadal teoretycznie
+ * mogłoby przekroczyć 256 KB (np. bardzo długa treść markdown/tabeli w wielu
+ * elementach naraz) — w praktyce mało prawdopodobne po Opcji C (obrazy/PDF-y
+ * to już same URL-e, nie base64), ale warto o tym pamiętać przy dalszym
+ * dostrajaniu. sync-response ma teraz retry (patrz useSafeBroadcast.ts).
+ */
 export const SYNC_CHUNK_SIZE = 100;
 
 /** Odstęp między paczkami (ms) — daje czas Supabase na przepuszczenie poprzedniej */
