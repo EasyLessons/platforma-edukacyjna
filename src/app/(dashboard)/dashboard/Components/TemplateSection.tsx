@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { createBoard } from '@/_new/features/board/api/boardApi';
+import { boardKeys } from '@/_new/features/board/hooks/useBoard';
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 
 type Subject = 'Matematyka' | 'Angielski' | 'Chemia' | 'Fizyka' | 'Biologia';
@@ -103,6 +105,7 @@ const TEMPLATE_CARDS: TemplateCard[] = [
 
 export default function TemplatesSection({ workspaceId }: TemplatesSectionProps) {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const subjectDropdownRef = useRef<HTMLDivElement>(null);
   const yearDropdownRef = useRef<HTMLDivElement>(null);
@@ -146,6 +149,16 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
         icon: 'FileText',
         bg_color: 'green-500',
       });
+
+      // 🛠️ FIX: ten create leciał przez "gołe" wywołanie API (createBoard z
+      // boardApi.ts), z pominięciem hooka useBoards() i jego useMutation —
+      // więc cache React Query dla listy tablic tego workspace'u nigdy się
+      // nie inwalidował. Efekt: po utworzeniu tablicy z szablonu i powrocie
+      // na dashboard, nowa tablica nie pokazywała się na liście dopóki nie
+      // zrobiło się F5 (BoardsSection swój create robi przez useBoards() —
+      // tam to zawsze działało poprawnie). boardKeys.workspace(id) to ten
+      // sam klucz cache, którego używa useBoards w BoardsSection.tsx.
+      queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspaceId) });
 
       const route = folder
         ? `/whiteboard?boardId=${newBoard.id}&workspace=${workspaceId}&arkusz=${encodeURIComponent(folder)}`

@@ -250,6 +250,36 @@ Nie miałem jak odtworzyć tego na żywo w tej sesji. Zanim to naprawimy na pewn
 1. Dodać tymczasowy `console.log` w cleanup i na starcie tego `useEffect`, żeby zobaczyć czy faktycznie odpina/podpina się w trakcie normalnego użytkowania (nie tylko w teorii).
 2. Sprawdzić, czy problem znika, jeśli zrobisz dokładnie ten sam scenariusz (zdjęcie → potem przesunięcie) ale wolniej, z przerwą 1-2 sekund między akcjami (jeśli zniknie — to potwierdza teorię o wyścigu w czasie, a nie inny błąd).
 
+**Aktualizacja — potwierdzone jako NAPRAWIONE efektem ubocznym (23.07.2026).** User potwierdził na żywo: po wdrożeniu Opcji C (obrazy/PDF nie jadą już przez Broadcast, patrz wpis #2, Aktualizacja 8) problem zniknął sam z siebie. Pasuje to do drugiej hipotezy opisanej wyżej — "cięższe" akcje na zdjęciu (duży payload + retry-storm) podbijały ruch w kanale realtime na tyle, że `elements` w `select-tool.tsx` zmieniało referencję w złym momencie i gubiło pierwszy ruch myszką. Skoro payload zdjęcia to teraz kilkadziesiąt-kilkaset bajtów (URL, nie base64) zamiast pełnego obrazu, ten skok ruchu w tle po prostu przestał występować. Nie zmieniałem samego `useEffect` w `select-tool.tsx` (proponowana naprawa z refem wciąż byłaby technicznie solidniejsza, niezależna od przyczyny ruchu) — zostawiam jako nieszkodliwą, opcjonalną poprawę na przyszłość, nie pilny dług.
+
+---
+
+## 4. Nowy workspace/tablica nie pojawiają się bez F5 — dwa niezależne miejsca z brakującą inwalidacją cache React Query (wysoki priorytet — częste, codzienne akcje)
+
+**Zgłoszone:** 23.07.2026, produkcja (easylesson.app), ręczny test. Dwa osobne, ale identyczne w naturze objawy:
+1. Zaakceptowanie zaproszenia do workspace z panelu powiadomień — nowy workspace nie pojawia się na liście, dopóki nie zrobi się F5.
+2. Utworzenie nowej tablicy z szablonu (sekcja "Szablony" na dashboardzie) i powrót do listy tablic w danym workspace — nowa tablica nie pojawia się, dopóki nie zrobi się F5.
+
+### Co naprawdę się dzieje (root cause)
+
+Apka używa React Query jako współdzielonego cache'u danych (`workspaceKeys.list()`, `boardKeys.workspace(id)` — patrz `hooks/useWorkspaces.ts`/`hooks/useBoard.ts`). Każda mutacja (tworzenie/edycja/usuwanie) ma w `onSuccess` wywołanie `queryClient.invalidateQueries(...)`, które każe React Query odświeżyć dane WSZĘDZIE, gdzie są aktualnie wyświetlane — niezależnie od tego, który komponent trzyma jaki lokalny stan. To działa poprawnie tam, gdzie się z tego korzysta. Problem: znalazłem dwa miejsca, które to omijają.
+
+1. **Panel powiadomień (`NotificationPanel`) dostawał `onWorkspacesRefresh` jako prop z `DashboardHeader`, a `DashboardHeader` dostawał `refreshWorkspaces` jako prop z `layout.tsx` (`src/app/(dashboard)/layout.tsx`).** Ten layout renderuje `<DashboardHeader />` **bez żadnych propsów** — więc `refreshWorkspaces` w `DashboardHeader.tsx` zawsze spadał na domyślną wartość `async () => {}` (cichy no-op). `dashboard/page.tsx` ma swoją WŁASNĄ, działającą kopię `refreshWorkspaces` z `useWorkspaces()`, ale nigdy jej nie przekazuje do headera (bo header żyje w layoucie o poziom wyżej, nie na samej stronie) — więc ta prawdziwa funkcja i tak nigdzie nie docierała do panelu powiadomień. Efekt: kliknięcie "Akceptuj" faktycznie akceptowało zaproszenie w bazie (stąd toast sukcesu), ale nigdy nie mówiło React Query "odśwież listę workspace'ów".
+2. **Tworzenie tablicy z szablonu (`TemplateSection.tsx`, funkcja `createAndOpenBoard`) woła gołą funkcję API `createBoard()` z `board/api/boardApi.ts` bezpośrednio**, zamiast przez `useBoards()` (hook z `useMutation`, którego `onSuccess` robi `queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspace_id) })` — patrz `hooks/useBoard.ts`). Zwykłe tworzenie tablicy przez modal w `BoardsSection.tsx` idzie przez `useBoards()` poprawnie i działa bez zarzutu — tylko ścieżka "z szablonu" ma osobną, niezależną implementację, która nigdy nie dotyka cache'u.
+
+W obu przypadkach dane w bazie są od razu poprawne (żadnej utraty danych) — user po prostu nawiguje do nowej tablicy/workspace'u i widzi ją poprawnie tam, ale wracając do listy nie widzi jej, bo lista czyta ze STAREGO zapamiętanego stanu React Query, którego nikt nie kazał odświeżyć.
+
+### Jak groźne
+
+Wysoki priorytet mimo że to "tylko" UI (bez utraty danych) — bo to dwie z najczęstszych, najbardziej podstawowych akcji w apce (dołączanie do workspace'u, tworzenie tablicy), i user myśli że coś nie zadziałało/zniknęło.
+
+### Naprawione
+
+- **`DashboardHeader.tsx`** — dodane wywołanie `useWorkspaces()` bezpośrednio w komponencie; `refreshWorkspaces` z propsów (`refreshWorkspacesProp`) jest teraz tylko opcjonalnym nadpisaniem, z realnym fallbackiem zamiast cichego no-opa. Ponieważ `useWorkspaces()` czyta/pisze do tego samego globalnego `queryClient` (owiniętego w `QueryProvider` w `src/app/layout.tsx`, ponad całą apką) co `dashboard/page.tsx`, wywołanie stąd poprawnie odświeża dane wszędzie.
+- **`TemplateSection.tsx`** — po udanym `createBoard(...)` dodane jawne `queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspaceId) })` (ten sam klucz, którego używa `useBoards`), zanim nastąpi `router.push()` do nowej tablicy. Zaimportowany `useQueryClient` i `boardKeys` z `hooks/useBoard.ts`.
+
+Zweryfikowane: `npx tsc --noEmit` scoped na oba zmienione pliki — zero błędów. **Nie zweryfikowane jeszcze na żywo** (wymaga wdrożenia na produkcję — patrz uwaga o niewypchniętych commitach w tej samej sesji) — do przetestowania po `git push`: zaproś kogoś do workspace'u i sprawdź czy lista odświeża się bez F5 po akceptacji; utwórz tablicę z szablonu i sprawdź czy pojawia się na liście bez F5 po powrocie do dashboardu.
+
 ---
 
 ## Zasada
