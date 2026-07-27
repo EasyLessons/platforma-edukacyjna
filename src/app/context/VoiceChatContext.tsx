@@ -34,7 +34,7 @@ import {
 } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { useAuth } from './AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 📝 TYPY

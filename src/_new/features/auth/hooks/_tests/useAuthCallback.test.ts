@@ -12,7 +12,7 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => mockSearchParams,
 }));
 
-vi.mock('@/app/context/AuthContext', () => ({
+vi.mock('@/_new/lib/auth', () => ({
   useAuth: () => ({ login: mockAuthLogin }),
 }));
 

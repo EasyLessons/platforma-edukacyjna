@@ -139,7 +139,10 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
         const now = Date.now();
         if (now - lastGroupBroadcastRef.current > GROUP_BROADCAST_THROTTLE_MS) {
           lastGroupBroadcastRef.current = now;
-          broadcastElementsBatch(updated).catch(console.error);
+          // 🛠️ FIX (known-issues.md #2, Opcja B): to update geometrii JUŻ
+          // istniejących elementów (live drag), nie tworzenie nowych —
+          // `geometryOnly=true` pomija `src` dla zdjęć w tej paczce.
+          broadcastElementsBatch(updated, true).catch(console.error);
         }
       },
 

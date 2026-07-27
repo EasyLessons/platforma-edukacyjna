@@ -46,6 +46,7 @@ import {
   constrainViewport,
   inverseTransformPoint,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
+import { compressAndUploadImage } from '@/_new/features/whiteboard/elements/image-compress';
 
 export interface ImageToolRef {
   handlePasteFromClipboard: () => void;
@@ -53,6 +54,8 @@ export interface ImageToolRef {
 }
 
 interface ImageToolProps {
+  /** ID tablicy — potrzebne do uploadu obrazu do Supabase Storage (docs/known-issues.md #2) */
+  boardId: string;
   viewport: ViewportTransform;
   canvasWidth: number;
   canvasHeight: number;
@@ -61,7 +64,7 @@ interface ImageToolProps {
 }
 
 export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
-  ({ viewport, canvasWidth, canvasHeight, onImageCreate, onViewportChange }, ref) => {
+  ({ boardId, viewport, canvasWidth, canvasHeight, onImageCreate, onViewportChange }, ref) => {
     const overlayRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -181,15 +184,16 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
 
           // Dodaj każdą stronę jako osobny obrazek
           for (let i = 0; i < images.length; i++) {
-            const dataUrl = images[i];
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-              img.onload = resolve;
-              img.onerror = reject;
-              img.src = dataUrl;
-            });
+            // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
+            // Strona PDF renderowana jest w pełnej rozdzielczości (skala 2x) —
+            // nawet po kompresji regularnie przekracza limit 256 KB na
+            // wiadomość Broadcast, dlatego trafia do Supabase Storage
+            // (element.src dostaje tylko URL).
+            const { url, width: imgW, height: imgH } = await compressAndUploadImage(
+              images[i], Number(boardId), `${file.name}-page-${i + 1}.jpg`
+            );
 
-            const aspectRatio = img.height / img.width;
+            const aspectRatio = imgH / Math.max(imgW, 1);
             const worldHeight = worldWidth * aspectRatio;
 
             const newImage: ImageElement = {
@@ -199,7 +203,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
               y: currentY,
               width: worldWidth,
               height: worldHeight,
-              src: dataUrl,
+              src: url,
               alt: `${file.name} - Strona ${i + 1}/${images.length}`,
             };
 
@@ -213,21 +217,19 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
         } else {
           // Obsługa zwykłego obrazka
           const reader = new FileReader();
-          const result = await new Promise<string>((resolve, reject) => {
+          const rawDataUrl = await new Promise<string>((resolve, reject) => {
             reader.onload = (evt) => resolve(evt.target?.result as string);
             reader.onerror = reject;
             reader.readAsDataURL(file);
           });
-          const dataUrl = result;
 
-          const img = new Image();
-          await new Promise((resolve, reject) => {
-            img.onload = resolve;
-            img.onerror = reject;
-            img.src = dataUrl;
-          });
-          const width = img.width;
-          const height = img.height;
+          // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
+          // Duże zdjęcie (np. z telefonu) nawet po kompresji regularnie
+          // przekraczało limit 256 KB na wiadomość Broadcast, dlatego trafia
+          // do Supabase Storage (element.src dostaje tylko URL).
+          const { url, width, height } = await compressAndUploadImage(
+            rawDataUrl, Number(boardId), file.name
+          );
 
           // Wstaw w centrum widoku
           const centerScreen = { x: canvasWidth / 2, y: canvasHeight / 2 };
@@ -250,7 +252,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
             y: centerWorld.y - worldHeight / 2,
             width: worldWidth,
             height: worldHeight,
-            src: dataUrl,
+            src: url,
             alt: file.name,
           };
 

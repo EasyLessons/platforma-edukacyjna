@@ -13,7 +13,7 @@ DELETE /{id}/elements/{element_id}  — usuń element
 """
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -26,7 +26,7 @@ from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
     OnlineUserInfo, OnlineStatusResponse, OnlineUsersBatchRequest, OnlineUsersBatchResponse,
     BoardElement, BoardElementWithAuthor,
-    SaveElementsResponse, DeleteElementResponse,
+    SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
 )
 from .service import WhiteboardService
 
@@ -140,6 +140,29 @@ async def load_elements(
     return ApiResponse(success=True, data=result)
 
 
+@router.post(
+    "/{board_id}/upload-image",
+    response_model=ApiResponse[UploadImageResponse],
+)
+async def upload_image(
+    board_id: int,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Upload obrazu tablicy do Supabase Storage (nie przez Realtime Broadcast —
+    patrz docs/known-issues.md #2). Frontend wywołuje to PRZED broadcastem
+    element-created, żeby wysłać w wiadomości tylko URL, nie base64.
+    """
+    service = WhiteboardService(db)
+    file_bytes = await file.read()
+    url = await service.upload_image(
+        board_id, current_user.id, file_bytes, file.content_type or "application/octet-stream"
+    )
+    return ApiResponse(success=True, data=UploadImageResponse(url=url))
+
+
 @router.delete(
     "/{board_id}/elements/{element_id}",
     response_model=ApiResponse[DeleteElementResponse],
@@ -147,9 +170,10 @@ async def load_elements(
 async def delete_element(
     board_id: int,
     element_id: str,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     service = WhiteboardService(db)
-    result = service.delete_element(board_id, element_id, current_user.id)
+    result = service.delete_element(board_id, element_id, current_user.id, background_tasks)
     return ApiResponse(success=True, data=DeleteElementResponse(**result))

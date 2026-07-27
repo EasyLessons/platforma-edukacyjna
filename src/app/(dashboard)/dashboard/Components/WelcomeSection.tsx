@@ -1,7 +1,7 @@
 'use client';
 
 import { Sparkles } from 'lucide-react';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { useEffect, useState } from 'react';
 
 export default function WelcomeSection() {

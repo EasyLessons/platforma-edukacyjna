@@ -33,6 +33,15 @@ function boardIdOrNull(ctx: CommandContext): number | null {
  */
 export function createEffect(ctx: CommandContext, element: DrawingElement): void {
   ctx.addElement(element);
+  // 🛠️ FIX (known-issues.md #2, Aktualizacja 10): bez tego undo usunięcia
+  // obrazu (i redo jego utworzenia) wracało jako szary blok — element trafiał
+  // z powrotem do `elements`, ale jego bitmapa nigdy nie ładowała się do
+  // cache'u renderowania (loadedImages), bo TYLKO to robiło to jawnie
+  // (handleImageCreate w whiteboard-canvas.tsx), a undo/redo idzie
+  // WYŁĄCZNIE przez ten wspólny efekt, z pominięciem tamtego kodu.
+  if (element.type === 'image' && element.src) {
+    ctx.loadImage(element.id, element.src);
+  }
   ctx.broadcastCreated(element);
   const boardId = boardIdOrNull(ctx);
   if (boardId) ctx.saveElement(boardId, element).catch(console.error);

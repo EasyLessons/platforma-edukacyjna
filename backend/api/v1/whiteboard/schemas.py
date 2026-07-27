@@ -75,3 +75,8 @@ class SaveElementsResponse(BaseModel):
 class DeleteElementResponse(BaseModel):
     success: bool
     message: str
+
+
+class UploadImageResponse(BaseModel):
+    """Zwracana po udanym uploadzie obrazu do Supabase Storage — patrz storage.py"""
+    url: str

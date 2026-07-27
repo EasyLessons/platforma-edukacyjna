@@ -21,7 +21,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeContext';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { Check, Eye, EyeOff, Phone, Plus, Users, History } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';

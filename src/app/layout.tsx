@@ -1,6 +1,6 @@
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider } from '@/_new/lib/auth';
 import { QueryProvider } from '@/_new/lib/query-provider';
 import Script from 'next/script';
 

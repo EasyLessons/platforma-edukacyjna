@@ -24,7 +24,7 @@ import { BoardCreateModal } from '@/_new/features/board/components/boardCreateMo
 import { BoardEditModal } from '@/_new/features/board/components/boardEditModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
 import { useBoards } from '@/_new/features/board/hooks/useBoard';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import type { Board, BoardCardActions } from '@/_new/features/board/types';
 import type { SortBy, FilterOwner } from '@/_new/features/board/utils/helpers';
 

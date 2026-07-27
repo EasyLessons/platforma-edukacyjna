@@ -6,8 +6,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Bell, Gift, Crown, Settings, Menu, X, LogOut, User as UserIcon } from 'lucide-react';
 
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { useNotifications } from '@/_new/features/notifications/hooks/useNotifications';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 import GiftPopup from './popups/GiftPopup';
 import UserMenuPopup from './popups/UserMenuPopup';
@@ -30,10 +31,22 @@ interface DashboardHeaderProps {
   refreshWorkspaces?: () => Promise<void>;
 }
 
-export default function DashboardHeader({ refreshWorkspaces = async () => {} }: DashboardHeaderProps) {
+export default function DashboardHeader({ refreshWorkspaces: refreshWorkspacesProp }: DashboardHeaderProps) {
   const router = useRouter();
   const { logout, user: authUser, isLoggedIn, loading: authLoading } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
+
+  // 🛠️ FIX: `refreshWorkspaces` z propsów zawsze był no-opem w praktyce —
+  // `layout.tsx` renderuje <DashboardHeader /> bez żadnych propsów (nagłówek
+  // żyje w layoucie, wspólnym dla wszystkich stron dashboardu, a nie na
+  // konkretnej stronie), więc kliknięcie "Akceptuj" na zaproszeniu do
+  // workspace nigdy realnie nie odświeżało listy — trzeba było zrobić F5.
+  // `useWorkspaces()` korzysta z tego samego globalnego cache React Query
+  // (queryClient) co `dashboard/page.tsx` — inwalidacja stąd i tak odświeży
+  // dane wszędzie, gdzie lista workspace'ów jest aktualnie wyświetlana,
+  // niezależnie od tego czy ktoś poda `refreshWorkspaces` jako prop.
+  const { refreshWorkspaces: refreshWorkspacesFallback } = useWorkspaces();
+  const refreshWorkspaces = refreshWorkspacesProp ?? refreshWorkspacesFallback;
 
   // Hook do powiadomień
   const {

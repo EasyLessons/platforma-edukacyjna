@@ -98,6 +98,7 @@ import type {
 } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
+import { compressAndUploadImage } from '../../elements/image-compress';
 
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
@@ -326,6 +327,7 @@ export default function WhiteboardCanvasNew({
     onRemoveElement: (elementId) => el.removeElement(elementId),
     onAddElement: (element) => el.addElements([element]),
     onUpdateElement: (element) => el.updateElement(element),
+    onLoadImage: el.loadImage,
     onClearSelection: sel.clearSelection,
     unsavedElementsRef: el.unsavedElementsRef,
     boardIdRef,
@@ -340,12 +342,26 @@ export default function WhiteboardCanvasNew({
       }
       el.addElements([element]);
     },
-    onRemoteElementUpdated: (element) => {
-      // Przy update ścieżki unieważnij cache — punkty mogły się zmienić
-      if (element.type === 'path') {
-        (element as DrawingPath).bbox = computePathBbox(element);
+    onRemoteElementUpdated: (partial) => {
+      // 🛠️ FIX (known-issues.md #2, Opcja B): `partial` może być NIEPEŁNY —
+      // przy zwykłym przesunięciu/resize/obrocie zdjęcia nadawca celowo NIE
+      // wysyła `src` (base64), bo my już je mamy. Dlatego SCALAMY przychodzące
+      // dane z lokalną kopią zamiast nadpisywać cały element — inaczej
+      // straciłbyś dane, których ten update w ogóle nie dotyczył.
+      const existing = el.elementsRef.current.find((e) => e.id === partial.id);
+      if (!existing) {
+        // Rzadki wyścig sieciowy: update dla elementu, którego jeszcze nie
+        // znamy lokalnie. Bez pełnych danych scalanie stworzyłoby zepsuty
+        // element (np. zdjęcie bez src) — ignorujemy, prawdziwy komplet
+        // danych dojdzie przez element-created albo sync-response.
+        return;
       }
-      el.updateElement(element);
+      const merged = { ...existing, ...partial } as DrawingElement;
+      // Przy update ścieżki unieważnij cache — punkty mogły się zmienić
+      if (merged.type === 'path') {
+        (merged as DrawingPath).bbox = computePathBbox(merged as DrawingPath);
+      }
+      el.updateElement(merged);
     },
     onRemoteElementDeleted: (elementId) => {
       el.removeElement(elementId);
@@ -353,13 +369,29 @@ export default function WhiteboardCanvasNew({
     onLoadRemoteImage: el.loadImage,
     onRemoteViewport: vp.applyRemoteViewport,
 
-    onElementsUpdated: (elements) => {
-          if (el.updateElements) {
-            el.updateElements(elements);
-          } else {
-            elements.forEach(e => el.updateElement(e));
-          }
-        },
+    onElementsUpdated: (elements, geometryOnly) => {
+      // 🛠️ FIX (known-issues.md #2, Opcja B): przy `geometryOnly` (live drag
+      // wielu elementów naraz) elementy w paczce są NIEPEŁNE — scalamy z
+      // lokalną kopią. Element, którego jeszcze nie znamy przy geometryOnly,
+      // pomijamy (patrz komentarz w onRemoteElementUpdated wyżej). Przy
+      // tworzeniu nowych elementów (geometryOnly=false) dane są zawsze pełne.
+      const currentMap = new Map(el.elementsRef.current.map((e) => [e.id, e]));
+      const merged: DrawingElement[] = [];
+      elements.forEach((incoming) => {
+        const existing = currentMap.get(incoming.id);
+        if (existing) {
+          merged.push({ ...existing, ...incoming } as DrawingElement);
+        } else if (!geometryOnly) {
+          merged.push(incoming as DrawingElement);
+        }
+      });
+      if (merged.length === 0) return;
+      if (el.updateElements) {
+        el.updateElements(merged);
+      } else {
+        merged.forEach((e) => el.updateElement(e));
+      }
+    },
         
 // 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
     onSyncRequest: (requestingUserId) => {
@@ -1404,18 +1436,20 @@ useMultiTouchGestures({
         if (!imageType) continue;
         const blob = await item.getType(imageType);
         // Blob → base64 data URL
-        const data: string = await new Promise((resolve, reject) => {
+        const rawData: string = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
           reader.onerror = reject;
           reader.readAsDataURL(blob);
         });
-        // Pobierz naturalne wymiary obrazka
-        const { width: imgW, height: imgH } = await new Promise<{ width: number; height: number }>((resolve) => {
-          const img = new Image();
-          img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
-          img.src = data;
-        });
+        // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
+        // Surowy zrzut ekranu (np. z narzędzia wycinania) łatwo przekracza
+        // limit rozmiaru wiadomości Supabase Broadcast (256 KB) nawet po samej
+        // kompresji, dlatego obraz trafia do Supabase Storage, a element.src
+        // dostaje tylko URL (patrz elements/image-compress.ts).
+        const { url, width: imgW, height: imgH } = await compressAndUploadImage(
+          rawData, Number(boardIdRef.current)
+        );
         const centerWorld = inverseTransformPoint(
           { x: canvasWidth / 2, y: canvasHeight / 2 },
           vp.viewportRef.current,
@@ -1432,7 +1466,7 @@ useMultiTouchGestures({
           y: centerWorld.y - worldHeight / 2,
           width: worldWidth,
           height: worldHeight,
-          src: data,
+          src: url,
           alt: 'Pasted image',
         };
         handleImageCreate(newImage);
@@ -1795,8 +1829,16 @@ useMultiTouchGestures({
                 canvas: canvas,
               }).promise;
 
-              const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-              const aspectRatio = pdfViewport.height / Math.max(pdfViewport.width, 1);
+              const rawDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+              // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
+              // Strona PDF renderowana jest w pełnej rozdzielczości (skala 2x) —
+              // nawet po kompresji regularnie przekracza limit 256 KB na
+              // wiadomość Broadcast, dlatego trafia do Supabase Storage
+              // (element.src dostaje tylko URL, patrz elements/image-compress.ts).
+              const { url, width: imgW, height: imgH } = await compressAndUploadImage(
+                rawDataUrl, Number(boardIdRef.current)
+              );
+              const aspectRatio = imgH / Math.max(imgW, 1);
               const worldHeight = worldWidth * aspectRatio;
 
               const newImage: ImageElement = {
@@ -1804,9 +1846,9 @@ useMultiTouchGestures({
                 type: 'image',
                 x: worldPos.x - worldWidth / 2,
                 y: currentY,
-                width: worldWidth, 
-                height: worldHeight, 
-                src: dataUrl, 
+                width: worldWidth,
+                height: worldHeight,
+                src: url,
                 alt: `${file.name} - strona ${i}`,
               };
               
@@ -1823,27 +1865,27 @@ useMultiTouchGestures({
         // 🖼️ OBSŁUGA ZWYKŁYCH OBRAZKÓW (Drag & Drop)
         else if (isImage) {
           const reader = new FileReader();
-          reader.onload = (event) => {
-            const dataUrl = event.target?.result as string;
-            const img = new Image();
-            img.onload = () => {
-              const aspectRatio = img.naturalHeight / Math.max(img.naturalWidth, 1);
-              const worldWidth = 5.0;
-              const worldHeight = worldWidth * aspectRatio;
-              
-              const newImage: ImageElement = {
-                id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
-                type: 'image',
-                x: worldPos.x - worldWidth / 2,
-                y: worldPos.y - worldHeight / 2,
-                width: worldWidth, 
-                height: worldHeight, 
-                src: dataUrl, 
-                alt: file.name,
-              };
-              handleImageCreate(newImage);
+          reader.onload = async (event) => {
+            const rawDataUrl = event.target?.result as string;
+            // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
+            const { url, width: imgW, height: imgH } = await compressAndUploadImage(
+              rawDataUrl, Number(boardIdRef.current), file.name
+            );
+            const aspectRatio = imgH / Math.max(imgW, 1);
+            const worldWidth = 5.0;
+            const worldHeight = worldWidth * aspectRatio;
+
+            const newImage: ImageElement = {
+              id: Date.now().toString() + '-' + Math.random().toString(36).substring(2, 9),
+              type: 'image',
+              x: worldPos.x - worldWidth / 2,
+              y: worldPos.y - worldHeight / 2,
+              width: worldWidth,
+              height: worldHeight,
+              src: url,
+              alt: file.name,
             };
-            img.src = dataUrl;
+            handleImageCreate(newImage);
           };
           reader.readAsDataURL(file);
         }
@@ -1866,6 +1908,7 @@ useMultiTouchGestures({
   // reaktywne re-renderują wyłącznie aktywne narzędzie (jak dawna drabinka).
   const hostValue = useMemo<ToolHostContextValue>(() => ({
     engine,
+    boardId,
     viewport: vp.viewport,
     viewportRef: vp.viewportRef,
     canvasWidth,
@@ -1906,7 +1949,7 @@ useMultiTouchGestures({
     onPanStart: hideOverlaysForPan,
     onPanEnd: restoreOverlaysAfterPan,
   }), [
-    engine, vp.viewport, vp.viewportRef, canvasWidth, canvasHeight, isGestureActive,
+    engine, boardId, vp.viewport, vp.viewportRef, canvasWidth, canvasHeight, isGestureActive,
     handleViewportChange, el.elements, sel.selectedElementIds, sel.editingTextId, overlaysVisible,
     handlePathCreate, handleShapeCreate, handleFunctionCreate, handleImageCreate,
     handleMarkdownNoteCreate, handleTableCreate, handleArrowCreate, handleTextCreate,

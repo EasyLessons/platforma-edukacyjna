@@ -12,11 +12,14 @@ WhiteboardService obsługuje:
   load_elements()       — ładowanie wszystkich elementów
   delete_element()      — usuń jeden element
 """
+import asyncio
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
+from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
+from core.database import SessionLocal
 from core.exceptions import NotFoundError, AppException, ValidationError
 from core.logging import get_logger
 from core.models import Board, BoardElement, BoardUsers, User, WorkspaceMember
@@ -25,8 +28,41 @@ from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
     OnlineUserInfo, BoardElementWithAuthor, SaveElementsResponse,
 )
+from .storage import upload_board_image, delete_board_image
 
 logger = get_logger(__name__)
+
+# Ile sekund czekamy po usunięciu elementu-obrazu, zanim NAPRAWDĘ skasujemy
+# plik ze Storage — patrz docs/known-issues.md #2, Aktualizacja 9: usera
+# undo (Ctrl+Z) przywraca element z tym samym URL-em, więc jeśli plik
+# zniknąłby natychmiast, undo pokazywałoby szary/pusty blok zamiast obrazka.
+IMAGE_DELETE_GRACE_PERIOD_SECONDS = 90.0
+
+
+async def _cleanup_image_after_delay(src: str, delay_seconds: float = IMAGE_DELETE_GRACE_PERIOD_SECONDS) -> None:
+    """
+    Wołane w tle (FastAPI BackgroundTasks) po usunięciu elementu-obrazu.
+    Czeka `delay_seconds` (margines na undo), otwiera WŁASNĄ, krótkotrwałą
+    sesję bazy (nie tę z requestu — ta jest już zamknięta/zamyka się zaraz
+    po odpowiedzi, a trzymanie jej otwartej przez 90s tylko po to żeby
+    „poczekać” marnowałoby połączenie do Neon), sprawdza czy w międzyczasie
+    ten sam URL nie wrócił na tablicę (undo), i dopiero wtedy kasuje plik.
+    """
+    await asyncio.sleep(delay_seconds)
+
+    db = SessionLocal()
+    try:
+        still_used = db.query(BoardElement).filter(
+            BoardElement.data["src"].astext == src
+        ).first()
+    finally:
+        db.close()
+
+    if still_used:
+        logger.info(f"Obraz {src} nadal używany (prawdopodobnie undo) — pomijam kasowanie ze Storage")
+        return
+
+    await delete_board_image(src)
 
 
 class WhiteboardService:
@@ -235,8 +271,30 @@ class WhiteboardService:
         for el in elements
     ]
 
+    async def upload_image(
+        self,
+        board_id: int,
+        user_id: int,
+        file_bytes: bytes,
+        content_type: str,
+    ) -> str:
+        """
+        Sprawdza dostęp do tablicy, uploaduje obraz do Supabase Storage
+        (storage.py), zwraca publiczny URL do wpisania w element.src.
+
+        Patrz docs/known-issues.md #2 — obraz nie jedzie już przez
+        Realtime Broadcast, żeby nie łamać limitu 256 KB na wiadomość.
+        """
+        board = self._get_board_or_404(board_id)
+        self._check_access(board, user_id)
+        return await upload_board_image(board_id, file_bytes, content_type)
+
     def delete_element(
-        self, board_id: int, element_id: str, user_id: int
+        self,
+        board_id: int,
+        element_id: str,
+        user_id: int,
+        background_tasks: Optional[BackgroundTasks] = None,
     ) -> dict:
         board = self._get_board_or_404(board_id)
         self._check_access(board, user_id)
@@ -248,6 +306,21 @@ class WhiteboardService:
 
         if not element:
             raise NotFoundError("Element nie znaleziony")
+
+        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
+        # o "zapychanie się" Storage. Obraz raz wgrany do Storage zostałby tam
+        # na zawsze, gdybyśmy kasowali tylko wiersz w bazie.
+        #
+        # NIE kasujemy pliku od razu — zaplanowane w tle z opóźnieniem
+        # (_cleanup_image_after_delay), bo natychmiastowe kasowanie psuło
+        # undo (patrz Aktualizacja 9): Ctrl+Z przywraca element z tym samym
+        # URL-em, a jeśli plik już zniknął, obrazek wraca jako szary/pusty
+        # blok. Background task sam sprawdzi tuż przed kasowaniem, czy URL
+        # nie wrócił na tablicę w międzyczasie.
+        if element.type == "image" and background_tasks is not None:
+            src = (element.data or {}).get("src")
+            if isinstance(src, str) and src:
+                background_tasks.add_task(_cleanup_image_after_delay, src)
 
         self.db.delete(element)
         self.db.commit()

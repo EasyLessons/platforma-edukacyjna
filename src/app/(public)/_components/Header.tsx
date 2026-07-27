@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
 import { Plus_Jakarta_Sans } from 'next/font/google';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 
 import ProductMegaMenu from './mega-menus/ProductMegaMenu';
 import CoursesMegaMenu from './/mega-menus/CoursesMegaMenu';

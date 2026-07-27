@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { LayoutGrid, Maximize2, PenTool, Layout, Star, MoreVertical, Search, Filter, ChevronDown, Clock } from 'lucide-react';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { BoardCard } from '@/_new/features/board/components/boardCard';
 import { getRecentBoards, type RecentBoard } from '@/_new/features/board/utils/recentBoards';
 import { getIconComponent, getGradientClass, formatDate, type SortBy } from '@/_new/features/board/utils/helpers';

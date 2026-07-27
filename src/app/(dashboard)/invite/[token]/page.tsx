@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { acceptInvite } from '@/_new/features/workspace/api/inviteApi';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { Check, X, Loader2 } from 'lucide-react';
 
 export default function InvitePage() {

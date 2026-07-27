@@ -20,6 +20,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 import type { TypingUser, RemoteViewport } from '@/app/context/BoardRealtimeContext';
+import type { ElementBroadcastPayload } from '@/_new/features/whiteboard/realtime/types';
 import type { DrawingElement, ImageElement } from '../types';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
@@ -33,9 +34,14 @@ export interface UseRealtimeOptions {
     userId: number,
     username: string
   ) => void;
-  /** Zaktualizuj element który zmienił się u innego użytkownika */
+  /**
+   * Zaktualizuj element który zmienił się u innego użytkownika.
+   * UWAGA: `element` może być NIEPEŁNY (bez `src` dla zdjęć — patrz
+   * ElementBroadcastPayload i docs/known-issues.md #2) — scal z lokalną
+   * kopią, nie nadpisuj całości.
+   */
   onRemoteElementUpdated: (
-    element: DrawingElement,
+    element: ElementBroadcastPayload,
     userId: number,
     username: string
   ) => void;
@@ -49,7 +55,12 @@ export interface UseRealtimeOptions {
   onLoadRemoteImage: (id: string, src: string) => void;
   /** Callback gdy zdalny viewport się zmienia (dla follow mode) */
   onRemoteViewport: (x: number, y: number, scale: number, fromUserId: number) => void;
-  onElementsUpdated?: (elements: DrawingElement[]) => void;
+  /**
+   * Elementy mogą być NIEPEŁNE (geometria-only, gdy `geometryOnly=true`) —
+   * scal z lokalną kopią; jeśli elementu jeszcze nie znasz lokalnie
+   * przy `geometryOnly=true`, zignoruj go (patrz BoardRealtimeContext.tsx).
+   */
+  onElementsUpdated?: (elements: ElementBroadcastPayload[], geometryOnly: boolean) => void;
   // 🔥 DODANE [SYNC]:
   onSyncRequest?: (userId: number, username: string) => void;
   onSyncResponse?: (elements: DrawingElement[], userId: number, username: string) => void;
@@ -63,7 +74,8 @@ export interface UseRealtimeReturn {
   broadcastElementCreated: (element: DrawingElement) => Promise<void>;
   broadcastElementUpdated: (element: DrawingElement) => Promise<void>;
   broadcastElementDeleted: (elementId: string) => Promise<void>;
-  broadcastElementsBatch: (elements: DrawingElement[]) => Promise<void>;
+  /** `geometryOnly=true` (live drag) → bez `src` dla zdjęć, patrz BoardRealtimeContext.tsx. */
+  broadcastElementsBatch: (elements: DrawingElement[], geometryOnly?: boolean) => Promise<void>;
   broadcastCursorMove: (x: number, y: number) => Promise<void>;
   broadcastViewportChange: (x: number, y: number, scale: number) => Promise<void>;
   broadcastTypingStarted: (elementId: string) => Promise<void>;
@@ -132,9 +144,9 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
     });
     
     if (registerRemoteBatch) {
-      registerRemoteBatch((elements, userId, username) => {
+      registerRemoteBatch((elements, userId, username, geometryOnly) => {
         if (optionsRef.current.onElementsUpdated) {
-          optionsRef.current.onElementsUpdated(elements);
+          optionsRef.current.onElementsUpdated(elements, geometryOnly);
         }
       });
     }

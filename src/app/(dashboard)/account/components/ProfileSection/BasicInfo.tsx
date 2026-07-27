@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react';
 import { Edit2, User, Mail, Upload, Calendar } from 'lucide-react';
 import type { User as UserType } from '@/_new/shared/types/user';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { apiClient } from '@/_new/lib/api';
 

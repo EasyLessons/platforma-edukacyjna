@@ -39,6 +39,8 @@ import type { WhiteboardEngine } from '@/_new/features/whiteboard/engine/types';
 export interface ToolHostContextValue {
   // ── silnik + stan współdzielony ──
   engine: WhiteboardEngine;
+  /** ID tablicy — potrzebne np. ImageTool do uploadu obrazu do Supabase Storage (docs/known-issues.md #2) */
+  boardId: string;
   viewport: ViewportTransform;
   viewportRef: RefObject<ViewportTransform>;
   canvasWidth: number;
