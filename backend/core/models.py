@@ -1,6 +1,5 @@
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
@@ -22,10 +21,6 @@ class User(Base):
     auth_provider = Column(String(20), default="email", nullable=False)  # "email" lub "google"
     profile_picture = Column(String, nullable=True)  # URL do zdjęcia profilowego
     avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
-
-    # Kod weryfikacyjny - bezpośrednio w tabeli user
-    verification_code = Column(String(6), nullable=True)
-    verification_code_expires = Column(DateTime, nullable=True)
     
     # 🔥 NOWE - Aktywny workspace
     active_workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)

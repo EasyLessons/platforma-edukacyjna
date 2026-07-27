@@ -13,7 +13,6 @@ from api.v1.workspaces.service import (
     delete_workspace,
     toggle_workspace_favourite,
     leave_workspace,
-    set_active_workspace,
 )
 from api.v1.workspaces.schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
 from core.exceptions import NotFoundError, AppException

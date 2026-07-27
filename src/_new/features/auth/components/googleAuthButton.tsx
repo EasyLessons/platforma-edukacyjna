@@ -27,7 +27,8 @@ function useGoogleAuth() {
   }, []);
 
   const handleGoogleLogin = () => {
-    const width = 520, height = 680;
+    const width = 520,
+      height = 680;
     const left = window.screenX + (window.outerWidth - width) / 2;
     const top = window.screenY + (window.outerHeight - height) / 2;
     const popup = window.open(
@@ -35,7 +36,8 @@ function useGoogleAuth() {
       'google-oauth',
       `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`
     );
-    if (!popup) alert('Nie udało się otworzyć okna logowania. Sprawdź blokowanie wyskakujących okien.');
+    if (!popup)
+      alert('Nie udało się otworzyć okna logowania. Sprawdź blokowanie wyskakujących okien.');
   };
 
   return { handleGoogleLogin };

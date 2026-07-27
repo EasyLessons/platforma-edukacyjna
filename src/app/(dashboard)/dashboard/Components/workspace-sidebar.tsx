@@ -195,7 +195,7 @@ export default function WorkspaceSidebar({
                     className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
                     title="Dodaj przestrzeń"
                   >
-                    <Plus size={18} strokeWidth={2.5} className='items-center'/>
+                    <Plus size={18} strokeWidth={2.5} className="items-center" />
                   </button>
                 </div>
               </div>
@@ -207,7 +207,11 @@ export default function WorkspaceSidebar({
               }`}
               title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
             >
-              {isCollapsed ? <PanelLeftOpen size={24} strokeWidth={2.5} /> : <PanelLeftClose size={18} strokeWidth={2.5} />}
+              {isCollapsed ? (
+                <PanelLeftOpen size={24} strokeWidth={2.5} />
+              ) : (
+                <PanelLeftClose size={18} strokeWidth={2.5} />
+              )}
             </button>
           </div>
 
@@ -236,7 +240,11 @@ export default function WorkspaceSidebar({
               title="Rozwiń aby wyszukać"
             >
               <div className="relative flex items-center justify-center w-8 h-8">
-                <Search size={24} className="text-gray-400 group-hover:text-gray-600 transition-colors" strokeWidth={2.5} />
+                <Search
+                  size={24}
+                  className="text-gray-400 group-hover:text-gray-600 transition-colors"
+                  strokeWidth={2.5}
+                />
               </div>
             </button>
           )}
@@ -248,15 +256,23 @@ export default function WorkspaceSidebar({
             <button
               onClick={onRecentSelect}
               className={`relative w-full flex items-center gap-2 pr-2 py-2.5 rounded-md transition-colors duration-100 cursor-pointer group shadow-none ${
-                currentView === 'recent' ? 'bg-gray-100/80 shadow-none' : 'bg-transparent hover:bg-gray-100'
+                currentView === 'recent'
+                  ? 'bg-gray-100/80 shadow-none'
+                  : 'bg-transparent hover:bg-gray-100'
               }`}
             >
               <div className="w-[18px] pl-0.5 border-none" />
               <div className="relative flex items-center justify-center flex-shrink-0 w-[24px] h-[24px]">
-                <Clock size={20} className={`${currentView === 'recent' ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`} strokeWidth={2.5} />
+                <Clock
+                  size={20}
+                  className={`${currentView === 'recent' ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`}
+                  strokeWidth={2.5}
+                />
               </div>
               <div className="flex-1 min-w-0 flex items-center text-left gap-2 pr-1">
-                <span className={`text-[16px] transition-colors truncate ${currentView === 'recent' ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'}`}>
+                <span
+                  className={`text-[16px] transition-colors truncate ${currentView === 'recent' ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'}`}
+                >
                   Ostatnio używane tablice
                 </span>
               </div>
@@ -270,7 +286,11 @@ export default function WorkspaceSidebar({
               title="Ostatnio używane tablice"
             >
               <div className="relative flex items-center justify-center w-8 h-8">
-                <Clock size={24} className={`${currentView === 'recent' ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`} strokeWidth={2.5} />
+                <Clock
+                  size={24}
+                  className={`${currentView === 'recent' ? 'text-gray-600' : 'text-gray-400 group-hover:text-gray-600'} transition-colors`}
+                  strokeWidth={2.5}
+                />
               </div>
             </button>
           )}

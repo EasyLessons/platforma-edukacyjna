@@ -51,8 +51,7 @@ export interface WhiteboardUiMetrics {
 
 function getWhiteboardUiMetrics(windowWidth: number): WhiteboardUiMetrics {
   const isMobile = windowWidth > 0 && windowWidth <= BREAKPOINTS.mobileMax;
-  const isOnlineUsersCompact =
-    windowWidth > 0 && windowWidth <= BREAKPOINTS.onlineUsersCompactMax;
+  const isOnlineUsersCompact = windowWidth > 0 && windowWidth <= BREAKPOINTS.onlineUsersCompactMax;
   const showFullHeader = windowWidth >= BREAKPOINTS.fullHeaderMin;
   const showCompactHeader =
     windowWidth >= BREAKPOINTS.compactHeaderMin && windowWidth < BREAKPOINTS.fullHeaderMin;

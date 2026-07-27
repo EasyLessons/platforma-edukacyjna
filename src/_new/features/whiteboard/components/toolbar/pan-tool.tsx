@@ -28,7 +28,15 @@ interface PanToolProps {
   onPanEnd?: () => void;
 }
 
-export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth, canvasHeight, onViewportChange, onPanStart, onPanEnd }: PanToolProps) {
+export function PanTool({
+  viewport,
+  viewportRef: canvasViewportRef,
+  canvasWidth,
+  canvasHeight,
+  onViewportChange,
+  onPanStart,
+  onPanEnd,
+}: PanToolProps) {
   /** Refs zamiast state — eliminują stale closures w hot-path pointer events */
   const isPanningRef = useRef(false);
   const lastMousePosRef = useRef<Point | null>(null);
@@ -69,14 +77,7 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
         const rect = overlay?.getBoundingClientRect() ?? { left: 0, top: 0 };
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
-        const newViewport = zoomViewport(
-          vp,
-          e.deltaY,
-          mouseX,
-          mouseY,
-          canvasWidth,
-          canvasHeight
-        );
+        const newViewport = zoomViewport(vp, e.deltaY, mouseX, mouseY, canvasWidth, canvasHeight);
         onViewportChange(constrainViewport(newViewport));
       } else {
         const newViewport = panViewportWithWheel(vp, e.deltaX, e.deltaY);
@@ -119,14 +120,13 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
       // Aktualizuj ref natychmiast (bez setState — brak re-renderu)
       lastMousePosRef.current = { x: e.clientX, y: e.clientY };
     },
-    [ onViewportChange]
+    [onViewportChange]
   );
 
   // Pointer up - zakończ panning
   const handlePointerUp = useCallback(
     (e: React.PointerEvent) => {
       if (isPanningRef.current) {
-
         if (e.currentTarget.hasPointerCapture(e.pointerId)) {
           e.currentTarget.releasePointerCapture(e.pointerId);
         }
@@ -140,7 +140,10 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
   );
 
   return (
-    <div className="absolute inset-0 z-20" style={{ cursor: isPanningVisual ? 'grabbing' : 'grab' }}>
+    <div
+      className="absolute inset-0 z-20"
+      style={{ cursor: isPanningVisual ? 'grabbing' : 'grab' }}
+    >
       {/* Overlay dla pointer events */}
       <div
         ref={overlayRef}
@@ -155,4 +158,3 @@ export function PanTool({ viewport, viewportRef: canvasViewportRef, canvasWidth,
     </div>
   );
 }
-

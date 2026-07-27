@@ -95,6 +95,7 @@ Rekomendacja: **A + B razem** jako najbliższy, praktyczny krok — A żeby bł�
 **Aktualizacja 4 — potwierdzenie na żywo + pierwsza naprawa wdrożona (22.07.2026).** User potwierdził scenariusz jeszcze raz narzędziem wycinania: mały, prosty zrzut (mało danych po kompresji) synchronizuje się normalnie; większy zrzut całego ekranu — nie, dopóki nie zrobi się F5. To ostatecznie potwierdza całość: giną i małe wiadomości (Aktualizacja 3, przez `ack:false`) i duże obrazy nie mieszczą się w limicie (Aktualizacja 1/2).
 
 **Wdrożone teraz (Opcja A + nowy krok D):**
+
 - `useRealtimeChannel.ts` — `broadcast.ack` zmienione z `false` na `true`. Kanał teraz faktycznie czeka na potwierdzenie serwera zamiast zakładać sukces od razu.
 - `useSafeBroadcast.ts` — `sendMessage()` czyta zwrócony status (`'ok' | 'timed_out' | 'error'`) zamiast tylko łapać wyjątek. Tylko `status === 'ok'` liczy się jako sukces — dzięki temu istniejący mechanizm retry (3 próby) faktycznie się uruchamia zamiast być martwym kodem, i błędy trafiają do `logWarn` zamiast ginąć po cichu.
 - **Nowy krok D (kompresja obrazka przed wstawieniem)** — `elements/image-compress.ts` (nowy plik): skaluje obrazek do max 1600px na dłuższym boku i przekodowuje na JPEG jakość 0.82 ZANIM stanie się elementem na tablicy. Podpięte we wszystkich 3 miejscach, gdzie obrazek wchodzi na tablicę: wklejanie ze schowka (`handleOsClipboardPaste` w `whiteboard-canvas.tsx`), przeciągnij-i-upuść (tamże), i przycisk Upload (`image-tool.tsx`). To atakuje przyczynę u źródła zamiast tylko naprawiać wykrywanie błędu — typowy zrzut ekranu czy zdjęcie z telefonu powinno teraz zmieścić się pod limitem w zdecydowanej większości przypadków.
@@ -104,6 +105,7 @@ Rekomendacja: **A + B razem** jako najbliższy, praktyczny krok — A żeby bł�
 **Aktualizacja 5 — wdrożona też Opcja B (22.07.2026), z myślą o skalowaniu przy wielu userach.** User poprosił wprost, żeby nie kończyć na łataniu wykrywania błędu, tylko naprawić architekturę tak, żeby zwykłe przesunięcie/obrót NIE wysyłało całego zdjęcia — bo przy większej liczbie userów sam rozmiar/częstotliwość wiadomości stanie się problemem niezależnie od limitu Supabase.
 
 Zrobione:
+
 - **`realtime/types.ts`** — nowy typ `ElementBroadcastPayload` (`DistributivePartial<DrawingElement> & {id, type}` — zwykły `Partial<>` nie zadziałałby poprawnie na unii 9 różnych typów elementów, patrz komentarz w kodzie). `element-updated`/`elements-batch` w `BoardEvent` używają teraz tego typu zamiast pełnego `DrawingElement`. `elements-batch` ma nowe pole `geometryOnly?: boolean`.
 - **`BoardRealtimeContext.tsx`** — nowa funkcja `stripHeavyFields()`: dla zdjęć usuwa `src` z payloadu PRZED wysyłką. Użyta w `broadcastElementUpdated` (zawsze) i `broadcastElementsBatch` (tylko gdy wołający jawnie poda `geometryOnly=true`). `element-created` NIE jest tym objęty — tam `src` musi dojść, bo odbiorca nie ma go jeszcze wcale.
 - **`use-whiteboard-engine.ts`** — `updateElementsLive` (live drag wielu zaznaczonych elementów) woła teraz `broadcastElementsBatch(updated, true)` zamiast `broadcastElementsBatch(updated)`.
@@ -132,6 +134,7 @@ User potwierdził: projekt jest na **planie Free** w Supabase. Limity na tym pla
 Kluczowa obserwacja z tych samych logów: `element-updated`/`elements-batch` (geometria BEZ `src`, dzięki Opcji B z Aktualizacji 5) przechodziły bezbłędnie cały czas. Padał WYŁĄCZNIE `element-created` dla obrazów — czyli jedyna wiadomość, która wciąż niesie pełny base64. To potwierdza to, co odrzuciliśmy zbyt wcześnie w Aktualizacji 2: **kompresja (1600px, JPEG 0.82) zmniejszała szansę na przekroczenie limitu 256 KB/wiadomość, ale jej nie eliminowała** — prawdziwe zdjęcia z telefonu i renderowane strony PDF (dużo szczegółów → gorsza kompresja JPEG) regularnie i tak go przekraczały. Tłumaczy to komplet objawów z całej tej sesji: mały czarny obrazek z Aktualizacji 2 się mieścił, 241 KB zdjęcie z telefonu po kompresji nadal nie, PDF (45 KB oryginał, ale renderowany w skali 2x do rastra) też nie.
 
 **Wdrożona Opcja C (ostateczne rozwiązanie, patrz opcje naprawy wyżej) — obraz w ogóle nie jedzie przez Realtime Broadcast:**
+
 - **Backend, nowy plik `backend/api/v1/whiteboard/storage.py`** — `upload_board_image()`: uploaduje bajty obrazu do Supabase Storage (bucket `board-images`, publiczny) kluczem `service_role` (ten sam już używany w `realtime.py`, omija RLS — autoryzację i tak sprawdzamy wcześniej przez nasz JWT). Zwraca publiczny URL. Walidacja typu (tylko jpeg/png/webp) i rozmiaru (max 15 MB — to bezpiecznik, nie limit Realtime).
 - **Backend, nowy endpoint `POST /api/v1/whiteboard/{board_id}/upload-image`** (`router.py` + `service.py`) — sprawdza dostęp do tablicy (`_check_access`, ten sam co reszta endpointów elementów) przed uploadem.
 - **Frontend, `elements/image-compress.ts`** — nowa funkcja `compressAndUploadImage()`: kompresuje (jak dotąd) I uploaduje wynik przez nowy endpoint, zwraca `{url, width, height}` zamiast `{dataUrl, width, height}`.
@@ -160,6 +163,7 @@ Root cause: `WhiteboardService.delete_element()` (Aktualizacja 8) kasował plik 
 Asymetria między A i B (dlaczego tylko osoba, która SAMA usunęła, widziała problem) tłumaczy się różnicą w lokalnym cache zdekodowanych obrazków (`loadedImages` w silniku tablicy): usuwający czyści wpis dla tego elementu od razu (`loadedImages.delete(e.id)` w `use-whiteboard-engine.ts`), więc po undo musi na nowo pobrać obrazek z sieci — i wtedy trafia na 404. Druga osoba nigdy nie czyściła swojego cache dla tego elementu, więc po powrocie elementu nadal renderuje wcześniej załadowaną, zdekodowaną bitmapę z pamięci, bez żadnego zapytania sieciowego — stąd u niej wygląda, jakby nic się nie stało.
 
 **Naprawione — opóźnione kasowanie z rewalidacją, zamiast natychmiastowego:**
+
 - `WhiteboardService.delete_element()` wrócił do bycia zwykłym `def` (nie `async def`) — nie kasuje już niczego synchronicznie. Zamiast tego, dla elementu typu `image`, planuje `background_tasks.add_task(_cleanup_image_after_delay, src)` (FastAPI `BackgroundTasks`, nowy parametr metody).
 - Nowa funkcja `_cleanup_image_after_delay()` (`service.py`): czeka `IMAGE_DELETE_GRACE_PERIOD_SECONDS = 90` sekund (margines na "usuń i zaraz cofnij"), otwiera WŁASNĄ, krótkotrwałą sesję bazy (`SessionLocal()` z `core/database.py` — nie tę z requestu, żeby nie trzymać połączenia do Neon otwartego przez 90s bez potrzeby), sprawdza czy ten sam URL (`BoardElement.data["src"].astext == src`) nadal występuje GDZIEKOLWIEK w bazie — jeśli tak (bo ktoś zrobił undo), **pomija kasowanie**. Dopiero jeśli URL naprawdę nigdzie już nie występuje, woła `delete_board_image()`.
 - `router.py`: endpoint `DELETE /elements/{element_id}` dostaje `background_tasks: BackgroundTasks` i przekazuje do serwisu; wywołanie `service.delete_element(...)` już bez `await` (funkcja sync).
@@ -208,6 +212,7 @@ Zweryfikowane: `npx tsc --noEmit` scoped na `useSafeBroadcast.ts` + `realtime/co
 ## 3. Resize/przesuwanie "nie trafia" — szczególnie zaraz po akcji na zdjęciu (wysoki priorytet, przyczyna NIE potwierdzona w 100%)
 
 **Zgłoszone:** lipiec 2026, ręczny test. Dwa powiązane objawy zgłoszone przez usera:
+
 1. Uchwyty do resize "jakoś dziwnie nie trafiają" — kiedyś działało normalnie.
 2. Konkretny, powtarzalny scenariusz: przesuwanie notatki działa OK (widać zmianę u obu userów). Ale jak najpierw zrobi się coś ze zdjęciem, a POTEM spróbuje się coś przesunąć — **pierwsza próba nic nie robi** (brak ruchu), dopiero kolejna działa.
 
@@ -247,6 +252,7 @@ Przepisać ten `useEffect` tak, żeby zależał TYLKO od `[isResizing, isDraggin
 ### Jak to zweryfikować przed naprawą
 
 Nie miałem jak odtworzyć tego na żywo w tej sesji. Zanim to naprawimy na pewno, warto:
+
 1. Dodać tymczasowy `console.log` w cleanup i na starcie tego `useEffect`, żeby zobaczyć czy faktycznie odpina/podpina się w trakcie normalnego użytkowania (nie tylko w teorii).
 2. Sprawdzić, czy problem znika, jeśli zrobisz dokładnie ten sam scenariusz (zdjęcie → potem przesunięcie) ale wolniej, z przerwą 1-2 sekund między akcjami (jeśli zniknie — to potwierdza teorię o wyścigu w czasie, a nie inny błąd).
 
@@ -257,6 +263,7 @@ Nie miałem jak odtworzyć tego na żywo w tej sesji. Zanim to naprawimy na pewn
 ## 4. Nowy workspace/tablica nie pojawiają się bez F5 — dwa niezależne miejsca z brakującą inwalidacją cache React Query (wysoki priorytet — częste, codzienne akcje)
 
 **Zgłoszone:** 23.07.2026, produkcja (easylesson.app), ręczny test. Dwa osobne, ale identyczne w naturze objawy:
+
 1. Zaakceptowanie zaproszenia do workspace z panelu powiadomień — nowy workspace nie pojawia się na liście, dopóki nie zrobi się F5.
 2. Utworzenie nowej tablicy z szablonu (sekcja "Szablony" na dashboardzie) i powrót do listy tablic w danym workspace — nowa tablica nie pojawia się, dopóki nie zrobi się F5.
 

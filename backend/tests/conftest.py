@@ -1,12 +1,16 @@
 """
 Konfiguracja pytest - fixtures wspólne dla wszystkich testów
 """
+# ruff: noqa: E402
+
 import pytest
 import asyncio
 import json
 import secrets
+import fakeredis
+import fakeredis.aioredis
 from datetime import datetime, timedelta
-from sqlalchemy import TypeDecorator, Text, event
+from sqlalchemy import TypeDecorator, Text
 from sqlalchemy.dialects import postgresql
 
 
@@ -39,7 +43,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
-from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers, RefreshToken
+from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers
 from api.v1.auth.utils import hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -69,6 +73,24 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture
+def fake_redis_server():
+    """Współdzielony in-memory serwer Redis (fake) dla jednego testu."""
+    return fakeredis.FakeServer()
+
+
+@pytest.fixture
+def redis_client(fake_redis_server):
+    """Async klient Redis (fake) — wstrzykiwany do AuthService w testach."""
+    return fakeredis.aioredis.FakeRedis(server=fake_redis_server, decode_responses=True)
+
+
+@pytest.fixture
+def sync_redis_client(fake_redis_server):
+    """Sync klient Redis (fake) — do seedowania danych w fixture'ach bez async (np. unverified_user)."""
+    return fakeredis.FakeStrictRedis(server=fake_redis_server, decode_responses=True)
 
 
 # ── Users ──────────────────────────────────────────────────────────────────
@@ -122,20 +144,19 @@ def test_user3(db_session: Session):
 
 
 @pytest.fixture
-def unverified_user(db_session: Session):
+def unverified_user(db_session: Session, sync_redis_client):
     """Niezweryfikowany użytkownik z aktywnym kodem"""
     user = User(
         username="unverified",
         email="unverified@example.com",
         hashed_password=hash_password("testpassword"),
         is_active=False,
-        verification_code="123456",
-        verification_code_expires=datetime.utcnow() + timedelta(minutes=15),
         created_at=datetime.utcnow(),
     )
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
+    sync_redis_client.setex(f"auth:email_verification:{user.id}", 900, "123456")
     return user
 
 

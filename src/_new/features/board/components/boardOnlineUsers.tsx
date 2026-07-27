@@ -20,7 +20,7 @@ const MAX_VISIBLE = 3;
 
 export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
   const { getAvatarColorClass, getInitials } = useUserAvatar();
-  console.log("BoardOnlineUsers render, users:", JSON.stringify(users, null, 2));
+  console.log('BoardOnlineUsers render, users:', JSON.stringify(users, null, 2));
 
   if (users.length === 0) {
     return <span className="text-gray-400 text-xs font-medium">—</span>;
@@ -45,11 +45,7 @@ export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
           title={user.username}
         >
           {user.avatar_url ? (
-            <img 
-              src={user.avatar_url} 
-              alt={user.username} 
-              className="w-full h-full object-cover"
-            />
+            <img src={user.avatar_url} alt={user.username} className="w-full h-full object-cover" />
           ) : (
             getInitials(user.username)
           )}

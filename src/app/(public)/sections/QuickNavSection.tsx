@@ -41,14 +41,14 @@ export default function QuickNavSection() {
 
   useEffect(() => {
     const sectionEls = navItems
-      .map(item => document.getElementById(item.href))
+      .map((item) => document.getElementById(item.href))
       .filter(Boolean) as HTMLElement[];
 
     if (sectionEls.length === 0) return;
 
     const observer = new IntersectionObserver(
-      entries => {
-        entries.forEach(entry => {
+      (entries) => {
+        entries.forEach((entry) => {
           if (entry.isIntersecting) {
             setActiveSection(entry.target.id);
           }
@@ -57,7 +57,7 @@ export default function QuickNavSection() {
       { threshold: 0.3, rootMargin: '-80px 0px -40% 0px' }
     );
 
-    sectionEls.forEach(el => observer.observe(el));
+    sectionEls.forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   }, []);
 
@@ -102,10 +102,7 @@ function NavBar({
   visible: boolean;
 }) {
   return (
-    <nav
-      className="w-full bg-white"
-      style={{ padding: '10px 0' }}
-    >
+    <nav className="w-full bg-white" style={{ padding: '10px 0' }}>
       <div className="w-full px-6 sm:px-10">
         <ul className="flex flex-wrap items-center justify-center gap-x-1 gap-y-2">
           {navItems.map((item) => {
@@ -125,11 +122,11 @@ function NavBar({
                     color: isActive ? '#b8860b' : '#888',
                     transition: 'color 0.15s ease, border-color 0.15s ease, transform 0.12s ease',
                   }}
-                  onMouseEnter={e => {
+                  onMouseEnter={(e) => {
                     if (!isActive) e.currentTarget.style.color = '#444';
                     e.currentTarget.style.transform = 'scale(1.03)';
                   }}
-                  onMouseLeave={e => {
+                  onMouseLeave={(e) => {
                     if (!isActive) e.currentTarget.style.color = '#888';
                     e.currentTarget.style.transform = 'scale(1)';
                   }}

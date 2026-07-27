@@ -79,17 +79,13 @@ describe('POST /api/contact — błąd Resend', () => {
       ok: false,
       json: async () => ({ error: 'Resend error' }),
     });
-    const res = await POST(
-      makeRequest({ name: 'Jan', email: 'jan@example.com', message: 'test' })
-    );
+    const res = await POST(makeRequest({ name: 'Jan', email: 'jan@example.com', message: 'test' }));
     expect(res.status).toBe(500);
   });
 
   it('500 gdy fetch rzuca wyjątek (brak sieci)', async () => {
     mockFetch.mockRejectedValue(new Error('Network error'));
-    const res = await POST(
-      makeRequest({ name: 'Jan', email: 'jan@example.com', message: 'test' })
-    );
+    const res = await POST(makeRequest({ name: 'Jan', email: 'jan@example.com', message: 'test' }));
     expect(res.status).toBe(500);
   });
 });

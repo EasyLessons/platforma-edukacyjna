@@ -8,9 +8,7 @@
 
 // validateBoardName - Waliduje nazwę tablicy.
 // Backend: min_length=1, max_length=50
-export const validateBoardName = (
-  name: string
-): { valid: boolean; error?: string } => {
+export const validateBoardName = (name: string): { valid: boolean; error?: string } => {
   const trimmed = name.trim();
 
   if (!trimmed) {
@@ -25,9 +23,7 @@ export const validateBoardName = (
 };
 
 // validateBoardIcon - Waliduje nazwę ikony.
-export const validateBoardIcon = (
-  icon: string
-): { valid: boolean; error?: string } => {
+export const validateBoardIcon = (icon: string): { valid: boolean; error?: string } => {
   if (!icon || !icon.trim()) {
     return { valid: false, error: 'Ikona jest wymagana' };
   }

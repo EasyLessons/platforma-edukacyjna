@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useRegister } from '../useRegister';
 import { registerUser, checkUser } from '../../api/authApi';
 import { AppError } from '@/_new/lib/errors';
+import { mockRegisterResponse, mockUser } from '@/test/mocks/authFixtures';
 
 const mockPush = vi.fn();
 
@@ -17,7 +18,7 @@ vi.mock('../../api/authApi', () => ({
 
 describe('useRegister', () => {
   beforeEach(() => {
-    vi.mocked(registerUser).mockResolvedValue({ user_id: 42, email: 'jan@example.com', message: 'OK' });
+    vi.mocked(registerUser).mockResolvedValue(mockRegisterResponse);
     vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: false, user_id: 42 });
   });
 
@@ -26,17 +27,30 @@ describe('useRegister', () => {
 
   const fillForm = (result: ReturnType<typeof setup>['result']) => {
     act(() => {
-      result.current.handleChange({ target: { name: 'username', value: 'janek' } } as React.ChangeEvent<HTMLInputElement>);
-      result.current.handleChange({ target: { name: 'email', value: 'jan@example.com' } } as React.ChangeEvent<HTMLInputElement>);
-      result.current.handleChange({ target: { name: 'password', value: 'Pass1word' } } as React.ChangeEvent<HTMLInputElement>);
-      result.current.handleChange({ target: { name: 'password_confirm', value: 'Pass1word' } } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'username', value: 'janek' },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'email', value: 'jan@example.com' },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'password', value: 'Pass1word' },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'password_confirm', value: 'Pass1word' },
+      } as React.ChangeEvent<HTMLInputElement>);
       result.current.handleTermsChange(true);
     });
   };
 
   it('inicjalizuje pusty formularz', () => {
     const { result } = setup();
-    expect(result.current.formData).toEqual({ username: '', email: '', password: '', password_confirm: '' });
+    expect(result.current.formData).toEqual({
+      username: '',
+      email: '',
+      password: '',
+      password_confirm: '',
+    });
     expect(result.current.acceptTerms).toBe(false);
     expect(result.current.generalError).toBe('');
   });
@@ -45,12 +59,22 @@ describe('useRegister', () => {
     it('ustawia błąd gdy regulamin niezaakceptowany', async () => {
       const { result } = setup();
       act(() => {
-        result.current.handleChange({ target: { name: 'username', value: 'janek' } } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({ target: { name: 'email', value: 'jan@example.com' } } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({ target: { name: 'password', value: 'Pass1word' } } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({ target: { name: 'password_confirm', value: 'Pass1word' } } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'username', value: 'janek' },
+        } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'email', value: 'jan@example.com' },
+        } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'password', value: 'Pass1word' },
+        } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'password_confirm', value: 'Pass1word' },
+        } as React.ChangeEvent<HTMLInputElement>);
       });
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.generalError).toBe('Musisz zaakceptować regulamin');
       expect(registerUser).not.toHaveBeenCalled();
     });
@@ -58,10 +82,14 @@ describe('useRegister', () => {
     it('ustawia błąd dla nieprawidłowego emaila', async () => {
       const { result } = setup();
       act(() => {
-        result.current.handleChange({ target: { name: 'email', value: 'zly-email' } } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'email', value: 'zly-email' },
+        } as React.ChangeEvent<HTMLInputElement>);
         result.current.handleTermsChange(true);
       });
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.errors.email).toBeTruthy();
       expect(registerUser).not.toHaveBeenCalled();
     });
@@ -71,8 +99,12 @@ describe('useRegister', () => {
     it('przekierowuje na /verify z user_id i emailem', async () => {
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
-      expect(mockPush).toHaveBeenCalledWith('/verify?userId=42&email=jan%40example.com');
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith(
+        `/verify?userId=${mockUser.id}&email=jan%40example.com`
+      );
     });
   });
 
@@ -85,7 +117,9 @@ describe('useRegister', () => {
       vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: true, user_id: 42 });
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.generalError).toBe('To konto już istnieje. Przejdź do logowania.');
       expect(mockPush).not.toHaveBeenCalled();
     });
@@ -93,8 +127,10 @@ describe('useRegister', () => {
     it('przekierowuje na /verify gdy konto istnieje ale niezweryfikowane', async () => {
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
-      expect(mockPush).toHaveBeenCalledWith('/verify?userId=42&email=jan%40example.com');
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith(`/verify?userId=42&email=jan%40example.com`);
     });
   });
 });

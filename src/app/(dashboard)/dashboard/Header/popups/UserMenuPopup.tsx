@@ -57,8 +57,8 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
       <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
         <div className="flex items-center gap-3">
           {user.avatar_url ? (
-            <img 
-              src={user.avatar_url} 
+            <img
+              src={user.avatar_url}
               alt="Avatar"
               className="w-11 h-11 rounded-full object-cover border border-[var(--dash-border)] shadow-sm"
             />

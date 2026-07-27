@@ -18,7 +18,8 @@ export function useAuthCallback() {
     };
 
     if (error || !token || !userEncoded) {
-      if (window.opener) sendToOpener({ type: 'GOOGLE_AUTH_ERROR', error: error ?? 'Missing data' });
+      if (window.opener)
+        sendToOpener({ type: 'GOOGLE_AUTH_ERROR', error: error ?? 'Missing data' });
       else router.replace('/login');
       return;
     }
@@ -26,7 +27,10 @@ export function useAuthCallback() {
     try {
       const userData = JSON.parse(atob(userEncoded));
       if (window.opener) sendToOpener({ type: 'GOOGLE_AUTH_SUCCESS', token, userData });
-      else { login(token, userData); router.replace('/dashboard'); }
+      else {
+        login(token, userData);
+        router.replace('/dashboard');
+      }
     } catch {
       if (window.opener) sendToOpener({ type: 'GOOGLE_AUTH_ERROR', error: 'Invalid user data' });
       else router.replace('/login');

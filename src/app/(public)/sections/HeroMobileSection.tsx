@@ -29,7 +29,6 @@ export default function HeroSection() {
 
   return (
     <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pt-4 pb-8`}>
-
       <section
         className="relative w-full overflow-hidden"
         style={{
@@ -38,7 +37,6 @@ export default function HeroSection() {
           minHeight: '560px',
         }}
       >
-
         <video
           ref={videoRef}
           className="absolute inset-0 w-full h-full object-cover"
@@ -66,13 +64,13 @@ export default function HeroSection() {
         <div
           className="absolute inset-0"
           style={{
-            background: 'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 28%, transparent 50%)',
+            background:
+              'linear-gradient(to top, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.10) 28%, transparent 50%)',
           }}
         />
 
         {/* Środkowa treść */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center z-10 px-5 sm:px-8">
-
           {/* Znacznik - ukryty na bardzo małych */}
           <div className="hidden sm:flex items-center gap-2 mb-4">
             <div
@@ -96,11 +94,7 @@ export default function HeroSection() {
               lineHeight: '1.1',
             }}
           >
-            Jedna tablica.{' '}
-            <span style={{ color: '#4bffab' }}>
-              Milion możliwości
-            </span>
-            {' '}nauki.
+            Jedna tablica. <span style={{ color: '#4bffab' }}>Milion możliwości</span> nauki.
           </h1>
 
           {/* H2 - vh */}
@@ -129,13 +123,9 @@ export default function HeroSection() {
 
         {/* Dolny pasek */}
         <div className="absolute bottom-0 left-0 right-0 z-10 flex items-end justify-between px-5 sm:px-8 pb-5 sm:pb-7">
-
           {/* Lewa - avatary */}
           <div className="flex flex-col gap-1.5">
-            <p
-              className="text-white font-semibold"
-              style={{ fontSize: '1.5vh', opacity: 0.9 }}
-            >
+            <p className="text-white font-semibold" style={{ fontSize: '1.5vh', opacity: 0.9 }}>
               Easylesson wybierają najlepsi korepetytorzy
             </p>
             <div className="flex items-center gap-1">
@@ -166,15 +156,34 @@ export default function HeroSection() {
 
           {/* Prawa - social media, ukryte na xs */}
           <div className="hidden sm:flex items-center gap-4">
-            <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Instagram ↗</a>
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">Facebook ↗</a>
-            <a href="https://tiktok.com" target="_blank" rel="noopener noreferrer" className="hero-social-link">TikTok ↗</a>
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hero-social-link"
+            >
+              Instagram ↗
+            </a>
+            <a
+              href="https://facebook.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hero-social-link"
+            >
+              Facebook ↗
+            </a>
+            <a
+              href="https://tiktok.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hero-social-link"
+            >
+              TikTok ↗
+            </a>
           </div>
-
         </div>
 
         <style jsx>{`
-
           .hero-btn-primary {
             display: inline-flex;
             align-items: center;
@@ -187,15 +196,18 @@ export default function HeroSection() {
             font-weight: 700;
             color: #032515;
             background: #4bffab;
-            box-shadow: 0 2px 14px rgba(43, 204, 130, 0.40);
-            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
+            box-shadow: 0 2px 14px rgba(43, 204, 130, 0.4);
+            transition:
+              transform 0.13s ease,
+              box-shadow 0.13s ease,
+              background 0.13s ease;
             user-select: none;
           }
 
           .hero-btn-primary:hover {
             transform: scale(1.03);
             background: rgb(6, 250, 144);
-            box-shadow: 0 4px 22px rgba(43, 204, 130, 0.60);
+            box-shadow: 0 4px 22px rgba(43, 204, 130, 0.6);
           }
 
           .hero-btn-primary:active {
@@ -215,7 +227,10 @@ export default function HeroSection() {
             color: #432f00;
             background: #ffce22;
             box-shadow: 0 2px 14px rgba(255, 206, 34, 0.35);
-            transition: transform 0.13s ease, box-shadow 0.13s ease, background 0.13s ease;
+            transition:
+              transform 0.13s ease,
+              box-shadow 0.13s ease,
+              background 0.13s ease;
             user-select: none;
           }
 
@@ -241,9 +256,7 @@ export default function HeroSection() {
           .hero-social-link:hover {
             color: rgba(255, 255, 255, 1);
           }
-
         `}</style>
-
       </section>
     </div>
   );

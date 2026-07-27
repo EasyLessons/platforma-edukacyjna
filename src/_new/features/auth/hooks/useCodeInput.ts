@@ -1,13 +1,13 @@
 /**
  * CODE INPUT HOOK
- * 
+ *
  * Hook dla 6-cyfrowego kodu weryfikacyjnego
  * Zarządza:
  * - Input state (code array, focus, paste)
  * - Verification logic
  * - Resend logic + cooldown
  * - Error/success messages
- * 
+ *
  * Używany w:
  * - Email verification
  * - Password reset (step 2)
@@ -30,7 +30,6 @@ export function useCodeInput({
   onResend,
   cooldownSeconds = 60,
 }: UseCodeInputOptions) {
-
   // STATE
   const [code, setCode] = useState<string[]>(Array(length).fill(''));
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -166,7 +165,7 @@ export function useCodeInput({
   // Pobierz kod jako string
   const getCodeString = () => code.join('');
   // Sprawdź czy kod jest kompletny
-  const isComplete = () => code.every(digit => digit !== '') && code.length === length;
+  const isComplete = () => code.every((digit) => digit !== '') && code.length === length;
 
   return {
     // State

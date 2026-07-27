@@ -55,10 +55,7 @@ export function PasswordResetForm() {
       {step === 'code' && (
         <div className="bg-white rounded-2xl shadow-2xl p-8">
           {/* 6-digit code inputs */}
-          <CodeInput
-            onVerify={handleCodeVerified}
-            onResend={handleCodeResend}
-          />
+          <CodeInput onVerify={handleCodeVerified} onResend={handleCodeResend} />
 
           {/* Helper text */}
           <p className="text-xs text-gray-500 text-center mt-4 font-light">

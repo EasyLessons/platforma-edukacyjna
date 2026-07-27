@@ -56,21 +56,36 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
 
     return {
       // ── ODCZYT ──
-      get elementsRef() { return d().elementsRef; },
+      get elementsRef() {
+        return d().elementsRef;
+      },
       getElements: () => d().elementsRef.current,
       getById: (id) => d().elementsRef.current.find((e) => e.id === id),
-      get viewportRef() { return d().viewportRef; },
-      get canvasSize() { return d().canvasSize; },
-      get boardIdRef() { return d().boardIdRef; },
-      get userRole() { return d().userRole; },
-      get isReadOnly() { return isReadOnly(); },
+      get viewportRef() {
+        return d().viewportRef;
+      },
+      get canvasSize() {
+        return d().canvasSize;
+      },
+      get boardIdRef() {
+        return d().boardIdRef;
+      },
+      get userRole() {
+        return d().userRole;
+      },
+      get isReadOnly() {
+        return isReadOnly();
+      },
 
       // ── INTENCJA: CREATE (persystencja markUnsaved, jak createElement) ──
       createElements: (elements) => {
         if (isReadOnly() || elements.length === 0) return;
         const {
-          addElements, markUnsaved,
-          broadcastElementCreated, broadcastElementsBatch, recordCommand,
+          addElements,
+          markUnsaved,
+          broadcastElementCreated,
+          broadcastElementsBatch,
+          recordCommand,
         } = d();
         addElements(elements);
         markUnsaved(elements.map((e) => e.id));
@@ -82,9 +97,7 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
       // ── INTENCJA: UPDATE (persystencja markUnsaved, jak handleElementUpdateWithHistory) ──
       updateElements: (before, after) => {
         if (isReadOnly() || after.length === 0) return;
-        const {
-          updateElements, markUnsaved, broadcastElementUpdated, recordCommand,
-        } = d();
+        const { updateElements, markUnsaved, broadcastElementUpdated, recordCommand } = d();
         updateElements(after);
         markUnsaved(after.map((e) => e.id));
         after.forEach((e) => broadcastElementUpdated(e).catch(console.error));
@@ -95,8 +108,12 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
       deleteElements: (elements) => {
         if (isReadOnly() || elements.length === 0) return;
         const {
-          removeElement, loadedImages, recordCommand,
-          broadcastElementDeleted, deleteElementDirectly, boardIdRef,
+          removeElement,
+          loadedImages,
+          recordCommand,
+          broadcastElementDeleted,
+          deleteElementDirectly,
+          boardIdRef,
         } = d();
         // 1. natychmiastowe usunięcie lokalne
         elements.forEach((e) => {
@@ -114,7 +131,7 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
             chunk.forEach((id) => broadcastElementDeleted(id));
             if (!Number.isNaN(boardIdNum)) {
               await Promise.all(
-                chunk.map((id) => deleteElementDirectly(boardIdNum, id).catch(console.error)),
+                chunk.map((id) => deleteElementDirectly(boardIdNum, id).catch(console.error))
               );
             }
             if (i + DELETE_CHUNK_SIZE < ids.length) {
@@ -149,11 +166,17 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
       // ── HISTORIA ──
       undo: () => d().undo(),
       redo: () => d().redo(),
-      get canUndo() { return d().canUndo; },
-      get canRedo() { return d().canRedo; },
+      get canUndo() {
+        return d().canUndo;
+      },
+      get canRedo() {
+        return d().canRedo;
+      },
 
       // ── SELEKCJA ──
-      get selectedIds() { return d().selectedElementIds; },
+      get selectedIds() {
+        return d().selectedElementIds;
+      },
       select: (ids) => d().selectElements(ids),
       clearSelection: () => d().clearSelection(),
 

@@ -26,17 +26,13 @@ export default function WarunkiKorzystaniaPage() {
 
           {/* Sekcja 2 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              2. Definicje i pojęcia
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Definicje i pojęcia</h2>
             <p className="text-gray-600 italic">Treść w przygotowaniu...</p>
           </section>
 
           {/* Sekcja 3 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              3. Akceptacja warunków
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. Akceptacja warunków</h2>
             <p className="text-gray-600 italic">Treść w przygotowaniu...</p>
           </section>
 
@@ -50,9 +46,7 @@ export default function WarunkiKorzystaniaPage() {
 
           {/* Sekcja 5 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              5. Zakres usług platformy
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Zakres usług platformy</h2>
             <p className="text-gray-600 italic">Treść w przygotowaniu...</p>
           </section>
 
@@ -66,9 +60,7 @@ export default function WarunkiKorzystaniaPage() {
 
           {/* Sekcja 7 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              7. Zawartość użytkownika
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Zawartość użytkownika</h2>
             <p className="text-gray-600 italic">Treść w przygotowaniu...</p>
           </section>
 
@@ -130,9 +122,7 @@ export default function WarunkiKorzystaniaPage() {
 
           {/* Sekcja 15 */}
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">
-              15. Dane kontaktowe
-            </h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mb-4">15. Dane kontaktowe</h2>
             <p className="text-gray-600 italic">Treść w przygotowaniu...</p>
           </section>
         </div>

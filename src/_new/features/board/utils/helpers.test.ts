@@ -132,14 +132,11 @@ describe('sortBoards', () => {
         makeBoard({ id: 3, name: 'Mango' }),
       ];
       const sorted = sortBoards(boards, 'name');
-      expect(sorted.map(b => b.name)).toEqual(['Apple', 'Mango', 'Zebra']);
+      expect(sorted.map((b) => b.name)).toEqual(['Apple', 'Mango', 'Zebra']);
     });
 
     it('sortuje bez uwzględnienia wielkości liter', () => {
-      const boards = [
-        makeBoard({ id: 1, name: 'zebra' }),
-        makeBoard({ id: 2, name: 'Apple' }),
-      ];
+      const boards = [makeBoard({ id: 1, name: 'zebra' }), makeBoard({ id: 2, name: 'Apple' })];
       const sorted = sortBoards(boards, 'name');
       expect(sorted[0].name).toBe('Apple');
     });
@@ -169,10 +166,7 @@ describe('sortBoards', () => {
   });
 
   it('nie mutuje oryginalnej tablicy', () => {
-    const boards = [
-      makeBoard({ id: 1, name: 'B' }),
-      makeBoard({ id: 2, name: 'A' }),
-    ];
+    const boards = [makeBoard({ id: 1, name: 'B' }), makeBoard({ id: 2, name: 'A' })];
     const original = [...boards];
     sortBoards(boards, 'name');
     expect(boards[0].id).toBe(original[0].id);
@@ -183,10 +177,7 @@ describe('sortBoards', () => {
 
 describe('filterBoards', () => {
   it('"all" zwraca wszystkie tablice', () => {
-    const boards = [
-      makeBoard({ owner_username: 'alice' }),
-      makeBoard({ owner_username: 'bob' }),
-    ];
+    const boards = [makeBoard({ owner_username: 'alice' }), makeBoard({ owner_username: 'bob' })];
     expect(filterBoards(boards, 'all', 'alice')).toHaveLength(2);
   });
 
@@ -198,6 +189,6 @@ describe('filterBoards', () => {
     ];
     const result = filterBoards(boards, 'mine', 'alice');
     expect(result).toHaveLength(2);
-    expect(result.every(b => b.owner_username === 'alice')).toBe(true);
+    expect(result.every((b) => b.owner_username === 'alice')).toBe(true);
   });
 });

@@ -63,9 +63,7 @@ export async function saveBoardElementsBatch(
  *
  * @returns tablica elementów z metadanymi (autor, data created_at)
  */
-export async function loadBoardElements(
-  boardId: number
-): Promise<BoardElementWithAuthor[]> {
+export async function loadBoardElements(boardId: number): Promise<BoardElementWithAuthor[]> {
   return _loadElements(boardId);
 }
 

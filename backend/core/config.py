@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     google_redirect_uri: str  # WYMAGANE - URI callback (np. http://localhost:8000/api/v1/auth/google/callback)
     frontend_url: str = "http://localhost:3000"  # Opcjonalne - URL frontendu (do przekierowania po logowaniu)
 
+        # === REDIS (kody weryfikacyjne) ===
+    redis_url: str  # WYMAGANE - connection string do Redis (np. redis://localhost:6379/0)
+    verification_code_expire_minutes: int = 15  # czas ważności kodu weryfikacji/resetu hasła
+
     port: int = 8000
     
     # === KONFIGURACJA PYDANTIC ===

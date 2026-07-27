@@ -16,7 +16,10 @@ export const PathHandler: ElementHandler<DrawingPath> = {
 
   getBoundingBox(el): BoundingBox {
     if (el.points.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
     for (const p of el.points) {
       if (p.x < minX) minX = p.x;
       if (p.y < minY) minY = p.y;
@@ -29,8 +32,10 @@ export const PathHandler: ElementHandler<DrawingPath> = {
   isPointInElement(point, el) {
     const box = PathHandler.getBoundingBox(el);
     return (
-      point.x >= box.x && point.x <= box.x + box.width &&
-      point.y >= box.y && point.y <= box.y + box.height
+      point.x >= box.x &&
+      point.x <= box.x + box.width &&
+      point.y >= box.y &&
+      point.y <= box.y + box.height
     );
   },
 
@@ -55,7 +60,7 @@ export const PathHandler: ElementHandler<DrawingPath> = {
     const newCenter = rotateAroundPivot({ x: centerX, y: centerY }, pivot, cos, sin);
 
     const rotatedPoints = el.points.map((p: Point) =>
-      rotateAroundPivot(p, { x: centerX, y: centerY }, cos, sin),
+      rotateAroundPivot(p, { x: centerX, y: centerY }, cos, sin)
     );
 
     const offsetX = newCenter.x - centerX;

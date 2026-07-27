@@ -66,7 +66,7 @@ export function useModal({
   }, [isOpen, focusRef]);
 
   // Close on escape
-   useEffect(() => {
+  useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -84,11 +84,7 @@ export function useModal({
     if (!isOpen || !closeOnClickOutside) return;
 
     const handleClickOutside = (e: MouseEvent) => {
-      if (
-        modalRef.current &&
-        !modalRef.current.contains(e.target as Node) &&
-        !preventCloseWhen()
-      ) {
+      if (modalRef.current && !modalRef.current.contains(e.target as Node) && !preventCloseWhen()) {
         onClose();
       }
     };

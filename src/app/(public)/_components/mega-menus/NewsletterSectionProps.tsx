@@ -62,11 +62,7 @@ export default function NewsletterSection({
         </div>
 
         <div className="flex items-start gap-2 mt-3">
-          <input
-            type="checkbox"
-            id="newsletter-privacy"
-            className="mt-0.5 cursor-pointer"
-          />
+          <input type="checkbox" id="newsletter-privacy" className="mt-0.5 cursor-pointer" />
           <label
             htmlFor="newsletter-privacy"
             className={`text-xs cursor-pointer ${isDark ? 'text-[#AEB2BC]' : 'text-gray-600'}`}
@@ -74,7 +70,9 @@ export default function NewsletterSection({
             Akceptuję{' '}
             <a
               href="#"
-              className={isDark ? 'text-[#ffffff] hover:underline' : 'text-blue-600 hover:underline'}
+              className={
+                isDark ? 'text-[#ffffff] hover:underline' : 'text-blue-600 hover:underline'
+              }
             >
               politykę prywatności
             </a>{' '}

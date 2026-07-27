@@ -29,14 +29,18 @@ interface ToolModeButtonsProps {
   onAfterSelect?: () => void;
 }
 
-export function ToolModeButtons({ group, isReadOnly = false, onAfterSelect }: ToolModeButtonsProps) {
+export function ToolModeButtons({
+  group,
+  isReadOnly = false,
+  onAfterSelect,
+}: ToolModeButtonsProps) {
   const activeTool = useToolStore((s) => s.activeTool);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
   const role: UserRole = isReadOnly ? 'viewer' : 'editor';
 
-  const tools = ALL_TOOLS
-    .filter((t) => t.group === group)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const tools = ALL_TOOLS.filter((t) => t.group === group).sort(
+    (a, b) => (a.order ?? 0) - (b.order ?? 0)
+  );
 
   return (
     <>

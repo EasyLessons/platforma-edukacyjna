@@ -37,7 +37,7 @@ function makeCtx(boardId: string | null = '7', unsaved = new Set<string>()) {
 }
 
 const el = (id: string): DrawingElement =>
-  ({ id, type: 'text', x: 0, y: 0, text: '', fontSize: 10, color: '#000' } as DrawingElement);
+  ({ id, type: 'text', x: 0, y: 0, text: '', fontSize: 10, color: '#000' }) as DrawingElement;
 
 describe('CreateElementsCommand', () => {
   it('do → add + broadcast + save; undo → remove + broadcast + delete', () => {
@@ -108,16 +108,10 @@ describe('CompositeCommand', () => {
     ]);
 
     cmd.do(ctx);
-    expect(calls).toEqual([
-      'add:a', 'bcCreated:a', 'save:a',
-      'add:b', 'bcCreated:b', 'save:b',
-    ]);
+    expect(calls).toEqual(['add:a', 'bcCreated:a', 'save:a', 'add:b', 'bcCreated:b', 'save:b']);
 
     calls.length = 0;
     cmd.undo(ctx);
-    expect(calls).toEqual([
-      'remove:b', 'bcDeleted:b', 'del:b',
-      'remove:a', 'bcDeleted:a', 'del:a',
-    ]);
+    expect(calls).toEqual(['remove:b', 'bcDeleted:b', 'del:b', 'remove:a', 'bcDeleted:a', 'del:a']);
   });
 });

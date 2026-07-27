@@ -73,14 +73,11 @@ export const updateBoardMemberRole = (
 
 export const updateBoardSettings = (
   id: number,
-  settings: BoardSettings,
+  settings: BoardSettings
 ): Promise<UpdateSettingsResponse> =>
-  apiClient.put<UpdateSettingsResponse>(
-    `/api/v1/boards/${id}/settings`,
-    { settings },
-  ).then(res => res.data);
+  apiClient
+    .put<UpdateSettingsResponse>(`/api/v1/boards/${id}/settings`, { settings })
+    .then((res) => res.data);
 
 export const joinBoardWorkspace = (id: number): Promise<JoinBoardResponse> =>
-  apiClient
-    .post<JoinBoardResponse>(`/api/v1/boards/${id}/join`)
-    .then(res => res.data);
+  apiClient.post<JoinBoardResponse>(`/api/v1/boards/${id}/join`).then((res) => res.data);

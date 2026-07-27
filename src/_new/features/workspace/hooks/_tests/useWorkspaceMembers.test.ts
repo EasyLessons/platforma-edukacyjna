@@ -59,14 +59,18 @@ describe('useWorkspaceMembers', () => {
   describe('loadMembers', () => {
     it('wczytuje członków i ustawia stan', async () => {
       const { result } = setup(10, false);
-      await act(async () => { await result.current.loadMembers(); });
+      await act(async () => {
+        await result.current.loadMembers();
+      });
       expect(result.current.members).toEqual(mockWorkspaceMembersResponse.members);
       expect(result.current.loading).toBe(false);
     });
 
     it('nie robi nic gdy workspace_id=null', async () => {
       const { result } = setup(null, false);
-      await act(async () => { await result.current.loadMembers(); });
+      await act(async () => {
+        await result.current.loadMembers();
+      });
       expect(fetchWorkspaceMembers).not.toHaveBeenCalled();
       expect(result.current.members).toEqual([]);
     });
@@ -76,7 +80,9 @@ describe('useWorkspaceMembers', () => {
         new AppError('Brak dostępu', ErrorCode.AUTH_ERROR, 403)
       );
       const { result } = setup(10, false);
-      await act(async () => { await result.current.loadMembers(); });
+      await act(async () => {
+        await result.current.loadMembers();
+      });
       expect(result.current.error).toBeTruthy();
     });
   });
@@ -89,14 +95,19 @@ describe('useWorkspaceMembers', () => {
       await waitFor(() => {
         expect(result.current.members).toHaveLength(1);
       });
-      await act(async () => { await result.current.removeMember(1); });
+      await act(async () => {
+        await result.current.removeMember(1);
+      });
       expect(result.current.members).toHaveLength(0);
     });
 
     it('ustawia removingMemberId podczas operacji', async () => {
       let resolveFn!: (val: { message: string }) => void;
       vi.mocked(removeWorkspaceMember).mockImplementation(
-        () => new Promise((resolve) => { resolveFn = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveFn = resolve;
+          })
       );
       const { result } = setup();
       await waitFor(() => {
@@ -104,17 +115,23 @@ describe('useWorkspaceMembers', () => {
       });
 
       let removePromise!: Promise<void>;
-      act(() => { removePromise = result.current.removeMember(1); });
+      act(() => {
+        removePromise = result.current.removeMember(1);
+      });
       expect(result.current.removingMemberId).toBe(1);
 
       act(() => resolveFn({ message: 'ok' }));
-      await act(async () => { await removePromise; });
+      await act(async () => {
+        await removePromise;
+      });
       expect(result.current.removingMemberId).toBeNull();
     });
 
     it('nie robi nic gdy workspace_id=null', async () => {
       const { result } = setup(null, false);
-      await act(async () => { await result.current.removeMember(1); });
+      await act(async () => {
+        await result.current.removeMember(1);
+      });
       expect(removeWorkspaceMember).not.toHaveBeenCalled();
     });
   });
@@ -138,7 +155,9 @@ describe('useWorkspaceMembers', () => {
         expect(result.current.members).toHaveLength(2);
       });
 
-      await act(async () => { await result.current.changeRole(2, 'editor'); });
+      await act(async () => {
+        await result.current.changeRole(2, 'editor');
+      });
       const updated = result.current.members.find((m) => m.user_id === 2);
       expect(updated?.role).toBe('editor');
     });

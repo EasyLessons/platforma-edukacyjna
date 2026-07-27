@@ -6,7 +6,7 @@
  *
  * Board CRUD → board-api.ts
  */
-import { apiClient } from "@/_new/lib/api";
+import { apiClient } from '@/_new/lib/api';
 
 export interface OnlineUser {
   user_id: number;
@@ -34,45 +34,43 @@ export interface SaveElementsResponse {
 export const markUserOnline = (id: number): Promise<void> =>
   apiClient.post(`/api/v1/whiteboard/${id}/online`).then(() => undefined);
 
-export const fetchOnlineUsers = (
-  id: number,
-  limit = 50,
-  offset = 0,
-): Promise<OnlineUser[]> =>
-  apiClient.get<OnlineUser[]>(`/api/v1/whiteboard/${id}/online-users`, {
-    params: { limit, offset },
-  }).then(res => res.data);
-
-export const fetchOnlineUsersBatch = (
-  board_ids: number[]
-): Promise<Record<number, OnlineUser[]>> =>
+export const fetchOnlineUsers = (id: number, limit = 50, offset = 0): Promise<OnlineUser[]> =>
   apiClient
-    .post<{ online_users_by_board: Record<number, OnlineUser[]> }>(
-      '/api/v1/whiteboard/online-users/batch',
-      { board_ids }
-    )
+    .get<OnlineUser[]>(`/api/v1/whiteboard/${id}/online-users`, {
+      params: { limit, offset },
+    })
+    .then((res) => res.data);
+
+export const fetchOnlineUsersBatch = (board_ids: number[]): Promise<Record<number, OnlineUser[]>> =>
+  apiClient
+    .post<{
+      online_users_by_board: Record<number, OnlineUser[]>;
+    }>('/api/v1/whiteboard/online-users/batch', { board_ids })
     .then((res) => res.data.online_users_by_board);
 
 export const saveBoardElementsBatch = (
   id: number,
-  elements: BoardElement[],
+  elements: BoardElement[]
 ): Promise<SaveElementsResponse> =>
-  apiClient.post<SaveElementsResponse>(
-    `/api/v1/whiteboard/${id}/elements/batch`,
-    elements,
-  ).then(res => res.data);
+  apiClient
+    .post<SaveElementsResponse>(`/api/v1/whiteboard/${id}/elements/batch`, elements)
+    .then((res) => res.data);
 
 export const loadBoardElements = (id: number): Promise<BoardElementWithAuthor[]> =>
-  apiClient.get<BoardElementWithAuthor[]>(`/api/v1/whiteboard/${id}/elements`)
-    .then(res => res.data);
+  apiClient
+    .get<BoardElementWithAuthor[]>(`/api/v1/whiteboard/${id}/elements`)
+    .then((res) => res.data);
 
 export const deleteBoardElement = (
   id: number,
-  element_id: string,
+  element_id: string
 ): Promise<{ success: boolean; message: string }> =>
-  apiClient.delete<{ success: boolean; message: string }>(
-    `/api/v1/whiteboard/${id}/elements/${element_id}`,
-  ).then(res => res.data);
+  apiClient
+    .delete<{
+      success: boolean;
+      message: string;
+    }>(`/api/v1/whiteboard/${id}/elements/${element_id}`)
+    .then((res) => res.data);
 
 /**
  * Upload obrazu (po kompresji, patrz elements/image-compress.ts) do Supabase
@@ -92,13 +90,15 @@ export const deleteBoardElement = (
 export const uploadBoardImage = (
   id: number,
   blob: Blob,
-  filename: string,
+  filename: string
 ): Promise<{ url: string }> => {
   const formData = new FormData();
   formData.append('file', blob, filename);
-  return apiClient.post<{ url: string }>(
-    `/api/v1/whiteboard/${id}/upload-image`,
-    formData,
-    { headers: { 'Content-Type': undefined } },
-  ).then(res => res.data);
+  return apiClient
+    .post<{
+      url: string;
+    }>(`/api/v1/whiteboard/${id}/upload-image`, formData, {
+      headers: { 'Content-Type': undefined },
+    })
+    .then((res) => res.data);
 };

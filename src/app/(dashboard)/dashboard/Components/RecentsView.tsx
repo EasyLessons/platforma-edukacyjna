@@ -2,18 +2,34 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { LayoutGrid, Maximize2, PenTool, Layout, Star, MoreVertical, Search, Filter, ChevronDown, Clock } from 'lucide-react';
+import {
+  LayoutGrid,
+  Maximize2,
+  PenTool,
+  Layout,
+  Star,
+  MoreVertical,
+  Search,
+  Filter,
+  ChevronDown,
+  Clock,
+} from 'lucide-react';
 import { useAuth } from '@/_new/lib/auth';
 import { BoardCard } from '@/_new/features/board/components/boardCard';
 import { getRecentBoards, type RecentBoard } from '@/_new/features/board/utils/recentBoards';
-import { getIconComponent, getGradientClass, formatDate, type SortBy } from '@/_new/features/board/utils/helpers';
+import {
+  getIconComponent,
+  getGradientClass,
+  formatDate,
+  type SortBy,
+} from '@/_new/features/board/utils/helpers';
 import { toggleBoardFavourite } from '@/_new/features/board/api/boardApi';
 
 export default function RecentsView() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [recentBoards, setRecentBoards] = useState<RecentBoard[]>([]);
   const [sortBy, setSortBy] = useState<SortBy>('recent');
-  
+
   const { user } = useAuth();
   const currentUsername = user?.username ?? '';
   const router = useRouter();
@@ -30,14 +46,16 @@ export default function RecentsView() {
   const handleToggleFavourite = async (id: number, isFavourite: boolean) => {
     try {
       await toggleBoardFavourite(id, isFavourite);
-      const updatedList = getRecentBoards().map(b => b.id === id ? { ...b, is_favourite: isFavourite } : b);
+      const updatedList = getRecentBoards().map((b) =>
+        b.id === id ? { ...b, is_favourite: isFavourite } : b
+      );
       if (typeof window !== 'undefined') {
         localStorage.setItem('recent_boards', JSON.stringify(updatedList));
       }
       setRecentBoards(updatedList);
     } catch (err) {
       console.error(err);
-      alert("Nie udało się zaktualizować ulubionych.");
+      alert('Nie udało się zaktualizować ulubionych.');
     }
   };
 
@@ -45,15 +63,19 @@ export default function RecentsView() {
     const list = [...recentBoards];
     switch (sortBy) {
       case 'name':
-         list.sort((a, b) => a.name.localeCompare(b.name));
-         break;
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        break;
       case 'favourite':
-         list.sort((a, b) => Number(b.is_favourite) - Number(a.is_favourite));
-         break;
+        list.sort((a, b) => Number(b.is_favourite) - Number(a.is_favourite));
+        break;
       case 'recent':
       default:
-         list.sort((a, b) => new Date(b.last_opened || b.last_modified).getTime() - new Date(a.last_opened || a.last_modified).getTime());
-         break;
+        list.sort(
+          (a, b) =>
+            new Date(b.last_opened || b.last_modified).getTime() -
+            new Date(a.last_opened || a.last_modified).getTime()
+        );
+        break;
     }
     // ensure desc
     if (sortBy === 'recent') {
@@ -72,7 +94,9 @@ export default function RecentsView() {
             <button
               onClick={() => setViewMode('grid')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${
-                viewMode === 'grid' ? 'text-black border-black' : 'text-gray-400 border-transparent hover:text-gray-600'
+                viewMode === 'grid'
+                  ? 'text-black border-black'
+                  : 'text-gray-400 border-transparent hover:text-gray-600'
               }`}
             >
               Miniatury
@@ -80,13 +104,15 @@ export default function RecentsView() {
             <button
               onClick={() => setViewMode('list')}
               className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${
-                viewMode === 'list' ? 'text-black border-black' : 'text-gray-400 border-transparent hover:text-gray-600'
+                viewMode === 'list'
+                  ? 'text-black border-black'
+                  : 'text-gray-400 border-transparent hover:text-gray-600'
               }`}
             >
               Lista
             </button>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <div className="relative">
               <select
@@ -119,9 +145,9 @@ export default function RecentsView() {
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {sortedBoards.map((board) => {
-               const Icon = getIconComponent(board.icon);
-               const gradient = getGradientClass(board.bg_color);
-               return (
+              const Icon = getIconComponent(board.icon);
+              const gradient = getGradientClass(board.bg_color);
+              return (
                 <div
                   key={board.id}
                   onClick={() => handleSelect(board.id)}
@@ -134,11 +160,15 @@ export default function RecentsView() {
                   </div>
                   <div className="p-4 flex flex-col">
                     <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}>
+                      <div
+                        className={`w-8 h-8 rounded bg-gradient-to-br ${gradient} flex items-center justify-center shrink-0`}
+                      >
                         <Icon size={16} className="text-white" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-black truncate text-[15px]">{board.name}</h3>
+                        <h3 className="font-semibold text-black truncate text-[15px]">
+                          {board.name}
+                        </h3>
                         <p className="text-xs text-gray-500 mt-0.5 truncate">
                           {formatDate(board.last_opened || board.last_modified)}
                           {board.workspaceName && ` w: ${board.workspaceName}`}
@@ -147,7 +177,7 @@ export default function RecentsView() {
                     </div>
                   </div>
                 </div>
-               );
+              );
             })}
           </div>
         ) : (
@@ -159,7 +189,7 @@ export default function RecentsView() {
               <div className="col-span-2 text-center"></div>
               <div className="col-span-2" />
             </div>
-            
+
             <div className="flex flex-col gap-0 [&>div:last-child]:border-b-0">
               {sortedBoards.map((board) => (
                 <div key={board.id} className="border-b border-gray-100 group relative">
@@ -172,14 +202,14 @@ export default function RecentsView() {
                     onSelect={handleSelect}
                   />
                   {board.workspaceName && (
-                     <div className="py-2 absolute lg:static top-0 right-0 hidden lg:block text-xs text-gray-400 pl-5 pb-2 -mt-1 truncate max-w-full z-10 pointer-events-none">
-                       Przestrzeń: {board.workspaceName}
-                     </div>
+                    <div className="py-2 absolute lg:static top-0 right-0 hidden lg:block text-xs text-gray-400 pl-5 pb-2 -mt-1 truncate max-w-full z-10 pointer-events-none">
+                      Przestrzeń: {board.workspaceName}
+                    </div>
                   )}
                   {board.workspaceName && (
-                     <div className="py-2 block lg:hidden text-xs text-gray-400 pl-[4.5rem] pr-4 pb-3 -mt-2 truncate z-10 pointer-events-none">
-                       Przestrzeń: {board.workspaceName}
-                     </div>
+                    <div className="py-2 block lg:hidden text-xs text-gray-400 pl-[4.5rem] pr-4 pb-3 -mt-2 truncate z-10 pointer-events-none">
+                      Przestrzeń: {board.workspaceName}
+                    </div>
                   )}
                 </div>
               ))}

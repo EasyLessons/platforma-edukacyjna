@@ -55,8 +55,10 @@ export function SnapGuides({ guides, viewport, canvasWidth, canvasHeight }: Snap
           return (
             <line
               key={`${guide.sourceId}-v-${idx}`}
-              x1={screenX} y1={0}
-              x2={screenX} y2={canvasHeight}
+              x1={screenX}
+              y1={0}
+              x2={screenX}
+              y2={canvasHeight}
               stroke="#3b82f6"
               strokeWidth="1"
               strokeDasharray="8 4"
@@ -75,8 +77,10 @@ export function SnapGuides({ guides, viewport, canvasWidth, canvasHeight }: Snap
           return (
             <line
               key={`${guide.sourceId}-h-${idx}`}
-              x1={0} y1={screenY}
-              x2={canvasWidth} y2={screenY}
+              x1={0}
+              y1={screenY}
+              x2={canvasWidth}
+              y2={screenY}
               stroke="#3b82f6"
               strokeWidth="1"
               strokeDasharray="8 4"

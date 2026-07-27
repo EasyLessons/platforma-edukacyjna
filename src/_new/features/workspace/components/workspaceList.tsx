@@ -156,7 +156,12 @@ export function WorkspaceList({
         const isFirstNormal = !workspace.is_favourite && (index === 0 || prev?.is_favourite);
 
         return (
-          <div key={workspace.id} className="mb-0" onMouseEnter={() => handlePrefetch(workspace.id)} onTouchStart={() => handlePrefetch(workspace.id)}>
+          <div
+            key={workspace.id}
+            className="mb-0"
+            onMouseEnter={() => handlePrefetch(workspace.id)}
+            onTouchStart={() => handlePrefetch(workspace.id)}
+          >
             {!isCollapsed && isFirstNormal && (
               <h3 className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2 mt-4 px-2">
                 Przestrzenie
@@ -183,7 +188,10 @@ export function WorkspaceList({
             className="w-full relative flex items-center gap-1.5 pr-2 pl-[18px] py-2 rounded-md transition-colors duration-100 cursor-pointer group shadow-none bg-transparent hover:bg-gray-100"
           >
             <div className="relative flex items-center  justify-center flex-shrink-0 w-[28px] h-[28px]">
-              <Plus size={30} className="ml-2 text-gray-500 group-hover:text-gray-700 transition-colors stroke-[2.5]" />
+              <Plus
+                size={30}
+                className="ml-2 text-gray-500 group-hover:text-gray-700 transition-colors stroke-[2.5]"
+              />
             </div>
             <div className="ml-1 flex-1 min-w-0 flex items-center gap-1.5 pr-1">
               <span className="text-[16px] font-medium text-gray-500 group-hover:text-gray-900 transition-colors truncate">

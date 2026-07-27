@@ -12,16 +12,16 @@ export default function ContactPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !email || !message) return;
-    
+
     setStatus('loading');
-    
+
     try {
       const response = await fetch('/api/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, message }),
       });
-      
+
       if (response.ok) {
         setStatus('success');
         setName('');
@@ -39,7 +39,7 @@ export default function ContactPage() {
     <div className="min-h-screen bg-[#F6F6F6] text-[#212224] flex flex-col relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-[#212224]/5 rounded-full blur-3xl pointer-events-none"></div>
-      
+
       <main className="mt-40  flex-grow max-w-4xl mx-auto px-6 py-24 pb-40 w-full z-10">
         <div className="flex flex-col items-center justify-center mb-12">
           <Image
@@ -54,7 +54,10 @@ export default function ContactPage() {
             Zacznijmy współpracę!
           </h1>
           <p className="text-lg md:text-xl text-gray-500 text-center max-w-2xl mx-auto leading-relaxed">
-            Masz pytania dotyczące wdrożenia <span className="font-semibold text-[#212224]">EasyLesson</span> w Twojej placówce? Wypełnij poniższy formularz, a nasi asystenci sprzedaży skontaktują się z Tobą najszybciej jak to możliwe.
+            Masz pytania dotyczące wdrożenia{' '}
+            <span className="font-semibold text-[#212224]">EasyLesson</span> w Twojej placówce?
+            Wypełnij poniższy formularz, a nasi asystenci sprzedaży skontaktują się z Tobą
+            najszybciej jak to możliwe.
           </p>
         </div>
 
@@ -62,7 +65,12 @@ export default function ContactPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2 ml-1">Imię i nazwisko</label>
+                <label
+                  htmlFor="name"
+                  className="block text-sm font-semibold text-gray-700 mb-2 ml-1"
+                >
+                  Imię i nazwisko
+                </label>
                 <input
                   type="text"
                   id="name"
@@ -73,9 +81,14 @@ export default function ContactPage() {
                   placeholder="Jan Kowalski"
                 />
               </div>
-              
+
               <div>
-                <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2 ml-1">Adres email</label>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-semibold text-gray-700 mb-2 ml-1"
+                >
+                  Adres email
+                </label>
                 <input
                   type="email"
                   id="email"
@@ -89,7 +102,12 @@ export default function ContactPage() {
             </div>
 
             <div>
-              <label htmlFor="message" className="block text-sm font-semibold text-gray-700 mb-2 ml-1">Wiadomość</label>
+              <label
+                htmlFor="message"
+                className="block text-sm font-semibold text-gray-700 mb-2 ml-1"
+              >
+                Wiadomość
+              </label>
               <textarea
                 id="message"
                 value={message}
@@ -103,14 +121,25 @@ export default function ContactPage() {
 
             {status === 'error' && (
               <div className="text-red-600 text-sm font-medium text-center bg-red-50 p-4 rounded-xl border border-red-100">
-                Wystąpił błąd podczas wysyłania wiadomości. Spróbuj ponownie lub napisz na <strong>kontakt@easylesson.app</strong>
+                Wystąpił błąd podczas wysyłania wiadomości. Spróbuj ponownie lub napisz na{' '}
+                <strong>kontakt@easylesson.app</strong>
               </div>
             )}
 
             {status === 'success' && (
               <div className="text-[#212224] text-sm font-medium text-center bg-gray-50 p-4 rounded-xl border border-gray-200 flex items-center justify-center gap-2">
-                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                <svg
+                  className="w-5 h-5 text-green-500"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M5 13l4 4L19 7"
+                  />
                 </svg>
                 Wiadomość została poprawnie wysłana! Odezwiemy się wkrótce.
               </div>
@@ -124,9 +153,25 @@ export default function ContactPage() {
               >
                 {status === 'loading' ? (
                   <>
-                    <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-5 w-5 text-white"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      ></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      ></path>
                     </svg>
                     Wysyłanie...
                   </>
@@ -135,17 +180,33 @@ export default function ContactPage() {
                 ) : (
                   <>
                     Wyślij wiadomość
-                    <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    <svg
+                      className="w-4 h-4 group-hover:translate-x-1 transition-transform"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2.5"
+                        d="M14 5l7 7m0 0l-7 7m7-7H3"
+                      />
                     </svg>
                   </>
                 )}
               </button>
             </div>
-            
+
             <p className="text-xs text-center text-gray-400 mt-4">
-              Przesyłając zapytanie, zgadzasz się z naszą 
-              <a href="/privacy-policy" className="underline hover:text-[#212224] ml-1 hover:cursor-pointer transition-colors">Polityką Prywatności</a>.
+              Przesyłając zapytanie, zgadzasz się z naszą
+              <a
+                href="/privacy-policy"
+                className="underline hover:text-[#212224] ml-1 hover:cursor-pointer transition-colors"
+              >
+                Polityką Prywatności
+              </a>
+              .
             </p>
           </form>
         </div>

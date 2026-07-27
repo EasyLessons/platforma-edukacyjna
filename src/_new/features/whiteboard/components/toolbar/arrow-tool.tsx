@@ -1,7 +1,12 @@
 ﻿'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { DrawingElement, Point, ViewportTransform, ArrowElement } from '@/_new/features/whiteboard/types';
+import {
+  DrawingElement,
+  Point,
+  ViewportTransform,
+  ArrowElement,
+} from '@/_new/features/whiteboard/types';
 import {
   transformPoint,
   inverseTransformPoint,
@@ -83,7 +88,12 @@ export function ArrowTool({
         { elementId: el.id, side: 'left', x: minX - 8, y: centerY },
         { elementId: el.id, side: 'center', x: centerX, y: centerY }
       );
-    } else if (el.type === 'text' || el.type === 'image' || el.type === 'markdown' || el.type === 'table') {
+    } else if (
+      el.type === 'text' ||
+      el.type === 'image' ||
+      el.type === 'markdown' ||
+      el.type === 'table'
+    ) {
       const width = el.width || 0;
       const height = el.height || 0;
       const centerX = el.x + width / 2;
@@ -93,7 +103,7 @@ export function ArrowTool({
       if ((el.type === 'text' || el.type === 'image') && el.rotation && el.rotation !== 0) {
         const cos = Math.cos(el.rotation);
         const sin = Math.sin(el.rotation);
-        
+
         const rotatePoint = (px: number, py: number) => {
           const dx = px - centerX;
           const dy = py - centerY;
@@ -152,27 +162,30 @@ export function ArrowTool({
   );
 
   // Znajdź najbliższy anchor point
-  const findClosestAnchor = useCallback((worldPoint: Point, anchors: AnchorPoint[]): AnchorPoint | null => {
-    if (anchors.length === 0) return null;
+  const findClosestAnchor = useCallback(
+    (worldPoint: Point, anchors: AnchorPoint[]): AnchorPoint | null => {
+      if (anchors.length === 0) return null;
 
-    let closest = anchors[0];
-    let minDist = Math.sqrt(
-      Math.pow(closest.x - worldPoint.x, 2) + Math.pow(closest.y - worldPoint.y, 2)
-    );
-
-    anchors.forEach((anchor) => {
-      const dist = Math.sqrt(
-        Math.pow(anchor.x - worldPoint.x, 2) + Math.pow(anchor.y - worldPoint.y, 2)
+      let closest = anchors[0];
+      let minDist = Math.sqrt(
+        Math.pow(closest.x - worldPoint.x, 2) + Math.pow(closest.y - worldPoint.y, 2)
       );
-      if (dist < minDist) {
-        minDist = dist;
-        closest = anchor;
-      }
-    });
 
-    // Snap tylko jeśli blisko (20px)
-    return minDist < 20 ? closest : null;
-  }, []);
+      anchors.forEach((anchor) => {
+        const dist = Math.sqrt(
+          Math.pow(anchor.x - worldPoint.x, 2) + Math.pow(anchor.y - worldPoint.y, 2)
+        );
+        if (dist < minDist) {
+          minDist = dist;
+          closest = anchor;
+        }
+      });
+
+      // Snap tylko jeśli blisko (20px)
+      return minDist < 20 ? closest : null;
+    },
+    []
+  );
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (isGestureActive) return;
@@ -221,7 +234,7 @@ export function ArrowTool({
       // Nawet bez rysowania pokazuj nearby anchors
       const nearby = findNearbyAnchors(worldPoint);
       setNearbyAnchors(nearby);
-      
+
       const closestAnchor = findClosestAnchor(worldPoint, nearby);
       setHoveredAnchor(closestAnchor);
     }
@@ -271,7 +284,8 @@ export function ArrowTool({
         canvasHeight
       );
 
-      const isHovered = hoveredAnchor?.elementId === anchor.elementId && hoveredAnchor?.side === anchor.side;
+      const isHovered =
+        hoveredAnchor?.elementId === anchor.elementId && hoveredAnchor?.side === anchor.side;
 
       return (
         <div

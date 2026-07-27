@@ -90,10 +90,13 @@ describe('registerUser', () => {
     });
 
     await expect(
-      registerUser({ username: 'a', email: 'x@x.com', password: 'P1pass', password_confirm: 'P1pass' })
-    ).rejects.toSatisfy(
-      (err: unknown) => err instanceof AppError && err.isConflict()
-    );
+      registerUser({
+        username: 'a',
+        email: 'x@x.com',
+        password: 'P1pass',
+        password_confirm: 'P1pass',
+      })
+    ).rejects.toSatisfy((err: unknown) => err instanceof AppError && err.isConflict());
   });
 });
 

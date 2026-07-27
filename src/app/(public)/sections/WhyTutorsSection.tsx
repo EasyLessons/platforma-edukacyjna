@@ -54,12 +54,15 @@ export default function WhyTutorsSection() {
     <section ref={sectionRef} className="w-full bg-[#0f0f0f] text-white">
       <div className="mx-auto max-w-[1640px] px-6 py-16 sm:px-10 sm:py-20 lg:px-14 lg:py-24">
         <h2 className="mx-auto mt-8 mb-16 max-w-[1020px] text-center text-3xl leading-[1.05] text-white sm:mt-10 sm:mb-20 sm:text-4xl lg:mt-12 lg:mb-24 lg:text-6xl">
-          Prowadź korepetycje bez chaosu. 
+          Prowadź korepetycje bez chaosu.
         </h2>
 
         <div className="grid grid-cols-1 gap-16 md:grid-cols-3 md:gap-8">
           {stats.map((item, index) => (
-            <article key={item.title} className="mx-auto max-w-[340px] text-center md:max-w-[380px] md:text-left">
+            <article
+              key={item.title}
+              className="mx-auto max-w-[340px] text-center md:max-w-[380px] md:text-left"
+            >
               <p
                 className="text-6xl font-medium leading-none text-white sm:text-7xl lg:text-8xl transition-transform duration-500"
                 style={{ transform: isVisible ? 'scale(1)' : 'scale(0.88)' }}

@@ -19,8 +19,18 @@
 
 import { useRef, useState } from 'react';
 import { X as XIcon, Copy, Files, FolderPlus } from 'lucide-react';
-import { DrawingElement, DrawingPath, Shape, MarkdownNote, ImageElement, TableElement } from '@/_new/features/whiteboard/types';
-import { resizeTableCells, calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
+import {
+  DrawingElement,
+  DrawingPath,
+  Shape,
+  MarkdownNote,
+  ImageElement,
+  TableElement,
+} from '@/_new/features/whiteboard/types';
+import {
+  resizeTableCells,
+  calculateTableFontSize,
+} from '@/_new/features/whiteboard/elements/table-helpers';
 
 interface SelectionPropertiesPanelProps {
   elements: DrawingElement[];
@@ -35,10 +45,10 @@ interface SelectionPropertiesPanelProps {
 
 // Szybkie presety skali — reszta przez wpisanie wartości
 const CONTENT_SCALE_PRESETS = [
-  { label: '50%',  value: 0.5 },
-  { label: '100%', value: 1   },
-  { label: '200%', value: 2   },
-  { label: '500%', value: 5   },
+  { label: '50%', value: 0.5 },
+  { label: '100%', value: 1 },
+  { label: '200%', value: 2 },
+  { label: '500%', value: 5 },
 ];
 
 export function SelectionPropertiesPanel({
@@ -75,20 +85,16 @@ export function SelectionPropertiesPanel({
   ) as MarkdownNote[];
 
   // 🆕 Filtruj obrazki
-  const imageElements = selectedElements.filter(
-    (el) => el.type === 'image'
-  ) as ImageElement[];
+  const imageElements = selectedElements.filter((el) => el.type === 'image') as ImageElement[];
 
   // 🆕 Filtruj tabele
-  const tableElements = selectedElements.filter(
-    (el) => el.type === 'table'
-  ) as TableElement[];
+  const tableElements = selectedElements.filter((el) => el.type === 'table') as TableElement[];
 
   // Jeśli nie ma żądnych elementów do edycji - nie pokazuj panelu
   if (
-    editableElements.length === 0 && 
-    markdownElements.length === 0 && 
-    imageElements.length === 0 && 
+    editableElements.length === 0 &&
+    markdownElements.length === 0 &&
+    imageElements.length === 0 &&
     tableElements.length === 0
   ) {
     return null;
@@ -267,12 +273,10 @@ export function SelectionPropertiesPanel({
               onClick={() => console.log('🤖 AI - funkcja w przygotowaniu')}
               className="relative rounded-lg cursor-pointer px-4 py-2 bg-gradient-to-br from-slate-900 via-slate-950 to-black text-white"
               style={{
-                border: '1px solid rgba(139, 92, 246, 0.4)'
+                border: '1px solid rgba(139, 92, 246, 0.4)',
               }}
             >
-              <span className="text-xs font-semibold text-violet-200">
-                Rozwiąż z AI
-              </span>
+              <span className="text-xs font-semibold text-violet-200">Rozwiąż z AI</span>
             </button>
             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
               Rozwiąż zadanie z pomocą AI
@@ -341,7 +345,7 @@ export function SelectionPropertiesPanel({
               onChange={(e) => handleColorChange(e.target.value)}
               className="absolute opacity-0 pointer-events-none"
             />
-           
+
             <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
               {hasMultiple && !allSameColor ? 'Różne kolory' : 'Kolor'}
             </span>
@@ -355,17 +359,15 @@ export function SelectionPropertiesPanel({
                 <button
                   onClick={() => handleFillChange(!currentFill)}
                   className={`w-8 h-8 rounded-md cursor-pointer ${
-                    currentFill
-                      ? 'bg-blue-500/20 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-100'
+                    currentFill ? 'bg-blue-500/20 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
                   <span className="text-lg">{currentFill ? '◼' : '◻'}</span>
                 </button>
-                
+
                 <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-1 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
                   {currentFill ? 'Wypełniony' : 'Kontur'}
-            </span>
+                </span>
               </div>
             </>
           )}
@@ -381,11 +383,10 @@ export function SelectionPropertiesPanel({
               >
                 <XIcon className="w-5 h-5" />
               </button>
-              
+
               <span className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 bg-gray-900 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap pointer-events-none z-50">
-                Usuń zaznaczone (Del)            
+                Usuń zaznaczone (Del)
               </span>
-              
             </div>
           )}
         </>
@@ -469,11 +470,7 @@ export function SelectionPropertiesPanel({
             <input
               type="text"
               inputMode="numeric"
-              value={
-                isEditingScale
-                  ? scaleInput
-                  : String(Math.round(currentContentScale * 100))
-              }
+              value={isEditingScale ? scaleInput : String(Math.round(currentContentScale * 100))}
               onFocus={() => {
                 setScaleInput(String(Math.round(currentContentScale * 100)));
                 setIsEditingScale(true);
@@ -610,8 +607,6 @@ export function SelectionPropertiesPanel({
           <FolderPlus size={16} /> Zapisz szablon
         </button>
       </div>
-
     </div>
   );
 }
-

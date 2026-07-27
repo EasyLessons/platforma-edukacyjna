@@ -1,5 +1,3 @@
-
-
 import { useCallback, useMemo, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/_new/lib/auth';
@@ -12,7 +10,12 @@ import {
   leaveWorkspace as apiLeaveWorkspace,
   toggleWorkspaceFavourite as apiToggleFavourite,
 } from '../api/workspaceApi';
-import type { Workspace, WorkspaceCreateRequest, WorkspaceListResponse, WorkspaceUpdateRequest } from '../types';
+import type {
+  Workspace,
+  WorkspaceCreateRequest,
+  WorkspaceListResponse,
+  WorkspaceUpdateRequest,
+} from '../types';
 
 export const workspaceKeys = {
   all: ['workspaces'] as const,
@@ -62,7 +65,6 @@ export function useWorkspaces() {
   const { isLoggedIn } = useAuth();
   const queryClient = useQueryClient();
 
-
   const {
     data,
     isLoading: loading,
@@ -75,10 +77,10 @@ export function useWorkspaces() {
 
   const workspaces: Workspace[] = data?.workspaces ?? [];
   const error: string | null = queryError
-    ? (queryError instanceof Error ? queryError.message : String(queryError))
+    ? queryError instanceof Error
+      ? queryError.message
+      : String(queryError)
     : null;
-
-
 
   const createMutation = useMutation({
     mutationFn: apiCreateWorkspace,
@@ -92,12 +94,13 @@ export function useWorkspaces() {
     mutationFn: ({ id, data }: { id: number; data: WorkspaceUpdateRequest }) =>
       apiUpdateWorkspace(id, data),
     onSuccess: (updated) => {
-      queryClient.setQueryData<WorkspaceListResponse>(
-        workspaceKeys.list(),
-        (old) =>
-          old
-            ? { ...old, workspaces: old.workspaces.map((ws) => (ws.id === updated.id ? updated : ws)) }
-            : old,
+      queryClient.setQueryData<WorkspaceListResponse>(workspaceKeys.list(), (old) =>
+        old
+          ? {
+              ...old,
+              workspaces: old.workspaces.map((ws) => (ws.id === updated.id ? updated : ws)),
+            }
+          : old
       );
     },
   });
@@ -105,12 +108,8 @@ export function useWorkspaces() {
   const deleteMutation = useMutation({
     mutationFn: apiDeleteWorkspace,
     onSuccess: (_, deletedId) => {
-      queryClient.setQueryData<WorkspaceListResponse>(
-        workspaceKeys.list(),
-        (old) =>
-          old
-            ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== deletedId) }
-            : old,
+      queryClient.setQueryData<WorkspaceListResponse>(workspaceKeys.list(), (old) =>
+        old ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== deletedId) } : old
       );
     },
   });
@@ -118,12 +117,8 @@ export function useWorkspaces() {
   const leaveMutation = useMutation({
     mutationFn: apiLeaveWorkspace,
     onSuccess: (_, leftId) => {
-      queryClient.setQueryData<WorkspaceListResponse>(
-        workspaceKeys.list(),
-        (old) =>
-          old
-            ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== leftId) }
-            : old,
+      queryClient.setQueryData<WorkspaceListResponse>(workspaceKeys.list(), (old) =>
+        old ? { ...old, workspaces: old.workspaces.filter((ws) => ws.id !== leftId) } : old
       );
     },
   });
@@ -132,12 +127,13 @@ export function useWorkspaces() {
     mutationFn: ({ id, is_favourite }: { id: number; is_favourite: boolean }) =>
       apiToggleFavourite(id, is_favourite),
     onSuccess: (_, { id, is_favourite }) => {
-      queryClient.setQueryData<WorkspaceListResponse>(
-        workspaceKeys.list(),
-        (old) =>
-          old
-            ? { ...old, workspaces: old.workspaces.map((ws) => (ws.id === id ? { ...ws, is_favourite } : ws)) }
-            : old,
+      queryClient.setQueryData<WorkspaceListResponse>(workspaceKeys.list(), (old) =>
+        old
+          ? {
+              ...old,
+              workspaces: old.workspaces.map((ws) => (ws.id === id ? { ...ws, is_favourite } : ws)),
+            }
+          : old
       );
     },
   });

@@ -83,7 +83,6 @@ export function useHistory({
   unsavedElementsRef,
   boardIdRef,
 }: UseHistoryOptions): UseHistoryReturn {
-
   // Stos KOMEND bieżącego użytkownika (wzorzec Command).
   const userUndoStackRef = useRef<Command[]>([]);
   const userRedoStackRef = useRef<Command[]>([]);
@@ -93,23 +92,34 @@ export function useHistory({
   // ─── Kontekst komend ─────────────────────────────────────────────────────
   // Opakowuje callbacki hooka w CommandContext — jedyne miejsce styku komend
   // z realnymi efektami (stan React, broadcast, baza).
-  const getContext = useCallback((): CommandContext => ({
-    addElement: onAddElement,
-    removeElement: onRemoveElement,
-    updateElement: onUpdateElement,
-    loadImage: onLoadImage,
-    broadcastCreated: onBroadcastCreated,
-    broadcastDeleted: onBroadcastDeleted,
-    broadcastUpdated: onBroadcastUpdated,
-    saveElement: onSaveElement,
-    deleteElement: onDeleteElement,
-    boardIdRef,
-    unsavedElementsRef,
-  }), [
-    onAddElement, onRemoveElement, onUpdateElement, onLoadImage,
-    onBroadcastCreated, onBroadcastDeleted, onBroadcastUpdated,
-    onSaveElement, onDeleteElement, boardIdRef, unsavedElementsRef,
-  ]);
+  const getContext = useCallback(
+    (): CommandContext => ({
+      addElement: onAddElement,
+      removeElement: onRemoveElement,
+      updateElement: onUpdateElement,
+      loadImage: onLoadImage,
+      broadcastCreated: onBroadcastCreated,
+      broadcastDeleted: onBroadcastDeleted,
+      broadcastUpdated: onBroadcastUpdated,
+      saveElement: onSaveElement,
+      deleteElement: onDeleteElement,
+      boardIdRef,
+      unsavedElementsRef,
+    }),
+    [
+      onAddElement,
+      onRemoveElement,
+      onUpdateElement,
+      onLoadImage,
+      onBroadcastCreated,
+      onBroadcastDeleted,
+      onBroadcastUpdated,
+      onSaveElement,
+      onDeleteElement,
+      boardIdRef,
+      unsavedElementsRef,
+    ]
+  );
 
   // ─── Zarejestruj komendę na stosie undo ──────────────────────────────────
   // Komenda jest TYLKO zapamiętywana (nie woła do()) — pierwsze wykonanie robi

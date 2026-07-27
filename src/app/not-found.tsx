@@ -19,17 +19,18 @@ export default function NotFound() {
             className="h-8 w-auto"
           />
         </Link>
-        
+
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-[#212224] mb-4">
           Strona nie istnieje
         </h1>
-        
+
         <p className="text-base md:text-lg text-gray-500 mb-10 font-normal">
-          Przepraszamy, ale nie mogliśmy znaleźć strony, której szukasz. Została usunięta lub podany adres jest nieprawidłowy.
+          Przepraszamy, ale nie mogliśmy znaleźć strony, której szukasz. Została usunięta lub podany
+          adres jest nieprawidłowy.
         </p>
 
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           className="inline-flex items-center justify-center bg-[#212224] text-white px-8 py-3 rounded-full text-base font-medium transition-all hover:bg-black hover:scale-105 active:scale-95 shadow-sm"
         >
           Wróć na stronę główną

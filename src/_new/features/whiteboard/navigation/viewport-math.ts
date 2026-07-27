@@ -278,9 +278,12 @@ export function isElementInViewport(
  * Wywołuj raz — po zakończeniu rysowania i przy wczytaniu z bazy.
  * W pętli renderowania używaj path.bbox zamiast przeliczać.
  */
-export function computePathBbox(
-  path: DrawingPath
-): { minX: number; minY: number; maxX: number; maxY: number } {
+export function computePathBbox(path: DrawingPath): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
   if (path.points.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
 
   let minX = path.points[0].x;

@@ -247,9 +247,7 @@ export function FunctionTool({
                 : 'border-gray-300 focus:border-blue-500'
             }`}
           />
-          {error && (
-            <p className="text-xs text-red-600 mt-1.5">⚠️ {error}</p>
-          )}
+          {error && <p className="text-xs text-red-600 mt-1.5">⚠️ {error}</p>}
         </div>
 
         {/* Separator */}
@@ -380,7 +378,15 @@ export function FunctionTool({
                 title="Linia przerywana"
               >
                 <svg width="20" height="20" viewBox="0 0 20 20">
-                  <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" strokeWidth="2" strokeDasharray="4 2" />
+                  <line
+                    x1="2"
+                    y1="10"
+                    x2="18"
+                    y2="10"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeDasharray="4 2"
+                  />
                 </svg>
               </button>
             </div>
@@ -733,4 +739,3 @@ export function FunctionTool({
     </div>
   );
 }
-

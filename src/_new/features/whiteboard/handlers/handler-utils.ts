@@ -14,12 +14,7 @@ import type { BoundingBox } from './types';
  * Obraca punkt wokół pivota.
  * cos/sin są prekomputowane przez wywołującego (wydajność).
  */
-export function rotateAroundPivot(
-  point: Point,
-  pivot: Point,
-  cos: number,
-  sin: number,
-): Point {
+export function rotateAroundPivot(point: Point, pivot: Point, cos: number, sin: number): Point {
   const dx = point.x - pivot.x;
   const dy = point.y - pivot.y;
   return {
@@ -37,7 +32,7 @@ export function getRotatedAABB(
   y: number,
   w: number,
   h: number,
-  rotation: number,
+  rotation: number
 ): BoundingBox {
   const centerX = x + w / 2;
   const centerY = y + h / 2;
@@ -51,7 +46,10 @@ export function getRotatedAABB(
     { x, y: y + h },
   ];
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
 
   for (const corner of corners) {
     const dx = corner.x - centerX;
@@ -70,11 +68,6 @@ export function getRotatedAABB(
 /**
  * AABB bez rotacji – prosty przypadek (box types: markdown, table, pdf).
  */
-export function getSimpleAABB(
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-): BoundingBox {
+export function getSimpleAABB(x: number, y: number, width: number, height: number): BoundingBox {
   return { x, y, width, height };
 }

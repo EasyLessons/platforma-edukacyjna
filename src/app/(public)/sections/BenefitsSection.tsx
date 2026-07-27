@@ -62,7 +62,7 @@ const benefits = [
   },
   {
     category: 'ORGANIZACJA PRACY',
-    title: 'Workspace\'y',
+    title: "Workspace'y",
     description: 'Projekty w jednym miejscu',
     duration: '1:55 min',
     image: '/resources/BoardHero.webp',
@@ -76,25 +76,22 @@ const SCROLL_AMOUNT = CARD_WIDTH + GAP;
 export default function BenefitsSection() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  const handlePrev = () => setCurrentIndex(prev => Math.max(prev - 1, 0));
-  const handleNext = () => setCurrentIndex(prev => Math.min(prev + 1, benefits.length - 1));
+  const handlePrev = () => setCurrentIndex((prev) => Math.max(prev - 1, 0));
+  const handleNext = () => setCurrentIndex((prev) => Math.min(prev + 1, benefits.length - 1));
 
   return (
     <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 py-8`}>
-
       <div
         className="relative w-full overflow-hidden"
         style={{ borderRadius: '24px', background: '#f8f8f8', padding: '4vh 0 4vh 0' }}
       >
-
         {/* Nagłówek wycentrowany + strzałki po prawej */}
         <div className="relative flex items-center justify-center mb-8 px-8 sm:px-10">
           <h2
             className="font-bold text-gray-900 text-center leading-tight"
             style={{ fontSize: 'clamp(1.8rem, 3.5vw, 3.2rem)', lineHeight: 1.1 }}
           >
-            Dlaczego warto wybrać{' '}
-            <span style={{ color: '#1e97fd' }}>EasyLesson</span>?
+            Dlaczego warto wybrać <span style={{ color: '#1e97fd' }}>EasyLesson</span>?
           </h2>
 
           <div className="absolute right-8 sm:right-10 flex items-center gap-2">
@@ -112,11 +109,19 @@ export default function BenefitsSection() {
                 opacity: currentIndex === 0 ? 0.3 : 1,
                 transition: 'border-color 0.15s, opacity 0.15s',
               }}
-              onMouseEnter={e => { if (currentIndex > 0) e.currentTarget.style.borderColor = '#aaa'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e0e0'; }}
+              onMouseEnter={(e) => {
+                if (currentIndex > 0) e.currentTarget.style.borderColor = '#aaa';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e0e0e0';
+              }}
             >
               <svg width="16" height="16" viewBox="0 0 20 20" fill="#555">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
             <button
@@ -133,11 +138,19 @@ export default function BenefitsSection() {
                 opacity: currentIndex >= benefits.length - 1 ? 0.3 : 1,
                 transition: 'border-color 0.15s, opacity 0.15s',
               }}
-              onMouseEnter={e => { if (currentIndex < benefits.length - 1) e.currentTarget.style.borderColor = '#aaa'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = '#e0e0e0'; }}
+              onMouseEnter={(e) => {
+                if (currentIndex < benefits.length - 1) e.currentTarget.style.borderColor = '#aaa';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e0e0e0';
+              }}
             >
               <svg width="16" height="16" viewBox="0 0 20 20" fill="#555">
-                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                <path
+                  fillRule="evenodd"
+                  d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z"
+                  clipRule="evenodd"
+                />
               </svg>
             </button>
           </div>
@@ -166,18 +179,14 @@ export default function BenefitsSection() {
                 }}
               >
                 {/* Zdjęcie */}
-                <Image
-                  src={benefit.image}
-                  alt={benefit.title}
-                  fill
-                  className="object-cover"
-                />
+                <Image src={benefit.image} alt={benefit.title} fill className="object-cover" />
 
                 {/* Gradient overlay - tylko od dołu */}
                 <div
                   className="absolute inset-0"
                   style={{
-                    background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.20) 50%, transparent 75%)',
+                    background:
+                      'linear-gradient(to top, rgba(0,0,0,0.88) 0%, rgba(0,0,0,0.20) 50%, transparent 75%)',
                   }}
                 />
 
@@ -185,7 +194,11 @@ export default function BenefitsSection() {
                 <div className="absolute bottom-0 left-0 right-0 p-5 z-10">
                   <p
                     className="font-bold uppercase mb-2"
-                    style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.55)', letterSpacing: '0.12em' }}
+                    style={{
+                      fontSize: '0.62rem',
+                      color: 'rgba(255,255,255,0.55)',
+                      letterSpacing: '0.12em',
+                    }}
                   >
                     {benefit.category}
                   </p>
@@ -204,10 +217,19 @@ export default function BenefitsSection() {
                       textDecoration: 'none',
                       transition: 'color 0.15s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.75)'}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#fff')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'rgba(255,255,255,0.75)')}
                   >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <circle cx="12" cy="12" r="10" />
                       <polygon points="10 8 16 12 10 16 10 8" fill="currentColor" />
                     </svg>
@@ -218,7 +240,6 @@ export default function BenefitsSection() {
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );

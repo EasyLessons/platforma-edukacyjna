@@ -19,7 +19,8 @@ const playfair = Playfair_Display({
 
 export const metadata = {
   title: 'EasyLesson - Korepetycje online z AI',
-  description: 'Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online',
+  description:
+    'Platforma do korepetycji z inteligentną tablicą, AI i wszystkim czego potrzebujesz do nauki online',
   verification: {
     google: 'VuL3zWFM6w8FMOI-gIv-jY28fSecnsh4jeVB6QkOd3Y',
   },
@@ -36,9 +37,9 @@ export default function RootLayout({
         className={`${plusJakarta.className} ${plusJakarta.variable} ${playfair.variable} antialiased`}
       >
         <div id="google_translate_element" style={{ display: 'none' }}></div>
-        <Script 
-          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" 
-          strategy="afterInteractive" 
+        <Script
+          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+          strategy="afterInteractive"
         />
         <Script id="google-translate-init" strategy="afterInteractive">
           {`
@@ -50,11 +51,9 @@ export default function RootLayout({
             }
           `}
         </Script>
-        
+
         <QueryProvider>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <AuthProvider>{children}</AuthProvider>
         </QueryProvider>
       </body>
     </html>

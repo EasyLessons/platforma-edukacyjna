@@ -13,6 +13,7 @@ UI (LoginForm, src/_new/features/auth/components/loginForm.tsx)
   → AuthContext.login() (src/app/context/AuthContext.tsx) zapisuje access token in-memory
   → redirect na /dashboard
 ```
+
 Pełny opis stanów i rotacji tokenów: `docs/architecture/auth.md`.
 
 ## 2. Synchronizacja tablicy (realtime, client-to-client)
@@ -28,6 +29,7 @@ User A rysuje na Canvas
   → osobno: zmiana persystowana do Postgresa przez backend/api/v1/whiteboard
     (żeby przetrwała reload/nowego usera dołączającego później)
 ```
+
 Presence (kto jest online na tablicy, kursory innych userów) — ten sam kanał Supabase, mechanizm Presence zamiast Broadcast.
 
 **Do zapamiętania:** to jest jeden z trzech dużych legacy plików (`BoardRealtimeContext`, 1245 linii) — patrz `docs/migration-status.md`.
@@ -49,6 +51,7 @@ User A zaprasza User B do workspace'u
   → User B klika → GET /invite/{token} (src/app/(dashboard)/invite/[token]/page.tsx)
     → akceptacja: POST akceptujący, tworzy WorkspaceMember, oznacza invite jako used
 ```
+
 Kanały są per-user (`notifications:{user_id}`) — jeden user nie widzi eventów innego.
 
 ## 4. AI Assistant (chat)
@@ -61,6 +64,7 @@ UI chatu (whiteboard) → POST /api/chat (src/app/api/chat/route.ts, Next.js Rou
     fallback na gemini-2.5-flash-lite przy przekroczeniu limitu
   → zapis do cache, zwrot odpowiedzi do UI
 ```
+
 **Ograniczenie architektoniczne do znajomości:** rate limiting i cache trzymane są w zwykłym `Map` w pamięci procesu Next.js. Działa poprawnie tylko dopóki appka działa na jednej, długo żyjącej instancji serwera. Jeśli kiedyś przejdziecie na wdrożenie serverless/edge (wiele instancji, cold starty) albo horizontal scaling — ten mechanizm przestanie działać poprawnie (każda instancja ma swoją osobną mapę) i trzeba będzie przenieść na współdzielony store (np. Redis). Nie problem dziś, ale ważne żeby wiedzieć zanim ktoś zmieni sposób hostingu.
 
 ## 5. Voice chat (WebRTC)

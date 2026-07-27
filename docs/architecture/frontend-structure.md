@@ -7,6 +7,7 @@ Stan obecny (nie historia zmian — historia scalona tu i usunięta jako osobne 
 `src/app` odpowiada wyłącznie za routing Next.js (które URL-e istnieją, jaki layout mają) i **składa** strony z komponentów zaimportowanych z `src/_new`. Cała logika biznesowa, hooki, komunikacja z API i większość komponentów UI żyje w `src/_new/features/*` (patrz `docs/architecture/stack.md`, sekcja "Struktura feature-based").
 
 Wyjątki, czyli kod, który wciąż żyje w `src/app` zamiast w `src/_new` (do przeniesienia, patrz `docs/migration-status.md`):
+
 - `src/app/context/AuthContext.tsx` — globalny stan sesji (`useAuth()`), 100 linii, już korzysta z `_new/lib/auth` i `_new/features/auth/api` pod spodem, ale sam Provider nie jest w `_new`.
 - `src/app/context/BoardRealtimeContext.tsx` — synchronizacja tablicy przez Supabase Realtime, **1245 linii**, wciąż w starym stylu (jeden duży plik).
 - `src/app/context/VoiceChatContext.tsx` — WebRTC voice chat, **1484 linie**, jak wyżej.

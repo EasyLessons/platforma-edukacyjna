@@ -3,10 +3,7 @@ import axios, { AxiosError, AxiosResponse } from 'axios';
 import { mapAxiosError } from './errorHandler';
 import { AppError, ErrorCode } from './AppError';
 
-function makeAxiosError(
-  status: number,
-  data?: Record<string, unknown>
-): AxiosError {
+function makeAxiosError(status: number, data?: Record<string, unknown>): AxiosError {
   const error = new AxiosError('Request failed');
   error.response = {
     status,
@@ -95,10 +92,12 @@ describe('mapAxiosError', () => {
   });
 
   it('data.error ma wyższy priorytet niż data.detail', () => {
-    const result = mapAxiosError(makeAxiosError(400, {
-      error: 'Główny komunikat',
-      detail: 'Zapasowy komunikat',
-    }));
+    const result = mapAxiosError(
+      makeAxiosError(400, {
+        error: 'Główny komunikat',
+        detail: 'Zapasowy komunikat',
+      })
+    );
     expect(result.message).toBe('Główny komunikat');
   });
 });

@@ -117,10 +117,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
 
   return createPortal(
     <div className="dashboard-modal-overlay">
-      <div
-        ref={modalRef}
-        className="dashboard-modal-surface max-w-2xl"
-      >
+      <div ref={modalRef} className="dashboard-modal-surface max-w-2xl">
         {/* Header */}
         <div className="dashboard-modal-header">
           <div className="flex items-center gap-3">
@@ -133,7 +130,12 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             </div>
           </div>
 
-          <DashboardButton variant="secondary" onClick={handleClose} aria-label="Zamknij" className="h-9 w-9 rounded-full p-0">
+          <DashboardButton
+            variant="secondary"
+            onClick={handleClose}
+            aria-label="Zamknij"
+            className="h-9 w-9 rounded-full p-0"
+          >
             <X size={20} />
           </DashboardButton>
         </div>
@@ -257,7 +259,11 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             </span>
           </div>
 
-          <DashboardButton variant="secondary" onClick={handleClose} className="w-full max-w-[160px]">
+          <DashboardButton
+            variant="secondary"
+            onClick={handleClose}
+            className="w-full max-w-[160px]"
+          >
             Zamknij
           </DashboardButton>
         </div>

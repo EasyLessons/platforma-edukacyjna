@@ -66,7 +66,7 @@ export function useNotifications() {
     const channel = supabase
       .channel(`notifications:${user.id}`)
       .on('broadcast', { event: 'new_invite' }, ({ payload }) => {
-        const p = payload as InvitePayload  & { notification_id: number };
+        const p = payload as InvitePayload & { notification_id: number };
 
         if (seenIds.current.has(p.notification_id)) return;
         seenIds.current.add(p.notification_id);
@@ -98,16 +98,12 @@ export function useNotifications() {
 
   const markAsRead = useCallback(async (id: number) => {
     // Optimistic update
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)));
     try {
       await markNotificationAsRead(id);
     } catch (err) {
       // Cofnij optimistic update przy błędzie
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: false } : n))
-      );
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: false } : n)));
       await handleError(err);
     }
   }, []);
@@ -123,25 +119,31 @@ export function useNotifications() {
     }
   }, [loadInitialNotifications]);
 
-  const handleAcceptInvite = useCallback(async (notification: InviteNotification) => {
-    await acceptInvite(notification.payload.invite_token);
-    try {
-      await deleteNotification(notification.id);
-    } catch {
-      // Best-effort
-    }
-    dismiss(notification.id);
-  }, [dismiss]);
+  const handleAcceptInvite = useCallback(
+    async (notification: InviteNotification) => {
+      await acceptInvite(notification.payload.invite_token);
+      try {
+        await deleteNotification(notification.id);
+      } catch {
+        // Best-effort
+      }
+      dismiss(notification.id);
+    },
+    [dismiss]
+  );
 
-  const handleRejectInvite = useCallback(async (notification: InviteNotification) => {
-    await rejectInvite(notification.payload.invite_token);
-    try {
-      await deleteNotification(notification.id);
-    } catch {
-      // Best-effort
-    }
-    dismiss(notification.id);
-  }, [dismiss]);
+  const handleRejectInvite = useCallback(
+    async (notification: InviteNotification) => {
+      await rejectInvite(notification.payload.invite_token);
+      try {
+        await deleteNotification(notification.id);
+      } catch {
+        // Best-effort
+      }
+      dismiss(notification.id);
+    },
+    [dismiss]
+  );
 
   // RETURN
   return {

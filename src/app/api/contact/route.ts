@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Nieprawidłowy adres email' }, { status: 400 });
     }
 
-    const apiKey = process.env.RESEND_API_KEY || 're_9bnc7xKz_DNoHSowYYzvgf1Ye9PeLZXee';
+    const apiKey = process.env.RESEND_API_KEY;
 
     // Wysyłka z użyciem endpointu Resend przez zapytanie fetch
     const response = await fetch('https://api.resend.com/emails', {
@@ -44,7 +44,10 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Błąd z Resend API:', errorData);
-      return NextResponse.json({ error: 'Błąd podczas wysyłania emaila do Resend' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Błąd podczas wysyłania emaila do Resend' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

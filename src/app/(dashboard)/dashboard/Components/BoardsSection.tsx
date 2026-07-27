@@ -45,15 +45,8 @@ export default function BoardsSection({
 
   // STATE
   // ================================
-  const {
-    boards,
-    loading,
-    error,
-    createBoard,
-    updateBoard,
-    deleteBoard,
-    toggleFavourite,
-  } = useBoards({ workspace_id });
+  const { boards, loading, error, createBoard, updateBoard, deleteBoard, toggleFavourite } =
+    useBoards({ workspace_id });
 
   const [sortBy, setSortBy] = useState<SortBy>('recent');
   const [filterOwner, setFilterOwner] = useState<FilterOwner>('all');
@@ -74,7 +67,7 @@ export default function BoardsSection({
   // HANDLERS
   // ================================
   const handleSelect = (boardId: number, boardWorkspaceId?: number) => {
-    const boardToSave = boards.find(b => b.id === boardId);
+    const boardToSave = boards.find((b) => b.id === boardId);
     if (boardToSave) {
       import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) => {
         addRecentBoard({ ...boardToSave, workspaceName: workspace_name });

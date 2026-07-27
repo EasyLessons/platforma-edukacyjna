@@ -2,11 +2,9 @@
 Members router — /api/v1/workspaces/{id}/members/*
 """
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
-from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (

@@ -18,7 +18,6 @@ export default function EasyLessonInfoSection() {
 
   return (
     <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 py-8`}>
-
       <div
         className="relative w-full overflow-hidden"
         style={{
@@ -27,7 +26,6 @@ export default function EasyLessonInfoSection() {
           padding: '5vh clamp(2rem, 5vw, 5rem)',
         }}
       >
-
         {/* Siatka */}
         <div
           className="absolute inset-0 pointer-events-none"
@@ -42,13 +40,13 @@ export default function EasyLessonInfoSection() {
         <div
           className="absolute inset-0 pointer-events-none"
           style={{
-            background: 'radial-gradient(ellipse at 50% 100%, rgba(17,17,18,0.0) 0%, rgba(17,17,18,0.85) 65%)',
+            background:
+              'radial-gradient(ellipse at 50% 100%, rgba(17,17,18,0.0) 0%, rgba(17,17,18,0.85) 65%)',
           }}
         />
 
         {/* Centralny kontener */}
         <div className="relative flex flex-col items-center text-center">
-
           {/* Badge */}
           <div className="flex items-center gap-2 mb-5">
             <div
@@ -77,9 +75,7 @@ export default function EasyLessonInfoSection() {
             }}
           >
             Zmień standardowe zajęcia
-            <br />
-            w lekcje pełne{' '}
-            <span style={{ color: '#2bcc82' }}>konkretów.</span>
+            <br />w lekcje pełne <span style={{ color: '#2bcc82' }}>konkretów.</span>
           </h2>
 
           {/* H3 */}
@@ -91,8 +87,7 @@ export default function EasyLessonInfoSection() {
               maxWidth: '520px',
             }}
           >
-            Platforma, która pomaga uczyć efektywniej i ułatwia pracę.
-            Zaoszczędź czas i przejdź na{' '}
+            Platforma, która pomaga uczyć efektywniej i ułatwia pracę. Zaoszczędź czas i przejdź na{' '}
             <span style={{ color: 'rgba(255,255,255,0.9)', fontWeight: 600 }}>EasyLesson</span>.
           </p>
 
@@ -178,11 +173,11 @@ export default function EasyLessonInfoSection() {
                 boxShadow: '0 2px 16px rgba(75,255,171,0.30)',
                 transition: 'transform 0.13s ease, background 0.13s ease',
               }}
-              onMouseEnter={e => {
+              onMouseEnter={(e) => {
                 e.currentTarget.style.transform = 'scale(1.03)';
                 e.currentTarget.style.background = 'rgb(6,250,144)';
               }}
-              onMouseLeave={e => {
+              onMouseLeave={(e) => {
                 e.currentTarget.style.transform = 'scale(1)';
                 e.currentTarget.style.background = '#4bffab';
               }}
@@ -190,7 +185,6 @@ export default function EasyLessonInfoSection() {
               Zaloguj się
             </button>
           </Link>
-
         </div>
       </div>
     </div>

@@ -13,10 +13,7 @@ import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { getColorClass, getIconComponent } from '@/_new/features/workspace/utils/helpers';
 import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/useWorkspaceMember';
 import { ROLE_COLORS, ROLE_LABELS } from '@/_new/features/workspace/utils/constants';
-import type {
-  Workspace,
-  WorkspaceUpdateRequest,
-} from '@/_new/features/workspace/types';
+import type { Workspace, WorkspaceUpdateRequest } from '@/_new/features/workspace/types';
 
 interface WorkspaceTopNavProps {
   activeWorkspaceId: number | null;
@@ -54,7 +51,9 @@ export default function WorkspaceTopNav({
   const [leavingWorkspace, setLeavingWorkspace] = useState<Workspace | null>(null);
 
   const WorkspaceIcon = activeWorkspace ? getIconComponent(activeWorkspace.icon) : null;
-  const workspaceColorClass = activeWorkspace ? getColorClass(activeWorkspace.bg_color) : 'bg-gray-500';
+  const workspaceColorClass = activeWorkspace
+    ? getColorClass(activeWorkspace.bg_color)
+    : 'bg-gray-500';
 
   const handleDeleteConfirm = async () => {
     if (!deletingWorkspace) return;
@@ -85,139 +84,133 @@ export default function WorkspaceTopNav({
       <div className="w-full shrink-0 bg-white">
         {/* Biały pasek Navu */}
         <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 sm:px-8 border-b border-gray-100">
-          
           <div className="min-w-0 flex items-center gap-3">
-          {activeWorkspace && WorkspaceIcon && (
-            <div
-              className={`flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm ${workspaceColorClass}`}
-            >
-              <WorkspaceIcon size={16} className="text-white" />
+            {activeWorkspace && WorkspaceIcon && (
+              <div
+                className={`flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm ${workspaceColorClass}`}
+              >
+                <WorkspaceIcon size={16} className="text-white" />
+              </div>
+            )}
+
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold leading-tight text-gray-800">
+                {activeWorkspace?.name || 'Wybierz przestrzeń'}
+              </p>
             </div>
-          )}
-
-          <div className="min-w-0">
-            <p className="truncate text-sm font-bold leading-tight text-gray-800">
-              {activeWorkspace?.name || 'Wybierz przestrzeń'}
-            </p>
           </div>
-        </div>
 
-        {activeWorkspace ? (
-          <div className="flex items-center gap-2">
-            <div className="hidden items-center pr-1 sm:flex">
-              {membersLoading ? (
-                <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400">
-                  <Loader2 size={14} className="animate-spin" />
-                </div>
-              ) : (
-                members.slice(0, 5).map((member, index) => {
-                  const displayName = member.full_name || member.username;
-                  const initials = getInitials(displayName);
+          {activeWorkspace ? (
+            <div className="flex items-center gap-2">
+              <div className="hidden items-center pr-1 sm:flex">
+                {membersLoading ? (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-400">
+                    <Loader2 size={14} className="animate-spin" />
+                  </div>
+                ) : (
+                  members.slice(0, 5).map((member, index) => {
+                    const displayName = member.full_name || member.username;
+                    const initials = getInitials(displayName);
 
-                  return (
-                    <div
-                      key={member.user_id}
-                      className={`group relative ${index === 0 ? '' : '-ml-2'} transition-transform hover:z-20 hover:scale-105`}
-                    >
-                      {(member as any).avatar_url ? (
-                        <img 
-                          src={(member as any).avatar_url}
-                          alt={displayName}
-                          className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white object-cover shadow-sm"
-                        />
-                      ) : (
-                        <div
-                          className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm ${getAvatarColorClass(member.user_id)}`}
-                        >
-                          {initials}
-                        </div>
-                      )}
+                    return (
+                      <div
+                        key={member.user_id}
+                        className={`group relative ${index === 0 ? '' : '-ml-2'} transition-transform hover:z-20 hover:scale-105`}
+                      >
+                        {(member as any).avatar_url ? (
+                          <img
+                            src={(member as any).avatar_url}
+                            alt={displayName}
+                            className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-white object-cover shadow-sm"
+                          />
+                        ) : (
+                          <div
+                            className={`flex h-8 w-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white shadow-sm ${getAvatarColorClass(member.user_id)}`}
+                          >
+                            {initials}
+                          </div>
+                        )}
 
-                      <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl group-hover:block">
-                        <div className="flex min-w-[210px] items-center gap-3">
-                          {(member as any).avatar_url ? (
-                            <img 
-                              src={(member as any).avatar_url}
-                              alt={displayName}
-                              className="flex h-10 w-10 items-center justify-center rounded-full object-cover shadow-sm"
-                            />
-                          ) : (
-                            <div
-                              className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getAvatarColorClass(member.user_id)}`}
-                            >
-                              {initials}
+                        <div className="pointer-events-none absolute left-1/2 top-full z-30 mt-2 hidden -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 shadow-xl group-hover:block">
+                          <div className="flex min-w-[210px] items-center gap-3">
+                            {(member as any).avatar_url ? (
+                              <img
+                                src={(member as any).avatar_url}
+                                alt={displayName}
+                                className="flex h-10 w-10 items-center justify-center rounded-full object-cover shadow-sm"
+                              />
+                            ) : (
+                              <div
+                                className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold text-white ${getAvatarColorClass(member.user_id)}`}
+                              >
+                                {initials}
+                              </div>
+                            )}
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold text-gray-900">
+                                {displayName}
+                              </p>
+                              <p className="truncate text-xs text-gray-500">{member.email}</p>
+                              <span
+                                className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${ROLE_COLORS[member.role] || 'bg-gray-100 text-gray-800'}`}
+                              >
+                                {ROLE_LABELS[member.role] || member.role}
+                              </span>
                             </div>
-                          )}
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-gray-900">
-                              {displayName}
-                            </p>
-                            <p className="truncate text-xs text-gray-500">{member.email}</p>
-                            <span
-                              className={`mt-1 inline-flex rounded-md px-2 py-0.5 text-[11px] font-medium ${ROLE_COLORS[member.role] || 'bg-gray-100 text-gray-800'}`}
-                            >
-                              {ROLE_LABELS[member.role] || member.role}
-                            </span>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    );
+                  })
+                )}
+              </div>
 
-            <button
-              onClick={() => setInvitingWorkspace(activeWorkspace)}
-              className="hover-shine cursor-pointer hidden sm:flex items-center gap-2 h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-200 text-[13px] font-semibold text-gray-700 transition"
-            >
-              <UserPlus size={14} className="text-gray-600" />
-              <span>Zaproś uczestników</span>
-            </button>
-
-            {activeWorkspace.is_owner && (
               <button
-                onClick={() => setEditingWorkspace(activeWorkspace)}
-                title="Zmień nazwę przestrzeni"
-                className="cursor-pointer hidden sm:flex items-center justify-center h-8 w-8 text-gray-500 hover:text-gray-800 transition"
+                onClick={() => setInvitingWorkspace(activeWorkspace)}
+                className="hover-shine cursor-pointer hidden sm:flex items-center gap-2 h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-200 text-[13px] font-semibold text-gray-700 transition"
               >
-                <Pencil size={16} />
+                <UserPlus size={14} className="text-gray-600" />
+                <span>Zaproś uczestników</span>
               </button>
-            )}
 
-            <button
-              onClick={() => toggleFavourite(activeWorkspace.id, !activeWorkspace.is_favourite)}
-              title={
-                activeWorkspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'
-              }
-              className={`cursor-pointer flex items-center justify-center h-8 w-8 transition ${
-                activeWorkspace.is_favourite
-                  ? 'text-yellow-500 hover:text-yellow-600'
-                  : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              <Star
-                size={16}
-                className={activeWorkspace.is_favourite ? 'fill-yellow-500' : ''}
-              />
-            </button>
+              {activeWorkspace.is_owner && (
+                <button
+                  onClick={() => setEditingWorkspace(activeWorkspace)}
+                  title="Zmień nazwę przestrzeni"
+                  className="cursor-pointer hidden sm:flex items-center justify-center h-8 w-8 text-gray-500 hover:text-gray-800 transition"
+                >
+                  <Pencil size={16} />
+                </button>
+              )}
 
-            <div className="cursor-pointer flex items-center justify-center h-8 w-8">
-              <WorkspaceDropdownMenu
-                workspace={activeWorkspace}
-                onInvite={() => setInvitingWorkspace(activeWorkspace)}
-                onEdit={() => setEditingWorkspace(activeWorkspace)}
-                onMembers={() => setMembersWorkspace(activeWorkspace)}
-                onDelete={() => setDeletingWorkspace(activeWorkspace)}
-                onLeave={() => setLeavingWorkspace(activeWorkspace)}
-                triggerClassName="h-8 w-8 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
-              />
+              <button
+                onClick={() => toggleFavourite(activeWorkspace.id, !activeWorkspace.is_favourite)}
+                title={activeWorkspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+                className={`cursor-pointer flex items-center justify-center h-8 w-8 transition ${
+                  activeWorkspace.is_favourite
+                    ? 'text-yellow-500 hover:text-yellow-600'
+                    : 'text-gray-500 hover:text-gray-800'
+                }`}
+              >
+                <Star size={16} className={activeWorkspace.is_favourite ? 'fill-yellow-500' : ''} />
+              </button>
+
+              <div className="cursor-pointer flex items-center justify-center h-8 w-8">
+                <WorkspaceDropdownMenu
+                  workspace={activeWorkspace}
+                  onInvite={() => setInvitingWorkspace(activeWorkspace)}
+                  onEdit={() => setEditingWorkspace(activeWorkspace)}
+                  onMembers={() => setMembersWorkspace(activeWorkspace)}
+                  onDelete={() => setDeletingWorkspace(activeWorkspace)}
+                  onLeave={() => setLeavingWorkspace(activeWorkspace)}
+                  triggerClassName="h-8 w-8 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
+                />
+              </div>
             </div>
-          </div>
-        ) : (
-          <span className="text-xs text-gray-500">Wybierz workspace z menu po lewej</span>
-        )}
-      </div>
+          ) : (
+            <span className="text-xs text-gray-500">Wybierz workspace z menu po lewej</span>
+          )}
+        </div>
       </div>
 
       {invitingWorkspace && (
@@ -230,7 +223,6 @@ export default function WorkspaceTopNav({
 
       {editingWorkspace && (
         <WorkspaceEditModal
-          
           isOpen={!!editingWorkspace}
           onClose={() => setEditingWorkspace(null)}
           workspace={editingWorkspace}

@@ -30,11 +30,14 @@ import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/white
 import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../../context/VoiceChatContext';
 import { joinBoardWorkspace, fetchBoardById } from '@/_new/features/board/api/boardApi';
-import { getMyRole } from '@/_new/features/workspace/api/memberApi';  
+import { getMyRole } from '@/_new/features/workspace/api/memberApi';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
-import { useWhiteboardSidebar, SIDEBAR_WIDTH } from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
+import {
+  useWhiteboardSidebar,
+  SIDEBAR_WIDTH,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
 import type { BoardSettings } from '@/_new/features/board/types';
 
 // Helper do odczytania user_id z JWT (payload.sub)
@@ -128,7 +131,9 @@ export function TablicaContent() {
           if (board.settings) {
             setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...board.settings });
           }
-          import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) => addRecentBoard(board));
+          import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) =>
+            addRecentBoard(board)
+          );
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {
@@ -302,11 +307,7 @@ export function TablicaContent() {
           workspaceId={workspaceId}
           activeBoardId={boardId}
           isOpen={sidebar.isOpen}
-          onSettingsClick={
-            boardId !== 'demo-board'
-              ? () => setShowBoardSettings(true)
-              : undefined
-          }
+          onSettingsClick={boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
           onClose={sidebar.close}
           onHoverLeave={sidebar.closeFromHoverLeave}
         />
@@ -346,9 +347,7 @@ export function TablicaContent() {
             isSidebarOpen={sidebar.isOpen}
             onSidebarToggle={sidebar.toggle}
             onSettingsClick={
-              boardId !== 'demo-board'
-                ? () => setShowBoardSettings(true)
-                : undefined
+              boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined
             }
           />
         )}

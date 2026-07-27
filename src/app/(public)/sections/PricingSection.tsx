@@ -88,7 +88,13 @@ function CheckIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
       <circle cx="9" cy="9" r="9" fill="#2bcc82" />
-      <path d="M5 9.5l2.5 2.5 5.5-5.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M5 9.5l2.5 2.5 5.5-5.5"
+        stroke="#fff"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -98,7 +104,10 @@ export default function PricingSection() {
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
 
   return (
-    <section className={`${jakartaSans.className} w-full bg-[#0f0f0f] py-14 sm:py-16 lg:py-20`} id="pakiet-premium">
+    <section
+      className={`${jakartaSans.className} w-full bg-[#0f0f0f] py-14 sm:py-16 lg:py-20`}
+      id="pakiet-premium"
+    >
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
         <div className="mx-auto w-full max-w-[1920px]">
           <div className="text-center">
@@ -117,7 +126,10 @@ export default function PricingSection() {
             </p>
 
             <div className="mx-auto mt-7 flex items-center justify-center gap-3">
-              <span className="text-sm font-semibold" style={{ color: yearly ? 'rgba(255,255,255,0.55)' : '#FFFFFF' }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: yearly ? 'rgba(255,255,255,0.55)' : '#FFFFFF' }}
+              >
                 Miesięcznie
               </span>
               <button
@@ -132,7 +144,10 @@ export default function PricingSection() {
                   style={{ left: yearly ? '33px' : '4px' }}
                 />
               </button>
-              <span className="text-sm font-semibold" style={{ color: yearly ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: yearly ? '#FFFFFF' : 'rgba(255,255,255,0.55)' }}
+              >
                 Rocznie
               </span>
             </div>
@@ -141,8 +156,8 @@ export default function PricingSection() {
           <div className="mt-12 flex flex-wrap justify-center gap-4">
             <PricingCard
               plan="Starter"
-              monthlyPrice={0.00}
-              yearlyPrice={0.00}
+              monthlyPrice={0.0}
+              yearlyPrice={0.0}
               yearly={yearly}
               subtitle="Idealny start dla indywidualnych korepetytorów"
               ctaLabel="Zacznij za darmo"
@@ -191,7 +206,9 @@ export default function PricingSection() {
               <table className="w-full min-w-[980px]">
                 <thead>
                   <tr className="border-b border-white/10 align-top">
-                    <th className="w-[180px] px-5 py-6 text-left text-sm font-semibold text-white/70">Porownanie planow</th>
+                    <th className="w-[180px] px-5 py-6 text-left text-sm font-semibold text-white/70">
+                      Porownanie planow
+                    </th>
                     <th className="w-[260px] px-4 py-6 text-left">
                       <p className="text-[1.1rem] font-semibold text-white">Starter</p>
                       <p className="mt-0.5 text-xs text-white/55">Plan podstawowy</p>
@@ -215,7 +232,9 @@ export default function PricingSection() {
                       </button>
                     </th>
                     <th className="w-[260px] px-4 py-6 text-left">
-                      <p className="text-[1.1rem] font-semibold text-white">Inteligentny Korepetytor</p>
+                      <p className="text-[1.1rem] font-semibold text-white">
+                        Inteligentny Korepetytor
+                      </p>
                       <p className="mt-0.5 text-xs text-white/55">Voice Chat + AI pomoc</p>
                       <button
                         type="button"
@@ -233,16 +252,27 @@ export default function PricingSection() {
                       key={row.name}
                       className="border-b border-white/8 align-top"
                       style={{
-                        backgroundColor: hoveredRowIndex === rowIndex ? '#303030' : rowIndex % 2 === 0 ? '#1f1f1f' : '#1b1b1b',
+                        backgroundColor:
+                          hoveredRowIndex === rowIndex
+                            ? '#303030'
+                            : rowIndex % 2 === 0
+                              ? '#1f1f1f'
+                              : '#1b1b1b',
                         transition: 'background-color 150ms ease',
                       }}
                       onMouseEnter={() => setHoveredRowIndex(rowIndex)}
                       onMouseLeave={() => setHoveredRowIndex(null)}
                     >
                       <td className="px-5 py-4 text-sm font-medium text-white">{row.name}</td>
-                      <td className="px-4 py-4 text-sm text-white/75">{renderComparisonCell(row.starter)}</td>
-                      <td className="px-4 py-4 text-sm text-white/85">{renderComparisonCell(row.premium)}</td>
-                      <td className="px-4 py-4 text-sm text-white/85">{renderComparisonCell(row.tutor)}</td>
+                      <td className="px-4 py-4 text-sm text-white/75">
+                        {renderComparisonCell(row.starter)}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-white/85">
+                        {renderComparisonCell(row.premium)}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-white/85">
+                        {renderComparisonCell(row.tutor)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -323,11 +353,16 @@ function PricingCard({
       </div>
 
       <div className="mt-6">
-        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.06em] text-white/82">Co dostajesz:</p>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-[0.06em] text-white/82">
+          Co dostajesz:
+        </p>
 
         <ul className="space-y-2.5">
           {features.map((feature) => (
-            <li key={feature.text} className="group relative flex items-start gap-2.5 text-white/86">
+            <li
+              key={feature.text}
+              className="group relative flex items-start gap-2.5 text-white/86"
+            >
               <CardCheckIcon />
               <span className="inline-flex flex-1 items-start gap-2 text-[0.96rem] leading-snug">
                 {feature.text}
@@ -364,7 +399,13 @@ function renderComparisonCell(value: string) {
 function CardCheckIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
-      <path d="M4.5 9.3l2.4 2.4 6.6-6.4" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M4.5 9.3l2.4 2.4 6.6-6.4"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -373,7 +414,13 @@ function TableCheckIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ flexShrink: 0 }}>
       <circle cx="9" cy="9" r="9" fill="#2bcc82" />
-      <path d="M5 9.5l2.5 2.5 5.5-5.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M5 9.5l2.5 2.5 5.5-5.5"
+        stroke="#fff"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

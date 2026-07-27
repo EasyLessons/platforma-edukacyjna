@@ -22,14 +22,10 @@ export default function DokumentacjaPage() {
       <h2>Od czego zaczac?</h2>
       <ul>
         <li>
-          <Link href="/docs/register">
-            Rejestracja i logowanie
-          </Link>
+          <Link href="/docs/register">Rejestracja i logowanie</Link>
         </li>
         <li>
-          <Link href="/docs/whiteboard">
-            Instrukcja tablicy
-          </Link>
+          <Link href="/docs/whiteboard">Instrukcja tablicy</Link>
         </li>
         <li>
           <Link href="/docs/faq">Najczestsze pytania (FAQ)</Link>

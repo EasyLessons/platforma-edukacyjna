@@ -83,4 +83,3 @@ const areZoomPropsEqual = (
 
 export const ZoomControls = memo(ZoomControlsComponent, areZoomPropsEqual);
 ZoomControls.displayName = 'ZoomControls';
-

@@ -31,10 +31,18 @@ describe('useLogin', () => {
 
   const fakeEvent = { preventDefault: vi.fn() } as unknown as React.FormEvent;
 
-  const fillForm = (result: ReturnType<typeof setup>['result'], login = 'test@example.com', password = 'Pass1word') => {
+  const fillForm = (
+    result: ReturnType<typeof setup>['result'],
+    login = 'test@example.com',
+    password = 'Pass1word'
+  ) => {
     act(() => {
-      result.current.handleChange({ target: { name: 'login', value: login } } as React.ChangeEvent<HTMLInputElement>);
-      result.current.handleChange({ target: { name: 'password', value: password } } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'login', value: login },
+      } as React.ChangeEvent<HTMLInputElement>);
+      result.current.handleChange({
+        target: { name: 'password', value: password },
+      } as React.ChangeEvent<HTMLInputElement>);
     });
   };
 
@@ -50,7 +58,9 @@ describe('useLogin', () => {
     it('aktualizuje pole formularza', () => {
       const { result } = setup();
       act(() => {
-        result.current.handleChange({ target: { name: 'login', value: 'jan@example.com' } } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'login', value: 'jan@example.com' },
+        } as React.ChangeEvent<HTMLInputElement>);
       });
       expect(result.current.formData.login).toBe('jan@example.com');
     });
@@ -58,10 +68,14 @@ describe('useLogin', () => {
     it('czyści błąd pola i generalError', () => {
       const { result } = setup();
       act(() => {
-        result.current.handleChange({ target: { name: 'login', value: 'bad' } } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'login', value: 'bad' },
+        } as React.ChangeEvent<HTMLInputElement>);
       });
       act(() => {
-        result.current.handleChange({ target: { name: 'login', value: 'ok@ok.com' } } as React.ChangeEvent<HTMLInputElement>);
+        result.current.handleChange({
+          target: { name: 'login', value: 'ok@ok.com' },
+        } as React.ChangeEvent<HTMLInputElement>);
       });
       expect(result.current.errors.login).toBeFalsy();
       expect(result.current.generalError).toBe('');
@@ -72,7 +86,9 @@ describe('useLogin', () => {
     it('ustawia errors.login dla nieprawidłowego emaila', async () => {
       const { result } = setup();
       fillForm(result, 'nieprawidlowy-email');
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.errors.login).toBeTruthy();
       expect(loginUser).not.toHaveBeenCalled();
     });
@@ -82,14 +98,21 @@ describe('useLogin', () => {
     it('wywołuje authLogin z tokenem i użytkownikiem', async () => {
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
-      expect(mockAuthLogin).toHaveBeenCalledWith(mockLoginResponse.access_token, mockLoginResponse.user);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockAuthLogin).toHaveBeenCalledWith(
+        mockLoginResponse.access_token,
+        mockLoginResponse.user
+      );
     });
 
     it('przekierowuje na /dashboard', async () => {
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
   });
@@ -99,7 +122,9 @@ describe('useLogin', () => {
       vi.mocked(loginUser).mockRejectedValue(new AppError('Unauthorized', 'AUTH_ERROR', 401));
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.generalError).toBe('Błędny email lub hasło');
       expect(mockPush).not.toHaveBeenCalled();
     });
@@ -108,7 +133,9 @@ describe('useLogin', () => {
       vi.mocked(loginUser).mockRejectedValue(new AppError('Forbidden', 'AUTH_ERROR', 403));
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(mockPush).toHaveBeenCalledWith('/verify?userId=5&email=test%40example.com');
     });
 
@@ -117,7 +144,9 @@ describe('useLogin', () => {
       vi.mocked(checkUser).mockResolvedValue({ exists: false, verified: false });
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.generalError).toBe('Konto niezweryfikowane. Sprawdź email.');
     });
 
@@ -125,7 +154,9 @@ describe('useLogin', () => {
       vi.mocked(loginUser).mockRejectedValue(new AppError('Unauthorized', 'AUTH_ERROR', 401));
       const { result } = setup();
       fillForm(result);
-      await act(async () => { await result.current.handleSubmit(fakeEvent); });
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
       expect(result.current.isLoading).toBe(false);
     });
   });

@@ -47,9 +47,9 @@ function getTableCellWrappedLines(
   cellText: string,
   maxWidth: number,
   fontSize: number,
-  bold: boolean,
+  bold: boolean
 ): string[] {
-  const slotKey    = `${tableId}|${r}|${c}`;
+  const slotKey = `${tableId}|${r}|${c}`;
   const contentKey = `${cellText}|${maxWidth.toFixed(1)}|${fontSize.toFixed(1)}|${bold ? '1' : '0'}`;
 
   const cached = tableWrapCache.get(slotKey);
@@ -63,7 +63,7 @@ function getTableCellWrappedLines(
 function computeCellWrappedLines(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
+  maxWidth: number
 ): string[] {
   const paragraphs = text.split('\n');
   const result: string[] = [];
@@ -75,7 +75,10 @@ function computeCellWrappedLines(
     for (const word of words) {
       // Słowo szersze niż komórka → łamanie znak po znaku
       if (ctx.measureText(word).width > maxWidth) {
-        if (current) { result.push(current); current = ''; }
+        if (current) {
+          result.push(current);
+          current = '';
+        }
 
         let remaining = word;
         while (ctx.measureText(remaining).width > maxWidth) {
@@ -107,7 +110,6 @@ function computeCellWrappedLines(
   return result;
 }
 
-
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const TableHandler: ElementHandler<TableElement> = {
@@ -120,19 +122,21 @@ export const TableHandler: ElementHandler<TableElement> = {
 
   isPointInElement(point, el) {
     return (
-      point.x >= el.x && point.x <= el.x + el.width &&
-      point.y >= el.y && point.y <= el.y + el.height
+      point.x >= el.x &&
+      point.x <= el.x + el.width &&
+      point.y >= el.y &&
+      point.y <= el.y + el.height
     );
   },
 
   resize(el, pivotX, pivotY, scaleX, scaleY) {
-    const newWidth  = Math.max(MIN_SIZE, el.width  * scaleX);
+    const newWidth = Math.max(MIN_SIZE, el.width * scaleX);
     const newHeight = Math.max(MIN_SIZE, el.height * scaleY);
     return {
-      x:        pivotX + (el.x - pivotX) * scaleX,
-      y:        pivotY + (el.y - pivotY) * scaleY,
-      width:    newWidth,
-      height:   newHeight,
+      x: pivotX + (el.x - pivotX) * scaleX,
+      y: pivotY + (el.y - pivotY) * scaleY,
+      width: newWidth,
+      height: newHeight,
       fontSize: calculateTableFontSize(newHeight, el.rows),
     } as any;
   },
@@ -142,25 +146,27 @@ export const TableHandler: ElementHandler<TableElement> = {
   },
 
   rotate(el, _rotationAngle, pivot, cos, sin) {
-    const cx = el.x + el.width  / 2;
+    const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
     const newCenter = rotateAroundPivot({ x: cx, y: cy }, pivot, cos, sin);
     return {
-      x: newCenter.x - el.width  / 2,
+      x: newCenter.x - el.width / 2,
       y: newCenter.y - el.height / 2,
     };
   },
 
   render(ctx, table, viewport, canvasWidth, canvasHeight) {
-    const topLeft     = transformPoint({ x: table.x, y: table.y }, viewport, canvasWidth, canvasHeight);
+    const topLeft = transformPoint({ x: table.x, y: table.y }, viewport, canvasWidth, canvasHeight);
     const bottomRight = transformPoint(
       { x: table.x + table.width, y: table.y + table.height },
-      viewport, canvasWidth, canvasHeight,
+      viewport,
+      canvasWidth,
+      canvasHeight
     );
 
-    const sw         = bottomRight.x - topLeft.x;
-    const sh         = bottomRight.y - topLeft.y;
-    const cellWidth  = sw / table.cols;
+    const sw = bottomRight.x - topLeft.x;
+    const sh = bottomRight.y - topLeft.y;
+    const cellWidth = sw / table.cols;
     const cellHeight = sh / table.rows;
 
     // Tło
@@ -175,26 +181,32 @@ export const TableHandler: ElementHandler<TableElement> = {
 
     // Siatka
     ctx.strokeStyle = table.borderColor ?? '#d1d5db';
-    ctx.lineWidth   = 1;
+    ctx.lineWidth = 1;
     ctx.strokeRect(topLeft.x, topLeft.y, sw, sh);
 
     for (let r = 1; r < table.rows; r++) {
       const y = topLeft.y + r * cellHeight;
-      ctx.beginPath(); ctx.moveTo(topLeft.x, y); ctx.lineTo(topLeft.x + sw, y); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(topLeft.x, y);
+      ctx.lineTo(topLeft.x + sw, y);
+      ctx.stroke();
     }
     for (let c = 1; c < table.cols; c++) {
       const x = topLeft.x + c * cellWidth;
-      ctx.beginPath(); ctx.moveTo(x, topLeft.y); ctx.lineTo(x, topLeft.y + sh); ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, topLeft.y);
+      ctx.lineTo(x, topLeft.y + sh);
+      ctx.stroke();
     }
 
     // Tekst komórek z word-wrappingiem i cache'owaniem
     const worldFontSize = table.fontSize ?? 0.12;
-    const fontSize      = worldFontSize * viewport.scale * 100;
-    const lineHeight    = fontSize * 1.2;
+    const fontSize = worldFontSize * viewport.scale * 100;
+    const lineHeight = fontSize * 1.2;
     // Horizontal padding per side matches the clip rect inset (3px)
-    const wrapMaxWidth  = cellWidth - 8;
+    const wrapMaxWidth = cellWidth - 8;
 
-    ctx.textAlign    = 'center';
+    ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     for (let r = 0; r < table.rows; r++) {
@@ -206,22 +218,34 @@ export const TableHandler: ElementHandler<TableElement> = {
 
         // Font musi być ustawiony przed getTableCellWrappedLines,
         // bo computeCellWrappedLines używa ctx.measureText z aktualnym fontem.
-        ctx.font      = isBold
+        ctx.font = isBold
           ? `bold ${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`
           : `${fontSize}px -apple-system, BlinkMacSystemFont, sans-serif`;
         ctx.fillStyle = isBold ? '#111827' : '#374151';
 
         const wrappedLines = getTableCellWrappedLines(
-          ctx, table.id, r, c, cellText, wrapMaxWidth, fontSize, isBold,
+          ctx,
+          table.id,
+          r,
+          c,
+          cellText,
+          wrapMaxWidth,
+          fontSize,
+          isBold
         );
 
-        const cx     = topLeft.x + c * cellWidth  + cellWidth  / 2;
-        const cy     = topLeft.y + r * cellHeight + cellHeight / 2;
+        const cx = topLeft.x + c * cellWidth + cellWidth / 2;
+        const cy = topLeft.y + r * cellHeight + cellHeight / 2;
         const startY = cy - ((wrappedLines.length - 1) * lineHeight) / 2;
 
         ctx.save();
         ctx.beginPath();
-        ctx.rect(topLeft.x + c * cellWidth + 3, topLeft.y + r * cellHeight + 2, cellWidth - 6, cellHeight - 4);
+        ctx.rect(
+          topLeft.x + c * cellWidth + 3,
+          topLeft.y + r * cellHeight + 2,
+          cellWidth - 6,
+          cellHeight - 4
+        );
         ctx.clip();
 
         for (let i = 0; i < wrappedLines.length; i++) {

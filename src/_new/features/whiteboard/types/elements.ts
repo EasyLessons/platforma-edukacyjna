@@ -31,8 +31,8 @@ export interface DrawingPath {
   points: Point[];
   color: string;
   width: number;
-  widths?: number[];  // grubość dla każdego punktu osobno (pressure-sensitive)
-  opacity?: number;   // 0–1, domyślnie 1
+  widths?: number[]; // grubość dla każdego punktu osobno (pressure-sensitive)
+  opacity?: number; // 0–1, domyślnie 1
   /** Cache bounding boxa — obliczany raz przy zakończeniu rysowania, nie co klatkę */
   bbox?: { minX: number; minY: number; maxX: number; maxY: number };
 }
@@ -49,8 +49,8 @@ export interface Shape {
   color: string;
   strokeWidth: number;
   fill: boolean;
-  sides?: number;     // tylko dla polygon (min. 3)
-  rotation?: number;  // radiany
+  sides?: number; // tylko dla polygon (min. 3)
+  rotation?: number; // radiany
 }
 
 /** Tekst edytowalny (narzędzie: text) */
@@ -64,7 +64,7 @@ export interface TextElement {
   text: string;
   fontSize: number;
   color: string;
-  fontFamily?: string;                    // domyślnie 'Arial, sans-serif'
+  fontFamily?: string; // domyślnie 'Arial, sans-serif'
   fontWeight?: 'normal' | 'bold';
   fontStyle?: 'normal' | 'italic';
   textAlign?: 'left' | 'center' | 'right';
@@ -80,7 +80,7 @@ export interface FunctionPlot {
   strokeWidth: number;
   xRange: number;
   yRange: number;
-  strokeDasharray?: string;  // np. '5 5' dla linii przerywanej
+  strokeDasharray?: string; // np. '5 5' dla linii przerywanej
 }
 
 /** Obraz/zdjęcie wstawione na tablicę (narzędzie: image) */
@@ -91,7 +91,7 @@ export interface ImageElement {
   y: number;
   width: number;
   height: number;
-  src: string;    // URL lub base64
+  src: string; // URL lub base64
   alt?: string;
   rotation?: number;
 }
@@ -104,7 +104,7 @@ export interface PDFElement {
   y: number;
   width: number;
   height: number;
-  src: string;          // URL lub base64
+  src: string; // URL lub base64
   fileName?: string;
   currentPage?: number;
   totalPages?: number;
@@ -119,10 +119,10 @@ export interface MarkdownNote {
   y: number;
   width: number;
   height: number;
-  content: string;              // treść w Markdown
+  content: string; // treść w Markdown
   backgroundColor?: string;
   borderColor?: string;
-  isFromChatbot?: boolean;      // czy wygenerowane przez AI
+  isFromChatbot?: boolean; // czy wygenerowane przez AI
   contentScale?: number;
 }
 
@@ -136,12 +136,12 @@ export interface TableElement {
   height: number;
   rows: number;
   cols: number;
-  cells: string[][];            // tablica 2D treści komórek
+  cells: string[][]; // tablica 2D treści komórek
   headerRow?: boolean;
   headerCol?: boolean;
   borderColor?: string;
   headerBgColor?: string;
-  fontSize?: number;            // Rozmiar tekstu — obliczany raz przy tworzeniu/resizing
+  fontSize?: number; // Rozmiar tekstu — obliczany raz przy tworzeniu/resizing
 }
 
 /** Strzałka łącząca elementy (narzędzie: arrow) */

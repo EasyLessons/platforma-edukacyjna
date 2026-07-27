@@ -12,7 +12,7 @@ from api.v1.workspaces.members_service import (
     get_user_role,
 )
 from api.v1.workspaces.schemas import WorkspaceMembersListResponse, MyRoleResponse
-from core.exceptions import NotFoundError, ValidationError, AppException
+from core.exceptions import NotFoundError, AppException
 from core.models import WorkspaceMember
 
 

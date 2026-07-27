@@ -2,7 +2,6 @@
 Testy pobierania danych zalogowanego użytkownika
 GET /api/v1/auth/me
 """
-import pytest
 
 from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import MeResponse
