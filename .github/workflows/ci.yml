@@ -98,9 +98,3 @@ jobs:
       - run: npm ci
       - run: npm run build
 
-  deploy-backend:
-    needs: [backend-test, backend-lint]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    steps:
-      - run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
