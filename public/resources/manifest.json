@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "lastUpdated": "2025-12-08",
-  
+
   "resourceTypes": {
     "card": {
       "label": "Karty wzorów",
@@ -58,10 +58,18 @@
         { "id": "funkcje", "name": "Funkcje", "order": 6 },
         { "id": "funkcja-kwadratowa", "name": "Funkcja kwadratowa", "order": 7 },
         { "id": "logarytmy", "name": "Logarytmy", "order": 8 },
-        { "id": "geometria-analityczna-na-plaszczyznie-kartezjanskiej", "name": "Geometria analityczna na płaszczyźnie kartezjańskiej", "order": 9 },
+        {
+          "id": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
+          "name": "Geometria analityczna na płaszczyźnie kartezjańskiej",
+          "order": 9
+        },
         { "id": "kombinatoryka", "name": "Kombinatoryka", "order": 10 },
         { "id": "rachunek-prawdopodobienstwa", "name": "Rachunek prawdopodobieństwa", "order": 11 },
-        { "id": "parametry-danych-statystycznych", "name": "Parametry danych statystycznych", "order": 12 },
+        {
+          "id": "parametry-danych-statystycznych",
+          "name": "Parametry danych statystycznych",
+          "order": 12
+        },
         { "id": "pochodna-funkcji", "name": "Pochodna funkcji", "order": 13 },
         { "id": "potegi-i-pierwiastki", "name": "Potęgi i pierwiastki", "order": 14 },
         { "id": "inne", "name": "Inne wzory", "order": 15 }
@@ -77,7 +85,17 @@
       "description": "Definicja sin, cos, tg, ctg w trójkącie prostokątnym",
       "category": "matematyka",
       "subcategory": "trygonometria",
-      "tags": ["definicja", "kąt ostry", "trójkąt prostokątny", "sin", "cos", "tg", "ctg", "przeciwprostokątna", "przyprostokątna"],
+      "tags": [
+        "definicja",
+        "kąt ostry",
+        "trójkąt prostokątny",
+        "sin",
+        "cos",
+        "tg",
+        "ctg",
+        "przeciwprostokątna",
+        "przyprostokątna"
+      ],
       "path": "/resources/matematyka/wzory/trygonometria/1def-fun-tryg-kata-ostr-w-trj-prostokatnym.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 1
@@ -89,7 +107,16 @@
       "description": "Definicja sin, cos, tg, ctg na kole jednostkowym",
       "category": "matematyka",
       "subcategory": "trygonometria",
-      "tags": ["definicja", "dowolny kąt", "koło jednostkowe", "sin", "cos", "tg", "ctg", "współrzędne"],
+      "tags": [
+        "definicja",
+        "dowolny kąt",
+        "koło jednostkowe",
+        "sin",
+        "cos",
+        "tg",
+        "ctg",
+        "współrzędne"
+      ],
       "path": "/resources/matematyka/wzory/trygonometria/2def-fun-tryg-dowolnego-kata.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 2
@@ -294,7 +321,14 @@
       "description": "Własności granic ciągów zbieżnych",
       "category": "matematyka",
       "subcategory": "ciagi",
-      "tags": ["granica", "ciąg zbieżny", "suma granic", "iloczyn granic", "iloraz granic", "twierdzenie"],
+      "tags": [
+        "granica",
+        "ciąg zbieżny",
+        "suma granic",
+        "iloczyn granic",
+        "iloraz granic",
+        "twierdzenie"
+      ],
       "path": "/resources/matematyka/wzory/ciagi/twierdzenie_o_granicy_sumy_roznicy_iloczynu_ilorazu_ciagow_zbieznych.webp",
       "dimensions": { "width": 700, "height": 400 },
       "order": 19
@@ -416,7 +450,14 @@
       "description": "Podstawowe wzory na logarytmy: suma, różnica, potęga",
       "category": "matematyka",
       "subcategory": "logarytmy",
-      "tags": ["logarytm", "log", "suma logarytmów", "różnica logarytmów", "logarytm potęgi", "własności"],
+      "tags": [
+        "logarytm",
+        "log",
+        "suma logarytmów",
+        "różnica logarytmów",
+        "logarytm potęgi",
+        "własności"
+      ],
       "path": "/resources/matematyka/wzory/logarytmy/logarytmy_wzory.webp",
       "dimensions": { "width": 700, "height": 500 },
       "order": 29
@@ -465,7 +506,13 @@
       "description": "(a±b)², (a+b)(a-b), (a±b)³, a³±b³",
       "category": "matematyka",
       "subcategory": "inne",
-      "tags": ["wzory skróconego mnożenia", "kwadrat sumy", "kwadrat różnicy", "różnica kwadratów", "sześcian"],
+      "tags": [
+        "wzory skróconego mnożenia",
+        "kwadrat sumy",
+        "kwadrat różnicy",
+        "różnica kwadratów",
+        "sześcian"
+      ],
       "path": "/resources/matematyka/wzory/reszta/wzory_skroconego_mnozenia.webp",
       "dimensions": { "width": 700, "height": 500 },
       "order": 33
@@ -503,7 +550,13 @@
       "description": "a² + b² = c² w trójkącie prostokątnym",
       "category": "matematyka",
       "subcategory": "planimetria",
-      "tags": ["Pitagoras", "trójkąt prostokątny", "przeciwprostokątna", "przyprostokątne", "a²+b²=c²"],
+      "tags": [
+        "Pitagoras",
+        "trójkąt prostokątny",
+        "przeciwprostokątna",
+        "przyprostokątne",
+        "a²+b²=c²"
+      ],
       "path": "/resources/matematyka/wzory/planimetria/twierdzenie_pitagorasa_planimetria.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 36
@@ -876,7 +929,13 @@
       "description": "Wzór na długośc odcinka AB oraz wzór na współrzędne środka S odcinka AB",
       "category": "matematyka",
       "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
-      "tags": ["długość odcinka", "współrzędne środka odcinka", "geometria analityczna", "odcinek AB", "punkt S"],
+      "tags": [
+        "długość odcinka",
+        "współrzędne środka odcinka",
+        "geometria analityczna",
+        "odcinek AB",
+        "punkt S"
+      ],
       "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/1-dlugosc-odcinka-i-wspolrzedne-srodka-odcinka.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 67
@@ -972,7 +1031,12 @@
       "description": "Przesunięcie, symetria osiowa i środkowa",
       "category": "matematyka",
       "subcategory": "geometria-analityczna-na-plaszczyznie-kartezjanskiej",
-      "tags": ["przekształcenia geometryczne", "symetria osiowa", "symetria środkowa", "przesunięcie"],
+      "tags": [
+        "przekształcenia geometryczne",
+        "symetria osiowa",
+        "symetria środkowa",
+        "przesunięcie"
+      ],
       "path": "/resources/matematyka/wzory/geometria analityczna na plaszczyznie kartezjanskiej/9-przeksztalcenia-geometryczne.webp",
       "dimensions": { "width": 600, "height": 400 },
       "order": 75
@@ -1008,7 +1072,13 @@
       "description": "Permutacje, kombinacje, wariacje z powtórzeniami i bez powtórzeń",
       "category": "matematyka",
       "subcategory": "kombinatoryka",
-      "tags": ["kombinatoryka", "permutacje", "kombinacje", "wariacje z powtórzeniami", "wariacje bez powtórzeń"],
+      "tags": [
+        "kombinatoryka",
+        "permutacje",
+        "kombinacje",
+        "wariacje z powtórzeniami",
+        "wariacje bez powtórzeń"
+      ],
       "path": "/resources/matematyka/wzory/kombinatoryka/1-kombinatoryka-permutacje-kombinacje-wariacje-z-powtorzeniami-wariacje-bez-powtorzen.webp",
       "dimensions": { "width": 700, "height": 500 },
       "order": 78
@@ -1104,7 +1174,14 @@
       "description": "Zasady różniczkowania",
       "category": "matematyka",
       "subcategory": "pochodna-funkcji",
-      "tags": ["pochodna", "różniczkowanie", "pochodna sumy", "pochodna iloczynu", "pochodna ilorazu", "funkcja złożona"],
+      "tags": [
+        "pochodna",
+        "różniczkowanie",
+        "pochodna sumy",
+        "pochodna iloczynu",
+        "pochodna ilorazu",
+        "funkcja złożona"
+      ],
       "path": "/resources/matematyka/wzory/pochodna funkcji/1-pochodna-sumy-roznicy-iloczynu-ilorazu-funkcji-pochodna-funkcji-zlozonej.webp",
       "dimensions": { "width": 700, "height": 500 },
       "order": 86
@@ -1318,10 +1395,7 @@
           "id": "karta-logarytmy",
           "name": "Logarytmy",
           "order": 4,
-          "items": [
-            { "ref": "log-wzory" },
-            { "ref": "log-zamiana-podstawy" }
-          ]
+          "items": [{ "ref": "log-wzory" }, { "ref": "log-zamiana-podstawy" }]
         },
         {
           "id": "karta-inne",
@@ -1411,9 +1485,7 @@
           "id": "karta-kombinatoryka",
           "name": "Kombinatoryka",
           "order": 10,
-          "items": [
-            { "ref": "kombinatoryka-1-metody" }
-          ]
+          "items": [{ "ref": "kombinatoryka-1-metody" }]
         },
         {
           "id": "karta-rachunek-prawdopodobienstwa",

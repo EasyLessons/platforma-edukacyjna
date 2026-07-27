@@ -54,8 +54,7 @@ export const checkUsersInviteStatusBatch = (
   user_ids: number[]
 ): Promise<Record<number, InviteStatusResponse>> =>
   apiClient
-    .post<{ statuses: Record<number, InviteStatusResponse> }>(
-      `/api/v1/workspaces/${workspace_id}/members/check-batch`,
-      { user_ids }
-    )
+    .post<{
+      statuses: Record<number, InviteStatusResponse>;
+    }>(`/api/v1/workspaces/${workspace_id}/members/check-batch`, { user_ids })
     .then((res) => res.data.statuses);

@@ -25,7 +25,7 @@ from core.responses import ApiResponse
 from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
     OnlineUserInfo, OnlineStatusResponse, OnlineUsersBatchRequest, OnlineUsersBatchResponse,
-    BoardElement, BoardElementWithAuthor,
+    BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
 )
 from .service import WhiteboardService

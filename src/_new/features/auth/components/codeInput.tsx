@@ -1,6 +1,6 @@
 /**
  * CODE INPUT COMPONENT
- * 
+ *
  * Reusable 6-digit code input UI
  * Używany w:
  * - Email verification
@@ -53,9 +53,7 @@ export function CodeInput({
     <div className="space-y-6">
       {/* Label */}
       {label && (
-        <label className="block text-sm font-medium text-gray-700 text-center">
-          {label}
-        </label>
+        <label className="block text-sm font-medium text-gray-700 text-center">{label}</label>
       )}
 
       {/* 6-digit inputs */}
@@ -100,9 +98,7 @@ export function CodeInput({
           disabled={resendCooldown > 0 || isLoading || disabled}
           className="text-sm"
         >
-          {resendCooldown > 0
-            ? `Wyślij ponownie za ${resendCooldown}s`
-            : resendButtonText}
+          {resendCooldown > 0 ? `Wyślij ponownie za ${resendCooldown}s` : resendButtonText}
         </Button>
       </div>
 

@@ -35,7 +35,7 @@ export function WorkspaceDropdownMenu({
   onDelete,
   onLeave,
   onInvite,
-  triggerClassName = "w-8 h-8", // Domyślny rozmiar dla TopNav i innych miejsc
+  triggerClassName = 'w-8 h-8', // Domyślny rozmiar dla TopNav i innych miejsc
   iconSize = 16,
 }: WorkspaceDropdownMenuProps) {
   // STATE
@@ -74,8 +74,10 @@ export function WorkspaceDropdownMenu({
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       if (
-        menuRef.current && !menuRef.current.contains(target) &&
-        dropdownRef.current && !dropdownRef.current.contains(target)
+        menuRef.current &&
+        !menuRef.current.contains(target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(target)
       ) {
         setIsOpen(false);
       }
@@ -131,81 +133,83 @@ export function WorkspaceDropdownMenu({
       </button>
 
       {/* Dropdown Menu (Portal) */}
-      {isMounted && isOpen && createPortal(
-        <div
-          ref={dropdownRef}
-          className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[1500] min-w-[180px] animate-in fade-in zoom-in-95 duration-100 origin-top-right"
-          style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
-          role="menu"
-          aria-orientation="vertical"
-        >
-          {workspace.is_owner ? (
-            // Owner menu
-            <>
-              {/* Opcja zapraszania widoczna tylko jeśli przekazano funkcję (używane na mobile) */}
-              {onInvite && (
+      {isMounted &&
+        isOpen &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            className="fixed bg-white border border-gray-200 rounded-lg shadow-lg py-1 z-[1500] min-w-[180px] animate-in fade-in zoom-in-95 duration-100 origin-top-right"
+            style={{ top: dropdownPosition.top, right: dropdownPosition.right }}
+            role="menu"
+            aria-orientation="vertical"
+          >
+            {workspace.is_owner ? (
+              // Owner menu
+              <>
+                {/* Opcja zapraszania widoczna tylko jeśli przekazano funkcję (używane na mobile) */}
+                {onInvite && (
+                  <button
+                    onClick={handleAction(onInvite)}
+                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 sm:hidden flex items-center gap-2 transition-colors cursor-pointer"
+                    role="menuitem"
+                  >
+                    <UserPlus size={14} />
+                    <span>Zaproś uczestników</span>
+                  </button>
+                )}
+
                 <button
-                  onClick={handleAction(onInvite)}
-                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 sm:hidden flex items-center gap-2 transition-colors cursor-pointer"
+                  onClick={handleAction(onEdit)}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
                   role="menuitem"
                 >
-                  <UserPlus size={14} />
-                  <span>Zaproś uczestników</span>
+                  <Pencil size={14} />
+                  <span>Zmień nazwę</span>
                 </button>
-              )}
 
+                <button
+                  onClick={handleAction(onEdit)}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
+                  role="menuitem"
+                >
+                  <Settings size={14} />
+                  <span>Ustawienia</span>
+                </button>
+
+                <button
+                  onClick={handleAction(onMembers)}
+                  className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
+                  role="menuitem"
+                >
+                  <Users size={14} />
+                  <span>Członkowie</span>
+                </button>
+
+                <div className="h-px bg-gray-200 my-1" role="separator" />
+
+                <button
+                  onClick={handleAction(onDelete)}
+                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100 flex items-center gap-2 transition-colors cursor-pointer"
+                  role="menuitem"
+                >
+                  <Trash2 size={14} />
+                  <span>Usuń</span>
+                </button>
+              </>
+            ) : (
+              // Member menu
               <button
-                onClick={handleAction(onEdit)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
-                role="menuitem"
-              >
-                <Pencil size={14} />
-                <span>Zmień nazwę</span>
-              </button>
-
-              <button
-                onClick={handleAction(onEdit)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
-                role="menuitem"
-              >
-                <Settings size={14} />
-                <span>Ustawienia</span>
-              </button>
-
-              <button
-                onClick={handleAction(onMembers)}
-                className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
-                role="menuitem"
-              >
-                <Users size={14} />
-                <span>Członkowie</span>
-              </button>
-
-              <div className="h-px bg-gray-200 my-1" role="separator" />
-
-              <button
-                onClick={handleAction(onDelete)}
-                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-100 flex items-center gap-2 transition-colors cursor-pointer"
+                onClick={handleAction(onLeave)}
+                className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
                 role="menuitem"
               >
                 <Trash2 size={14} />
-                <span>Usuń</span>
+                <span>Opuść</span>
               </button>
-            </>
-          ) : (
-            // Member menu
-            <button
-              onClick={handleAction(onLeave)}
-              className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
-              role="menuitem"
-            >
-              <Trash2 size={14} />
-              <span>Opuść</span>
-            </button>
-          )}
-        </div>,
-        document.body
-      )}
+            )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

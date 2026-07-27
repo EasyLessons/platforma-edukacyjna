@@ -157,9 +157,7 @@ export function WorkspaceCard({
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Wskaźnik drag-over */}
-      {isDragOver && (
-        <div className="absolute left-1 right-1 -top-0.5 h-px bg-gray-300 z-10" />
-      )}
+      {isDragOver && <div className="absolute left-1 right-1 -top-0.5 h-px bg-gray-300 z-10" />}
 
       <div
         draggable={!!dragHandlers}
@@ -179,9 +177,7 @@ export function WorkspaceCard({
       >
         {/* Grip przy hover — maks z lewej */}
         {dragHandlers ? (
-          <div
-            className="flex w-[18px] pl-0.5 items-center justify-center text-gray-400 transition-opacity opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing"
-          >
+          <div className="flex w-[18px] pl-0.5 items-center justify-center text-gray-400 transition-opacity opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing">
             <GripVertical size={16} />
           </div>
         ) : (
@@ -201,7 +197,9 @@ export function WorkspaceCard({
         >
           <span
             className={`text-[16px] truncate leading-normal ${
-              isActive ? 'font-semibold text-gray-900' : 'font-semibold text-gray-700 group-hover:text-gray-900'
+              isActive
+                ? 'font-semibold text-gray-900'
+                : 'font-semibold text-gray-700 group-hover:text-gray-900'
             }`}
           >
             {workspace.name}
@@ -216,50 +214,47 @@ export function WorkspaceCard({
           className="absolute right-1 top-1/2 z-40 flex -translate-y-1/2 items-center gap-0.5 transition-opacity duration-150 bg-transparent opacity-0 group-hover:opacity-100 overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
-            <button
-              onClick={handleToggleFavourite}
-              className={`flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors ${
-                workspace.is_favourite ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'
-              }`}
-              title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
-            >
-              <Star
-                size={16}
-                className={workspace.is_favourite ? 'fill-yellow-500' : ''}
-              />
-            </button>
+          <button
+            onClick={handleToggleFavourite}
+            className={`flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors ${
+              workspace.is_favourite ? 'text-yellow-500' : 'text-gray-400 hover:text-gray-600'
+            }`}
+            title={workspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
+          >
+            <Star size={16} className={workspace.is_favourite ? 'fill-yellow-500' : ''} />
+          </button>
 
+          <button
+            onClick={() => onAction.invite(workspace)}
+            className="flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
+            title="Zaproś członków"
+            aria-label="Zaproś członków"
+          >
+            <UserPlus size={16} />
+          </button>
+
+          {workspace.is_owner && (
             <button
-              onClick={() => onAction.invite(workspace)}
+              onClick={() => onAction.edit(workspace)}
               className="flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
-              title="Zaproś członków"
-              aria-label="Zaproś członków"
+              title="Zmień nazwę"
+              aria-label="Zmień nazwę"
             >
-              <UserPlus size={16} />
+              <Pencil size={16} />
             </button>
+          )}
 
-            {workspace.is_owner && (
-              <button
-                onClick={() => onAction.edit(workspace)}
-                className="flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
-                title="Zmień nazwę"
-                aria-label="Zmień nazwę"
-              >
-                <Pencil size={16} />
-              </button>
-            )}
-
-            <div className="relative flex" onClick={(e) => e.stopPropagation()}>
-              <WorkspaceDropdownMenu
-                workspace={workspace}
-                triggerClassName="w-[30px] h-[30px]"
-                iconSize={16}
-                onEdit={() => onAction.edit(workspace)}
-                onMembers={() => onAction.members(workspace)}
-                onDelete={() => onAction.delete(workspace)}
-                onLeave={() => onAction.leave(workspace)}
-              />
-            </div>
+          <div className="relative flex" onClick={(e) => e.stopPropagation()}>
+            <WorkspaceDropdownMenu
+              workspace={workspace}
+              triggerClassName="w-[30px] h-[30px]"
+              iconSize={16}
+              onEdit={() => onAction.edit(workspace)}
+              onMembers={() => onAction.members(workspace)}
+              onDelete={() => onAction.delete(workspace)}
+              onLeave={() => onAction.leave(workspace)}
+            />
+          </div>
         </div>
       </div>
     </div>

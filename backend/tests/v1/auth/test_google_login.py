@@ -10,7 +10,7 @@ from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import AuthResponse
 from api.v1.auth.utils import hash_password
 from core.exceptions import AuthenticationError
-from core.models import User, Workspace, WorkspaceMember
+from core.models import User, Workspace
 
 GOOGLE_USER_INFO = {
     "id": "google-123",

@@ -65,20 +65,22 @@ export function PenTool({
 }: PenToolProps) {
   /** Zawsze używaj najbardziej aktualnego viewportu z canvasViewportRef (bez opóźnienia debounce) */
   const localViewportRef = useRef(viewport);
-  useEffect(() => { localViewportRef.current = viewport; }, [viewport]);
+  useEffect(() => {
+    localViewportRef.current = viewport;
+  }, [viewport]);
 
   const getViewport = () => canvasViewportRef?.current ?? localViewportRef.current;
   const isDrawingRef = useRef(false);
   const penTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-      if (isGestureActive && isDrawingRef.current) {
-        isDrawingRef.current = false;
-        currentPathRef.current = null;
-        pointsRef.current = [];
-        forceUpdate({}); // Czyści podgląd linii spod palca
-      }
-    }, [isGestureActive]);
+    if (isGestureActive && isDrawingRef.current) {
+      isDrawingRef.current = false;
+      currentPathRef.current = null;
+      pointsRef.current = [];
+      forceUpdate({}); // Czyści podgląd linii spod palca
+    }
+  }, [isGestureActive]);
 
   const currentPathRef = useRef<DrawingPath | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -87,11 +89,17 @@ export function PenTool({
   const lastTimestampRef = useRef<number>(0); // 🆕 Timestamp ostatniego punktu
   const [, forceUpdate] = useState({});
 
-  // 🆕 Pen Mode 
+  // 🆕 Pen Mode
   const isPenModeRef = useRef(false);
 
-
-  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, viewportRefOverride: canvasViewportRef });
+  useCanvasWheel({
+    overlayRef,
+    canvasWidth,
+    canvasHeight,
+    viewport,
+    onViewportChange,
+    viewportRefOverride: canvasViewportRef,
+  });
 
   // 🍎 FIX: Apple Pencil bug z iOS 14+ Scribble
   // Dodanie preventDefault na touchmove naprawia problem z brakującymi eventami Apple Pencil
@@ -136,19 +144,19 @@ export function PenTool({
     // Przechwytuj pointer events
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
 
-        const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
-        const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
-        const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
+    const overlayRect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
+    const screenPoint = { x: e.clientX - overlayRect.left, y: e.clientY - overlayRect.top };
+    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
 
-      pointsRef.current = [worldPoint];
+    pointsRef.current = [worldPoint];
 
-      const isHighlighter = lineWidth >= 20;
-          if (!isHighlighter) {
-            widthsRef.current = [lineWidth]; 
-            lastTimestampRef.current = performance.now(); 
-          } else {
-            widthsRef.current = []; 
-          }
+    const isHighlighter = lineWidth >= 20;
+    if (!isHighlighter) {
+      widthsRef.current = [lineWidth];
+      lastTimestampRef.current = performance.now();
+    } else {
+      widthsRef.current = [];
+    }
 
     const newPath: DrawingPath = {
       id: Date.now().toString(),
@@ -172,7 +180,6 @@ export function PenTool({
       return;
     }
 
-
     if (!isDrawingRef.current || !currentPathRef.current) return;
 
     e.preventDefault();
@@ -184,15 +191,15 @@ export function PenTool({
 
     if (e.shiftKey) {
       const firstPoint = pointsRef.current[0];
-      
+
       // Zostawiamy w tablicy tylko pierwszy i aktualny punkt = prosta linia
       pointsRef.current = [firstPoint, worldPoint];
-      
+
       const isHighlighter = lineWidth >= 20;
       if (!isHighlighter) {
-         widthsRef.current = [lineWidth, lineWidth];
+        widthsRef.current = [lineWidth, lineWidth];
       }
-      
+
       forceUpdate({});
       return; // Omijamy standardowe "wygładzanie" i krzywe rysowanie
     }
@@ -203,11 +210,11 @@ export function PenTool({
       const dx = worldPoint.x - lastPoint.x;
       const dy = worldPoint.y - lastPoint.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
+
       // Minimalna odległość między punktami (w jednostkach świata)
       // Im większa wartość, tym bardziej wygładzona linia
       const minDistance = 0.001 * (viewport.scale || 1); // Skaluj minimalną odległość wraz z zoomem
-      
+
       if (distance < minDistance) {
         return; // Pomiń ten punkt - zbyt blisko poprzedniego
       }
@@ -215,7 +222,7 @@ export function PenTool({
       // 🆕 Oblicz szybkość rysowania dla pressure-sensitive width
       // Tylko dla cienkich linii (pędzel), highlighter ma stałą grubość
       const isHighlighter = lineWidth >= 20;
-      
+
       if (!isHighlighter) {
         const currentTime = performance.now();
         const deltaTime = currentTime - lastTimestampRef.current;
@@ -231,7 +238,7 @@ export function PenTool({
         const speedFactor = Math.exp(-speed * 0.5); // Wykładnicze zanikanie
         const minWidthRatio = 0.5; // Minimalna grubość to 50% bazowej
         const widthMultiplier = minWidthRatio + (1 - minWidthRatio) * speedFactor;
-        
+
         const newWidth = lineWidth * widthMultiplier;
         widthsRef.current.push(newWidth);
       }
@@ -244,7 +251,7 @@ export function PenTool({
     forceUpdate({});
   };
 
-const handlePointerUp = (e: React.PointerEvent) => {
+  const handlePointerUp = (e: React.PointerEvent) => {
     if (!isDrawingRef.current) return;
 
     // Zwolnij pointer capture
@@ -268,13 +275,22 @@ const handlePointerUp = (e: React.PointerEvent) => {
             const p = finalPoints[i];
             const p1 = finalPoints[first];
             const p2 = finalPoints[last];
-            let x = p1.x, y = p1.y, dx = p2.x - x, dy = p2.y - y;
+            let x = p1.x,
+              y = p1.y,
+              dx = p2.x - x,
+              dy = p2.y - y;
             if (dx !== 0 || dy !== 0) {
               const t = ((p.x - x) * dx + (p.y - y) * dy) / (dx * dx + dy * dy);
-              if (t > 1) { x = p2.x; y = p2.y; }
-              else if (t > 0) { x += dx * t; y += dy * t; }
+              if (t > 1) {
+                x = p2.x;
+                y = p2.y;
+              } else if (t > 0) {
+                x += dx * t;
+                y += dy * t;
+              }
             }
-            dx = p.x - x; dy = p.y - y;
+            dx = p.x - x;
+            dy = p.y - y;
             const sqDist = dx * dx + dy * dy;
             if (sqDist > maxSqDist) {
               index = i;
@@ -291,11 +307,10 @@ const handlePointerUp = (e: React.PointerEvent) => {
         simplifyDPStep(0, finalPoints.length - 1);
 
         const sortedIndices = Array.from(retainedIndices).sort((a, b) => a - b);
-        finalPoints = sortedIndices.map(i => finalPoints[i]);
+        finalPoints = sortedIndices.map((i) => finalPoints[i]);
         if (finalWidths) {
-          finalWidths = sortedIndices.map(i => finalWidths![i]);
+          finalWidths = sortedIndices.map((i) => finalWidths![i]);
         }
-
       }
 
       const finalPath: DrawingPath = {
@@ -321,7 +336,6 @@ const handlePointerUp = (e: React.PointerEvent) => {
 
   // Pointer cancel - anuluj rysowanie
   const handlePointerCancel = (e: React.PointerEvent) => {
-
     if (!isDrawingRef.current) return;
 
     // Zwolnij pointer capture
@@ -383,4 +397,3 @@ const handlePointerUp = (e: React.PointerEvent) => {
     </div>
   );
 }
-

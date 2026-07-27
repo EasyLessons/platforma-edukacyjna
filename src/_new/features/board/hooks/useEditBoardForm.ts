@@ -68,7 +68,7 @@ export function useEditBoardForm({ board, onSubmit, onClose }: UseEditBoardFormO
 
   const resetForm = () => {
     setFormData({ name: board.name, icon: board.icon, bg_color: board.bg_color });
-    setErrors({})
+    setErrors({});
     setSubmitError('');
     setIsSubmitting(false);
   };
@@ -92,7 +92,7 @@ export function useEditBoardForm({ board, onSubmit, onClose }: UseEditBoardFormO
       });
       handleClose();
     } catch (err) {
-      await handleError(err); 
+      await handleError(err);
     } finally {
       setIsSubmitting(false);
     }

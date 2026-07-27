@@ -2,7 +2,6 @@
 Testy serwisu powiadomień
 api/v1/notifications/service.py
 """
-import pytest
 from datetime import datetime, timedelta
 
 from api.v1.notifications.service import (
@@ -164,7 +163,6 @@ class TestMarkAsRead:
 
     def test_idempotent_on_already_read(self, db_session, test_user):
         n = add_notification(db_session, test_user.id, is_read=True)
-        original_read_at = n.read_at
 
         result = mark_as_read(db_session, n.id, test_user.id)
         assert result is not None

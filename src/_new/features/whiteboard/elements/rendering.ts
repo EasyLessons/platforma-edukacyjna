@@ -42,9 +42,12 @@ import {
   ViewportTransform,
 } from '@/_new/features/whiteboard/types';
 import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { clampLineWidth, clampFontSize, evaluateExpression } from '@/_new/features/whiteboard/elements/math-eval';
+import {
+  clampLineWidth,
+  clampFontSize,
+  evaluateExpression,
+} from '@/_new/features/whiteboard/elements/math-eval';
 import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
-
 
 /**
  * Rysuje wykres funkcji matematycznej
@@ -61,7 +64,7 @@ export function drawFunction(
   ctx.lineWidth = clampLineWidth(func.strokeWidth, viewport.scale);
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-  
+
   // ObsĹ‚uga linii przerywanej
   if (func.strokeDasharray) {
     const dashArray = func.strokeDasharray.split(' ').map(Number);
@@ -69,7 +72,7 @@ export function drawFunction(
   } else {
     ctx.setLineDash([]);
   }
-  
+
   ctx.beginPath();
 
   let started = false;
@@ -103,7 +106,7 @@ export function drawFunction(
   if (started) {
     ctx.stroke();
   }
-  
+
   // Resetuj lineDash po narysowaniu
   ctx.setLineDash([]);
 }
@@ -135,11 +138,11 @@ export function drawImage(
   // đź†• ObsĹ‚uga rotacji
   if (img.rotation && img.rotation !== 0) {
     ctx.save();
-    
+
     // Ĺšrodek obrazu w screen space
     const centerX = topLeft.x + screenWidth / 2;
     const centerY = topLeft.y + screenHeight / 2;
-    
+
     // PrzesuĹ„ do Ĺ›rodka, obrĂłÄ‡, przesuĹ„ z powrotem
     ctx.translate(centerX, centerY);
     ctx.rotate(img.rotation);
@@ -174,7 +177,7 @@ export function drawElement(
   canvasWidth: number,
   canvasHeight: number,
   loadedImages?: Map<string, HTMLImageElement>,
-  debug?: boolean,
+  debug?: boolean
 ): void {
   // Wykres funkcji – jedyny typ bez handlera (niezaznaczalny)
   if (element.type === 'function') {
@@ -314,22 +317,26 @@ export function drawTable(
       }
       ctx.save();
       ctx.beginPath();
-      ctx.rect(topLeft.x + c * cellWidth + 3, topLeft.y + r * cellHeight + 2, cellWidth - 6, cellHeight - 4);
+      ctx.rect(
+        topLeft.x + c * cellWidth + 3,
+        topLeft.y + r * cellHeight + 2,
+        cellWidth - 6,
+        cellHeight - 4
+      );
       ctx.clip();
-      
+
       // Obsługa wielu linii tekstu w komórce
       const lines = cellText.split('\n');
       const lineHeight = fontSize * 1.2;
       const totalTextHeight = lines.length * lineHeight;
       const startY = cy - (totalTextHeight - lineHeight) / 2;
-      
+
       lines.forEach((line, lineIndex) => {
         const lineY = startY + lineIndex * lineHeight;
         ctx.fillText(line, cx, lineY, cellWidth - 8);
       });
-      
+
       ctx.restore();
     }
   }
 }
-

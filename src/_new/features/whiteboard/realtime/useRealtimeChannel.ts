@@ -175,10 +175,9 @@ export function useRealtimeChannel(
       }, PRESENCE_SYNC_DEBOUNCE_MS);
     };
 
-    channel.on('presence', { event: 'sync' }, handlePresenceSync).on(
-      'presence',
-      { event: 'join' },
-      ({ newPresences }) => {
+    channel
+      .on('presence', { event: 'sync' }, handlePresenceSync)
+      .on('presence', { event: 'join' }, ({ newPresences }) => {
         const realNewUsers = newPresences.filter((p: any) => p.user_id !== user.id);
         if (realNewUsers.length > 0) {
           log(
@@ -186,8 +185,7 @@ export function useRealtimeChannel(
             realNewUsers.map((p: any) => p.username)
           );
         }
-      }
-    );
+      });
 
     // ═══════════════════════════════════════════════════════════════════════
     // 🔌 tu wpinają się listenery, które jeszcze nie zostały wydzielone

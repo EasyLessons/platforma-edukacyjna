@@ -74,9 +74,7 @@ export function ShapeProperties() {
         <button
           onClick={() => setSelectedShape('line')}
           className={`p-1.5 rounded-md transition-all cursor-pointer ${
-            selectedShape === 'line'
-              ? 'bg-blue-500 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
+            selectedShape === 'line' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
           }`}
           title="Linia"
         >
@@ -85,9 +83,7 @@ export function ShapeProperties() {
         <button
           onClick={() => setSelectedShape('arrow')}
           className={`p-1.5 rounded-md transition-all cursor-pointer ${
-            selectedShape === 'arrow'
-              ? 'bg-blue-500 text-white'
-              : 'text-gray-700 hover:bg-gray-100'
+            selectedShape === 'arrow' ? 'bg-blue-500 text-white' : 'text-gray-700 hover:bg-gray-100'
           }`}
           title="Strzałka"
         >
@@ -110,9 +106,7 @@ export function ShapeProperties() {
               min="3"
               max="20"
               value={polygonSides}
-              onChange={(e) =>
-                setPolygonSides(Math.max(3, Math.min(20, Number(e.target.value))))
-              }
+              onChange={(e) => setPolygonSides(Math.max(3, Math.min(20, Number(e.target.value))))}
               className="w-14 px-2 py-1 text-sm text-black border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
             />
           </div>

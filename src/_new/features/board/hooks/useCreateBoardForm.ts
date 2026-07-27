@@ -9,7 +9,7 @@
  * - Obsługę błędów
  * - Reset formularza po zamknięciu
  */
-'use client'
+'use client';
 
 import { useState } from 'react';
 import { validateBoardName, validateBoardIcon } from '../utils/validation';

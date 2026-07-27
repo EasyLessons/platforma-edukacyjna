@@ -105,7 +105,11 @@ export function BoardCard({
               className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400 text-yellow-400' : ''}`}
             />
           </button>
-          <BoardDropdownMenu canRename={canRename} onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          <BoardDropdownMenu
+            canRename={canRename}
+            onEdit={handleDropdownEdit}
+            onDelete={handleDropdownDelete}
+          />
         </div>
       </div>
 
@@ -153,11 +157,12 @@ export function BoardCard({
         {/* Online users — col 2 */}
         <div className="col-span-2 flex justify-center">
           {(() => {
-            const activeUsers = board.online_users && board.online_users.length > 0 ? board.online_users : onlineUsers;
-            
-            return activeUsers.length > 0 && (
-              <BoardOnlineUsers users={activeUsers} />
-            );
+            const activeUsers =
+              board.online_users && board.online_users.length > 0
+                ? board.online_users
+                : onlineUsers;
+
+            return activeUsers.length > 0 && <BoardOnlineUsers users={activeUsers} />;
           })()}
         </div>
 
@@ -179,16 +184,18 @@ export function BoardCard({
           <button
             onClick={handleToggleFavourite}
             className={`p-2 rounded-lg transition-all hover:bg-gray-100 ${
-              board.is_favourite
-                ? 'text-yellow-400'
-                : 'text-gray-400 hover:text-yellow-400'
+              board.is_favourite ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'
             }`}
             title={board.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
           >
             <Star className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400' : ''}`} />
           </button>
 
-          <BoardDropdownMenu canRename={canRename} onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          <BoardDropdownMenu
+            canRename={canRename}
+            onEdit={handleDropdownEdit}
+            onDelete={handleDropdownDelete}
+          />
         </div>
       </div>
     </div>

@@ -138,12 +138,7 @@ export class ElementSpatialIndex {
    * Zapytaj indeks o elementy w podanym prostokącie świata.
    * Zwraca Set id widocznych elementów + id elementów alwaysRender.
    */
-  query(
-    worldMinX: number,
-    worldMinY: number,
-    worldMaxX: number,
-    worldMaxY: number
-  ): Set<string> {
+  query(worldMinX: number, worldMinY: number, worldMaxX: number, worldMaxY: number): Set<string> {
     const results = this.tree.search({
       minX: worldMinX,
       minY: worldMinY,

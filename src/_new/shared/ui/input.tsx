@@ -104,7 +104,12 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           <input
             ref={ref}
             disabled={disabled}
-            className={cn(inputVariants({ state }), leftIcon && 'pl-10', rightIcon && 'pr-12', className)}
+            className={cn(
+              inputVariants({ state }),
+              leftIcon && 'pl-10',
+              rightIcon && 'pr-12',
+              className
+            )}
             {...props}
           />
 

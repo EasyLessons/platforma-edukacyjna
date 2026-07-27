@@ -23,13 +23,16 @@ export const removeWorkspaceMember = (
 export const updateMemberRole = (
   workspace_id: number,
   user_id: number,
-  role: 'owner' | 'editor' | 'viewer',
+  role: 'owner' | 'editor' | 'viewer'
 ): Promise<{ message: string; new_role: string }> =>
-  apiClient.patch<{ message: string; new_role: string }>(
-    `/api/v1/workspaces/${workspace_id}/members/${user_id}/role`,
-    { role },
-  ).then(res => res.data);
+  apiClient
+    .patch<{
+      message: string;
+      new_role: string;
+    }>(`/api/v1/workspaces/${workspace_id}/members/${user_id}/role`, { role })
+    .then((res) => res.data);
 
 export const getMyRole = (workspace_id: number): Promise<MyRoleResponse> =>
-  apiClient.get<MyRoleResponse>(`/api/v1/workspaces/${workspace_id}/my-role`)
-    .then(res => res.data);
+  apiClient
+    .get<MyRoleResponse>(`/api/v1/workspaces/${workspace_id}/my-role`)
+    .then((res) => res.data);

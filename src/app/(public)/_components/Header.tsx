@@ -44,7 +44,6 @@ export default function Header() {
     router.push('/');
   };
 
-
   const [showProductMenu, setShowProductMenu] = useState(false);
   const [showCoursesMenu, setShowCoursesMenu] = useState(false);
   const [showPricingMenu, setShowPricingMenu] = useState(false);

@@ -17,12 +17,14 @@ każdego widocznego elementu 60×/s. Wywołanie mutacji wewnątrz tej pętli pow
 kaskadę: `render()` → `setState` → re-render → `render()` → …
 
 **Przykład naruszenia (usunięty):**
+
 ```ts
 // ❌ handlers/text-handler.ts — BYŁO (usunięte)
 extras?.onAutoExpand(id, height); // mutacja Zustanda w środku render()
 ```
 
 **Kontrakt po refaktorze:**
+
 ```ts
 // ✅ TextHandler.render() — po refaktorze
 // Brak parametru extras.onAutoExpand. Metoda jest (ctx, el, viewport) → void.
@@ -39,15 +41,16 @@ kończącym edycję.
 
 **Zdarzenia kończące edycję:**
 
-| Zdarzenie | Akcja |
-|-----------|-------|
+| Zdarzenie                     | Akcja                                      |
+| ----------------------------- | ------------------------------------------ |
 | Blur textarea / Click outside | `handleSave()` → `engine.updateElements()` |
-| Escape | `handleCancel()` — brak zapisu |
-| Unmount (zmiana narzędzia) | `handleSave()` via `useEffect` cleanup |
+| Escape                        | `handleCancel()` — brak zapisu             |
+| Unmount (zmiana narzędzia)    | `handleSave()` via `useEffect` cleanup     |
 
 **Złożoność:** O(1) commitów do Zustanda niezależnie od długości tekstu.
 
 **Przykład naruszenia (usunięty):**
+
 ```ts
 // ❌ text-tool.tsx — BYŁO (usunięte)
 useEffect(() => {
@@ -56,6 +59,7 @@ useEffect(() => {
 ```
 
 **Kontrakt:**
+
 ```ts
 // ✅ text-tool.tsx — po refaktorze
 const [editText, setEditText]       = useState('');
@@ -75,6 +79,7 @@ kluczem jest `el.id`. Każdy element ma co najwyżej jeden wpis. Cache jest
 inwalidowany natychmiast przy usunięciu elementu.
 
 **Klucz wpisu** (konkatenacja 6 pól):
+
 ```
 key = `${text}|${width.toFixed(1)}|${fontSize}|${fontFamily}|${fontWeight}|${fontStyle}`
 ```
@@ -84,11 +89,11 @@ Pola **nie** uczestniczące w kluczu (nie wpływają na łamanie wierszy):
 
 **Złożoność:**
 
-| Operacja | Stary cache | Nowy cache |
-|----------|-------------|------------|
-| HIT | O(1) | O(1) |
-| Purge | O(cache.size) przy >1000 wpisów | O(1) per usunięty element |
-| Rozmiar | Rósł do 1000 bez strategii | Bounded = #elementów tekstowych |
+| Operacja | Stary cache                     | Nowy cache                      |
+| -------- | ------------------------------- | ------------------------------- |
+| HIT      | O(1)                            | O(1)                            |
+| Purge    | O(cache.size) przy >1000 wpisów | O(1) per usunięty element       |
+| Rozmiar  | Rósł do 1000 bez strategii      | Bounded = #elementów tekstowych |
 
 ---
 
@@ -98,6 +103,7 @@ Pola **nie** uczestniczące w kluczu (nie wpływają na łamanie wierszy):
 na początku każdego handlera inicjującego interakcję.
 
 **Wzorzec guard clause:**
+
 ```ts
 const handlePointerDown = (e: React.PointerEvent) => {
   if (isGestureActive) return; // ← obowiązkowe
@@ -107,17 +113,17 @@ const handlePointerDown = (e: React.PointerEvent) => {
 
 **Status implementacji (wszystkie narzędzia):**
 
-| Narzędzie | Guard w handlerze | Reset przy gescie |
-|-----------|-------------------|-------------------|
-| `pen-tool` | ✅ `handlePointerDown` | ✅ `useEffect([isGestureActive])` |
-| `shape-tool` | ✅ `handlePointerDown` | ✅ `useEffect([isGestureActive])` |
-| `eraser-tool` | ✅ `handlePointerDown` | ✅ `useEffect([isGestureActive])` |
-| `arrow-tool` | ✅ `handlePointerDown` | ✅ `useEffect([isGestureActive])` |
-| `text-tool` | ✅ `handleOverlayDown` | ✅ `useEffect([isGestureActive])` |
-| `select-tool` | ✅ | ✅ |
-| `markdown-note-tool` | ✅ `handleMouseDown` (Faza 1) | ✅ `useEffect([isGestureActive])` (Faza 1) |
-| `table-tool` | ✅ `handleClick` (Faza 1) | — (click-to-open dialog, reset niekonieczny) |
-| `pan-tool` | ✅ | ✅ |
+| Narzędzie            | Guard w handlerze             | Reset przy gescie                            |
+| -------------------- | ----------------------------- | -------------------------------------------- |
+| `pen-tool`           | ✅ `handlePointerDown`        | ✅ `useEffect([isGestureActive])`            |
+| `shape-tool`         | ✅ `handlePointerDown`        | ✅ `useEffect([isGestureActive])`            |
+| `eraser-tool`        | ✅ `handlePointerDown`        | ✅ `useEffect([isGestureActive])`            |
+| `arrow-tool`         | ✅ `handlePointerDown`        | ✅ `useEffect([isGestureActive])`            |
+| `text-tool`          | ✅ `handleOverlayDown`        | ✅ `useEffect([isGestureActive])`            |
+| `select-tool`        | ✅                            | ✅                                           |
+| `markdown-note-tool` | ✅ `handleMouseDown` (Faza 1) | ✅ `useEffect([isGestureActive])` (Faza 1)   |
+| `table-tool`         | ✅ `handleClick` (Faza 1)     | — (click-to-open dialog, reset niekonieczny) |
+| `pan-tool`           | ✅                            | ✅                                           |
 
 ---
 
@@ -129,16 +135,17 @@ hook `useCanvasWheel`. Listener nie może mieć `viewport` w tablicy zależnośc
 i ponownie rejestrowany 60×/s.
 
 **Wzorzec (obowiązuje w pen, eraser, shape, markdown, table):**
+
 ```ts
 useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
 ```
 
 **Opcje hooka:**
 
-| Prop | Kiedy używać |
-|------|-------------|
-| `viewportRefOverride` | Narzędzia z dostępem do `h.viewportRef` z canvasu (pen, shape) — omija debounce React |
-| `disabled` | Narzędzia z modalnym popupem (table z `showConfig`) — zatrzymuje scroll gdy popup otwarty |
+| Prop                  | Kiedy używać                                                                              |
+| --------------------- | ----------------------------------------------------------------------------------------- |
+| `viewportRefOverride` | Narzędzia z dostępem do `h.viewportRef` z canvasu (pen, shape) — omija debounce React     |
+| `disabled`            | Narzędzia z modalnym popupem (table z `showConfig`) — zatrzymuje scroll gdy popup otwarty |
 
 **Implementacja hooka:** [hooks/use-canvas-wheel.ts](../../../src/_new/features/whiteboard/hooks/use-canvas-wheel.ts)
 — szczegółowa dokumentacja w `use-canvas-wheel-spec.md`.
@@ -179,7 +186,9 @@ nie przez reaktywną zmienną — unikamy podwójnego odpalenia.
 ```ts
 // ✅ shape-tool.tsx — wzorzec po Fazie 3
 const isDrawingRef = useRef(false);
-useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+useEffect(() => {
+  isDrawingRef.current = isDrawing;
+}, [isDrawing]);
 
 useEffect(() => {
   if (isGestureActive && isDrawingRef.current) {
@@ -220,11 +229,17 @@ Gumka obsługuje hit-testing tylko dla: `shape`, `text`, `image`, `path`, `funct
 
 ```ts
 // eraser-tool.tsx — isPointInElement
-if (element.type === 'shape')    { /* ... */ }
-else if (element.type === 'text')   { /* ... */ }
-else if (element.type === 'image')  { /* ... */ }
-else if (element.type === 'path')   { /* ... */ }
-else if (element.type === 'function') { /* ... */ }
+if (element.type === 'shape') {
+  /* ... */
+} else if (element.type === 'text') {
+  /* ... */
+} else if (element.type === 'image') {
+  /* ... */
+} else if (element.type === 'path') {
+  /* ... */
+} else if (element.type === 'function') {
+  /* ... */
+}
 // ← brak: markdown, table, arrow
 return false; // te typy zawsze zwracają false → gumka ich nie dotyka
 ```

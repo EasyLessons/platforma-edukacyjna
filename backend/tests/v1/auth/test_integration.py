@@ -7,7 +7,6 @@ from unittest.mock import patch, AsyncMock
 
 from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import RegisterUser, LoginData, VerifyEmail, ResetPassword, RequestPasswordReset
-from api.v1.auth.utils import verify_password
 from core.models import User, Workspace, WorkspaceMember
 
 MOCK_EMAIL = "api.v1.auth.service.send_verification_email"

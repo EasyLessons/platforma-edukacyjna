@@ -74,10 +74,10 @@ src/
 
 ## Poziomy testowania
 
-| Poziom | Narzędzie | Zakres |
-|---|---|---|
-| Jednostkowy | pytest / Vitest | serwisy, hooki, narzędzia pomocnicze |
-| Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API |
+| Poziom              | Narzędzie                        | Zakres                               |
+| ------------------- | -------------------------------- | ------------------------------------ |
+| Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze |
+| Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
 
 ---
 
@@ -143,17 +143,17 @@ npx vitest run src/app/api/chat/route.test.ts src/app/api/contact/route.test.ts
 
 ## Pokrycie
 
-| Moduł | Jednostkowe | Integracyjne | Łącznie |
-|---|---|---|---|
-| Autentykacja | ~40 | ~30 | ~70 |
-| Przestrzenie robocze | ~15 | 12 | ~27 |
-| Tablice | ~10 | 10 | ~20 |
-| Powiadomienia | ~8 | 8 | ~16 |
-| Chat API | — | 9 | 9 |
-| Contact API | — | 8 | 8 |
-| Narzędzia i hooki | ~50 | — | ~50 |
-| Tablica interaktywna | ~15 | — | ~15 |
-| **Razem** | **~138** | **~77** | **~215** |
+| Moduł                | Jednostkowe | Integracyjne | Łącznie  |
+| -------------------- | ----------- | ------------ | -------- |
+| Autentykacja         | ~40         | ~30          | ~70      |
+| Przestrzenie robocze | ~15         | 12           | ~27      |
+| Tablice              | ~10         | 10           | ~20      |
+| Powiadomienia        | ~8          | 8            | ~16      |
+| Chat API             | —           | 9            | 9        |
+| Contact API          | —           | 8            | 8        |
+| Narzędzia i hooki    | ~50         | —            | ~50      |
+| Tablica interaktywna | ~15         | —            | ~15      |
+| **Razem**            | **~138**    | **~77**      | **~215** |
 
 ---
 

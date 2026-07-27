@@ -8,20 +8,9 @@
 
 'use client';
 
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  ReactNode,
-} from 'react';
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-import {
-  setAccessToken,
-  removeAccessToken,
-  setStoredUser,
-  removeStoredUser,
-} from './tokenStore';
+import { setAccessToken, removeAccessToken, setStoredUser, removeStoredUser } from './tokenStore';
 import { refreshAccessToken } from './tokenService';
 import { getCurrentUser, logoutUser } from '@/_new/features/auth/api/authApi';
 import type { User } from '@/_new/shared/types/user';
@@ -38,7 +27,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(null);
         }
       } finally {
-          setLoading(false);
+        setLoading(false);
       }
     };
 

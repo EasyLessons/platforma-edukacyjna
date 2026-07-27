@@ -15,7 +15,6 @@ import type { ElementHandler, BoundingBox, RenderExtras } from './types';
 import { rotateAroundPivot, getRotatedAABB, getSimpleAABB } from './handler-utils';
 import { transformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
 
-
 // ─── Cache per-element ────────────────────────────────────────────────────────
 //
 // Klucz główny Map: el.id (jeden wpis per element).
@@ -38,15 +37,15 @@ export function invalidateTextCache(id: string): void {
 function getWrappedLines(
   ctx: CanvasRenderingContext2D,
   el: TextElement,
-  maxWidth: number,
+  maxWidth: number
 ): string[] {
   const newKey = [
     el.text,
     maxWidth.toFixed(1),
     el.fontSize,
-    el.fontFamily  ?? 'Arial',
-    el.fontWeight  ?? 'normal',
-    el.fontStyle   ?? 'normal',
+    el.fontFamily ?? 'Arial',
+    el.fontWeight ?? 'normal',
+    el.fontStyle ?? 'normal',
   ].join('|');
 
   const cached = textWrapCache.get(el.id);
@@ -60,7 +59,7 @@ function getWrappedLines(
 function computeWrappedLines(
   ctx: CanvasRenderingContext2D,
   text: string,
-  maxWidth: number,
+  maxWidth: number
 ): string[] {
   const paragraphs = text.split('\n');
   const result: string[] = [];
@@ -72,7 +71,10 @@ function computeWrappedLines(
     for (const word of words) {
       // Słowo szersze niż ramka → łamanie znak po znaku
       if (ctx.measureText(word).width > maxWidth) {
-        if (current) { result.push(current); current = ''; }
+        if (current) {
+          result.push(current);
+          current = '';
+        }
 
         let remaining = word;
         while (ctx.measureText(remaining).width > maxWidth) {
@@ -105,7 +107,6 @@ function computeWrappedLines(
   return result;
 }
 
-
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
 export const TextHandler: ElementHandler<TextElement> = {
@@ -113,7 +114,7 @@ export const TextHandler: ElementHandler<TextElement> = {
   canRotate: true,
 
   getBoundingBox(el): BoundingBox {
-    const w = el.width  ?? 3;
+    const w = el.width ?? 3;
     const h = el.height ?? 1;
     if (el.rotation && el.rotation !== 0) {
       return getRotatedAABB(el.x, el.y, w, h, el.rotation);
@@ -122,7 +123,7 @@ export const TextHandler: ElementHandler<TextElement> = {
   },
 
   isPointInElement(point, el) {
-    const w = el.width  ?? 3;
+    const w = el.width ?? 3;
     const h = el.height ?? 1;
 
     if (el.rotation && el.rotation !== 0) {
@@ -137,19 +138,16 @@ export const TextHandler: ElementHandler<TextElement> = {
       return rx >= el.x && rx <= el.x + w && ry >= el.y && ry <= el.y + h;
     }
 
-    return (
-      point.x >= el.x && point.x <= el.x + w &&
-      point.y >= el.y && point.y <= el.y + h
-    );
+    return point.x >= el.x && point.x <= el.x + w && point.y >= el.y && point.y <= el.y + h;
   },
 
   resize(el, pivotX, pivotY, scaleX, scaleY) {
     // Miro-style: czyste proporcjonalne skalowanie
     return {
-      x:        pivotX + (el.x - pivotX) * scaleX,
-      y:        pivotY + (el.y - pivotY) * scaleY,
-      width:    (el.width  ?? 3) * scaleX,
-      height:   (el.height ?? 1) * scaleY,
+      x: pivotX + (el.x - pivotX) * scaleX,
+      y: pivotY + (el.y - pivotY) * scaleY,
+      width: (el.width ?? 3) * scaleX,
+      height: (el.height ?? 1) * scaleY,
       fontSize: el.fontSize * scaleX,
     };
   },
@@ -159,15 +157,15 @@ export const TextHandler: ElementHandler<TextElement> = {
   },
 
   rotate(el, rotationAngle, pivot, cos, sin) {
-    const w = el.width  ?? 3;
+    const w = el.width ?? 3;
     const h = el.height ?? 1;
     const cx = el.x + w / 2;
     const cy = el.y + h / 2;
     const newCenter = rotateAroundPivot({ x: cx, y: cy }, pivot, cos, sin);
 
     return {
-      x:        newCenter.x - w / 2,
-      y:        newCenter.y - h / 2,
+      x: newCenter.x - w / 2,
+      y: newCenter.y - h / 2,
       rotation: (el.rotation ?? 0) + rotationAngle,
     };
   },
@@ -177,8 +175,8 @@ export const TextHandler: ElementHandler<TextElement> = {
 
     if (el.rotation && el.rotation !== 0) {
       ctx.save();
-      const w  = (el.width  ?? 3) * viewport.scale * 100;
-      const h  = (el.height ?? 1) * viewport.scale * 100;
+      const w = (el.width ?? 3) * viewport.scale * 100;
+      const h = (el.height ?? 1) * viewport.scale * 100;
       const cx = pos.x + w / 2;
       const cy = pos.y + h / 2;
       ctx.translate(cx, cy);
@@ -187,36 +185,36 @@ export const TextHandler: ElementHandler<TextElement> = {
     }
 
     const fontWeight = el.fontWeight ?? 'normal';
-    const fontStyle  = el.fontStyle  ?? 'normal';
+    const fontStyle = el.fontStyle ?? 'normal';
     const fontFamily = el.fontFamily ?? 'Arial, sans-serif';
-    const fontSize   = el.fontSize * viewport.scale;
+    const fontSize = el.fontSize * viewport.scale;
 
-    ctx.fillStyle    = el.color;
-    ctx.font         = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
+    ctx.fillStyle = el.color;
+    ctx.font = `${fontStyle} ${fontWeight} ${fontSize}px ${fontFamily}`;
     ctx.textBaseline = 'top';
 
     const textAlign = el.textAlign ?? 'left';
-    ctx.textAlign   = textAlign;
+    ctx.textAlign = textAlign;
 
     const lineHeight = fontSize * 1.4;
-    const paddingX   = 0;
-    const paddingY   = 0;
+    const paddingX = 0;
+    const paddingY = 0;
 
     let textX = pos.x + paddingX;
 
     if (el.width) {
-      const boxWidth     = el.width * viewport.scale * 100;
+      const boxWidth = el.width * viewport.scale * 100;
       const contentWidth = boxWidth - paddingX * 2;
       if (textAlign === 'center') textX = pos.x + paddingX + contentWidth / 2;
       else if (textAlign === 'right') textX = pos.x + paddingX + contentWidth;
 
-      const maxWidth     = boxWidth - paddingX * 2;
+      const maxWidth = boxWidth - paddingX * 2;
       const wrappedLines = getWrappedLines(ctx, el, maxWidth);
 
       if (extras?.debug) {
         const curPx = (el.height ?? 0) * viewport.scale * 100;
         ctx.strokeStyle = 'rgba(0, 100, 255, 0.8)';
-        ctx.lineWidth   = 2;
+        ctx.lineWidth = 2;
         ctx.strokeRect(pos.x, pos.y, boxWidth, curPx);
       }
 

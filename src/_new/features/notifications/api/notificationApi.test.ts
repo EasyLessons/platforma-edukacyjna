@@ -61,7 +61,11 @@ describe('fetchNotifications', () => {
 
 describe('markNotificationAsRead', () => {
   it('zwraca zaktualizowane powiadomienie z is_read=true', async () => {
-    const readNotification = { ...mockNotification, is_read: true, read_at: '2024-06-01T13:00:00Z' };
+    const readNotification = {
+      ...mockNotification,
+      is_read: true,
+      read_at: '2024-06-01T13:00:00Z',
+    };
     mock.onPatch('/api/v1/notifications/1/read').reply(200, {
       success: true,
       data: readNotification,

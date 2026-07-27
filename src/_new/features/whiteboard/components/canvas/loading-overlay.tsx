@@ -66,9 +66,7 @@ export function LoadingOverlay({ isLoading, progress }: LoadingOverlayProps) {
       </div>
 
       {/* Tekst */}
-      <p className="mt-4 text-sm text-gray-600">
-        Ładowanie tablicy... {Math.round(progress)}%
-      </p>
+      <p className="mt-4 text-sm text-gray-600">Ładowanie tablicy... {Math.round(progress)}%</p>
 
       {/* Hint przy wolnym starcie bazy (Neon cold start) */}
       {showSlowHint && (

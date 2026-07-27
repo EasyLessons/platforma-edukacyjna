@@ -83,9 +83,17 @@ export function tryCalculate(query: string): CalculationResult | null {
 
 function normalizeText(text: string): string {
   const map: Record<string, string> = {
-    'ą': 'a', 'ć': 'c', 'ę': 'e', 'ł': 'l', 'ń': 'n', 'ó': 'o', 'ś': 's', 'ź': 'z', 'ż': 'z'
+    ą: 'a',
+    ć: 'c',
+    ę: 'e',
+    ł: 'l',
+    ń: 'n',
+    ó: 'o',
+    ś: 's',
+    ź: 'z',
+    ż: 'z',
   };
-  return text.toLowerCase().replace(/[ąćęłńóśźż]/g, match => map[match]);
+  return text.toLowerCase().replace(/[ąćęłńóśźż]/g, (match) => map[match]);
 }
 
 export function searchResources(manifest: ResourceManifest, query: string): SearchResult[] {
@@ -96,7 +104,8 @@ export function searchResources(manifest: ResourceManifest, query: string): Sear
 
   // Pokaż tylko karty wzorów dla polecenia docelowego
   if (normalizedQuery === 'karty wzorow') {
-    return manifest.cards.map(card => ({ ...card, resultType: 'card' } as SearchResult))
+    return manifest.cards
+      .map((card) => ({ ...card, resultType: 'card' }) as SearchResult)
       .sort((a, b) => {
         const orderA = 'order' in a ? (a.order as number) : 0;
         const orderB = 'order' in b ? (b.order as number) : 0;
@@ -150,7 +159,7 @@ export function searchResources(manifest: ResourceManifest, query: string): Sear
     return orderA - orderB;
   });
 
-  return resultsWithScore.map(r => r.item);
+  return resultsWithScore.map((r) => r.item);
 }
 
 function calculateScore(formula: FormulaResource, queryWords: string[]): number {
@@ -173,7 +182,7 @@ function calculateScore(formula: FormulaResource, queryWords: string[]): number 
     }
 
     // Tagi - wysoki priorytet (+5 punktów)
-    if (normalizedTags.some(t => t.includes(word))) {
+    if (normalizedTags.some((t) => t.includes(word))) {
       score += 5;
       wordMatched = true;
     }
@@ -197,13 +206,9 @@ function calculateScore(formula: FormulaResource, queryWords: string[]): number 
 function calculateCardScore(card: CardResource, queryWords: string[]): number {
   let score = 0;
 
-  const searchText = normalizeText([
-    card.title,
-    card.description,
-    ...card.tags,
-    ...card.sections.map((s) => s.name),
-  ]
-    .join(' '));
+  const searchText = normalizeText(
+    [card.title, card.description, ...card.tags, ...card.sections.map((s) => s.name)].join(' ')
+  );
 
   for (const word of queryWords) {
     if (searchText.includes(word)) {

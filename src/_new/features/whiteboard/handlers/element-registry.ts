@@ -22,13 +22,13 @@
 import type { DrawingElement } from '@/_new/features/whiteboard/types';
 import type { ElementHandler } from './types';
 
-import { PathHandler }     from './path-handler';
-import { ShapeHandler }    from './shape-handler';
-import { TextHandler }     from './text-handler';
-import { ImageHandler }    from './image-handler';
+import { PathHandler } from './path-handler';
+import { ShapeHandler } from './shape-handler';
+import { TextHandler } from './text-handler';
+import { ImageHandler } from './image-handler';
 import { MarkdownHandler } from './markdown-handler';
-import { TableHandler }    from './table-handler';
-import { PdfHandler }      from './pdf-handler';
+import { TableHandler } from './table-handler';
+import { PdfHandler } from './pdf-handler';
 
 /**
  * Główny rejestr.
@@ -37,12 +37,12 @@ import { PdfHandler }      from './pdf-handler';
  * problemów z wariancją generyczną podczas zwykłego lookup.
  */
 export const ElementRegistry: Partial<Record<DrawingElement['type'], ElementHandler<any>>> = {
-  path:     PathHandler,
-  shape:    ShapeHandler,
-  text:     TextHandler,
-  image:    ImageHandler,
+  path: PathHandler,
+  shape: ShapeHandler,
+  text: TextHandler,
+  image: ImageHandler,
   markdown: MarkdownHandler,
-  table:    TableHandler,
-  pdf:      PdfHandler,
+  table: TableHandler,
+  pdf: PdfHandler,
   // 'function' – brak handlera (nie jest zaznaczalny w select-tool)
 };

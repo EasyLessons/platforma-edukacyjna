@@ -58,10 +58,7 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
 
   return createPortal(
     <div className="dashboard-modal-overlay">
-      <div
-        ref={modalRef}
-        className="dashboard-modal-surface max-w-lg"
-      >
+      <div ref={modalRef} className="dashboard-modal-surface max-w-lg">
         {/* Header */}
         <div className="dashboard-modal-header">
           <h2 className="text-xl font-bold text-gray-900">Stwórz nową przestrzeń</h2>

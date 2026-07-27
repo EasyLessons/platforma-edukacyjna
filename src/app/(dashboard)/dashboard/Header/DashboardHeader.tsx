@@ -31,7 +31,9 @@ interface DashboardHeaderProps {
   refreshWorkspaces?: () => Promise<void>;
 }
 
-export default function DashboardHeader({ refreshWorkspaces: refreshWorkspacesProp }: DashboardHeaderProps) {
+export default function DashboardHeader({
+  refreshWorkspaces: refreshWorkspacesProp,
+}: DashboardHeaderProps) {
   const router = useRouter();
   const { logout, user: authUser, isLoggedIn, loading: authLoading } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
@@ -189,8 +191,8 @@ export default function DashboardHeader({ refreshWorkspaces: refreshWorkspacesPr
                     aria-label="Otwórz ustawienia konta"
                   >
                     {(user as any).avatar_url ? (
-                      <img 
-                        src={(user as any).avatar_url} 
+                      <img
+                        src={(user as any).avatar_url}
                         alt="Avatar"
                         className="h-7 w-7 rounded-full object-cover border border-gray-200"
                       />
@@ -269,13 +271,12 @@ export default function DashboardHeader({ refreshWorkspaces: refreshWorkspacesPr
           {showMobileMenu && user && (
             <div className="absolute top-[100%] left-0 w-full min-[1640px]:hidden z-40 bg-transparent animate-in slide-in-from-top-2">
               <div className="dashboard-popup-surface w-full overflow-hidden mx-auto rounded-t-none border-t-0 border-x-0 sm:border-x shadow-2xl">
-                
                 {/* Info użytkownika */}
                 <div className="border-b border-[var(--dash-border)] bg-[var(--dash-panel)] px-4 py-4">
                   <div className="flex items-center gap-3">
                     {(user as any).avatar_url ? (
-                      <img 
-                        src={(user as any).avatar_url} 
+                      <img
+                        src={(user as any).avatar_url}
                         alt="Avatar"
                         className="w-11 h-11 rounded-full object-cover border border-[var(--dash-border)] shadow-sm"
                       />
@@ -283,11 +284,15 @@ export default function DashboardHeader({ refreshWorkspaces: refreshWorkspacesPr
                       <div
                         className={`w-11 h-11 rounded-full flex items-center justify-center shadow-sm ${getAvatarColorClass(user.id)}`}
                       >
-                        <span className="text-white font-semibold text-base">{getInitials(user.name)}</span>
+                        <span className="text-white font-semibold text-base">
+                          {getInitials(user.name)}
+                        </span>
                       </div>
                     )}
                     <div className="min-w-0 flex-1">
-                      <div className="font-semibold text-gray-800 text-sm truncate">{user.name}</div>
+                      <div className="font-semibold text-gray-800 text-sm truncate">
+                        {user.name}
+                      </div>
                       <div className="text-xs text-gray-500 truncate">{user.email}</div>
                     </div>
                   </div>

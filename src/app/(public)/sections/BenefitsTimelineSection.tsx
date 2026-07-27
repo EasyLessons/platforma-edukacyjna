@@ -19,7 +19,8 @@ const milestones = [
   },
   {
     badge: 'W pierwsze 4 minuty',
-    description: 'Poczuj się jak u siebie. Tablica i materiały zawsze pod ręką. Bez zbędnego klikania i szukania.',
+    description:
+      'Poczuj się jak u siebie. Tablica i materiały zawsze pod ręką. Bez zbędnego klikania i szukania.',
     image: '/resources/Feature2.webp',
     imageAlt: 'EasyLesson funkcja 2',
   },
@@ -118,18 +119,20 @@ export default function BenefitsTimelineSection() {
   const translateX = -(scrollProgress * maxTranslate);
 
   return (
-    <section
-      ref={sectionRef}
-      className={`${jakartaSans.className} w-full bg-[#0f0f0f] text-white`}
-    >
+    <section ref={sectionRef} className={`${jakartaSans.className} w-full bg-[#0f0f0f] text-white`}>
       {/* --- WERSJA MOBILNA --- */}
       <div className="flex flex-col px-6 py-14 sm:px-8 sm:py-16 lg:hidden">
         <div className="mx-auto w-full max-w-[1500px]">
           <p
             className="max-w-6xl text-[2rem] font-semibold leading-[1.02] text-white sm:max-w-5xl sm:text-[2.8rem]"
-            style={{ opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(18px)', transition: 'opacity 0.7s ease, transform 0.7s ease' }}
+            style={{
+              opacity: isVisible ? 1 : 0,
+              transform: isVisible ? 'translateY(0)' : 'translateY(18px)',
+              transition: 'opacity 0.7s ease, transform 0.7s ease',
+            }}
           >
-            Oto co zyskasz z EasyLesson<br/> w zaledwie 30 dni.
+            Oto co zyskasz z EasyLesson
+            <br /> w zaledwie 30 dni.
           </p>
 
           <div className="mt-12 flex flex-col gap-14 sm:gap-16">
@@ -173,9 +176,14 @@ export default function BenefitsTimelineSection() {
             <div className="mx-auto w-full max-w-[1500px] px-10">
               <p
                 className="max-w-6xl text-[3.6rem] font-semibold leading-[1.02] text-white"
-                style={{ opacity: isVisible ? 1 : 0, transform: isVisible ? 'translateY(0)' : 'translateY(18px)', transition: 'opacity 0.7s ease, transform 0.7s ease' }}
+                style={{
+                  opacity: isVisible ? 1 : 0,
+                  transform: isVisible ? 'translateY(0)' : 'translateY(18px)',
+                  transition: 'opacity 0.7s ease, transform 0.7s ease',
+                }}
               >
-                Oto co zyskasz z EasyLesson<br/> w zaledwie 30 dni.
+                Oto co zyskasz z EasyLesson
+                <br /> w zaledwie 30 dni.
               </p>
             </div>
 
@@ -183,8 +191,10 @@ export default function BenefitsTimelineSection() {
               <div
                 className="absolute left-0 top-0 h-full w-full overflow-hidden"
                 style={{
-                  maskImage: 'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%)',
-                  WebkitMaskImage: 'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%)',
+                  maskImage:
+                    'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%)',
+                  WebkitMaskImage:
+                    'linear-gradient(to right, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 5%, rgba(0,0,0,1) 95%, rgba(0,0,0,0) 100%)',
                 }}
               >
                 <div
@@ -223,7 +233,7 @@ export default function BenefitsTimelineSection() {
                       </div>
                     </article>
                   ))}
-                  
+
                   {/* Sztuczny opór dla scrolla przeliczający brakujące pole (right padding), co poprawnie centruje widok */}
                   <div className="shrink-0 w-[25vw]" />
                 </div>

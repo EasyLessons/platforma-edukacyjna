@@ -85,13 +85,13 @@ apiClient.interceptors.response.use(
     const status = error?.response?.status;
 
     const isAuthError =
-      status === 401 ||
-      (status === 403 && error?.response?.data?.detail === 'Not authenticated');
+      status === 401 || (status === 403 && error?.response?.data?.detail === 'Not authenticated');
 
     const originalRequest = error.config as AxiosRequestConfig & { _retried?: boolean };
 
     // Na endpointach auth (login, register) 401 zawsze znaczy złe dane — nie próbuj refresha
-    const isAuthEndpoint = originalRequest.url?.includes('/auth/login') ||
+    const isAuthEndpoint =
+      originalRequest.url?.includes('/auth/login') ||
       originalRequest.url?.includes('/auth/register');
 
     if (isAuthError && !originalRequest._retried && !isAuthEndpoint) {

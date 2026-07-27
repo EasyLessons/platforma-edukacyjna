@@ -3,11 +3,10 @@ Testy serwisu whiteboard (sesja tablicy)
 api/v1/whiteboard/service.py
 """
 import pytest
-from datetime import datetime
 
 from api.v1.whiteboard.service import WhiteboardService
 from api.v1.whiteboard.schemas import (
-    OnlineUserInfo, BoardOwnerInfo, LastModifiedByInfo,
+    BoardOwnerInfo, LastModifiedByInfo,
     SaveElementsResponse, BoardElementWithAuthor,
 )
 from core.exceptions import NotFoundError, AppException, ValidationError

@@ -1,7 +1,7 @@
 """Schemas dla modułu whiteboard (sesja tablicy)."""
 from datetime import datetime
 from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class OnlineUserInfo(BaseModel):

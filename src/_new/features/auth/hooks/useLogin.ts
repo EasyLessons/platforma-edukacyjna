@@ -55,7 +55,7 @@ export function useLogin() {
     if (!emailValidation.valid) {
       newErrors.login = emailValidation.error;
     }
-    
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };

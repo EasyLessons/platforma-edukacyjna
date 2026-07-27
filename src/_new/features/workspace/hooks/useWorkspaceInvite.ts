@@ -70,7 +70,11 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
 
   const statusesQuery = useQuery<Record<number, InviteStatusResponse>>({
     queryKey: ['workspace-invite-statuses', workspace_id, users.map((user) => user.id).join(',')],
-    queryFn: () => checkUsersInviteStatusBatch(workspace_id, users.map((user) => user.id)),
+    queryFn: () =>
+      checkUsersInviteStatusBatch(
+        workspace_id,
+        users.map((user) => user.id)
+      ),
     enabled: isOpen && users.length > 0,
   });
 
@@ -137,7 +141,11 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
     searchQuery,
     setSearchQuery,
     users: usersWithStatus,
-    searchLoading: usersQuery.isLoading || statusesQuery.isLoading || usersQuery.isFetching || statusesQuery.isFetching,
+    searchLoading:
+      usersQuery.isLoading ||
+      statusesQuery.isLoading ||
+      usersQuery.isFetching ||
+      statusesQuery.isFetching,
     searchError,
     // Invite
     invite,

@@ -60,7 +60,6 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
     preventCloseWhen: () => !!invitingUserId,
   });
 
-
   // HELPERS
   // ================================
   const getUserStatusBadge = (user: UserWithStatus) => {

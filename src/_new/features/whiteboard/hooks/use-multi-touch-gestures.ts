@@ -95,8 +95,14 @@ export function useMultiTouchGestures({
 
         onViewportChange({
           scale: targetScale,
-          x: worldX - (centerX - rect.width / 2) / (targetScale * 100) - (deltaX / (targetScale * 100)),
-          y: worldY - (centerY - rect.height / 2) / (targetScale * 100) - (deltaY / (targetScale * 100)),
+          x:
+            worldX -
+            (centerX - rect.width / 2) / (targetScale * 100) -
+            deltaX / (targetScale * 100),
+          y:
+            worldY -
+            (centerY - rect.height / 2) / (targetScale * 100) -
+            deltaY / (targetScale * 100),
         });
 
         lastCenterRef.current = newCenter;

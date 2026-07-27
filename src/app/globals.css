@@ -219,7 +219,14 @@ body {
 
 /* Kolorowe glow effects na tekście dla przycisków menu - falka koloru */
 button.text-glow-blue {
-  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(59, 130, 246) 50%, #6b7280 70%, #6b7280 100%);
+  background: linear-gradient(
+    90deg,
+    #6b7280 0%,
+    #6b7280 30%,
+    rgb(59, 130, 246) 50%,
+    #6b7280 70%,
+    #6b7280 100%
+  );
   background-size: 300% 100%;
   background-position: -100% center;
   -webkit-background-clip: text;
@@ -232,7 +239,14 @@ button.text-glow-blue:hover {
 }
 
 button.text-glow-purple {
-  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(168, 85, 247) 50%, #6b7280 70%, #6b7280 100%);
+  background: linear-gradient(
+    90deg,
+    #6b7280 0%,
+    #6b7280 30%,
+    rgb(168, 85, 247) 50%,
+    #6b7280 70%,
+    #6b7280 100%
+  );
   background-size: 300% 100%;
   background-position: -100% center;
   -webkit-background-clip: text;
@@ -245,7 +259,14 @@ button.text-glow-purple:hover {
 }
 
 button.text-glow-orange {
-  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(249, 115, 22) 50%, #6b7280 70%, #6b7280 100%);
+  background: linear-gradient(
+    90deg,
+    #6b7280 0%,
+    #6b7280 30%,
+    rgb(249, 115, 22) 50%,
+    #6b7280 70%,
+    #6b7280 100%
+  );
   background-size: 300% 100%;
   background-position: -100% center;
   -webkit-background-clip: text;
@@ -258,7 +279,14 @@ button.text-glow-orange:hover {
 }
 
 button.text-glow-green {
-  background: linear-gradient(90deg, #6b7280 0%, #6b7280 30%, rgb(34, 197, 94) 50%, #6b7280 70%, #6b7280 100%);
+  background: linear-gradient(
+    90deg,
+    #6b7280 0%,
+    #6b7280 30%,
+    rgb(34, 197, 94) 50%,
+    #6b7280 70%,
+    #6b7280 100%
+  );
   background-size: 300% 100%;
   background-position: -100% center;
   -webkit-background-clip: text;
@@ -360,6 +388,12 @@ button.text-glow-green:hover {
   background: transparent !important;
 }
 
-iframe.VIpgJd-ZVi9od-ORHb-OEVmcd { display: none !important; }
-body { top: 0px !important; }
-.skiptranslate>iframe { display: none !important; }
+iframe.VIpgJd-ZVi9od-ORHb-OEVmcd {
+  display: none !important;
+}
+body {
+  top: 0px !important;
+}
+.skiptranslate > iframe {
+  display: none !important;
+}

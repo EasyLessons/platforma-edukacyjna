@@ -113,8 +113,8 @@ async def send_workspace_invite_email(
             """
         }
         
-        response = resend.Emails.send(params)
+        resend.Emails.send(params)
         return True
         
-    except Exception as e:
+    except Exception:
         raise

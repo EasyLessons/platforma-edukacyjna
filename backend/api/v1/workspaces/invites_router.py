@@ -2,12 +2,11 @@
 Invites router — /api/v1/workspaces/*
 """
 from typing import List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
-from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (

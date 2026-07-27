@@ -2,7 +2,6 @@
 Testy wyszukiwania użytkowników
 GET /api/v1/auth/users/search
 """
-import pytest
 
 from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import UserSearchResult

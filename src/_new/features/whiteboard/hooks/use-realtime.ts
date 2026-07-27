@@ -29,11 +29,7 @@ export type { TypingUser, RemoteViewport };
 
 export interface UseRealtimeOptions {
   /** Dodaj element który przyszedł od innego użytkownika */
-  onRemoteElementAdded: (
-    element: DrawingElement,
-    userId: number,
-    username: string
-  ) => void;
+  onRemoteElementAdded: (element: DrawingElement, userId: number, username: string) => void;
   /**
    * Zaktualizuj element który zmienił się u innego użytkownika.
    * UWAGA: `element` może być NIEPEŁNY (bez `src` dla zdjęć — patrz
@@ -46,11 +42,7 @@ export interface UseRealtimeOptions {
     username: string
   ) => void;
   /** Usuń element który skasował inny użytkownik */
-  onRemoteElementDeleted: (
-    elementId: string,
-    userId: number,
-    username: string
-  ) => void;
+  onRemoteElementDeleted: (elementId: string, userId: number, username: string) => void;
   /** Załaduj zdalne obrazy do cache loadedImages */
   onLoadRemoteImage: (id: string, src: string) => void;
   /** Callback gdy zdalny viewport się zmienia (dla follow mode) */
@@ -93,7 +85,6 @@ export interface UseRealtimeReturn {
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
 export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
-
   const {
     onlineUsers,
     isConnected,
@@ -134,15 +125,15 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
         optionsRef.current.onLoadRemoteImage(element.id, (element as ImageElement).src);
       }
     });
-    
+
     registerRemoteUpdated((element, userId, username) => {
       optionsRef.current.onRemoteElementUpdated(element, userId, username);
     });
-    
+
     registerRemoteDeleted((elementId, userId, username) => {
       optionsRef.current.onRemoteElementDeleted(elementId, userId, username);
     });
-    
+
     if (registerRemoteBatch) {
       registerRemoteBatch((elements, userId, username, geometryOnly) => {
         if (optionsRef.current.onElementsUpdated) {
@@ -158,7 +149,7 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
         }
       });
     }
-    
+
     if (onRemoteSyncResponse) {
       onRemoteSyncResponse((elements, userId, username) => {
         if (optionsRef.current.onSyncResponse) {
@@ -166,7 +157,7 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
         }
       });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ─── Subskrypcja: typing indicator ──────────────────────────────────────

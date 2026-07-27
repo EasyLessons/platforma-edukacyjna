@@ -12,7 +12,7 @@ Folder `EasyLesson - dokumentacja projektu` istnieje w dwóch miejscach: w root 
 
 ### 1.2 `docs/ai-context/global-context.md` jest nieaktualny (wysoki priorytet)
 
-Ten plik to prompt startowy do wklejania w rozmowy z AI — opisuje stack jako "FastAPI + Supabase (Auth & Realtime)" i wymienia jako *przyszły cel* zbudowanie dashboardu z CRUD i "połączeniem z bazą Supabase". To już nieprawda: macie osobny dokument `auth-cookie-first-refactor.md` opisujący w pełni działającą autoryzację cookie-first z własnym JWT i refresh-tokenami w Postgresie (potwierdzone w kodzie: tabela `refresh_tokens`, `backend/auth`), a dashboard z pełnym CRUD boardów/workspace'ów już istnieje (`backend/dashboard`, `backend/api/v1/boards`, `backend/api/v1/workspaces`). Supabase w rzeczywistości jest używany wyłącznie do realtime broadcast tablicy (`src/lib/supabase.ts`), nie do auth.
+Ten plik to prompt startowy do wklejania w rozmowy z AI — opisuje stack jako "FastAPI + Supabase (Auth & Realtime)" i wymienia jako _przyszły cel_ zbudowanie dashboardu z CRUD i "połączeniem z bazą Supabase". To już nieprawda: macie osobny dokument `auth-cookie-first-refactor.md` opisujący w pełni działającą autoryzację cookie-first z własnym JWT i refresh-tokenami w Postgresie (potwierdzone w kodzie: tabela `refresh_tokens`, `backend/auth`), a dashboard z pełnym CRUD boardów/workspace'ów już istnieje (`backend/dashboard`, `backend/api/v1/boards`, `backend/api/v1/workspaces`). Supabase w rzeczywistości jest używany wyłącznie do realtime broadcast tablicy (`src/lib/supabase.ts`), nie do auth.
 
 Jeśli używasz tego pliku jako kontekstu startowego dla AI, obecnie wprowadza on błędne założenia o architekturze.
 

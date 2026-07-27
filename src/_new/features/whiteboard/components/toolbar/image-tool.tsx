@@ -189,8 +189,14 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
             // nawet po kompresji regularnie przekracza limit 256 KB na
             // wiadomość Broadcast, dlatego trafia do Supabase Storage
             // (element.src dostaje tylko URL).
-            const { url, width: imgW, height: imgH } = await compressAndUploadImage(
-              images[i], Number(boardId), `${file.name}-page-${i + 1}.jpg`
+            const {
+              url,
+              width: imgW,
+              height: imgH,
+            } = await compressAndUploadImage(
+              images[i],
+              Number(boardId),
+              `${file.name}-page-${i + 1}.jpg`
             );
 
             const aspectRatio = imgH / Math.max(imgW, 1);
@@ -213,7 +219,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
             // Małe opóźnienie żeby ID były unikalne i state się zaktualizował
             await new Promise((resolve) => setTimeout(resolve, 50));
           }
-
         } else {
           // Obsługa zwykłego obrazka
           const reader = new FileReader();
@@ -228,7 +233,9 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           // przekraczało limit 256 KB na wiadomość Broadcast, dlatego trafia
           // do Supabase Storage (element.src dostaje tylko URL).
           const { url, width, height } = await compressAndUploadImage(
-            rawDataUrl, Number(boardId), file.name
+            rawDataUrl,
+            Number(boardId),
+            file.name
           );
 
           // Wstaw w centrum widoku
@@ -259,7 +266,6 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           // ✅ Od razu tworzy element - BEZ PREVIEW!
           onImageCreate(newImage);
         }
-
       } catch (err) {
         console.error('File upload error:', err);
       }
@@ -291,4 +297,3 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
 );
 
 ImageTool.displayName = 'ImageTool';
-

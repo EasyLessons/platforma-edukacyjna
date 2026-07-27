@@ -7,9 +7,7 @@ from unittest.mock import patch, AsyncMock
 
 from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import ResendCodeResponse
-from api.v1.auth.utils import hash_password
 from core.exceptions import NotFoundError, ValidationError
-from core.models import User
 
 MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
 

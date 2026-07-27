@@ -122,11 +122,13 @@ export function BoardHeader({
               </button>
             </Tooltip>
 
-           
-
             {/* Sidebar toggle (po prawej stronie logo) */}
             {onSidebarToggle && (
-              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom" className='ml-2'>
+              <Tooltip
+                content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+                position="bottom"
+                className="ml-2"
+              >
                 <button
                   onClick={onSidebarToggle}
                   style={{
@@ -153,11 +155,9 @@ export function BoardHeader({
               </Tooltip>
             )}
 
-            
-
             {/* Przycisk ustawień tablicy */}
             {onSettingsClick && (
-              <Tooltip content="Ustawienia tablicy" position="bottom" className='ml-3 '>
+              <Tooltip content="Ustawienia tablicy" position="bottom" className="ml-3 ">
                 <button
                   onClick={onSettingsClick}
                   style={{
@@ -182,8 +182,6 @@ export function BoardHeader({
                 </button>
               </Tooltip>
             )}
-
-           
 
             {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
             <Tooltip content={boardName || 'Tablica'} position="bottom">
@@ -221,22 +219,18 @@ export function BoardHeader({
 
             {showUpgradeButton && (
               <>
-                
-
                 <Tooltip content="Zmień wersję na premium" position="bottom">
                   <Button
                     onClick={() => router.push('/#pricing')}
                     variant="secondary"
                     size="sm"
-                  className="font-semibold ml-4 -mr-[5px] hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700  whitespace-nowrap transition-all duration-300 ease-in-out"
-                >
-                  Zmień wersję
-                </Button>
+                    className="font-semibold ml-4 -mr-[5px] hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700  whitespace-nowrap transition-all duration-300 ease-in-out"
+                  >
+                    Zmień wersję
+                  </Button>
                 </Tooltip>
               </>
             )}
-
-          
           </div>
         </div>
       )}
@@ -313,7 +307,10 @@ export function BoardHeader({
             )}
 
             {onSidebarToggle && (
-              <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="bottom">
+              <Tooltip
+                content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+                position="bottom"
+              >
                 <button
                   onClick={onSidebarToggle}
                   style={{
@@ -396,7 +393,10 @@ export function BoardHeader({
           }}
         >
           {onSidebarToggle && (
-            <Tooltip content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'} position="right">
+            <Tooltip
+              content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+              position="right"
+            >
               <button
                 onClick={onSidebarToggle}
                 style={{

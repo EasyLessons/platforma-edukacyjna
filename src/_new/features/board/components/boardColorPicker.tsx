@@ -17,11 +17,7 @@ interface BoardColorPickerProps {
   disabled?: boolean;
 }
 
-export function BoardColorPicker({
-  selected,
-  onChange,
-  disabled = false,
-}: BoardColorPickerProps) {
+export function BoardColorPicker({ selected, onChange, disabled = false }: BoardColorPickerProps) {
   return (
     <div>
       {/* Label */}
@@ -60,9 +56,7 @@ export function BoardColorPicker({
       </div>
 
       {/* Helper text */}
-      <p className="text-xs text-gray-500 mt-2">
-        Wybierz kolor który pomoże Ci rozpoznać tablicę
-      </p>
+      <p className="text-xs text-gray-500 mt-2">Wybierz kolor który pomoże Ci rozpoznać tablicę</p>
     </div>
   );
 }

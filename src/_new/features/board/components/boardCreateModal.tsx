@@ -25,7 +25,12 @@ interface BoardCreateModalProps {
   onSubmit: (data: BoardCreateRequest) => Promise<void>;
 }
 
-export function BoardCreateModal({ isOpen, onClose, workspace_id, onSubmit }: BoardCreateModalProps) {
+export function BoardCreateModal({
+  isOpen,
+  onClose,
+  workspace_id,
+  onSubmit,
+}: BoardCreateModalProps) {
   // STATE
   // ================================
 
@@ -62,10 +67,7 @@ export function BoardCreateModal({ isOpen, onClose, workspace_id, onSubmit }: Bo
 
   return createPortal(
     <div className="dashboard-modal-overlay">
-      <div
-        ref={modalRef}
-        className="dashboard-modal-surface max-w-lg"
-      >
+      <div ref={modalRef} className="dashboard-modal-surface max-w-lg">
         {/* Header */}
         <div className="dashboard-modal-header">
           <h2 className="text-xl font-bold text-gray-900">Nowa tablica</h2>

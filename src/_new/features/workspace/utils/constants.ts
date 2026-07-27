@@ -2,7 +2,7 @@
  * WORKSPACE CONSTANTS
  *
  * Centralne miejsce dla wszystkich stałych używanych w workspace module.
- * 
+ *
  */
 
 import {

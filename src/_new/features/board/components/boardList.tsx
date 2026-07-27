@@ -46,7 +46,14 @@ export function BoardList({
   // DATA
   // ================================
 
-  const boardIdsKey = useMemo(() => boards.map((b) => b.id).sort((a, b) => a - b).join(','), [boards]);
+  const boardIdsKey = useMemo(
+    () =>
+      boards
+        .map((b) => b.id)
+        .sort((a, b) => a - b)
+        .join(','),
+    [boards]
+  );
   const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const onlineUsersQuery = useQuery<Record<number, OnlineUser[]>>({
     queryKey: ['board-online-users-batch', boardIdsKey],
@@ -67,10 +74,12 @@ export function BoardList({
   // Loading state — Identical to BoardCard UI
   if (loading) {
     return (
-      <div className="flex flex-col gap-0"> {/* Gap 0, bo BoardCard ma własne paddingi */}
-        {[1, 2, 3, 4, ].map((i) => (
-          <div 
-            key={i} 
+      <div className="flex flex-col gap-0">
+        {' '}
+        {/* Gap 0, bo BoardCard ma własne paddingi */}
+        {[1, 2, 3, 4].map((i) => (
+          <div
+            key={i}
             className="px-3 py-3 border-b border-gray-50/50 flex flex-col justify-center"
           >
             {/* MOBILE LAYOUT SKELETON (flex lg:hidden) */}
@@ -84,7 +93,6 @@ export function BoardList({
 
             {/* DESKTOP LAYOUT SKELETON (hidden lg:grid grid-cols-12) */}
             <div className="hidden lg:grid grid-cols-12 gap-4 items-center">
-              
               {/* Nazwa + ikona (col-4) */}
               <div className="col-span-4 flex items-center gap-3">
                 <div className="w-7 h-7 rounded-md bg-gray-200 animate-pulse shrink-0" />
@@ -115,7 +123,6 @@ export function BoardList({
                 <div className="w-8 h-8 bg-gray-50 rounded-lg animate-pulse" />
                 <div className="w-8 h-8 bg-gray-50 rounded-lg animate-pulse" />
               </div>
-
             </div>
           </div>
         ))}

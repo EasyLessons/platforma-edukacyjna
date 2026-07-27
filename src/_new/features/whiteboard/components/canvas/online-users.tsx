@@ -48,7 +48,14 @@ interface OnlineUsersProps {
   isHistoryOpen?: boolean;
 }
 
-export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, userRole, onToggleHistory, isHistoryOpen }: OnlineUsersProps) {
+export function OnlineUsers({
+  onFollowUser,
+  onStopFollowing,
+  followingUserId,
+  userRole,
+  onToggleHistory,
+  isHistoryOpen,
+}: OnlineUsersProps) {
   const { onlineUsers, isConnected, subscribeViewports } = useBoardRealtime();
   const { user: currentUser } = useAuth();
   const { getAvatarColorClass, getInitials } = useUserAvatar();
@@ -172,7 +179,7 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
       style={{
         top: `${metrics.onlineUsers.topOffset}px`,
         right: `${metrics.spacing.side}px`,
-          maxWidth: metrics.isMobile ? 'calc(100vw - 10px)' : 'calc(100vw - 32px)',
+        maxWidth: metrics.isMobile ? 'calc(100vw - 10px)' : 'calc(100vw - 32px)',
       }}
     >
       <div
@@ -195,53 +202,56 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
 
           <div className="flex -space-x-1.5 shrink-0 ml-1">
             {onlineUsers.map((onlineUser, index) => {
-            const isCurrentUser = onlineUser.user_id === currentUser?.id;
-            const isBeingFollowed = followingUserId === onlineUser.user_id;
-            const avatarColorClass = getAvatarColorClass(onlineUser.user_id);
-            const initials = getInitials(onlineUser.username);
+              const isCurrentUser = onlineUser.user_id === currentUser?.id;
+              const isBeingFollowed = followingUserId === onlineUser.user_id;
+              const avatarColorClass = getAvatarColorClass(onlineUser.user_id);
+              const initials = getInitials(onlineUser.username);
 
-            // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
-            const uniqueKey = `${onlineUser.user_id}-${onlineUser.online_at || index}`;
+              // Unikalny klucz: user_id + timestamp lub index (naprawia duplikaty)
+              const uniqueKey = `${onlineUser.user_id}-${onlineUser.online_at || index}`;
 
-            // Handler kliknięcia
-            const handleClick = () => {
-              if (isCurrentUser) return;
+              // Handler kliknięcia
+              const handleClick = () => {
+                if (isCurrentUser) return;
 
-              // Jeśli już śledzimy tego użytkownika → zatrzymaj
-              if (isBeingFollowed && onStopFollowing) {
-                onStopFollowing();
-                return;
-              }
-
-              if (!onFollowUser) return;
-
-              // Pobierz ostatni znany viewport z subskrypcji
-              const remoteVp = remoteViewportsRef.current.find(
-                (v) => v.userId === onlineUser.user_id
-              );
-              onFollowUser(
-                onlineUser.user_id,
-                remoteVp?.x ?? 0,
-                remoteVp?.y ?? 0,
-                remoteVp?.scale ?? 1
-              );
-            };
-
-            return (
-              <Tooltip
-                key={uniqueKey}
-                position="bottom"
-                content={
-                  <>
-                    {onlineUser.username}
-                    {isCurrentUser && userRole && ` (${userRole})`}
-                    {!isCurrentUser && (isBeingFollowed ? ' – Kliknij, by przestać śledzić' : ' – Kliknij, by śledzić')}
-                  </>
+                // Jeśli już śledzimy tego użytkownika → zatrzymaj
+                if (isBeingFollowed && onStopFollowing) {
+                  onStopFollowing();
+                  return;
                 }
-              >
-                <div
-                  onClick={handleClick}
-                  className={`
+
+                if (!onFollowUser) return;
+
+                // Pobierz ostatni znany viewport z subskrypcji
+                const remoteVp = remoteViewportsRef.current.find(
+                  (v) => v.userId === onlineUser.user_id
+                );
+                onFollowUser(
+                  onlineUser.user_id,
+                  remoteVp?.x ?? 0,
+                  remoteVp?.y ?? 0,
+                  remoteVp?.scale ?? 1
+                );
+              };
+
+              return (
+                <Tooltip
+                  key={uniqueKey}
+                  position="bottom"
+                  content={
+                    <>
+                      {onlineUser.username}
+                      {isCurrentUser && userRole && ` (${userRole})`}
+                      {!isCurrentUser &&
+                        (isBeingFollowed
+                          ? ' – Kliknij, by przestać śledzić'
+                          : ' – Kliknij, by śledzić')}
+                    </>
+                  }
+                >
+                  <div
+                    onClick={handleClick}
+                    className={`
                     relative w-8 h-8 rounded-full 
                     ${(onlineUser as any).avatar_url ? '' : avatarColorClass} 
                     flex items-center justify-center 
@@ -255,34 +265,34 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
                           : 'ring-2 ring-white/90'
                     }
                   `}
-                >
-                  {(onlineUser as any).avatar_url ? (
-                    <img 
-                      src={(onlineUser as any).avatar_url} 
-                      alt={onlineUser.username} 
-                      className="w-full h-full object-cover rounded-full"
-                    />
-                  ) : (
-                    initials
-                  )}
+                  >
+                    {(onlineUser as any).avatar_url ? (
+                      <img
+                        src={(onlineUser as any).avatar_url}
+                        alt={onlineUser.username}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    ) : (
+                      initials
+                    )}
 
-                  {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
-                  {!isCurrentUser && (
-                    <div
-                      className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow-md border border-white ${
-                        isBeingFollowed ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
-                      }`}
-                    >
-                      {isBeingFollowed ? (
-                        <EyeOff size={10} className="text-white" />
-                      ) : (
-                        <Eye size={10} className="text-white" />
-                      )}
-                    </div>
-                  )}
-                </div>
-              </Tooltip>
-            );
+                    {/* Wskaźnik follow — zawsze widoczny dla innych użytkowników */}
+                    {!isCurrentUser && (
+                      <div
+                        className={`absolute -bottom-1 -right-1 rounded-full p-0.5 shadow-md border border-white ${
+                          isBeingFollowed ? 'bg-blue-500 animate-pulse' : 'bg-green-500'
+                        }`}
+                      >
+                        {isBeingFollowed ? (
+                          <EyeOff size={10} className="text-white" />
+                        ) : (
+                          <Eye size={10} className="text-white" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </Tooltip>
+              );
             })}
           </div>
 
@@ -298,7 +308,11 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
             </Button>
           </Tooltip>
 
-          <Tooltip position="bottom" content={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'} className="mr-0 sm:-mr-3">
+          <Tooltip
+            position="bottom"
+            content={linkCopied ? 'Skopiowano!' : 'Udostępnij tablicę'}
+            className="mr-0 sm:-mr-3"
+          >
             <Button
               variant="dark"
               size="sm"
@@ -316,7 +330,9 @@ export function OnlineUsers({ onFollowUser, onStopFollowing, followingUserId, us
 
       {toastState && (
         <div className="fixed inset-x-0 bottom-8 z-[1200] pointer-events-none flex justify-center px-4">
-          <div className={`whiteboard-toast-base ${isToastExiting ? 'whiteboard-toast-exit' : 'whiteboard-toast-enter'}`}>
+          <div
+            className={`whiteboard-toast-base ${isToastExiting ? 'whiteboard-toast-exit' : 'whiteboard-toast-enter'}`}
+          >
             <span className="inline-flex items-center gap-2">
               <Check className="w-4 h-4 text-gray-300" />
               {toastState.message}

@@ -47,15 +47,15 @@ export function collectGuidelinesFromImages(elements: DrawingElement[]): GuideLi
   for (const img of images) {
     // Pionowe (kontrolują X)
     guidelines.push(
-      { value: img.x,                    orientation: 'vertical',   sourceId: img.id },
-      { value: img.x + img.width,        orientation: 'vertical',   sourceId: img.id },
-      { value: img.x + img.width / 2,    orientation: 'vertical',   sourceId: img.id },
+      { value: img.x, orientation: 'vertical', sourceId: img.id },
+      { value: img.x + img.width, orientation: 'vertical', sourceId: img.id },
+      { value: img.x + img.width / 2, orientation: 'vertical', sourceId: img.id }
     );
     // Poziome (kontrolują Y)
     guidelines.push(
-      { value: img.y,                    orientation: 'horizontal', sourceId: img.id },
-      { value: img.y + img.height,       orientation: 'horizontal', sourceId: img.id },
-      { value: img.y + img.height / 2,   orientation: 'horizontal', sourceId: img.id },
+      { value: img.y, orientation: 'horizontal', sourceId: img.id },
+      { value: img.y + img.height, orientation: 'horizontal', sourceId: img.id },
+      { value: img.y + img.height / 2, orientation: 'horizontal', sourceId: img.id }
     );
   }
 
@@ -86,24 +86,50 @@ export function snapToGuidelines(
 
   // Snap X — sprawdzamy: lewa krawędź, prawa krawędź, środek
   for (const guide of valid.filter((g) => g.orientation === 'vertical')) {
-    const left   = x;
-    const right  = x + width;
+    const left = x;
+    const right = x + width;
     const centerX = x + width / 2;
 
-    if      (Math.abs(left    - guide.value) < SNAP_THRESHOLD) { adjustedX = guide.value;           snappedX = true; activeGuides.push(guide); break; }
-    else if (Math.abs(right   - guide.value) < SNAP_THRESHOLD) { adjustedX = guide.value - width;   snappedX = true; activeGuides.push(guide); break; }
-    else if (Math.abs(centerX - guide.value) < SNAP_THRESHOLD) { adjustedX = guide.value - width/2; snappedX = true; activeGuides.push(guide); break; }
+    if (Math.abs(left - guide.value) < SNAP_THRESHOLD) {
+      adjustedX = guide.value;
+      snappedX = true;
+      activeGuides.push(guide);
+      break;
+    } else if (Math.abs(right - guide.value) < SNAP_THRESHOLD) {
+      adjustedX = guide.value - width;
+      snappedX = true;
+      activeGuides.push(guide);
+      break;
+    } else if (Math.abs(centerX - guide.value) < SNAP_THRESHOLD) {
+      adjustedX = guide.value - width / 2;
+      snappedX = true;
+      activeGuides.push(guide);
+      break;
+    }
   }
 
   // Snap Y — sprawdzamy: górna krawędź, dolna krawędź, środek
   for (const guide of valid.filter((g) => g.orientation === 'horizontal')) {
-    const top    = y;
+    const top = y;
     const bottom = y + height;
     const centerY = y + height / 2;
 
-    if      (Math.abs(top     - guide.value) < SNAP_THRESHOLD) { adjustedY = guide.value;            snappedY = true; activeGuides.push(guide); break; }
-    else if (Math.abs(bottom  - guide.value) < SNAP_THRESHOLD) { adjustedY = guide.value - height;   snappedY = true; activeGuides.push(guide); break; }
-    else if (Math.abs(centerY - guide.value) < SNAP_THRESHOLD) { adjustedY = guide.value - height/2; snappedY = true; activeGuides.push(guide); break; }
+    if (Math.abs(top - guide.value) < SNAP_THRESHOLD) {
+      adjustedY = guide.value;
+      snappedY = true;
+      activeGuides.push(guide);
+      break;
+    } else if (Math.abs(bottom - guide.value) < SNAP_THRESHOLD) {
+      adjustedY = guide.value - height;
+      snappedY = true;
+      activeGuides.push(guide);
+      break;
+    } else if (Math.abs(centerY - guide.value) < SNAP_THRESHOLD) {
+      adjustedY = guide.value - height / 2;
+      snappedY = true;
+      activeGuides.push(guide);
+      break;
+    }
   }
 
   return { x: adjustedX, y: adjustedY, snappedX, snappedY, activeGuides };

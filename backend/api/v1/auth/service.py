@@ -23,7 +23,7 @@ from .schemas import (
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     RegisterResponse, AuthResponse, UserResponse,
     ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
-    RefreshResponse, MeResponse
+    MeResponse
 )
 from .utils import (
     hash_password, verify_password, create_access_token,

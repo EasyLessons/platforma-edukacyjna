@@ -14,7 +14,7 @@
 
 /* To zostawiamy jako białe, bo to będzie nasza karta */
 .dashboard-main {
-  background: var(--dash-bg); 
+  background: var(--dash-bg);
   border-top-left-radius: 2.5rem;
   border-top-right-radius: 2.5rem;
   border-bottom-left-radius: 2.5rem;
@@ -56,7 +56,9 @@
 .dashboard-hover-surface {
   border-radius: 12px;
   background: transparent;
-  transition: background-color 150ms ease, transform 150ms ease;
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
 }
 
 .dashboard-hover-surface:hover {

@@ -12,7 +12,10 @@
 
 import { useState, useRef, useEffect, memo } from 'react';
 import { Point, ViewportTransform, TableElement } from '@/_new/features/whiteboard/types';
-import { inverseTransformPoint, getScaledWorldSize } from '@/_new/features/whiteboard/navigation/viewport-math';
+import {
+  inverseTransformPoint,
+  getScaledWorldSize,
+} from '@/_new/features/whiteboard/navigation/viewport-math';
 import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
 import { calculateTableFontSize } from '@/_new/features/whiteboard/elements/table-helpers';
 import { Plus, Minus } from 'lucide-react';
@@ -44,7 +47,14 @@ export function TableTool({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
 
-  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, disabled: showConfig });
+  useCanvasWheel({
+    overlayRef,
+    canvasWidth,
+    canvasHeight,
+    viewport,
+    onViewportChange,
+    disabled: showConfig,
+  });
 
   const handleClick = (e: React.MouseEvent) => {
     if (isGestureActive) return;
@@ -76,7 +86,7 @@ export function TableTool({
 
     // Rozmiary komórek skalowane do aktualnego zoom: tabela zawsze wygląda
     // tak samo na ekranie niezależnie od przybliżenia (60×28 px screen-space).
-    const cellWidth  = getScaledWorldSize(60, viewport.scale);
+    const cellWidth = getScaledWorldSize(60, viewport.scale);
     const cellHeight = getScaledWorldSize(28, viewport.scale);
     const tableWidth = cols * cellWidth;
     const tableHeight = rows * cellHeight;
@@ -133,7 +143,7 @@ export function TableTool({
           }}
           onMouseMove={(e) => {
             if (isDragging) {
-              setDragOffset(prev => ({
+              setDragOffset((prev) => ({
                 x: prev.x + e.movementX,
                 y: prev.y + e.movementY,
               }));
@@ -160,7 +170,9 @@ export function TableTool({
             }
           }}
         >
-          <h3 className="text-sm font-semibold text-gray-800 mb-3 cursor-grab active:cursor-grabbing">Utwórz tabelę</h3>
+          <h3 className="text-sm font-semibold text-gray-800 mb-3 cursor-grab active:cursor-grabbing">
+            Utwórz tabelę
+          </h3>
 
           {/* Wiersze */}
           <div className="flex items-center justify-between mb-2">
@@ -366,4 +378,3 @@ export const TableView = memo(
     );
   }
 );
-

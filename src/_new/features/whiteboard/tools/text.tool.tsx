@@ -11,7 +11,7 @@ function TextOverlay() {
   const h = useToolHost();
   const textElements = useMemo(
     () => h.elements.filter((e) => e.type === 'text') as TextElement[],
-    [h.elements],
+    [h.elements]
   );
   return (
     <TextTool

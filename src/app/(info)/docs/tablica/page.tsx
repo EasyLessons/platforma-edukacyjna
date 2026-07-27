@@ -25,8 +25,7 @@ export default function TablicaPage() {
       <p>Mozesz zaprosic innych uzytkownikow i rysowac wspolnie w czasie rzeczywistym.</p>
 
       <p>
-        Nastepne:{' '}
-        <Link href="/docs/workspaces">Workspaces i wspolpraca</Link>
+        Nastepne: <Link href="/docs/workspaces">Workspaces i wspolpraca</Link>
       </p>
     </>
   );

@@ -13,7 +13,11 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ViewportTransform } from '@/_new/features/whiteboard/types';
-import { zoomViewport, panViewportWithWheel, constrainViewport } from '@/_new/features/whiteboard/navigation/viewport-math';
+import {
+  zoomViewport,
+  panViewportWithWheel,
+  constrainViewport,
+} from '@/_new/features/whiteboard/navigation/viewport-math';
 import { X, Delete, Divide, Plus, Minus, Equal, Percent, GripHorizontal } from 'lucide-react';
 import * as math from 'mathjs';
 
@@ -537,4 +541,3 @@ export function CalculatorTool({
     </div>
   );
 }
-

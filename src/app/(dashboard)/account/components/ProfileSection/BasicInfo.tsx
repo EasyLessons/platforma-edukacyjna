@@ -48,7 +48,7 @@ export default function BasicInfo({ user }: BasicInfoProps) {
       // Usunięto podwójne /avatars/, ładujemy bezpośrednio do bucketu "avatars"
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('avatars')
         .upload(fileName, file, { upsert: true });
@@ -64,12 +64,11 @@ export default function BasicInfo({ user }: BasicInfoProps) {
 
       // Aktualizacja na backendzie FastAPI
       await apiClient.put('/api/v1/auth/users/me', {
-        avatar_url: avatarUrl
+        avatar_url: avatarUrl,
       });
 
       // Błyskawiczna zmiana w aplikacji (bez przeładowania)
       updateUser({ avatar_url: avatarUrl });
-
     } catch (error) {
       console.error('Błąd podczas zapisywania awatara:', error);
       alert('Nie udało się zapisać awatara');
@@ -100,9 +99,9 @@ export default function BasicInfo({ user }: BasicInfoProps) {
       <div className="mb-6 flex items-center gap-4">
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center overflow-hidden border border-gray-200 relative">
           {(user as any)?.avatar_url ? (
-            <img 
-              src={(user as any).avatar_url} 
-              alt="Avatar" 
+            <img
+              src={(user as any).avatar_url}
+              alt="Avatar"
               className="w-full h-full object-cover"
             />
           ) : (
@@ -110,15 +109,15 @@ export default function BasicInfo({ user }: BasicInfoProps) {
           )}
         </div>
         <div>
-          <input 
-            type="file" 
-            accept="image/*" 
-            ref={fileInputRef} 
-            onChange={handleAvatarUpload} 
-            className="hidden" 
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            onChange={handleAvatarUpload}
+            className="hidden"
             id="avatar-upload"
           />
-          <label 
+          <label
             htmlFor="avatar-upload"
             className="cursor-pointer px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
           >

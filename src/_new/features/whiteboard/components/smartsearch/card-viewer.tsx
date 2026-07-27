@@ -12,7 +12,15 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { X, Check, Plus, ChevronRight, ChevronDown, GripVertical, GripHorizontal } from 'lucide-react';
+import {
+  X,
+  Check,
+  Plus,
+  ChevronRight,
+  ChevronDown,
+  GripVertical,
+  GripHorizontal,
+} from 'lucide-react';
 import { CardResource, FormulaResource, ResourceManifest, CardSection } from './types';
 import { loadManifest, getFormulaById, getResourceTypeColor } from './search-service';
 
@@ -131,14 +139,18 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
     });
   };
 
-  const allFormulasList = useMemo(() => Array.from(sectionFormulas.values()).flat(), [sectionFormulas]);
-  const isAllSelectedGlobal = allFormulasList.length > 0 && selectedIds.size === allFormulasList.length;
+  const allFormulasList = useMemo(
+    () => Array.from(sectionFormulas.values()).flat(),
+    [sectionFormulas]
+  );
+  const isAllSelectedGlobal =
+    allFormulasList.length > 0 && selectedIds.size === allFormulasList.length;
 
   const toggleAll = () => {
     if (isAllSelectedGlobal) {
       setSelectedIds(new Set()); // odznacz wszystkie
     } else {
-      setSelectedIds(new Set(allFormulasList.map(f => f.id))); // zaznacz wszystkie
+      setSelectedIds(new Set(allFormulasList.map((f) => f.id))); // zaznacz wszystkie
     }
   };
 
@@ -270,7 +282,9 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                             ${selectedInSection > 0 ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-700 hover:bg-gray-100'}
                           `}
                         >
-                          <span className="flex-1 truncate text-sm select-none">{section.name}</span>
+                          <span className="flex-1 truncate text-sm select-none">
+                            {section.name}
+                          </span>
                           <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
                             {selectedInSection > 0 && (
                               <span className="text-[10px] font-bold bg-blue-500 text-white px-2 py-0.5 rounded-full">
@@ -353,7 +367,11 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                     const allSelected = formulas.every((f) => selectedIds.has(f.id));
 
                     return (
-                      <div id={`section-${section.id}`} key={section.id} className="space-y-4 scroll-mt-6">
+                      <div
+                        id={`section-${section.id}`}
+                        key={section.id}
+                        className="space-y-4 scroll-mt-6"
+                      >
                         {/* Section header */}
                         <div className="flex items-center justify-between pb-2 border-b border-gray-100">
                           <h3 className="text-xl font-bold text-gray-900">{section.name}</h3>
@@ -362,8 +380,8 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                             className={`
                               flex items-center gap-1.5 text-sm py-1.5 px-3 cursor-pointer rounded-lg border font-medium transition-colors
                               ${
-                                allSelected 
-                                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100' 
+                                allSelected
+                                  ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
                                   : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                               }
                             `}
@@ -440,9 +458,13 @@ export function CardViewer({ card, onClose, onAddFormulas, onActiveChange }: Car
                                       {formula.title}
                                     </span>
                                   </div>
-                                  
-                                  <div className={`shrink-0 ml-3 w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}>
-                                     {isSelected && <Check className="w-3.5 h-3.5 text-white stroke-[3]" />}
+
+                                  <div
+                                    className={`shrink-0 ml-3 w-5 h-5 rounded-[4px] border-2 flex items-center justify-center transition-colors ${isSelected ? 'bg-blue-600 border-blue-600' : 'border-gray-300 bg-white'}`}
+                                  >
+                                    {isSelected && (
+                                      <Check className="w-3.5 h-3.5 text-white stroke-[3]" />
+                                    )}
                                   </div>
                                 </div>
                               </div>

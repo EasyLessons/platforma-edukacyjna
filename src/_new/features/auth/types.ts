@@ -1,13 +1,13 @@
 /**
  * AUTH TYPES
- * 
+ *
  * Typy i interfejsy związane z autoryzacją użytkowników.
  * Ułatwiają zarządzanie formularzami oraz komunikacją z API.
- *  
+ *
  * IDEA: typy zawarte w pliku są wspódzielone przez różne komponenty.
-*/
+ */
 
-import { User } from "@/_new/shared/types/user";
+import { User } from '@/_new/shared/types/user';
 
 export type FormErrors<T> = Partial<Record<keyof T, string>>;
 

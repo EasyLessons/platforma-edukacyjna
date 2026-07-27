@@ -269,7 +269,7 @@ class BoardService:
         ).first()
 
         if not board_user:
-            board = self._get_board_or_404(board_id)
+            self._get_board_or_404(board_id)
             board_user = BoardUsers(
                 board_id=board_id, user_id=user_id,
                 is_favourite=toggle_data.is_favourite,

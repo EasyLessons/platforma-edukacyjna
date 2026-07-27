@@ -173,37 +173,37 @@ interface InviteItemProps {
 
 function InviteItem({ notification, processing, formatDate, onAccept, onReject }: InviteItemProps) {
   const { payload, is_read } = notification;
- 
+
   return (
-    <div className={`px-6 py-4 transition-colors hover:bg-[var(--dash-panel)] ${!is_read ? 'bg-green-50/30' : ''}`}>
+    <div
+      className={`px-6 py-4 transition-colors hover:bg-[var(--dash-panel)] ${!is_read ? 'bg-green-50/30' : ''}`}
+    >
       <div className="flex gap-3">
         <div
           className={`flex-shrink-0 w-12 h-12 ${payload.workspace_bg_color} rounded-lg flex items-center justify-center text-white`}
         >
           <Building size={24} />
         </div>
- 
+
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-2 mb-2">
             <div>
-              <h3 className="font-semibold text-gray-800 text-sm mb-1">
-                Zaproszenie do workspace
-              </h3>
+              <h3 className="font-semibold text-gray-800 text-sm mb-1">Zaproszenie do workspace</h3>
               <p className="text-sm text-gray-600">
-                <span className="font-medium">{payload.inviter_name}</span> zaprasza Cię
-                do <span className="font-medium">{payload.workspace_name}</span>
+                <span className="font-medium">{payload.inviter_name}</span> zaprasza Cię do{' '}
+                <span className="font-medium">{payload.workspace_name}</span>
               </p>
             </div>
             {!is_read && (
               <span className="flex-shrink-0 w-2 h-2 bg-green-500 rounded-full mt-1.5" />
             )}
           </div>
- 
+
           <div className="flex items-center gap-1 text-xs text-gray-400 mb-3">
             <Clock size={12} />
             <span>{formatDate(notification.created_at)}</span>
           </div>
- 
+
           <div className="flex gap-2">
             <DashboardButton
               variant="primary"

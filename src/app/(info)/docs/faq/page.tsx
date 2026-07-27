@@ -41,8 +41,8 @@ export default function FaqPage() {
         className="rounded-lg border border-gray-200"
       />
       <p>
-        Obrazki wrzucaj do folderu <strong>public</strong>, a potem uzywaj sciezki zaczynajacej
-        sie od <strong>/</strong>, np. <strong>/resources/BoardHero.webp</strong>.
+        Obrazki wrzucaj do folderu <strong>public</strong>, a potem uzywaj sciezki zaczynajacej sie
+        od <strong>/</strong>, np. <strong>/resources/BoardHero.webp</strong>.
       </p>
 
       <p>
