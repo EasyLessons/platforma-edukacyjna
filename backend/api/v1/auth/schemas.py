@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 from datetime import datetime
 from typing import Optional
 
@@ -9,6 +9,12 @@ class RegisterUser(BaseModel):
     password: str = Field(..., min_length=8, max_length=72)
     password_confirm: str = Field(..., min_length=8, max_length=72)
     full_name: Optional[str] = None
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "RegisterUser":
+        if self.password != self.password_confirm:
+            raise ValueError("Hasła nie są identyczne")
+        return self
 
 class LoginData(BaseModel):
     """Schema do logowania"""
@@ -77,6 +83,12 @@ class ResetPassword(BaseModel):
     code: str = Field(..., min_length=6, max_length=6)
     password: str = Field(..., min_length=8, max_length=72)
     password_confirm: str = Field(..., min_length=8, max_length=72)
+
+    @model_validator(mode="after")
+    def passwords_match(self) -> "ResetPassword":
+        if self.password != self.password_confirm:
+            raise ValueError("Hasła nie są identyczne")
+        return self
 
 # === RESPONSE SCHEMAS (API output) ===
 

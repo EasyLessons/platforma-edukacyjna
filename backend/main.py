@@ -9,6 +9,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 import logging
 
 from core.logging import setup_logging
@@ -64,6 +65,18 @@ async def shutdown_event():
     logger.info("... Education Platform API stopped")
 
 # Exception handlers
+@app.exception_handler(RequestValidationError)
+async def request_validation_handler(request, exc: RequestValidationError):
+    first_error = exc.errors()[0]
+    return JSONResponse(
+        status_code=422,
+        content=ApiResponse(
+            success=False,
+            error=first_error.get("msg", "Nieprawidłowe dane"),
+            code="VALIDATION_ERROR"
+        ).model_dump(mode="json")
+    )
+
 @app.exception_handler(ValidationError)
 async def validation_error_handler(request, exc: ValidationError):
     """Handle validation errors"""

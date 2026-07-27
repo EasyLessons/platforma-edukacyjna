@@ -11,6 +11,9 @@ services:
       - FRONTEND_URL=http://localhost:3000
       - GOOGLE_REDIRECT_URI=http://localhost:8000/api/v1/auth/google/callback
       - PORT=8000
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
 
   frontend:
     build: .
@@ -26,3 +29,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"

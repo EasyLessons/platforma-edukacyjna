@@ -17,9 +17,9 @@ MOCK_RESET = "api.v1.auth.service.send_password_reset_email"
 class TestRegistrationToLoginFlow:
 
     @pytest.mark.asyncio
-    async def test_full_register_verify_login(self, db_session):
+    async def test_full_register_verify_login(self, db_session, redis_client):
         """Rejestracja → weryfikacja emaila → logowanie"""
-        service = AuthService(db_session)
+        service = AuthService(db_session, redis_client)
 
         # 1. Rejestracja
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
@@ -32,9 +32,9 @@ class TestRegistrationToLoginFlow:
 
         assert register_result.user.is_active is False
 
-        # 2. Pobierz kod z bazy (w produkcji byłby w emailu)
+        # 2. Pobierz kod z Redis (w produkcji byłby w emailu)
         db_user = db_session.query(User).filter(User.id == register_result.user.id).first()
-        code = db_user.verification_code
+        code = await redis_client.get(f"auth:email_verification:{db_user.id}")
 
         # 3. Weryfikacja
         verify_result, _ = await service.verify_email(
@@ -53,9 +53,9 @@ class TestRegistrationToLoginFlow:
         assert login_result.access_token
 
     @pytest.mark.asyncio
-    async def test_register_creates_complete_workspace_setup(self, db_session):
+    async def test_register_creates_complete_workspace_setup(self, db_session, redis_client):
         """Rejestracja tworzy user + workspace + membership + active_workspace"""
-        service = AuthService(db_session)
+        service = AuthService(db_session, redis_client)
 
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
             result = await service.register_user(RegisterUser(
@@ -86,9 +86,9 @@ class TestRegistrationToLoginFlow:
 class TestPasswordResetFlow:
 
     @pytest.mark.asyncio
-    async def test_full_reset_flow(self, db_session, test_user):
+    async def test_full_reset_flow(self, db_session, redis_client, test_user):
         """Żądanie resetu → weryfikacja kodu → zmiana hasła → logowanie nowym hasłem"""
-        service = AuthService(db_session)
+        service = AuthService(db_session, redis_client)
 
         # 1. Żądanie resetu
         with patch(MOCK_RESET, new_callable=AsyncMock):
@@ -96,8 +96,7 @@ class TestPasswordResetFlow:
                 RequestPasswordReset(email=test_user.email)
             )
 
-        db_session.refresh(test_user)
-        code = test_user.verification_code
+        code = await redis_client.get(f"auth:password_reset:{test_user.id}")
         assert code is not None
 
         # 2. Weryfikacja kodu
@@ -122,17 +121,16 @@ class TestPasswordResetFlow:
         assert login_result.user.id == test_user.id
 
     @pytest.mark.asyncio
-    async def test_old_password_invalid_after_reset(self, db_session, test_user):
+    async def test_old_password_invalid_after_reset(self, db_session, redis_client, test_user):
         """Stare hasło nie działa po resecie"""
-        service = AuthService(db_session)
+        service = AuthService(db_session, redis_client)
 
         with patch(MOCK_RESET, new_callable=AsyncMock):
             await service.request_password_reset(
                 RequestPasswordReset(email=test_user.email)
             )
 
-        db_session.refresh(test_user)
-        code = test_user.verification_code
+        code = await redis_client.get(f"auth:password_reset:{test_user.id}")
 
         await service.reset_password(ResetPassword(
             email=test_user.email,
@@ -151,9 +149,9 @@ class TestPasswordResetFlow:
 class TestCodeExpiry:
 
     @pytest.mark.asyncio
-    async def test_code_usable_only_once(self, db_session):
+    async def test_code_usable_only_once(self, db_session, redis_client):
         """Kod weryfikacyjny można użyć tylko raz"""
-        service = AuthService(db_session)
+        service = AuthService(db_session, redis_client)
 
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
             result = await service.register_user(RegisterUser(
@@ -164,7 +162,7 @@ class TestCodeExpiry:
             ))
 
         db_user = db_session.query(User).filter(User.id == result.user.id).first()
-        code = db_user.verification_code
+        code = await redis_client.get(f"auth:email_verification:{db_user.id}")
 
         # Pierwsze użycie — OK
         await service.verify_email(VerifyEmail(user_id=db_user.id, code=code))

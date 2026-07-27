@@ -16,49 +16,49 @@ MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
 class TestCheckUser:
 
     @pytest.mark.asyncio
-    async def test_user_not_exists(self, db_session):
+    async def test_user_not_exists(self, db_session, redis_client):
         """Nieistniejący email → exists=False, verified=False"""
-        result = await AuthService(db_session).check_user("ghost@nowhere.com")
+        result = await AuthService(db_session, redis_client).check_user("ghost@nowhere.com")
 
         assert isinstance(result, CheckUserResponse)
         assert result.exists is False
         assert result.verified is False
 
     @pytest.mark.asyncio
-    async def test_user_exists_and_verified(self, db_session, test_user):
+    async def test_user_exists_and_verified(self, db_session, redis_client, test_user):
         """Zweryfikowany user → exists=True, verified=True"""
-        result = await AuthService(db_session).check_user(test_user.email)
+        result = await AuthService(db_session, redis_client).check_user(test_user.email)
 
         assert result.exists is True
         assert result.verified is True
         assert result.user_id is None  # nie ujawniamy ID zweryfikowanym
 
     @pytest.mark.asyncio
-    async def test_user_exists_unverified(self, db_session, unverified_user):
+    async def test_user_exists_unverified(self, db_session, redis_client, unverified_user):
         """Niezweryfikowany user → exists=True, verified=False, user_id zwrócony"""
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
-            result = await AuthService(db_session).check_user(unverified_user.email)
+            result = await AuthService(db_session, redis_client).check_user(unverified_user.email)
 
         assert result.exists is True
         assert result.verified is False
         assert result.user_id == unverified_user.id
 
     @pytest.mark.asyncio
-    async def test_unverified_triggers_new_code(self, db_session, unverified_user):
+    async def test_unverified_triggers_new_code(self, db_session, redis_client, unverified_user):
         """Dla niezweryfikowanego wysyła nowy kod"""
-        old_code = unverified_user.verification_code
+        old_code = await redis_client.get(f"auth:email_verification:{unverified_user.id}")
 
         with patch(MOCK_EMAIL, new_callable=AsyncMock) as mock_send:
-            await AuthService(db_session).check_user(unverified_user.email)
+            await AuthService(db_session, redis_client).check_user(unverified_user.email)
 
         mock_send.assert_called_once()
-        db_session.refresh(unverified_user)
-        assert unverified_user.verification_code != old_code
+        new_code = await redis_client.get(f"auth:email_verification:{unverified_user.id}")
+        assert new_code != old_code
 
     @pytest.mark.asyncio
-    async def test_verified_does_not_send_email(self, db_session, test_user):
+    async def test_verified_does_not_send_email(self, db_session, redis_client, test_user):
         """Dla zweryfikowanego NIE wysyła kodu"""
         with patch(MOCK_EMAIL, new_callable=AsyncMock) as mock_send:
-            await AuthService(db_session).check_user(test_user.email)
+            await AuthService(db_session, redis_client).check_user(test_user.email)
 
         mock_send.assert_not_called()
