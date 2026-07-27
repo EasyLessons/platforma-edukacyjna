@@ -1,6 +1,6 @@
 """Schemas dla modułu boards (CRUD tablicy)."""
 from datetime import datetime
-from typing import Optional, List, Any, Dict
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 class OnlineUserInfo(BaseModel):

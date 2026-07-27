@@ -14,11 +14,7 @@
  * ============================================================================
  */
 
-import type {
-  DrawingElement,
-  ViewportTransform,
-  Point,
-} from '@/_new/features/whiteboard/types';
+import type { DrawingElement, ViewportTransform, Point } from '@/_new/features/whiteboard/types';
 
 // ─── SHARED VALUE OBJECTS ────────────────────────────────────────────────────
 
@@ -80,7 +76,7 @@ export interface ElementHandler<T extends DrawingElement = DrawingElement> {
     pivotX: number,
     pivotY: number,
     scaleX: number,
-    scaleY: number,
+    scaleY: number
   ): Partial<DrawingElement>;
 
   /**
@@ -98,7 +94,7 @@ export interface ElementHandler<T extends DrawingElement = DrawingElement> {
     rotationAngle: number,
     pivot: Point,
     cos: number,
-    sin: number,
+    sin: number
   ): Partial<DrawingElement>;
 
   /**
@@ -111,6 +107,6 @@ export interface ElementHandler<T extends DrawingElement = DrawingElement> {
     viewport: ViewportTransform,
     canvasWidth: number,
     canvasHeight: number,
-    extras?: RenderExtras,
+    extras?: RenderExtras
   ): void;
 }

@@ -103,7 +103,7 @@ export function useCreateWorkspaceForm({ onSubmit, onClose }: UseCreateWorkspace
       });
       handleClose();
     } catch (err) {
-      await handleError(err);  
+      await handleError(err);
     } finally {
       setIsSubmitting(false);
     }

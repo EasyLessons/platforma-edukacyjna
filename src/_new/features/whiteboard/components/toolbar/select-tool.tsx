@@ -24,7 +24,11 @@ import {
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import { TextMiniToolbar } from './text-mini-toolbar';
 import { SelectionPropertiesPanel } from './properties-panel';
-import { GuideLine, collectGuidelinesFromImages, snapToGuidelines } from '@/_new/features/whiteboard/selection/snap-utils';
+import {
+  GuideLine,
+  collectGuidelinesFromImages,
+  snapToGuidelines,
+} from '@/_new/features/whiteboard/selection/snap-utils';
 import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
 
 interface SelectToolProps {
@@ -111,7 +115,6 @@ export function SelectTool({
 
   const overlayRef = useRef<HTMLDivElement>(null);
 
-
   // Ref do viewport żeby uniknąć re-subscribe wheel listenera
   const viewportRef = useRef(viewport);
   useEffect(() => {
@@ -174,10 +177,10 @@ export function SelectTool({
       setIsRotating(false);
       onOperationFinish?.();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isGestureActive]);
 
-// 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
+  // 🔥 KRYTYCZNE: Global mouseup/mousemove dla resize/drag/rotate
   useEffect(() => {
     if (!isResizing && !isDragging && !isRotating) return;
 
@@ -218,7 +221,12 @@ export function SelectTool({
           resizeOriginalElements.forEach((originalEl, id) => {
             // 🔥 ZABEZPIECZENIE: Zmieniamy szerokość ramki tylko dla odpowiednich typów!
             // Ignorujemy path (gdzie width to grubość linii) i shape.
-            if (originalEl.type === 'text' || originalEl.type === 'markdown' || originalEl.type === 'image' || originalEl.type === 'table') {
+            if (
+              originalEl.type === 'text' ||
+              originalEl.type === 'markdown' ||
+              originalEl.type === 'image' ||
+              originalEl.type === 'table'
+            ) {
               updates.set(id, { x: newX, width: newWidth });
             }
           });
@@ -226,7 +234,7 @@ export function SelectTool({
           if (updates.size > 0) {
             onElementsUpdate(updates);
           }
-          return; 
+          return;
         }
 
         // Minimalne wymiary notatki markdown (~150×100px przy scale=1)
@@ -247,7 +255,7 @@ export function SelectTool({
         const horizontalGuides = validGuidelines.filter((g) => g.orientation === 'horizontal');
 
         const activeGuides: any[] = [];
-          
+
         if (resizeHandle === 'se') {
           // Prawy dolny róg - snapujemy right i bottom edge
           let targetRight = currentWorldX;
@@ -551,7 +559,7 @@ export function SelectTool({
       if (isRotating && rotationOriginalElements.size > 0) {
         // 🆕 Zaktualizuj bounding boxy po rotacji
         const finalUpdates = new Map<string, Partial<DrawingElement>>();
-        
+
         elements.forEach((el) => {
           if (selectedIds.has(el.id)) {
             if (el.type === 'shape') {
@@ -560,8 +568,13 @@ export function SelectTool({
               const maxX = Math.max(el.startX, el.endX);
               const minY = Math.min(el.startY, el.endY);
               const maxY = Math.max(el.startY, el.endY);
-              
-              if (minX !== el.startX || maxX !== el.endX || minY !== el.startY || maxY !== el.endY) {
+
+              if (
+                minX !== el.startX ||
+                maxX !== el.endX ||
+                minY !== el.startY ||
+                maxY !== el.endY
+              ) {
                 finalUpdates.set(el.id, {
                   startX: minX,
                   startY: minY,
@@ -573,11 +586,11 @@ export function SelectTool({
             // Path, Text i Image już mają poprawne współrzędne
           }
         });
-        
+
         if (finalUpdates.size > 0) {
           onElementsUpdate(finalUpdates);
         }
-        
+
         onOperationFinish?.(rotationOriginalElements);
       }
 
@@ -736,48 +749,47 @@ export function SelectTool({
       canvasWidth,
       canvasHeight
     );
-    
+
     const rightCenter = transformPoint(
       { x: box.x + box.width, y: box.y + box.height / 2 },
-       viewport,
-        canvasWidth,
-         canvasHeight
-        );
-
-    const leftCenter = transformPoint(
-      { x: box.x, y: box.y + box.height / 2 }, 
-      viewport, 
-      canvasWidth, 
+      viewport,
+      canvasWidth,
       canvasHeight
     );
 
+    const leftCenter = transformPoint(
+      { x: box.x, y: box.y + box.height / 2 },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
 
-
-  const isNear = (p1: Point, p2: Point) => {
-        const dx = p1.x - p2.x;
-        const dy = p1.y - p2.y;
-        return Math.sqrt(dx * dx + dy * dy) < handleSize;
-      };
-
-      // Sprawdzamy, czy wszystkie zaznaczone elementy obsługują boczne uchwyty
-      const selectedElements = elements.filter(el => selectedIds.has(el.id));
-      const supportsSideResize = selectedElements.every(el => 
-        el.type === 'text' || el.type === 'markdown' || el.type === 'image' || el.type === 'table'
-      );
-
-      if (isNear(screenPoint, topLeft)) return 'nw';
-      if (isNear(screenPoint, topRight)) return 'ne';
-      if (isNear(screenPoint, bottomRight)) return 'se';
-      if (isNear(screenPoint, bottomLeft)) return 'sw';
-      
-      // Zwracamy 'e' i 'w' tylko jeśli element to wspiera!
-      if (supportsSideResize) {
-        if (isNear(screenPoint, rightCenter)) return 'e';
-        if (isNear(screenPoint, leftCenter)) return 'w';
-      }
-      
-      return null;
+    const isNear = (p1: Point, p2: Point) => {
+      const dx = p1.x - p2.x;
+      const dy = p1.y - p2.y;
+      return Math.sqrt(dx * dx + dy * dy) < handleSize;
     };
+
+    // Sprawdzamy, czy wszystkie zaznaczone elementy obsługują boczne uchwyty
+    const selectedElements = elements.filter((el) => selectedIds.has(el.id));
+    const supportsSideResize = selectedElements.every(
+      (el) =>
+        el.type === 'text' || el.type === 'markdown' || el.type === 'image' || el.type === 'table'
+    );
+
+    if (isNear(screenPoint, topLeft)) return 'nw';
+    if (isNear(screenPoint, topRight)) return 'ne';
+    if (isNear(screenPoint, bottomRight)) return 'se';
+    if (isNear(screenPoint, bottomLeft)) return 'sw';
+
+    // Zwracamy 'e' i 'w' tylko jeśli element to wspiera!
+    if (supportsSideResize) {
+      if (isNear(screenPoint, rightCenter)) return 'e';
+      if (isNear(screenPoint, leftCenter)) return 'w';
+    }
+
+    return null;
+  };
 
   const handleDoubleClick = (e: React.MouseEvent) => {
     const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
@@ -800,7 +812,7 @@ export function SelectTool({
     }
   };
 
-const handlePointerDown = (e: React.PointerEvent) => {
+  const handlePointerDown = (e: React.PointerEvent) => {
     if (isGestureActive) return;
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
@@ -859,7 +871,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
           newSelection.add(clickedElement.id);
         }
         onSelectionChange(newSelection);
-        
+
         // 🆕 Pobierz elementy z nową selekcją natychmiast
         setIsDragging(true);
         setDragStart(worldPoint);
@@ -881,9 +893,9 @@ const handlePointerDown = (e: React.PointerEvent) => {
           // Nowy element - zaznacz tylko jego
           newSelection = new Set([clickedElement.id]);
         }
-        
+
         onSelectionChange(newSelection);
-        
+
         setIsDragging(true);
         setDragStart(worldPoint);
         const originalElements = new Map<string, DrawingElement>();
@@ -946,17 +958,17 @@ const handlePointerDown = (e: React.PointerEvent) => {
         // Znajdź 4 narożniki rotowanego elementu
         const centerX = elemX + elemW / 2;
         const centerY = elemY + elemH / 2;
-        
+
         const corners = [
           { x: elemX, y: elemY },
           { x: elemX + elemW, y: elemY },
           { x: elemX + elemW, y: elemY + elemH },
           { x: elemX, y: elemY + elemH },
         ];
-        
+
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
-        
+
         const rotatedCorners = corners.map((corner) => {
           const dx = corner.x - centerX;
           const dy = corner.y - centerY;
@@ -965,7 +977,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
             y: centerY + dx * sin + dy * cos,
           };
         });
-        
+
         // Sprawdź czy którykolwiek narożnik rotowanego elementu jest w selection box
         for (const corner of rotatedCorners) {
           if (
@@ -977,7 +989,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
             return true;
           }
         }
-        
+
         // Sprawdź czy środek elementu jest w selection box
         if (
           centerX >= selectX &&
@@ -987,7 +999,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         ) {
           return true;
         }
-        
+
         // Sprawdź czy środek selection box jest w rotowanym elemencie (odwróć punkt)
         const selectCenterX = selectX + selectW / 2;
         const selectCenterY = selectY + selectH / 2;
@@ -997,7 +1009,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         const sinNeg = Math.sin(-rotation);
         const rotatedSelectX = centerX + dx * cosNeg - dy * sinNeg;
         const rotatedSelectY = centerY + dx * sinNeg + dy * cosNeg;
-        
+
         if (
           rotatedSelectX >= elemX &&
           rotatedSelectX <= elemX + elemW &&
@@ -1006,7 +1018,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         ) {
           return true;
         }
-        
+
         return false;
       };
 
@@ -1055,7 +1067,16 @@ const handlePointerDown = (e: React.PointerEvent) => {
             }
           } else {
             if (
-              rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)
+              rectanglesIntersect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                elWidth,
+                elHeight
+              )
             ) {
               preview.add(el.id);
             }
@@ -1178,17 +1199,17 @@ const handlePointerDown = (e: React.PointerEvent) => {
         // Znajdź 4 narożniki rotowanego elementu
         const centerX = elemX + elemW / 2;
         const centerY = elemY + elemH / 2;
-        
+
         const corners = [
           { x: elemX, y: elemY },
           { x: elemX + elemW, y: elemY },
           { x: elemX + elemW, y: elemY + elemH },
           { x: elemX, y: elemY + elemH },
         ];
-        
+
         const cos = Math.cos(rotation);
         const sin = Math.sin(rotation);
-        
+
         const rotatedCorners = corners.map((corner) => {
           const dx = corner.x - centerX;
           const dy = corner.y - centerY;
@@ -1197,7 +1218,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
             y: centerY + dx * sin + dy * cos,
           };
         });
-        
+
         // Sprawdź czy którykolwiek narożnik rotowanego elementu jest w selection box
         for (const corner of rotatedCorners) {
           if (
@@ -1209,7 +1230,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
             return true;
           }
         }
-        
+
         // Sprawdź czy środek elementu jest w selection box
         if (
           centerX >= selectX &&
@@ -1219,7 +1240,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         ) {
           return true;
         }
-        
+
         // Sprawdź czy środek selection box jest w rotowanym elemencie (odwróć punkt)
         const selectCenterX = selectX + selectW / 2;
         const selectCenterY = selectY + selectH / 2;
@@ -1229,7 +1250,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         const sinNeg = Math.sin(-rotation);
         const rotatedSelectX = centerX + dx * cosNeg - dy * sinNeg;
         const rotatedSelectY = centerY + dx * sinNeg + dy * cosNeg;
-        
+
         if (
           rotatedSelectX >= elemX &&
           rotatedSelectX <= elemX + elemW &&
@@ -1238,7 +1259,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
         ) {
           return true;
         }
-        
+
         return false;
       };
 
@@ -1288,7 +1309,16 @@ const handlePointerDown = (e: React.PointerEvent) => {
             }
           } else {
             if (
-              rectanglesIntersect(minX, minY, maxX - minX, maxY - minY, el.x, el.y, elWidth, elHeight)
+              rectanglesIntersect(
+                minX,
+                minY,
+                maxX - minX,
+                maxY - minY,
+                el.x,
+                el.y,
+                elWidth,
+                elHeight
+              )
             ) {
               newSelection.add(el.id);
             }
@@ -1458,36 +1488,39 @@ const handlePointerDown = (e: React.PointerEvent) => {
           } else if (element.type === 'text') {
             const width = element.width || 3;
             const height = element.height || 1;
-            
+
             // 🆕 Dla obróconych tekstów oblicz rotowane narożniki
             if (element.rotation && element.rotation !== 0) {
               const centerX = element.x + width / 2;
               const centerY = element.y + height / 2;
-              
+
               const corners = [
                 { x: element.x, y: element.y },
                 { x: element.x + width, y: element.y },
                 { x: element.x + width, y: element.y + height },
                 { x: element.x, y: element.y + height },
               ];
-              
+
               const cos = Math.cos(element.rotation);
               const sin = Math.sin(element.rotation);
-              
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              
+
+              let minX = Infinity,
+                minY = Infinity,
+                maxX = -Infinity,
+                maxY = -Infinity;
+
               corners.forEach((corner) => {
                 const dx = corner.x - centerX;
                 const dy = corner.y - centerY;
                 const rotatedX = centerX + dx * cos - dy * sin;
                 const rotatedY = centerY + dx * sin + dy * cos;
-                
+
                 minX = Math.min(minX, rotatedX);
                 minY = Math.min(minY, rotatedY);
                 maxX = Math.max(maxX, rotatedX);
                 maxY = Math.max(maxY, rotatedY);
               });
-              
+
               bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
             } else {
               bbox = {
@@ -1502,31 +1535,34 @@ const handlePointerDown = (e: React.PointerEvent) => {
             if (element.rotation && element.rotation !== 0) {
               const centerX = element.x + element.width / 2;
               const centerY = element.y + element.height / 2;
-              
+
               const corners = [
                 { x: element.x, y: element.y },
                 { x: element.x + element.width, y: element.y },
                 { x: element.x + element.width, y: element.y + element.height },
                 { x: element.x, y: element.y + element.height },
               ];
-              
+
               const cos = Math.cos(element.rotation);
               const sin = Math.sin(element.rotation);
-              
-              let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-              
+
+              let minX = Infinity,
+                minY = Infinity,
+                maxX = -Infinity,
+                maxY = -Infinity;
+
               corners.forEach((corner) => {
                 const dx = corner.x - centerX;
                 const dy = corner.y - centerY;
                 const rotatedX = centerX + dx * cos - dy * sin;
                 const rotatedY = centerY + dx * sin + dy * cos;
-                
+
                 minX = Math.min(minX, rotatedX);
                 minY = Math.min(minY, rotatedY);
                 maxX = Math.max(maxX, rotatedX);
                 maxY = Math.max(maxY, rotatedY);
               });
-              
+
               bbox = { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
             } else {
               bbox = {
@@ -1595,65 +1631,72 @@ const handlePointerDown = (e: React.PointerEvent) => {
   };
 
   const renderSelectionBox = () => {
-      // 🆕 Nie renderuj selection box gdy overlay jest ukryty
-      if (!isOverlayVisible) return null;
-      
-      const bbox = getSelectionBoundingBox();
-      if (!bbox || selectedIds.size === 0) return null;
+    // 🆕 Nie renderuj selection box gdy overlay jest ukryty
+    if (!isOverlayVisible) return null;
 
-      const topLeft = transformPoint({ x: bbox.x, y: bbox.y }, viewport, canvasWidth, canvasHeight);
-      const bottomRight = transformPoint(
-        { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
-        viewport,
-        canvasWidth,
-        canvasHeight
-      );
+    const bbox = getSelectionBoundingBox();
+    if (!bbox || selectedIds.size === 0) return null;
 
-      const width = bottomRight.x - topLeft.x;
-      const height = bottomRight.y - topLeft.y;
-      const centerX = topLeft.x + width / 2;
-      const centerY = topLeft.y + height / 2;
+    const topLeft = transformPoint({ x: bbox.x, y: bbox.y }, viewport, canvasWidth, canvasHeight);
+    const bottomRight = transformPoint(
+      { x: bbox.x + bbox.width, y: bbox.y + bbox.height },
+      viewport,
+      canvasWidth,
+      canvasHeight
+    );
 
-      const handleSize = 10;
+    const width = bottomRight.x - topLeft.x;
+    const height = bottomRight.y - topLeft.y;
+    const centerX = topLeft.x + width / 2;
+    const centerY = topLeft.y + height / 2;
 
-      // 🔥 ZABEZPIECZENIE: Sprawdzamy czy wszystkie zaznaczone elementy wspierają zmianę szerokości bez deformacji
-      const selectedElements = elements.filter(el => selectedIds.has(el.id));
-      const supportsSideResize = selectedElements.every(el => 
+    const handleSize = 10;
+
+    // 🔥 ZABEZPIECZENIE: Sprawdzamy czy wszystkie zaznaczone elementy wspierają zmianę szerokości bez deformacji
+    const selectedElements = elements.filter((el) => selectedIds.has(el.id));
+    const supportsSideResize = selectedElements.every(
+      (el) =>
         el.type === 'text' || el.type === 'markdown' || el.type === 'image' || el.type === 'table'
-      );
+    );
 
-      // Rogi selection box (zawsze pokazujemy te 4 rogi do skalowania)
-      const corners = [
-        { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
-        { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
-        { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
-        { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
-      ];
+    // Rogi selection box (zawsze pokazujemy te 4 rogi do skalowania)
+    const corners = [
+      { pos: 'nw', x: topLeft.x, y: topLeft.y, cursor: 'nwse-resize' },
+      { pos: 'ne', x: topLeft.x + width, y: topLeft.y, cursor: 'nesw-resize' },
+      { pos: 'se', x: topLeft.x + width, y: topLeft.y + height, cursor: 'nwse-resize' },
+      { pos: 'sw', x: topLeft.x, y: topLeft.y + height, cursor: 'nesw-resize' },
+    ];
 
-      // 🔥 Dodajemy boczne uchwyty TYLKO jeśli zaznaczone elementy to wspierają!
-      if (supportsSideResize) {
-        corners.push({ pos: 'e', x: topLeft.x + width, y: topLeft.y + height / 2, cursor: 'ew-resize' });
-        corners.push({ pos: 'w', x: topLeft.x, y: topLeft.y + height / 2, cursor: 'ew-resize' });
-      }
+    // 🔥 Dodajemy boczne uchwyty TYLKO jeśli zaznaczone elementy to wspierają!
+    if (supportsSideResize) {
+      corners.push({
+        pos: 'e',
+        x: topLeft.x + width,
+        y: topLeft.y + height / 2,
+        cursor: 'ew-resize',
+      });
+      corners.push({ pos: 'w', x: topLeft.x, y: topLeft.y + height / 2, cursor: 'ew-resize' });
+    }
 
-      return (
-        <>
-          {/* Selection box - prosty prostokąt */}
-          {!isRotating && (
-            <div
-              className="absolute border border-blue-500 pointer-events-none z-40"
-              style={{
-                left: topLeft.x,
-                top: topLeft.y,
-                width: width,
-                height: height,
-                boxSizing: 'border-box',
-              }}
-            />
-          )}
+    return (
+      <>
+        {/* Selection box - prosty prostokąt */}
+        {!isRotating && (
+          <div
+            className="absolute border border-blue-500 pointer-events-none z-40"
+            style={{
+              left: topLeft.x,
+              top: topLeft.y,
+              width: width,
+              height: height,
+              boxSizing: 'border-box',
+            }}
+          />
+        )}
 
-          {/* Resize handles w rogach (i na bokach, jeśli dodane) */}
-          {!isRotating && corners.map(({ pos, x, y, cursor }) => (
+        {/* Resize handles w rogach (i na bokach, jeśli dodane) */}
+        {!isRotating &&
+          corners.map(({ pos, x, y, cursor }) => (
             <div
               key={pos}
               className="absolute bg-white z-50 border border-gray-400 rounded-full pointer-events-auto"
@@ -1681,8 +1724,9 @@ const handlePointerDown = (e: React.PointerEvent) => {
             />
           ))}
 
-          {/* 🆕 Rotation handle - ukryj podczas rotacji */}
-          {!isRotating && (() => {
+        {/* 🆕 Rotation handle - ukryj podczas rotacji */}
+        {!isRotating &&
+          (() => {
             // Lewy górny róg
             const nwCorner = corners.find((c) => c.pos === 'nw');
             if (!nwCorner) return null;
@@ -1691,7 +1735,7 @@ const handlePointerDown = (e: React.PointerEvent) => {
             const dx = nwCorner.x - centerX;
             const dy = nwCorner.y - centerY;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            
+
             // Wydłuż wektor o 50px
             const extendedX = centerX + (dx / dist) * (dist + 50);
             const extendedY = centerY + (dy / dist) * (dist + 50);
@@ -1740,26 +1784,32 @@ const handlePointerDown = (e: React.PointerEvent) => {
                   setRotationOriginalElements(originalElements);
                 }}
               >
-              <svg 
-                width="18"      // Zmień na swoją wartość
-                height="18"     // Zmień na swoją wartość
-                viewBox="0 0 24 24" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg" 
-                transform="matrix(-1, 0, 0, 1, 0, 0)"
-              >
-                <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
-                <g id="SVGRepo_iconCarrier"> 
-                  <path d="M4.06189 13C4.02104 12.6724 4 12.3387 4 12C4 7.58172 7.58172 4 12 4C14.5006 4 16.7332 5.14727 18.2002 6.94416M19.9381 11C19.979 11.3276 20 11.6613 20 12C20 16.4183 16.4183 20 12 20C9.61061 20 7.46589 18.9525 6 17.2916M9 17H6V17.2916M18.2002 4V6.94416M18.2002 6.94416V6.99993L15.2002 7M6 20V17.2916" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> 
-                </g>
-              </svg>            
-            </div>
+                <svg
+                  width="18" // Zmień na swoją wartość
+                  height="18" // Zmień na swoją wartość
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  xmlns="http://www.w3.org/2000/svg"
+                  transform="matrix(-1, 0, 0, 1, 0, 0)"
+                >
+                  <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+                  <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
+                  <g id="SVGRepo_iconCarrier">
+                    <path
+                      d="M4.06189 13C4.02104 12.6724 4 12.3387 4 12C4 7.58172 7.58172 4 12 4C14.5006 4 16.7332 5.14727 18.2002 6.94416M19.9381 11C19.979 11.3276 20 11.6613 20 12C20 16.4183 16.4183 20 12 20C9.61061 20 7.46589 18.9525 6 17.2916M9 17H6V17.2916M18.2002 4V6.94416M18.2002 6.94416V6.99993L15.2002 7M6 20V17.2916"
+                      stroke="#000000"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    ></path>
+                  </g>
+                </svg>
+              </div>
             );
           })()}
-        </>
-      );
-    };
+      </>
+    );
+  };
 
   // Renderuj panel właściwości dla zaznaczonych kształtów/ścieżek lub markdown
   const renderPropertiesPanel = () => {
@@ -1854,4 +1904,3 @@ const handlePointerDown = (e: React.PointerEvent) => {
     </>
   );
 }
-

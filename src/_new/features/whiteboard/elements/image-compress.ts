@@ -106,7 +106,7 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 export async function compressAndUploadImage(
   rawDataUrl: string,
   boardId: number,
-  filename: string = 'image.jpg',
+  filename: string = 'image.jpg'
 ): Promise<UploadedImage> {
   const { dataUrl, width, height } = await compressImageDataUrl(rawDataUrl);
   const blob = await dataUrlToBlob(dataUrl);

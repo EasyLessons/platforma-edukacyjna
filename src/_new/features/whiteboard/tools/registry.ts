@@ -41,12 +41,12 @@ export const ALL_TOOLS: ToolDefinition[] = [
 ];
 
 export const toolRegistry: ReadonlyMap<ToolId, ToolDefinition> = new Map(
-  ALL_TOOLS.map((t) => [t.id, t]),
+  ALL_TOOLS.map((t) => [t.id, t])
 );
 
 export const getTool = (id: ToolId): ToolDefinition | undefined => toolRegistry.get(id);
 
 /** Mapa skrót → id narzędzia (budowana raz; zastępuje switch w canvasie). */
 export const TOOL_SHORTCUTS: ReadonlyMap<string, ToolId> = new Map(
-  ALL_TOOLS.filter((t) => t.shortcut).map((t) => [t.shortcut as string, t.id]),
+  ALL_TOOLS.filter((t) => t.shortcut).map((t) => [t.shortcut as string, t.id])
 );

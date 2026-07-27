@@ -1,6 +1,8 @@
 """
 Konfiguracja pytest - fixtures wspólne dla wszystkich testów
 """
+# ruff: noqa: E402
+
 import pytest
 import asyncio
 import json
@@ -8,7 +10,7 @@ import secrets
 import fakeredis
 import fakeredis.aioredis
 from datetime import datetime, timedelta
-from sqlalchemy import TypeDecorator, Text, event
+from sqlalchemy import TypeDecorator, Text
 from sqlalchemy.dialects import postgresql
 
 
@@ -41,7 +43,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 
-from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers, RefreshToken
+from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers
 from api.v1.auth.utils import hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

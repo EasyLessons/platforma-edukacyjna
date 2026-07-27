@@ -23,14 +23,14 @@ export type ToolId = string;
 
 export interface ToolDefinition {
   id: ToolId;
-  label: string;                       // tooltip, np. "Rysuj (P)"
+  label: string; // tooltip, np. "Rysuj (P)"
   icon: LucideIcon;
-  shortcut?: string;                   // np. 'p' — rejestrowany automatycznie
+  shortcut?: string; // np. 'p' — rejestrowany automatycznie
   /** Sekcja toolbara. Brak `group` = narzędzie bez przycisku (tylko overlay, np. arrow). */
   group?: 'main' | 'more';
   order?: number;
-  cursor?: CSSProperties['cursor'];    // kursor canvasu gdy narzędzie aktywne
-  availableTo?: UserRole[];            // domyślnie ['owner','editor']; 'viewer' tylko gdy podane
+  cursor?: CSSProperties['cursor']; // kursor canvasu gdy narzędzie aktywne
+  availableTo?: UserRole[]; // domyślnie ['owner','editor']; 'viewer' tylko gdy podane
   /** Wypełnienie ikony w przycisku toolbara (fillOpacity); brak = ikona konturowa. */
   iconFill?: number;
 

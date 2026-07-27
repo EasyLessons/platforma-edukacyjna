@@ -6,7 +6,7 @@
  *
  */
 
-import type { FormErrors } from "../auth/types";
+import type { FormErrors } from '../auth/types';
 
 // CORE TYPES
 

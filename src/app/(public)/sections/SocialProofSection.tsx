@@ -64,7 +64,6 @@ const testimonials: Testimonial[] = [
 export default function SocialProofSection() {
   return (
     <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pb-8`}>
-
       {/* Blok z zaokrąglonymi rogami - pomarańczowe tło */}
       <div
         className="relative w-full overflow-hidden"
@@ -74,7 +73,6 @@ export default function SocialProofSection() {
           padding: '4vh 4vw',
         }}
       >
-
         {/* Dekoracyjne kółka w tle */}
         <div
           className="absolute top-0 right-0 pointer-events-none"
@@ -105,7 +103,11 @@ export default function SocialProofSection() {
         <div className="relative text-center mb-10 sm:mb-14">
           <p
             className="text-white font-semibold tracking-widest uppercase mb-3"
-            style={{ fontSize: 'clamp(0.6rem, 1vw, 0.75rem)', opacity: 0.8, letterSpacing: '0.14em' }}
+            style={{
+              fontSize: 'clamp(0.6rem, 1vw, 0.75rem)',
+              opacity: 0.8,
+              letterSpacing: '0.14em',
+            }}
           >
             ZAUFANIE UŻYTKOWNIKÓW
           </p>
@@ -210,7 +212,6 @@ export default function SocialProofSection() {
             </div>
           ))}
         </div>
-
       </div>
     </div>
   );

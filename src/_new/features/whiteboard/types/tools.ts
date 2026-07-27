@@ -54,10 +54,4 @@ export type Tool =
  * 'arrow'      → strzałka prosta (kształt, nie ArrowElement)
  * 'polygon'    → wielokąt foremny (liczba boków konfigurowana osobno)
  */
-export type ShapeType =
-  | 'rectangle'
-  | 'circle'
-  | 'triangle'
-  | 'line'
-  | 'arrow'
-  | 'polygon';
+export type ShapeType = 'rectangle' | 'circle' | 'triangle' | 'line' | 'arrow' | 'polygon';

@@ -324,4 +324,3 @@ export const MarkdownNoteView = memo(
     );
   }
 );
-

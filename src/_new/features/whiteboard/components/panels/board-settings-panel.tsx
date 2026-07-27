@@ -16,9 +16,28 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Settings, Users, Bot, Grid3X3, Search, PanelLeft, Crown, Shield, User, Eye, ChevronDown, Check, Loader2 } from 'lucide-react';
+import {
+  X,
+  Settings,
+  Users,
+  Bot,
+  Grid3X3,
+  Search,
+  PanelLeft,
+  Crown,
+  Shield,
+  User,
+  Eye,
+  ChevronDown,
+  Check,
+  Loader2,
+} from 'lucide-react';
 import type { BoardSettings, BoardMember } from '@/_new/features/board/types';
-import { fetchBoardMembers, updateBoardSettings, updateBoardMemberRole } from '@/_new/features/board/api/boardApi';
+import {
+  fetchBoardMembers,
+  updateBoardSettings,
+  updateBoardMemberRole,
+} from '@/_new/features/board/api/boardApi';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 // ─── TYPY ───────────────────────────────────────────────────────────────────
@@ -34,8 +53,8 @@ interface BoardSettingsPanelProps {
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 const ROLE_CONFIG = {
-  editor:  { label: 'Edytor',      icon: Shield, color: '#3b82f6', bg: '#dbeafe' },
-  viewer: { label: 'Obserwator', icon: Eye,    color: '#8b5cf6', bg: '#ede9fe' },
+  editor: { label: 'Edytor', icon: Shield, color: '#3b82f6', bg: '#dbeafe' },
+  viewer: { label: 'Obserwator', icon: Eye, color: '#8b5cf6', bg: '#ede9fe' },
 } as const;
 
 type Role = keyof typeof ROLE_CONFIG;
@@ -46,10 +65,15 @@ function RoleBadge({ role }: { role: Role }) {
   return (
     <span
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: '4px',
-        padding: '2px 8px', borderRadius: '99px',
-        backgroundColor: cfg.bg, color: cfg.color,
-        fontSize: '12px', fontWeight: 600,
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '4px',
+        padding: '2px 8px',
+        borderRadius: '99px',
+        backgroundColor: cfg.bg,
+        color: cfg.color,
+        fontSize: '12px',
+        fontWeight: 600,
       }}
     >
       <Icon size={11} />
@@ -73,9 +97,13 @@ function ToggleRow({ icon, label, description, value, disabled, onChange }: Togg
   return (
     <div
       style={{
-        display: 'flex', alignItems: 'center', gap: '12px',
-        padding: '12px 16px', borderRadius: '10px',
-        backgroundColor: '#f9fafb', marginBottom: '8px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        padding: '12px 16px',
+        borderRadius: '10px',
+        backgroundColor: '#f9fafb',
+        marginBottom: '8px',
         opacity: disabled ? 0.5 : 1,
       }}
     >
@@ -88,18 +116,25 @@ function ToggleRow({ icon, label, description, value, disabled, onChange }: Togg
         disabled={disabled}
         onClick={() => onChange(!value)}
         style={{
-          width: '44px', height: '24px', borderRadius: '99px', border: 'none',
+          width: '44px',
+          height: '24px',
+          borderRadius: '99px',
+          border: 'none',
           cursor: disabled ? 'default' : 'pointer',
           backgroundColor: value ? '#212224' : '#d1d5db',
-          position: 'relative', transition: 'background-color 0.2s',
+          position: 'relative',
+          transition: 'background-color 0.2s',
           flexShrink: 0,
         }}
       >
         <div
           style={{
-            position: 'absolute', top: '2px',
+            position: 'absolute',
+            top: '2px',
             left: value ? '22px' : '2px',
-            width: '20px', height: '20px', borderRadius: '50%',
+            width: '20px',
+            height: '20px',
+            borderRadius: '50%',
             backgroundColor: 'white',
             boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
             transition: 'left 0.2s',
@@ -140,38 +175,66 @@ function RoleSelect({ currentRole, userId, boardId, onRoleChange, saving }: Role
         onClick={() => setOpen(!open)}
         disabled={saving}
         style={{
-          display: 'inline-flex', alignItems: 'center', gap: '4px',
-          padding: '4px 8px', borderRadius: '6px',
-          border: '1px solid #e5e7eb', backgroundColor: 'white',
-          cursor: saving ? 'default' : 'pointer', fontSize: '13px',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '4px',
+          padding: '4px 8px',
+          borderRadius: '6px',
+          border: '1px solid #e5e7eb',
+          backgroundColor: 'white',
+          cursor: saving ? 'default' : 'pointer',
+          fontSize: '13px',
         }}
       >
-        {saving
-          ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
-          : <RoleBadge role={currentRole} />}
+        {saving ? (
+          <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
+        ) : (
+          <RoleBadge role={currentRole} />
+        )}
         <ChevronDown size={12} style={{ color: '#6b7280' }} />
       </button>
       {open && (
         <div
           style={{
-            position: 'absolute', right: 0, top: '100%', marginTop: '4px',
-            backgroundColor: 'white', border: '1px solid #e5e7eb',
-            borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-            zIndex: 200, minWidth: '140px', overflow: 'hidden',
+            position: 'absolute',
+            right: 0,
+            top: '100%',
+            marginTop: '4px',
+            backgroundColor: 'white',
+            border: '1px solid #e5e7eb',
+            borderRadius: '8px',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+            zIndex: 200,
+            minWidth: '140px',
+            overflow: 'hidden',
           }}
         >
           {options.map((role) => (
             <button
               key={role}
-              onClick={() => { onRoleChange(userId, role); setOpen(false); }}
-              style={{
-                width: '100%', padding: '8px 12px', textAlign: 'left',
-                border: 'none', backgroundColor: role === currentRole ? '#f9fafb' : 'white',
-                cursor: 'pointer', display: 'flex', alignItems: 'center',
-                justifyContent: 'space-between', gap: '8px',
+              onClick={() => {
+                onRoleChange(userId, role);
+                setOpen(false);
               }}
-              onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6'; }}
-              onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = role === currentRole ? '#f9fafb' : 'white'; }}
+              style={{
+                width: '100%',
+                padding: '8px 12px',
+                textAlign: 'left',
+                border: 'none',
+                backgroundColor: role === currentRole ? '#f9fafb' : 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+              }}
+              onMouseOver={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                  role === currentRole ? '#f9fafb' : 'white';
+              }}
             >
               <RoleBadge role={role} />
               {role === currentRole && <Check size={12} style={{ color: '#212224' }} />}
@@ -206,7 +269,7 @@ export function BoardSettingsPanel({
     if (tab !== 'members') return;
     setMembersLoading(true);
     setMembersError(null);
-    fetchBoardMembers(boardId).then(res => setMembers(res.members));
+    fetchBoardMembers(boardId).then((res) => setMembers(res.members));
   }, [tab, boardId]);
 
   // Debounced save ustawień do backendu (tylko właściciel)
@@ -236,9 +299,7 @@ export function BoardSettingsPanel({
       setSavingRoles((prev) => new Set(prev).add(userId));
       try {
         await updateBoardMemberRole(boardId, userId, newRole);
-        setMembers((prev) =>
-          prev.map((m) => (m.user_id === userId ? { ...m, role: newRole } : m))
-        );
+        setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, role: newRole } : m)));
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : 'Błąd zmiany roli';
         alert(message);
@@ -256,25 +317,37 @@ export function BoardSettingsPanel({
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 1000,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         backgroundColor: 'rgba(0,0,0,0.4)',
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         style={{
-          backgroundColor: 'white', borderRadius: '16px',
+          backgroundColor: 'white',
+          borderRadius: '16px',
           boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
-          width: '480px', maxWidth: 'calc(100vw - 32px)',
-          maxHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column',
+          width: '480px',
+          maxWidth: 'calc(100vw - 32px)',
+          maxHeight: 'calc(100vh - 64px)',
+          display: 'flex',
+          flexDirection: 'column',
           overflow: 'hidden',
         }}
       >
         {/* ── HEADER ── */}
         <div
           style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
             padding: '20px 24px 16px',
             borderBottom: '1px solid #f3f4f6',
           }}
@@ -287,7 +360,15 @@ export function BoardSettingsPanel({
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {settingsSaving && (
-              <span style={{ fontSize: '12px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <span
+                style={{
+                  fontSize: '12px',
+                  color: '#6b7280',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                }}
+              >
                 <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} />
                 Zapisywanie…
               </span>
@@ -295,11 +376,19 @@ export function BoardSettingsPanel({
             <button
               onClick={onClose}
               style={{
-                padding: '6px', border: 'none', borderRadius: '8px',
-                backgroundColor: 'transparent', cursor: 'pointer', color: '#6b7280',
+                padding: '6px',
+                border: 'none',
+                borderRadius: '8px',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                color: '#6b7280',
               }}
-              onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6'; }}
-              onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent'; }}
+              onMouseOver={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = '#f3f4f6';
+              }}
+              onMouseOut={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'transparent';
+              }}
             >
               <X size={18} />
             </button>
@@ -308,19 +397,27 @@ export function BoardSettingsPanel({
 
         {/* ── TABS ── */}
         <div style={{ display: 'flex', borderBottom: '1px solid #f3f4f6', padding: '0 24px' }}>
-          {([
-            { key: 'settings', label: 'Ustawienia', Icon: Settings },
-            { key: 'members',  label: 'Członkowie', Icon: Users },
-          ] as const).map(({ key, label, Icon }) => (
+          {(
+            [
+              { key: 'settings', label: 'Ustawienia', Icon: Settings },
+              { key: 'members', label: 'Członkowie', Icon: Users },
+            ] as const
+          ).map(({ key, label, Icon }) => (
             <button
               key={key}
               onClick={() => setTab(key)}
               style={{
-                padding: '12px 16px', border: 'none', backgroundColor: 'transparent',
-                cursor: 'pointer', fontSize: '14px', fontWeight: tab === key ? 600 : 400,
+                padding: '12px 16px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                fontSize: '14px',
+                fontWeight: tab === key ? 600 : 400,
                 color: tab === key ? '#212224' : '#6b7280',
                 borderBottom: tab === key ? '2px solid #212224' : '2px solid transparent',
-                display: 'flex', alignItems: 'center', gap: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
                 transition: 'color 0.15s',
               }}
             >
@@ -332,17 +429,22 @@ export function BoardSettingsPanel({
 
         {/* ── CONTENT ── */}
         <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1 }}>
-
           {/* ──── TAB: USTAWIENIA ──── */}
           {tab === 'settings' && (
             <div>
               {!isOwner && (
                 <div
                   style={{
-                    padding: '10px 14px', marginBottom: '16px',
-                    backgroundColor: '#f3f4f6', border: '1px solid #d1d5db',
-                    borderRadius: '8px', fontSize: '13px', color: '#374151',
-                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 14px',
+                    marginBottom: '16px',
+                    backgroundColor: '#f3f4f6',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '13px',
+                    color: '#374151',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
                   }}
                 >
                   <Crown size={14} style={{ color: '#4b5563', flexShrink: 0 }} />
@@ -390,7 +492,10 @@ export function BoardSettingsPanel({
             <div>
               {membersLoading && (
                 <div style={{ textAlign: 'center', padding: '32px', color: '#6b7280' }}>
-                  <Loader2 size={24} style={{ animation: 'spin 1s linear infinite', margin: '0 auto 8px' }} />
+                  <Loader2
+                    size={24}
+                    style={{ animation: 'spin 1s linear infinite', margin: '0 auto 8px' }}
+                  />
                   <div style={{ fontSize: '14px' }}>Ładowanie członków…</div>
                 </div>
               )}
@@ -401,17 +506,29 @@ export function BoardSettingsPanel({
               )}
               {!membersLoading && !membersError && (
                 <>
-                  <p style={{ fontSize: '13px', color: '#6b7280', marginBottom: '16px', marginTop: 0 }}>
-                    Role workspace-owe mają zastosowanie na wszystkich tablicach w tym workspace&apos;ie.
+                  <p
+                    style={{
+                      fontSize: '13px',
+                      color: '#6b7280',
+                      marginBottom: '16px',
+                      marginTop: 0,
+                    }}
+                  >
+                    Role workspace-owe mają zastosowanie na wszystkich tablicach w tym
+                    workspace&apos;ie.
                   </p>
                   <div>
                     {members.map((m) => (
                       <div
                         key={m.user_id}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: '12px',
-                          padding: '10px 12px', borderRadius: '10px',
-                          marginBottom: '6px', backgroundColor: '#f9fafb',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '12px',
+                          padding: '10px 12px',
+                          borderRadius: '10px',
+                          marginBottom: '6px',
+                          backgroundColor: '#f9fafb',
                         }}
                       >
                         {/* Avatar */}
@@ -424,10 +541,27 @@ export function BoardSettingsPanel({
 
                         {/* Info */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: '14px', fontWeight: 600, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div
+                            style={{
+                              fontSize: '14px',
+                              fontWeight: 600,
+                              color: '#111827',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {m.username}
                           </div>
-                          <div style={{ fontSize: '12px', color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <div
+                            style={{
+                              fontSize: '12px',
+                              color: '#6b7280',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            }}
+                          >
                             {m.email}
                           </div>
                         </div>

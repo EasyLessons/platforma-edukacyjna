@@ -1,8 +1,4 @@
 """
-Entry point - API v1
-Zamiast main.py, ale trzymamy main.py dla backward compat
-"""
-"""
 MAIN.PY - Entry point aplikacji
 """
 import os

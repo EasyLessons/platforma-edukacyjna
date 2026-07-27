@@ -44,7 +44,10 @@ export async function POST(request: Request) {
     if (!response.ok) {
       const errorData = await response.json();
       console.error('Błąd z Resend API:', errorData);
-      return NextResponse.json({ error: 'Błąd podczas wysyłania emaila do Resend' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Błąd podczas wysyłania emaila do Resend' },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ success: true }, { status: 200 });

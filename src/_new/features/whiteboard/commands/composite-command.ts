@@ -16,7 +16,7 @@ export class CompositeCommand implements Command {
 
   constructor(
     private readonly commands: readonly Command[],
-    label = 'batch',
+    label = 'batch'
   ) {
     this.label = label;
   }

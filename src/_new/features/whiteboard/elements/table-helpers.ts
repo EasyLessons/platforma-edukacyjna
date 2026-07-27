@@ -1,6 +1,6 @@
 /**
  * table-helpers.ts
- * 
+ *
  * Pomocnicze funkcje do zarządzania tabelami.
  * Głównie obliczanie fontSize na podstawie rozmiaru tabeli.
  */
@@ -10,7 +10,7 @@ import type { TableElement } from '../types';
 /**
  * Oblicz optymalny fontSize dla tabeli w world units.
  * Wywoływane przy tworzeniu i resizing tabeli.
- * 
+ *
  * @param height - wysokość tabeli w world units
  * @param rows - liczba wierszy
  * @returns fontSize w world units (np. 0.12)
@@ -33,7 +33,7 @@ export function resizeTableCells(
   newCols: number
 ): string[][] {
   const newCells: string[][] = [];
-  
+
   for (let r = 0; r < newRows; r++) {
     const row: string[] = [];
     for (let c = 0; c < newCols; c++) {
@@ -42,6 +42,6 @@ export function resizeTableCells(
     }
     newCells.push(row);
   }
-  
+
   return newCells;
 }

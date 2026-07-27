@@ -63,7 +63,10 @@ import { SnapGuides } from './snap-guides';
 
 // ─── SmartSearch ─────────────────────────────────────────────────────────────
 import { SmartSearchBar, CardViewer } from '@/_new/features/whiteboard/components/smartsearch';
-import type { FormulaResource, CardResource } from '@/_new/features/whiteboard/components/smartsearch';
+import type {
+  FormulaResource,
+  CardResource,
+} from '@/_new/features/whiteboard/components/smartsearch';
 
 // ─── MathChatbot ─────────────────────────────────────────────────────────────
 import { MathChatbot } from '@/_new/features/whiteboard/components/toolbar/math-chatbot';
@@ -99,7 +102,6 @@ import type {
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/board/types';
 import { compressAndUploadImage } from '../../elements/image-compress';
-
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
@@ -159,7 +161,9 @@ export default function WhiteboardCanvasNew({
   const settings = boardSettingsProp ?? DEFAULT_BOARD_SETTINGS;
   // Ref do settings — unika stale closure w useCallback renderowania
   const settingsRef = useRef(settings);
-  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
   // ─── Refs do DOM ────────────────────────────────────────────────────────────
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -202,7 +206,9 @@ export default function WhiteboardCanvasNew({
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
   const [windowHeight, setWindowHeight] = useState(0);
-  const [bottomToastState, setBottomToastState] = useState<{ id: number; message: string } | null>(null);
+  const [bottomToastState, setBottomToastState] = useState<{ id: number; message: string } | null>(
+    null
+  );
   const [isBottomToastExiting, setIsBottomToastExiting] = useState(false);
 
   // ─── Stan MathChatbot ───────────────────────────────────────────────────────
@@ -232,7 +238,9 @@ export default function WhiteboardCanvasNew({
   const cellEditorInputRef = useRef<HTMLTextAreaElement>(null);
   /** Aktualny stan editingTableCell bez stałej closure — do użytku w handlerach */
   const editingTableCellRef = useRef(editingTableCell);
-  useEffect(() => { editingTableCellRef.current = editingTableCell; }, [editingTableCell]);
+  useEffect(() => {
+    editingTableCellRef.current = editingTableCell;
+  }, [editingTableCell]);
   // Autofocus + zaznaczenie całości + inicjalizacja wysokości przy otwarciu edytora
   useEffect(() => {
     if (editingTableCell && cellEditorInputRef.current) {
@@ -295,15 +303,9 @@ export default function WhiteboardCanvasNew({
   // ─── Broadcast refs — rozwiązanie problemu "kółkowej zależności" ────────────
   // hist potrzebuje rt.broadcastElementCreated, ale rt inicjalizujemy po hist.
   // Rozwiązanie: ref do funkcji broadcastu, wypełniany po inicjalizacji rt.
-  const broadcastCreatedRef = useRef<(el: DrawingElement) => Promise<void>>(
-    async () => {}
-  );
-  const broadcastDeletedRef = useRef<(id: string) => Promise<void>>(
-    async () => {}
-  );
-  const broadcastUpdatedRef = useRef<(el: DrawingElement) => Promise<void>>(
-    async () => {}
-  );
+  const broadcastCreatedRef = useRef<(el: DrawingElement) => Promise<void>>(async () => {});
+  const broadcastDeletedRef = useRef<(id: string) => Promise<void>>(async () => {});
+  const broadcastUpdatedRef = useRef<(el: DrawingElement) => Promise<void>>(async () => {});
 
   // ─── HOOK: viewport ─────────────────────────────────────────────────────────
   const vp = useViewport();
@@ -316,10 +318,8 @@ export default function WhiteboardCanvasNew({
 
   // ─── HOOK: history ──────────────────────────────────────────────────────────
   const hist = useHistory({
-    onDeleteElement: (boardIdNum, elementId) =>
-      el.deleteElementDirectly(boardIdNum, elementId),
-    onSaveElement: (boardIdNum, element) =>
-      el.saveElementDirectly(boardIdNum, element),
+    onDeleteElement: (boardIdNum, elementId) => el.deleteElementDirectly(boardIdNum, elementId),
+    onSaveElement: (boardIdNum, element) => el.saveElementDirectly(boardIdNum, element),
     // Używamy ref żeby nie tworzyć pętli zależności z rt
     onBroadcastCreated: (element) => broadcastCreatedRef.current(element),
     onBroadcastDeleted: (elementId) => broadcastDeletedRef.current(elementId),
@@ -392,22 +392,24 @@ export default function WhiteboardCanvasNew({
         merged.forEach((e) => el.updateElement(e));
       }
     },
-        
-// 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
+
+    // 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
     onSyncRequest: (requestingUserId) => {
       // ⚠️ UŻYWAMY boardRt ZAMIAST rt!
       if (el.elementsRef.current.length > 0 && boardRt.broadcastSyncResponse) {
-        boardRt.broadcastSyncResponse(el.elementsRef.current, requestingUserId).catch(console.error);
+        boardRt
+          .broadcastSyncResponse(el.elementsRef.current, requestingUserId)
+          .catch(console.error);
       }
     },
-    
+
     // 🔥 DODANE [SYNC] To my weszliśmy i ktoś nam przysłał najświeższe dane - łatajmy dziury!
     onSyncResponse: (incomingElements) => {
-      const currentMap = new Map(el.elementsRef.current.map(e => [e.id, e]));
+      const currentMap = new Map(el.elementsRef.current.map((e) => [e.id, e]));
       const toAdd: DrawingElement[] = [];
       const toUpdate: DrawingElement[] = [];
 
-      incomingElements.forEach(incoming => {
+      incomingElements.forEach((incoming) => {
         // Uzupełnij bbox dla ścieżek z sync (przyszły z sieci, nie mają cache)
         if (incoming.type === 'path' && !incoming.bbox) {
           (incoming as DrawingPath).bbox = computePathBbox(incoming);
@@ -422,8 +424,7 @@ export default function WhiteboardCanvasNew({
       if (toAdd.length > 0) el.addElements(toAdd);
       if (toUpdate.length > 0 && el.updateElements) el.updateElements(toUpdate);
     },
- 
-      });
+  });
 
   // Wypełnij broadcast refs gdy rt jest dostępne (bez ponownego renderowania)
   useEffect(() => {
@@ -495,15 +496,15 @@ export default function WhiteboardCanvasNew({
       await saveUserAsset({
         name: assetName,
         elements_data: normalizedElements,
-        thumbnail
+        thumbnail,
       });
       setAssetModalOpen(false);
       setFrozenElementsForAsset([]);
       setShowAssetsLibrary(true);
-      setAssetsRefreshKey(k => k + 1);
+      setAssetsRefreshKey((k) => k + 1);
     } catch (err) {
       console.error(err);
-      alert("Wystąpił błąd podczas zapisywania szablonu");
+      alert('Wystąpił błąd podczas zapisywania szablonu');
     }
   };
 
@@ -523,17 +524,22 @@ export default function WhiteboardCanvasNew({
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
         const dropScreenPt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-        const dropWorldPt = inverseTransformPoint(dropScreenPt, vp.viewportRef.current, rect.width, rect.height);
+        const dropWorldPt = inverseTransformPoint(
+          dropScreenPt,
+          vp.viewportRef.current,
+          rect.width,
+          rect.height
+        );
 
         const now = Date.now();
-        const insertedElements = parsedElements.map(el => {
+        const insertedElements = parsedElements.map((el) => {
           // Tworzymy głęboką kopię elementu, aby nie referować do starych danych
           const copy = structuredClone(el) as any;
 
           copy.id = crypto.randomUUID();
           copy.created_at = now;
           copy.updated_at = now;
-          
+
           if (copy.type === 'path') {
             copy.points = copy.points.map((p: any) => ({
               x: p.x + dropWorldPt.x,
@@ -559,74 +565,74 @@ export default function WhiteboardCanvasNew({
             (copy as any).x += dropWorldPt.x;
             (copy as any).y += dropWorldPt.y;
           }
-          
+
           return copy as DrawingElement;
         });
 
         engine.createElements(insertedElements);
-        sel.selectElements(insertedElements.map(e => e.id));
+        sel.selectElements(insertedElements.map((e) => e.id));
 
         // Load images if there are any
-        insertedElements.forEach(item => {
+        insertedElements.forEach((item) => {
           if (item.type === 'image' && (item as ImageElement).src) {
             el.loadImage(item.id, (item as ImageElement).src);
           }
         });
-
       } catch (err) {
-        console.error("Błąd podczas upuszczania zasobu:", err);
+        console.error('Błąd podczas upuszczania zasobu:', err);
       }
     }
   };
 
-  const handleViewportChange = useCallback((newVp: ViewportTransform) => {
-    const constrained = constrainViewport(newVp);
-    
-    // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
-    vp.viewportRef.current = constrained;
+  const handleViewportChange = useCallback(
+    (newVp: ViewportTransform) => {
+      const constrained = constrainViewport(newVp);
 
-    // 2. Jeśli overlaye są widoczne, ukryj je TYLKO wizualnie (bez czyszczenia zaznaczenia!)
-    // Używamy CSS dla szybkości, by nie wymuszać ciężkiego re-renderu całego drzewa Reacta
-    if (htmlOverlaysRef.current && htmlOverlaysRef.current.style.visibility !== 'hidden') {
-      htmlOverlaysRef.current.style.visibility = 'hidden';
-    }
+      // 1. Zaktualizuj stabilną referencję (Ref) - to daje płynność Canvasowi (60 FPS)
+      vp.viewportRef.current = constrained;
 
-    // 3. Zarządzanie renderowaniem:
-    // Jeśli używamy narzędzia Pan lub gestów (isPanningRef), nie robimy setViewport (stanu React),
-    // bo to by zabiło wydajność mobilną przez ciągłe re-rendery.
-    if (isPanningRef.current) {
-      // Tylko przerysowujemy Canvas "na żywo"
-      requestAnimationFrame(() => redrawCanvasRef.current());
-    } else {
-      // Jeśli to np. Zoom z przycisku, aktualizujemy stan normalnie
-      vp.setViewport(constrained);
-    }
+      // 2. Jeśli overlaye są widoczne, ukryj je TYLKO wizualnie (bez czyszczenia zaznaczenia!)
+      // Używamy CSS dla szybkości, by nie wymuszać ciężkiego re-renderu całego drzewa Reacta
+      if (htmlOverlaysRef.current && htmlOverlaysRef.current.style.visibility !== 'hidden') {
+        htmlOverlaysRef.current.style.visibility = 'hidden';
+      }
 
-    // 4. Przywróć overlaye po zakończeniu ruchu (Debounce)
-    if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
-    viewportChangeTimerRef.current = setTimeout(() => {
-      viewportChangeTimerRef.current = null;
-      if (isPanningRef.current) return; 
+      // 3. Zarządzanie renderowaniem:
+      // Jeśli używamy narzędzia Pan lub gestów (isPanningRef), nie robimy setViewport (stanu React),
+      // bo to by zabiło wydajność mobilną przez ciągłe re-rendery.
+      if (isPanningRef.current) {
+        // Tylko przerysowujemy Canvas "na żywo"
+        requestAnimationFrame(() => redrawCanvasRef.current());
+      } else {
+        // Jeśli to np. Zoom z przycisku, aktualizujemy stan normalnie
+        vp.setViewport(constrained);
+      }
 
-      // Dopiero po zatrzymaniu ruchu synchronizujemy stan Reacta
-      vp.setViewport(vp.viewportRef.current);
-      if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
-    }, 100);
-  }, [vp.setViewport, vp.viewportRef]); // Usunąłem 'sel' z zależności - funkcja jest teraz stabilna!
+      // 4. Przywróć overlaye po zakończeniu ruchu (Debounce)
+      if (viewportChangeTimerRef.current) clearTimeout(viewportChangeTimerRef.current);
+      viewportChangeTimerRef.current = setTimeout(() => {
+        viewportChangeTimerRef.current = null;
+        if (isPanningRef.current) return;
 
+        // Dopiero po zatrzymaniu ruchu synchronizujemy stan Reacta
+        vp.setViewport(vp.viewportRef.current);
+        if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
+      }, 100);
+    },
+    [vp.setViewport, vp.viewportRef]
+  ); // Usunąłem 'sel' z zależności - funkcja jest teraz stabilna!
 
-
-useMultiTouchGestures({
+  useMultiTouchGestures({
     containerRef,
     viewportRef: vp.viewportRef,
     onGestureStart: () => {
-      setIsGestureActive(true);      // Blokuje PenTool i inne narzędzia
-      isPanningRef.current = true;   // Flaga dla wydajności rysowania
+      setIsGestureActive(true); // Blokuje PenTool i inne narzędzia
+      isPanningRef.current = true; // Flaga dla wydajności rysowania
       // Ukrywamy ramkę zaznaczenia natychmiast, żeby nie "pływała"
       if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = 'hidden';
     },
     onGestureEnd: () => {
-      setIsGestureActive(false);     // Odblokowuje narzędzia rysowania
+      setIsGestureActive(false); // Odblokowuje narzędzia rysowania
       // isPanningRef zostaje true — momentum kontynuuje pan bez setViewport per klatka
     },
     onMomentumEnd: () => {
@@ -651,7 +657,7 @@ useMultiTouchGestures({
     rt.broadcastViewportChange(vp.viewport.x, vp.viewport.y, vp.viewport.scale);
   }, [vp.viewport, vp.followingUserId, rt.broadcastViewportChange, rt.isConnected]);
 
-// 📡 [SYNC] Gdy kanał WebSocket się połączy, poproś innych graczy o niezapisany stan
+  // 📡 [SYNC] Gdy kanał WebSocket się połączy, poproś innych graczy o niezapisany stan
   useEffect(() => {
     if (rt.isConnected && rt.broadcastSyncRequest) {
       rt.broadcastSyncRequest().catch(console.error);
@@ -714,10 +720,10 @@ useMultiTouchGestures({
     const CULL_MARGIN_PX = 150;
     const scale100 = viewport.scale * 100;
     const worldMargin = CULL_MARGIN_PX / scale100;
-    const worldMinX = viewport.x - (width / 2) / scale100 - worldMargin;
-    const worldMinY = viewport.y - (height / 2) / scale100 - worldMargin;
-    const worldMaxX = viewport.x + (width / 2) / scale100 + worldMargin;
-    const worldMaxY = viewport.y + (height / 2) / scale100 + worldMargin;
+    const worldMinX = viewport.x - width / 2 / scale100 - worldMargin;
+    const worldMinY = viewport.y - height / 2 / scale100 - worldMargin;
+    const worldMaxX = viewport.x + width / 2 / scale100 + worldMargin;
+    const worldMaxY = viewport.y + height / 2 / scale100 + worldMargin;
 
     const visibleIds = spatialIndex.query(worldMinX, worldMinY, worldMaxX, worldMaxY);
 
@@ -745,9 +751,9 @@ useMultiTouchGestures({
       const ww = parseFloat(d.getAttribute('data-world-w') || '0');
       const wh = parseFloat(d.getAttribute('data-world-h') || '0');
       const tl = transformPoint({ x: wx, y: wy }, viewport, width, height);
-      d.style.left   = `${tl.x}px`;
-      d.style.top    = `${tl.y}px`;
-      d.style.width  = `${ww * viewport.scale * 100}px`;
+      d.style.left = `${tl.x}px`;
+      d.style.top = `${tl.y}px`;
+      d.style.width = `${ww * viewport.scale * 100}px`;
       d.style.height = `${wh * viewport.scale * 100}px`;
     }
 
@@ -761,19 +767,23 @@ useMultiTouchGestures({
         const cellH = t.height / t.rows;
         const tl = transformPoint(
           { x: t.x + editing.col * cellW, y: t.y + editing.row * cellH },
-          viewport, width, height
+          viewport,
+          width,
+          height
         );
         const br = transformPoint(
           { x: t.x + (editing.col + 1) * cellW, y: t.y + (editing.row + 1) * cellH },
-          viewport, width, height
+          viewport,
+          width,
+          height
         );
         // Pozycja/rozmiar → wrapper div (parentElement); typografia → textarea
-        const ta      = cellEditorInputRef.current;
+        const ta = cellEditorInputRef.current;
         const wrapper = ta.parentElement;
         if (wrapper) {
-          wrapper.style.left   = `${tl.x}px`;
-          wrapper.style.top    = `${tl.y}px`;
-          wrapper.style.width  = `${br.x - tl.x}px`;
+          wrapper.style.left = `${tl.x}px`;
+          wrapper.style.top = `${tl.y}px`;
+          wrapper.style.width = `${br.x - tl.x}px`;
           wrapper.style.height = `${br.y - tl.y}px`;
         }
         // Wzór identyczny jak w table-handler.ts render(): world fontSize × scale × 100
@@ -785,7 +795,7 @@ useMultiTouchGestures({
     }
 
     ctx.restore();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Stabilna — wszystkie wartości runtime przez renderStateRef
 
   // Przechowuj redrawCanvas w ref — teraz zbędne bo jest już stabilna, ale zostawiamy
@@ -923,7 +933,7 @@ useMultiTouchGestures({
     return () => container.removeEventListener('wheel', handleWheel);
   }, [vp.handleStopFollowing, vp.setViewport, vp.viewportRef]);
 
-// ─── BROADCAST CURSOR (pointermove → world coords → WebSocket) ──────────
+  // ─── BROADCAST CURSOR (pointermove → world coords → WebSocket) ──────────
 
   const lastCursorBroadcastRef = useRef(0); // pamięć czasu
 
@@ -934,7 +944,7 @@ useMultiTouchGestures({
     const handlePointerMove = (e: PointerEvent) => {
       // 🔥 DODANE: THROTTLE (ogranicznik częstotliwości)
       const now = Date.now();
-      if (now - lastCursorBroadcastRef.current < 40) return; 
+      if (now - lastCursorBroadcastRef.current < 40) return;
       lastCursorBroadcastRef.current = now;
 
       const rect = container.getBoundingClientRect();
@@ -970,8 +980,10 @@ useMultiTouchGestures({
       const tables = el.elementsRef.current.filter((el) => el.type === 'table') as TableElement[];
       for (const t of tables) {
         if (
-          worldPos.x >= t.x && worldPos.x <= t.x + t.width &&
-          worldPos.y >= t.y && worldPos.y <= t.y + t.height
+          worldPos.x >= t.x &&
+          worldPos.x <= t.x + t.width &&
+          worldPos.y >= t.y &&
+          worldPos.y <= t.y + t.height
         ) {
           const col = Math.min(Math.floor((worldPos.x - t.x) / (t.width / t.cols)), t.cols - 1);
           const row = Math.min(Math.floor((worldPos.y - t.y) / (t.height / t.rows)), t.rows - 1);
@@ -980,11 +992,15 @@ useMultiTouchGestures({
           const cellH = t.height / t.rows;
           const tl = transformPoint(
             { x: t.x + col * cellW, y: t.y + row * cellH },
-            vp.viewportRef.current, rect.width, rect.height
+            vp.viewportRef.current,
+            rect.width,
+            rect.height
           );
           const br = transformPoint(
             { x: t.x + (col + 1) * cellW, y: t.y + (row + 1) * cellH },
-            vp.viewportRef.current, rect.width, rect.height
+            vp.viewportRef.current,
+            rect.width,
+            rect.height
           );
           setEditingTableCell({ tableId: t.id, row, col });
           return;
@@ -1022,11 +1038,11 @@ useMultiTouchGestures({
       // button 1 = scroll (MMB), button 2 = PPM
       if (e.button !== 1 && e.button !== 2) return;
 
-      e.preventDefault();      // blokuje autoscroll (MMB) + zapobiega mousedown
-      e.stopPropagation();     // blokuje tool-overlay od widzenia pointerdown
+      e.preventDefault(); // blokuje autoscroll (MMB) + zapobiega mousedown
+      e.stopPropagation(); // blokuje tool-overlay od widzenia pointerdown
 
       isPanningRef.current = true;
-      panButtonRef.current = e.button;  // 1=MMB, 2=PPM
+      panButtonRef.current = e.button; // 1=MMB, 2=PPM
       panDidDragRef.current = false;
       panLastPosRef.current = { x: e.clientX, y: e.clientY };
 
@@ -1141,7 +1157,10 @@ useMultiTouchGestures({
         return;
       }
       // Ctrl+Y / Ctrl+Shift+Z — ponów
-      if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) {
+      if (
+        (e.ctrlKey && e.key.toLowerCase() === 'y') ||
+        (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')
+      ) {
         e.preventDefault();
         hist.redo();
         return;
@@ -1201,9 +1220,13 @@ useMultiTouchGestures({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
-    hist.undo, hist.redo,
-    sel.selectedElementIds, sel.clearSelection,
-    clip.handleCopy, clip.handlePaste, clip.handleDuplicate,
+    hist.undo,
+    hist.redo,
+    sel.selectedElementIds,
+    sel.clearSelection,
+    clip.handleCopy,
+    clip.handlePaste,
+    clip.handleDuplicate,
     userRole,
   ]);
 
@@ -1243,33 +1266,41 @@ useMultiTouchGestures({
     if (htmlOverlaysRef.current) htmlOverlaysRef.current.style.visibility = '';
   }, [vp.setViewport, vp.viewportRef]);
 
-
   /** Używane przez ActivityHistory — centruje widok i zaznacza elementy */
-  const handleCenterViewAndSelectElements = useCallback((
-    x: number,
-    y: number,
-    scale?: number,
-    _bounds?: { minX: number; minY: number; maxX: number; maxY: number }
-  ) => {
-    const constrained = constrainViewport({ x, y, scale: scale ?? vp.viewport.scale });
-    vp.viewportRef.current = constrained;
-    vp.setViewport(constrained);
-  }, [vp.setViewport, vp.viewportRef, vp.viewport.scale]);
+  const handleCenterViewAndSelectElements = useCallback(
+    (
+      x: number,
+      y: number,
+      scale?: number,
+      _bounds?: { minX: number; minY: number; maxX: number; maxY: number }
+    ) => {
+      const constrained = constrainViewport({ x, y, scale: scale ?? vp.viewport.scale });
+      vp.viewportRef.current = constrained;
+      vp.setViewport(constrained);
+    },
+    [vp.setViewport, vp.viewportRef, vp.viewport.scale]
+  );
 
   /** Używane przez ActivityHistory — zaznacza elementy i przełącza na select */
-  const handleSelectElementsFromHistory = useCallback((elementIds: string[]) => {
-    sel.selectElements(elementIds);
-    setTool('select');
-  }, [sel.selectElements]);
+  const handleSelectElementsFromHistory = useCallback(
+    (elementIds: string[]) => {
+      sel.selectElements(elementIds);
+      setTool('select');
+    },
+    [sel.selectElements]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY TWORZENIA ELEMENTÓW
   // ═══════════════════════════════════════════════════════════════════════════
 
   /** Wspólna logika: dodaj element + broadcast + history */
-  const createElement = useCallback((element: DrawingElement) => {
-    engine.createElements([element]);
-  }, [engine]);
+  const createElement = useCallback(
+    (element: DrawingElement) => {
+      engine.createElements([element]);
+    },
+    [engine]
+  );
 
   const handlePathCreate = useCallback(
     (path: DrawingPath) => {
@@ -1280,10 +1311,7 @@ useMultiTouchGestures({
     [createElement]
   );
 
-  const handleShapeCreate = useCallback(
-    (shape: Shape) => createElement(shape),
-    [createElement]
-  );
+  const handleShapeCreate = useCallback((shape: Shape) => createElement(shape), [createElement]);
 
   const handleFunctionCreate = useCallback(
     (func: FunctionPlot) => createElement(func),
@@ -1295,132 +1323,157 @@ useMultiTouchGestures({
     [createElement]
   );
 
-  const handleImageCreate = useCallback((image: ImageElement) => {
-    if (engine.isReadOnly) return;
-    engine.createElements([image]);
-    if (image.src) el.loadImage(image.id, image.src);
-    setTool('select');
-  }, [engine, el.loadImage]);
+  const handleImageCreate = useCallback(
+    (image: ImageElement) => {
+      if (engine.isReadOnly) return;
+      engine.createElements([image]);
+      if (image.src) el.loadImage(image.id, image.src);
+      setTool('select');
+    },
+    [engine, el.loadImage]
+  );
 
   // ─── SmartSearch handlers ──────────────────────────────────────────────────
 
-  const handleFormulaSelect = useCallback((formula: FormulaResource) => {
-    const img = new Image();
-    img.src = formula.path;
-    img.onload = () => {
-      const aspectRatio = img.naturalHeight / img.naturalWidth;
-      const worldWidth = 12.0; // 2x większe niż 6.0
-      const worldHeight = worldWidth * aspectRatio;
+  const handleFormulaSelect = useCallback(
+    (formula: FormulaResource) => {
+      const img = new Image();
+      img.src = formula.path;
+      img.onload = () => {
+        const aspectRatio = img.naturalHeight / img.naturalWidth;
+        const worldWidth = 12.0; // 2x większe niż 6.0
+        const worldHeight = worldWidth * aspectRatio;
+        const centerWorld = inverseTransformPoint(
+          { x: canvasWidth / 2, y: canvasHeight / 2 },
+          vp.viewportRef.current,
+          canvasWidth,
+          canvasHeight
+        );
+        const newImage: ImageElement = {
+          id: `formula-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          type: 'image',
+          x: centerWorld.x - worldWidth / 2,
+          y: centerWorld.y - worldHeight / 2,
+          width: worldWidth,
+          height: worldHeight,
+          src: formula.path,
+          alt: formula.title,
+        };
+        handleImageCreate(newImage);
+        setIsBottomToastExiting(false);
+        setBottomToastState({
+          id: Date.now() + Math.floor(Math.random() * 1000),
+          message: `Dodano: ${formula.title}`,
+        });
+      };
+    },
+    [canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]
+  );
+
+  const handleCardSelect = useCallback((card: CardResource) => {
+    setActiveCard(card);
+  }, []);
+
+  const handleChatbotAddToBoard = useCallback(
+    (content: string) => {
+      const centerWorld = engine.centerOfViewport();
+      const noteWidth = 5;
+      const noteHeight = 4;
+      const newNote: MarkdownNote = {
+        id: `chatbot-note-${Date.now()}`,
+        type: 'markdown',
+        x: centerWorld.x - noteWidth / 2,
+        y: centerWorld.y - noteHeight / 2,
+        width: noteWidth,
+        height: noteHeight,
+        content,
+        backgroundColor: '#ffffff',
+        borderColor: '#e5e7eb',
+      };
+      engine.createElements([newNote]);
+    },
+    [engine]
+  );
+
+  const handleAddFormulasFromCard = useCallback(
+    (formulas: FormulaResource[]) => {
+      const COLS = 2,
+        WORLD_WIDTH = 12.0,
+        WORLD_PADDING = 1.0; // 2x większe niż poprzednie 6.0
       const centerWorld = inverseTransformPoint(
         { x: canvasWidth / 2, y: canvasHeight / 2 },
         vp.viewportRef.current,
         canvasWidth,
         canvasHeight
       );
-      const newImage: ImageElement = {
-        id: `formula-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        type: 'image',
-        x: centerWorld.x - worldWidth / 2,
-        y: centerWorld.y - worldHeight / 2,
-        width: worldWidth,
-        height: worldHeight,
-        src: formula.path,
-        alt: formula.title,
-      };
-      handleImageCreate(newImage);
-      setIsBottomToastExiting(false);
-      setBottomToastState({
-        id: Date.now() + Math.floor(Math.random() * 1000),
-        message: `Dodano: ${formula.title}`,
-      });
-    };
-  }, [canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+      const imagePromises = formulas.map(
+        (formula, index) =>
+          new Promise<{ formula: FormulaResource; img: HTMLImageElement; index: number }>(
+            (resolve, reject) => {
+              const img = new Image();
+              img.src = formula.path;
+              img.onload = () => resolve({ formula, img, index });
+              img.onerror = () => reject(new Error(`Failed to load: ${formula.path}`));
+            }
+          )
+      );
+      Promise.allSettled(imagePromises)
+        .then((results) => {
+          const loaded = results
+            .filter(
+              (
+                res
+              ): res is PromiseFulfilledResult<{
+                formula: FormulaResource;
+                img: HTMLImageElement;
+                index: number;
+              }> => res.status === 'fulfilled'
+            )
+            .map((res) => res.value);
 
-  const handleCardSelect = useCallback((card: CardResource) => {
-    setActiveCard(card);
-  }, []);
+          if (loaded.length === 0) return; // all failed
 
-  const handleChatbotAddToBoard = useCallback((content: string) => {
-    const centerWorld = engine.centerOfViewport();
-    const noteWidth = 5;
-    const noteHeight = 4;
-    const newNote: MarkdownNote = {
-      id: `chatbot-note-${Date.now()}`,
-      type: 'markdown',
-      x: centerWorld.x - noteWidth / 2,
-      y: centerWorld.y - noteHeight / 2,
-      width: noteWidth,
-      height: noteHeight,
-      content,
-      backgroundColor: '#ffffff',
-      borderColor: '#e5e7eb',
-    };
-    engine.createElements([newNote]);
-  }, [engine]);
-
-  const handleAddFormulasFromCard = useCallback((formulas: FormulaResource[]) => {
-    const COLS = 2, WORLD_WIDTH = 12.0, WORLD_PADDING = 1.0; // 2x większe niż poprzednie 6.0
-    const centerWorld = inverseTransformPoint(
-      { x: canvasWidth / 2, y: canvasHeight / 2 },
-      vp.viewportRef.current,
-      canvasWidth,
-      canvasHeight
-    );
-    const imagePromises = formulas.map((formula, index) =>
-      new Promise<{ formula: FormulaResource; img: HTMLImageElement; index: number }>((resolve, reject) => {
-        const img = new Image();
-        img.src = formula.path;
-        img.onload = () => resolve({ formula, img, index });
-        img.onerror = () => reject(new Error(`Failed to load: ${formula.path}`));
-      })
-    );
-    Promise.allSettled(imagePromises)
-      .then((results) => {
-        const loaded = results
-          .filter((res): res is PromiseFulfilledResult<{ formula: FormulaResource; img: HTMLImageElement; index: number }> => res.status === 'fulfilled')
-          .map(res => res.value);
-        
-        if (loaded.length === 0) return; // all failed
-
-        const newImages = loaded.map(({ formula, img, index }) => {
-          const aspectRatio = img.naturalHeight / img.naturalWidth;
-          const worldHeight = WORLD_WIDTH * aspectRatio;
-          const col = index % COLS;
-          const row = Math.floor(index / COLS);
-          const startX = centerWorld.x - ((COLS - 1) * (WORLD_WIDTH + WORLD_PADDING)) / 2;
-          const startY = centerWorld.y - 2;
-          const imageEl: ImageElement = {
-            id: `formula-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
-            type: 'image',
-            x: startX + col * (WORLD_WIDTH + WORLD_PADDING) - WORLD_WIDTH / 2,
-            y: startY + row * (worldHeight + WORLD_PADDING),
-            width: WORLD_WIDTH,
-            height: worldHeight,
-            src: formula.path,
-            alt: formula.title,
-          };
-          return { imageEl, img };
+          const newImages = loaded.map(({ formula, img, index }) => {
+            const aspectRatio = img.naturalHeight / img.naturalWidth;
+            const worldHeight = WORLD_WIDTH * aspectRatio;
+            const col = index % COLS;
+            const row = Math.floor(index / COLS);
+            const startX = centerWorld.x - ((COLS - 1) * (WORLD_WIDTH + WORLD_PADDING)) / 2;
+            const startY = centerWorld.y - 2;
+            const imageEl: ImageElement = {
+              id: `formula-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+              type: 'image',
+              x: startX + col * (WORLD_WIDTH + WORLD_PADDING) - WORLD_WIDTH / 2,
+              y: startY + row * (worldHeight + WORLD_PADDING),
+              width: WORLD_WIDTH,
+              height: worldHeight,
+              src: formula.path,
+              alt: formula.title,
+            };
+            return { imageEl, img };
+          });
+          const elements = newImages.map(({ imageEl }) => imageEl);
+          // Jedno grupowe cofnięcie (Ctrl+Z usuwa całą wklejoną kartę naraz)
+          engine.createElements(elements);
+          elements.forEach((imageEl) => el.loadImage(imageEl.id, imageEl.src!));
+          const toastMessage =
+            loaded.length === 1
+              ? `Dodano: ${loaded[0].formula.title}`
+              : `Dodano: ${loaded.length} elementow z karty`;
+          setIsBottomToastExiting(false);
+          setBottomToastState({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            message: toastMessage,
+          });
+          setActiveCard(null);
+        })
+        .catch((err) => {
+          console.error('❌ Błąd ładowania wzorów z karty:', err);
+          setActiveCard(null);
         });
-        const elements = newImages.map(({ imageEl }) => imageEl);
-        // Jedno grupowe cofnięcie (Ctrl+Z usuwa całą wklejoną kartę naraz)
-        engine.createElements(elements);
-        elements.forEach((imageEl) => el.loadImage(imageEl.id, imageEl.src!));
-        const toastMessage =
-          loaded.length === 1
-            ? `Dodano: ${loaded[0].formula.title}`
-            : `Dodano: ${loaded.length} elementow z karty`;
-        setIsBottomToastExiting(false);
-        setBottomToastState({
-          id: Date.now() + Math.floor(Math.random() * 1000),
-          message: toastMessage,
-        });
-        setActiveCard(null);
-      })
-      .catch((err) => {
-        console.error('❌ Błąd ładowania wzorów z karty:', err);
-        setActiveCard(null);
-      });
-  }, [canvasWidth, canvasHeight, vp.viewportRef, el, engine]);
+    },
+    [canvasWidth, canvasHeight, vp.viewportRef, el, engine]
+  );
 
   /**
    * Wklejanie obrazka ze schowka systemowego (screenshot, Ctrl+C z przeglądarki itp.).
@@ -1447,9 +1500,11 @@ useMultiTouchGestures({
         // limit rozmiaru wiadomości Supabase Broadcast (256 KB) nawet po samej
         // kompresji, dlatego obraz trafia do Supabase Storage, a element.src
         // dostaje tylko URL (patrz elements/image-compress.ts).
-        const { url, width: imgW, height: imgH } = await compressAndUploadImage(
-          rawData, Number(boardIdRef.current)
-        );
+        const {
+          url,
+          width: imgW,
+          height: imgH,
+        } = await compressAndUploadImage(rawData, Number(boardIdRef.current));
         const centerWorld = inverseTransformPoint(
           { x: canvasWidth / 2, y: canvasHeight / 2 },
           vp.viewportRef.current,
@@ -1480,73 +1535,93 @@ useMultiTouchGestures({
 
   // Ref — umożliwia wywołanie w async then-chain wewnątrz useEffect (keydown handler)
   const handleOsClipboardPasteRef = useRef(handleOsClipboardPaste);
-  useEffect(() => { handleOsClipboardPasteRef.current = handleOsClipboardPaste; }, [handleOsClipboardPaste]);
+  useEffect(() => {
+    handleOsClipboardPasteRef.current = handleOsClipboardPaste;
+  }, [handleOsClipboardPaste]);
 
-  const handleMarkdownNoteCreate = useCallback((note: MarkdownNote) => {
-    if (engine.isReadOnly) return;
-    engine.createElements([note]);
-    setTool('select');
-    sel.setSelectedElementIds(new Set([note.id]));
-    sel.setEditingMarkdownId(note.id);
-  }, [engine, sel.setSelectedElementIds, sel.setEditingMarkdownId]);
+  const handleMarkdownNoteCreate = useCallback(
+    (note: MarkdownNote) => {
+      if (engine.isReadOnly) return;
+      engine.createElements([note]);
+      setTool('select');
+      sel.setSelectedElementIds(new Set([note.id]));
+      sel.setEditingMarkdownId(note.id);
+    },
+    [engine, sel.setSelectedElementIds, sel.setEditingMarkdownId]
+  );
 
-  const handleTableCreate = useCallback((table: TableElement) => {
-    if (engine.isReadOnly) return;
-    engine.createElements([table]);
-    setTool('select');
-    sel.setSelectedElementIds(new Set([table.id]));
-  }, [engine, sel.setSelectedElementIds]);
+  const handleTableCreate = useCallback(
+    (table: TableElement) => {
+      if (engine.isReadOnly) return;
+      engine.createElements([table]);
+      setTool('select');
+      sel.setSelectedElementIds(new Set([table.id]));
+    },
+    [engine, sel.setSelectedElementIds]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY TextTool
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const handleTextCreate = useCallback(
-    (text: TextElement) => createElement(text),
-    [createElement]
+  const handleTextCreate = useCallback((text: TextElement) => createElement(text), [createElement]);
+
+  const handleTextUpdate = useCallback(
+    (id: string, updates: Partial<TextElement>) => {
+      if (userRole === 'viewer') return;
+      const current = el.elementsRef.current.find((e) => e.id === id);
+      if (!current) return;
+      const updated = { ...current, ...updates } as DrawingElement;
+      el.updateElement(updated);
+      el.markUnsaved([id]);
+      rt.broadcastElementUpdated(updated);
+    },
+    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
   );
 
-  const handleTextUpdate = useCallback((id: string, updates: Partial<TextElement>) => {
-    if (userRole === 'viewer') return;
-    const current = el.elementsRef.current.find((e) => e.id === id);
-    if (!current) return;
-    const updated = { ...current, ...updates } as DrawingElement;
-    el.updateElement(updated);
-    el.markUnsaved([id]);
-    rt.broadcastElementUpdated(updated);
-  }, [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]);
-
-  const handleTextDelete = useCallback((id: string) => {
-    const current = engine.getById(id);
-    if (!current) return;
-    engine.deleteElements([current]);
-  }, [engine]);
+  const handleTextDelete = useCallback(
+    (id: string) => {
+      const current = engine.getById(id);
+      if (!current) return;
+      engine.deleteElements([current]);
+    },
+    [engine]
+  );
 
   const handleEditingComplete = useCallback(() => {
     sel.setEditingTextId(null);
     if (userRole !== 'viewer') setTool('select');
   }, [sel.setEditingTextId, userRole]);
 
-  const handleTextEdit = useCallback((id: string) => {
-    sel.setEditingTextId(id);
-    setTool('text');
-  }, [sel.setEditingTextId]);
+  const handleTextEdit = useCallback(
+    (id: string) => {
+      sel.setEditingTextId(id);
+      setTool('text');
+    },
+    [sel.setEditingTextId]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY SelectTool
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const handleSelectionChange = useCallback((ids: Set<string>) => {
-    sel.setSelectedElementIds(ids);
-  }, [sel.setSelectedElementIds]);
+  const handleSelectionChange = useCallback(
+    (ids: Set<string>) => {
+      sel.setSelectedElementIds(ids);
+    },
+    [sel.setSelectedElementIds]
+  );
 
   /** Szybki update bez historii (podczas przeciągania) */
-  const handleElementUpdate = useCallback((id: string, updates: Partial<DrawingElement>) => {
-    if (userRole === 'viewer') return;
-    const current = el.elementsRef.current.find((e) => e.id === id);
-    if (!current) return;
-    el.updateElement({ ...current, ...updates } as DrawingElement);
-  }, [userRole, el.elementsRef, el.updateElement]);
+  const handleElementUpdate = useCallback(
+    (id: string, updates: Partial<DrawingElement>) => {
+      if (userRole === 'viewer') return;
+      const current = el.elementsRef.current.find((e) => e.id === id);
+      if (!current) return;
+      el.updateElement({ ...current, ...updates } as DrawingElement);
+    },
+    [userRole, el.elementsRef, el.updateElement]
+  );
 
   // Podpina handleElementUpdate do renderStateRef żeby redrawCanvas miał zawsze świeżą wersję
   useEffect(() => {
@@ -1572,54 +1647,66 @@ useMultiTouchGestures({
     },
     [engine]
   );
-  
+
   /** Wywoływane przez SelectTool po zakończeniu operacji (mouseup) */
-  const handleSelectionFinish = useCallback((originalElementsMap?: Map<string, DrawingElement>) => {
-    if (engine.isReadOnly || !originalElementsMap || originalElementsMap.size === 0) return;
-    const current = engine.getElements();
-    const before: DrawingElement[] = [];
-    const after: DrawingElement[] = [];
-    for (const id of sel.selectedElementIdsRef.current) {
-      const b = originalElementsMap.get(id);
-      const a = current.find((e) => e.id === id);
-      if (b && a && JSON.stringify(b) !== JSON.stringify(a)) {
-        before.push(b);
-        after.push(a);
+  const handleSelectionFinish = useCallback(
+    (originalElementsMap?: Map<string, DrawingElement>) => {
+      if (engine.isReadOnly || !originalElementsMap || originalElementsMap.size === 0) return;
+      const current = engine.getElements();
+      const before: DrawingElement[] = [];
+      const after: DrawingElement[] = [];
+      for (const id of sel.selectedElementIdsRef.current) {
+        const b = originalElementsMap.get(id);
+        const a = current.find((e) => e.id === id);
+        if (b && a && JSON.stringify(b) !== JSON.stringify(a)) {
+          before.push(b);
+          after.push(a);
+        }
       }
-    }
-    // Commit tylko realnie zmienionych elementów — silnik robi persist + broadcast
-    // + zapis komendy (UpdateElementsCommand) + legacy snapshot.
-    if (after.length > 0) engine.updateElements(before, after);
-  }, [engine, sel.selectedElementIdsRef]);
+      // Commit tylko realnie zmienionych elementów — silnik robi persist + broadcast
+      // + zapis komendy (UpdateElementsCommand) + legacy snapshot.
+      if (after.length > 0) engine.updateElements(before, after);
+    },
+    [engine, sel.selectedElementIdsRef]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLER EraserTool
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const handleElementDelete = useCallback((id: string) => {
-    const current = engine.getById(id);
-    if (!current) return;
-    engine.deleteElements([current]);
-  }, [engine]);
+  const handleElementDelete = useCallback(
+    (id: string) => {
+      const current = engine.getById(id);
+      if (!current) return;
+      engine.deleteElements([current]);
+    },
+    [engine]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HANDLERY HTML OVERLAYS (Markdown + Table)
   // ═══════════════════════════════════════════════════════════════════════════
 
-  const handleMarkdownContentChange = useCallback((noteId: string, content: string) => {
-    if (userRole === 'viewer') return;
-    const current = el.elementsRef.current.find((e) => e.id === noteId);
-    if (!current || current.type !== 'markdown') return;
-    const updated = { ...current, content } as DrawingElement;
-    el.updateElement(updated);
-    el.markUnsaved([noteId]);
-    rt.broadcastElementUpdated(updated);
-  }, [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]);
+  const handleMarkdownContentChange = useCallback(
+    (noteId: string, content: string) => {
+      if (userRole === 'viewer') return;
+      const current = el.elementsRef.current.find((e) => e.id === noteId);
+      if (!current || current.type !== 'markdown') return;
+      const updated = { ...current, content } as DrawingElement;
+      el.updateElement(updated);
+      el.markUnsaved([noteId]);
+      rt.broadcastElementUpdated(updated);
+    },
+    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+  );
 
-  const handleMarkdownEditStart = useCallback((noteId: string) => {
-    sel.setEditingMarkdownId(noteId);
-    rt.broadcastTypingStarted(noteId);
-  }, [sel.setEditingMarkdownId, rt.broadcastTypingStarted]);
+  const handleMarkdownEditStart = useCallback(
+    (noteId: string) => {
+      sel.setEditingMarkdownId(noteId);
+      rt.broadcastTypingStarted(noteId);
+    },
+    [sel.setEditingMarkdownId, rt.broadcastTypingStarted]
+  );
 
   const handleMarkdownEditEnd = useCallback(() => {
     const editingId = sel.editingMarkdownId;
@@ -1649,31 +1736,36 @@ useMultiTouchGestures({
     setEditingTableCell({ tableId, row, col });
   }, []);
 
-  const handleCellEditorKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    const editing = editingTableCellRef.current;
-    if (!editing) return;
-    const table = el.elementsRef.current.find((el) => el.id === editing.tableId) as TableElement | undefined;
-    if (!table) return;
+  const handleCellEditorKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const editing = editingTableCellRef.current;
+      if (!editing) return;
+      const table = el.elementsRef.current.find((el) => el.id === editing.tableId) as
+        | TableElement
+        | undefined;
+      if (!table) return;
 
-    if (e.key === 'Tab') {
-      e.preventDefault();
-      const nextCol = editing.col + 1;
-      const nextRow = editing.row + 1;
-      if (nextCol < table.cols) {
-        openCellEditor(editing.tableId, editing.row, nextCol);
-      } else if (nextRow < table.rows) {
-        openCellEditor(editing.tableId, nextRow, 0);
-      } else {
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        const nextCol = editing.col + 1;
+        const nextRow = editing.row + 1;
+        if (nextCol < table.cols) {
+          openCellEditor(editing.tableId, editing.row, nextCol);
+        } else if (nextRow < table.rows) {
+          openCellEditor(editing.tableId, nextRow, 0);
+        } else {
+          setEditingTableCell(null);
+        }
+      } else if (e.key === 'Escape') {
+        setEditingTableCell(null);
+      } else if (e.key === 'Enter' && e.shiftKey) {
+        // Shift+Enter kończy edytowanie
         setEditingTableCell(null);
       }
-    } else if (e.key === 'Escape') {
-      setEditingTableCell(null);
-    } else if (e.key === 'Enter' && e.shiftKey) {
-      // Shift+Enter kończy edytowanie
-      setEditingTableCell(null);
-    }
-    // Zwykły Enter (bez Shift) dodaje nową linię w textarea
-  }, [el.elementsRef, openCellEditor]);
+      // Zwykły Enter (bez Shift) dodaje nową linię w textarea
+    },
+    [el.elementsRef, openCellEditor]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // USUWANIE ZAZNACZONYCH
@@ -1764,11 +1856,10 @@ useMultiTouchGestures({
     vp.handleStopFollowing();
   }, [vp.handleStopFollowing]);
 
-
-// ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════
   // DRAG & DROP (Globalny nasłuchiwacz na całe okno)
   // ═══════════════════════════════════════════════════════════════════════════
- // ═══════════════════════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════════════════
   // DRAG & DROP (Globalny nasłuchiwacz na całe okno)
   // ═══════════════════════════════════════════════════════════════════════════
   useEffect(() => {
@@ -1781,21 +1872,24 @@ useMultiTouchGestures({
 
     const handleDrop = async (e: DragEvent) => {
       e.preventDefault();
-      
+
       if (e.dataTransfer && e.dataTransfer.files.length > 0) {
         const file = e.dataTransfer.files[0];
-        
+
         const isImage = file.type.startsWith('image/');
         const isPdf = file.type === 'application/pdf';
 
         // Odrzucamy pliki, które nie są obrazkiem ani PDF-em
         if (!isImage && !isPdf) return;
-        
+
         const rect = containerRef.current?.getBoundingClientRect();
         const mouseX = e.clientX - (rect?.left || 0);
         const mouseY = e.clientY - (rect?.top || 0);
         const worldPos = inverseTransformPoint(
-          { x: mouseX, y: mouseY }, vp.viewportRef.current, canvasWidth, canvasHeight
+          { x: mouseX, y: mouseY },
+          vp.viewportRef.current,
+          canvasWidth,
+          canvasHeight
         );
 
         // 📄 OBSŁUGA PDF (Drag & Drop)
@@ -1807,7 +1901,7 @@ useMultiTouchGestures({
 
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-            
+
             const worldWidth = 5.0;
             const padding = 0.5; // Odstęp między wygenerowanymi stronami
             let currentY = worldPos.y; // Zaczynamy dokładnie tam, gdzie upuszczono plik
@@ -1835,9 +1929,11 @@ useMultiTouchGestures({
               // nawet po kompresji regularnie przekracza limit 256 KB na
               // wiadomość Broadcast, dlatego trafia do Supabase Storage
               // (element.src dostaje tylko URL, patrz elements/image-compress.ts).
-              const { url, width: imgW, height: imgH } = await compressAndUploadImage(
-                rawDataUrl, Number(boardIdRef.current)
-              );
+              const {
+                url,
+                width: imgW,
+                height: imgH,
+              } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current));
               const aspectRatio = imgH / Math.max(imgW, 1);
               const worldHeight = worldWidth * aspectRatio;
 
@@ -1851,26 +1947,28 @@ useMultiTouchGestures({
                 src: url,
                 alt: `${file.name} - strona ${i}`,
               };
-              
+
               handleImageCreate(newImage);
               currentY += worldHeight + padding; // Przesuwamy wskaźnik Y dla następnej strony
-              
+
               // Bardzo krótkie opóźnienie, aby state wyrobił przy dużych dokumentach i nie zgubił obrazków
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
           } catch (error) {
             console.error('Błąd podczas ładowania PDF:', error);
           }
-        } 
+        }
         // 🖼️ OBSŁUGA ZWYKŁYCH OBRAZKÓW (Drag & Drop)
         else if (isImage) {
           const reader = new FileReader();
           reader.onload = async (event) => {
             const rawDataUrl = event.target?.result as string;
             // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
-            const { url, width: imgW, height: imgH } = await compressAndUploadImage(
-              rawDataUrl, Number(boardIdRef.current), file.name
-            );
+            const {
+              url,
+              width: imgW,
+              height: imgH,
+            } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current), file.name);
             const aspectRatio = imgH / Math.max(imgW, 1);
             const worldWidth = 5.0;
             const worldHeight = worldWidth * aspectRatio;
@@ -1906,59 +2004,90 @@ useMultiTouchGestures({
   // Zbiera silnik + reaktywny stan + refy + istniejące handlery w jeden obiekt.
   // Konsumuje go tylko zamontowany overlay (<ActiveToolOverlay/>), więc zmiany
   // reaktywne re-renderują wyłącznie aktywne narzędzie (jak dawna drabinka).
-  const hostValue = useMemo<ToolHostContextValue>(() => ({
-    engine,
-    boardId,
-    viewport: vp.viewport,
-    viewportRef: vp.viewportRef,
-    canvasWidth,
-    canvasHeight,
-    isGestureActive,
-    onViewportChange: handleViewportChange,
-    elements: el.elements,
-    selectedIds: sel.selectedElementIds,
-    editingTextId: sel.editingTextId,
-    overlaysVisible,
-    htmlOverlaysRef,
-    textEditorDivRef,
-    imageToolRef,
-    onPathCreate: handlePathCreate,
-    onShapeCreate: handleShapeCreate,
-    onFunctionCreate: handleFunctionCreate,
-    onImageCreate: handleImageCreate,
-    onNoteCreate: handleMarkdownNoteCreate,
-    onTableCreate: handleTableCreate,
-    onArrowCreate: handleArrowCreate,
-    onTextCreate: handleTextCreate,
-    onTextUpdate: handleTextUpdate,
-    onTextDelete: handleTextDelete,
-    onEditingComplete: handleEditingComplete,
-    onTextEdit: handleTextEdit,
-    onSelectionChange: handleSelectionChange,
-    onElementUpdate: handleElementUpdate,
-    onElementUpdateWithHistory: handleElementUpdateWithHistory,
-    onElementsUpdate: handleElementsUpdate,
-    onOperationFinish: handleSelectionFinish,
-    onMarkdownEdit: handleMarkdownEditStart,
-    onActiveGuidesChange: setActiveGuides,
-    onDeleteSelected: deleteSelectedElements,
-    onCopySelected: clip.handleCopy,
-    onDuplicateSelected: clip.handleDuplicate,
-    onSaveGroupTemplate: handleSaveGroupTemplate,
-    onElementDelete: handleElementDelete,
-    onPanStart: hideOverlaysForPan,
-    onPanEnd: restoreOverlaysAfterPan,
-  }), [
-    engine, boardId, vp.viewport, vp.viewportRef, canvasWidth, canvasHeight, isGestureActive,
-    handleViewportChange, el.elements, sel.selectedElementIds, sel.editingTextId, overlaysVisible,
-    handlePathCreate, handleShapeCreate, handleFunctionCreate, handleImageCreate,
-    handleMarkdownNoteCreate, handleTableCreate, handleArrowCreate, handleTextCreate,
-    handleTextUpdate, handleTextDelete, handleEditingComplete, handleTextEdit,
-    handleSelectionChange, handleElementUpdate, handleElementUpdateWithHistory, handleElementsUpdate,
-    handleSelectionFinish, handleMarkdownEditStart, deleteSelectedElements,
-    clip.handleCopy, clip.handleDuplicate, handleSaveGroupTemplate, handleElementDelete,
-    hideOverlaysForPan, restoreOverlaysAfterPan,
-  ]);
+  const hostValue = useMemo<ToolHostContextValue>(
+    () => ({
+      engine,
+      boardId,
+      viewport: vp.viewport,
+      viewportRef: vp.viewportRef,
+      canvasWidth,
+      canvasHeight,
+      isGestureActive,
+      onViewportChange: handleViewportChange,
+      elements: el.elements,
+      selectedIds: sel.selectedElementIds,
+      editingTextId: sel.editingTextId,
+      overlaysVisible,
+      htmlOverlaysRef,
+      textEditorDivRef,
+      imageToolRef,
+      onPathCreate: handlePathCreate,
+      onShapeCreate: handleShapeCreate,
+      onFunctionCreate: handleFunctionCreate,
+      onImageCreate: handleImageCreate,
+      onNoteCreate: handleMarkdownNoteCreate,
+      onTableCreate: handleTableCreate,
+      onArrowCreate: handleArrowCreate,
+      onTextCreate: handleTextCreate,
+      onTextUpdate: handleTextUpdate,
+      onTextDelete: handleTextDelete,
+      onEditingComplete: handleEditingComplete,
+      onTextEdit: handleTextEdit,
+      onSelectionChange: handleSelectionChange,
+      onElementUpdate: handleElementUpdate,
+      onElementUpdateWithHistory: handleElementUpdateWithHistory,
+      onElementsUpdate: handleElementsUpdate,
+      onOperationFinish: handleSelectionFinish,
+      onMarkdownEdit: handleMarkdownEditStart,
+      onActiveGuidesChange: setActiveGuides,
+      onDeleteSelected: deleteSelectedElements,
+      onCopySelected: clip.handleCopy,
+      onDuplicateSelected: clip.handleDuplicate,
+      onSaveGroupTemplate: handleSaveGroupTemplate,
+      onElementDelete: handleElementDelete,
+      onPanStart: hideOverlaysForPan,
+      onPanEnd: restoreOverlaysAfterPan,
+    }),
+    [
+      engine,
+      boardId,
+      vp.viewport,
+      vp.viewportRef,
+      canvasWidth,
+      canvasHeight,
+      isGestureActive,
+      handleViewportChange,
+      el.elements,
+      sel.selectedElementIds,
+      sel.editingTextId,
+      overlaysVisible,
+      handlePathCreate,
+      handleShapeCreate,
+      handleFunctionCreate,
+      handleImageCreate,
+      handleMarkdownNoteCreate,
+      handleTableCreate,
+      handleArrowCreate,
+      handleTextCreate,
+      handleTextUpdate,
+      handleTextDelete,
+      handleEditingComplete,
+      handleTextEdit,
+      handleSelectionChange,
+      handleElementUpdate,
+      handleElementUpdateWithHistory,
+      handleElementsUpdate,
+      handleSelectionFinish,
+      handleMarkdownEditStart,
+      deleteSelectedElements,
+      clip.handleCopy,
+      clip.handleDuplicate,
+      handleSaveGroupTemplate,
+      handleElementDelete,
+      hideOverlaysForPan,
+      restoreOverlaysAfterPan,
+    ]
+  );
 
   // ═══════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -1966,11 +2095,10 @@ useMultiTouchGestures({
 
   return (
     <div className={`relative w-full h-full bg-[#FEF2F2] ${className}`}>
-
       {/* Loading overlay — zakrywa canvas aż elementy się załadują */}
       <LoadingOverlay isLoading={el.isLoading} progress={el.loadingProgress} />
 
-    {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
+      {/* Wewnętrzny kontener (narzędzia, overlaye, canvas) */}
       <div
         ref={containerRef}
         tabIndex={-1}
@@ -1979,10 +2107,9 @@ useMultiTouchGestures({
         onDragOver={handleAssetDragOver}
         onDrop={(e) => {
           handleAssetDropCenter(e);
-        }}       
+        }}
         style={{ userSelect: 'none', WebkitUserSelect: 'none', touchAction: 'none' }}
       >
-
         {/* ── ONLINE USERS ──────────────────────────────────────────────── */}
         <OnlineUsers
           onFollowUser={handleFollowUser}
@@ -1997,14 +2124,13 @@ useMultiTouchGestures({
         {vp.followingUserId && (
           <div className="absolute top-20 right-6 z-50 flex items-center gap-4 px-4 py-2 bg-white border border-zinc-200 shadow-sm rounded-full">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-zinc-800 rounded-full" /> {/* Dyskretny wskaźnik zamiast emoji */}
+              <div className="w-2 h-2 bg-zinc-800 rounded-full" />{' '}
+              {/* Dyskretny wskaźnik zamiast emoji */}
               <span className="text-[13px] font-medium text-zinc-600 tracking-tight">
                 Śledzisz użytkownika
               </span>
             </div>
-            
             <div className="w-[1px] h-4 bg-zinc-200" /> {/* Separator */}
-
             <button
               onClick={handleStopFollowing}
               className="text-[13px] font-bold text-zinc-900 hover:text-red-600 transition-colors duration-200"
@@ -2015,58 +2141,60 @@ useMultiTouchGestures({
         )}
 
         {/* ── SMARTSEARCH BAR ───────────────────────────────────────────── */}
-        {userRole !== 'viewer' && settings.smartsearch_visible && !(isSidebarOpen && windowWidth <= 1140) && (
-          <div
-            className="absolute z-50 pointer-events-auto"
-            style={{
-              top: '16px',
-              left:
-                windowWidth <= 760
-                  ? '82px'
-                  : windowWidth <= 1299
-                    ? '90px'
-                    : windowWidth <= 1640
-                      ? '350px'
-                      : '50%',
-              transform:
-                windowWidth <= 760
-                  ? 'none'
-                  : windowWidth <= 1299
+        {userRole !== 'viewer' &&
+          settings.smartsearch_visible &&
+          !(isSidebarOpen && windowWidth <= 1140) && (
+            <div
+              className="absolute z-50 pointer-events-auto"
+              style={{
+                top: '16px',
+                left:
+                  windowWidth <= 760
+                    ? '82px'
+                    : windowWidth <= 1299
+                      ? '90px'
+                      : windowWidth <= 1640
+                        ? '350px'
+                        : '50%',
+                transform:
+                  windowWidth <= 760
                     ? 'none'
-                    : windowWidth <= 1640
+                    : windowWidth <= 1299
                       ? 'none'
-                      : 'translateX(-50%)',
-              right:
-                windowWidth <= 600
-                  ? '50px'
-                  : windowWidth <= 760
-                    ? '350px'
-                  : windowWidth <= 1299
-                    ? '380px'
-                    : windowWidth <= 1640
-                      ? '470px'
-                      : 'auto',
-              maxWidth:
-                windowWidth <= 600
-                  ? 'calc(100vw - 82px - 50px)'
-                  : windowWidth <= 760
-                    ? 'calc(100vw - 82px - 350px)'
-                  : windowWidth <= 1300
-                    ? 'calc(100vw - 90px - 380px)'
-                    : windowWidth <= 1640
-                      ? 'calc(100vw - 300px - 420px)'
-                      : '900px',
-            }}
-          >
-            <SmartSearchBar
-              onFormulaSelect={handleFormulaSelect}
-              onCardSelect={handleCardSelect}
-              onActiveChange={setIsSearchActive}
-              userRole={userRole}
-              browseButtonPlacement="outside-right"
-            />
-          </div>
-        )}
+                      : windowWidth <= 1640
+                        ? 'none'
+                        : 'translateX(-50%)',
+                right:
+                  windowWidth <= 600
+                    ? '50px'
+                    : windowWidth <= 760
+                      ? '350px'
+                      : windowWidth <= 1299
+                        ? '380px'
+                        : windowWidth <= 1640
+                          ? '470px'
+                          : 'auto',
+                maxWidth:
+                  windowWidth <= 600
+                    ? 'calc(100vw - 82px - 50px)'
+                    : windowWidth <= 760
+                      ? 'calc(100vw - 82px - 350px)'
+                      : windowWidth <= 1300
+                        ? 'calc(100vw - 90px - 380px)'
+                        : windowWidth <= 1640
+                          ? 'calc(100vw - 300px - 420px)'
+                          : '900px',
+              }}
+            >
+              <SmartSearchBar
+                onFormulaSelect={handleFormulaSelect}
+                onCardSelect={handleCardSelect}
+                onActiveChange={setIsSearchActive}
+                userRole={userRole}
+                browseButtonPlacement="outside-right"
+              />
+            </div>
+          )}
 
         {/* ── CARD VIEWER MODAL ─────────────────────────────────────────── */}
         {activeCard && (
@@ -2103,7 +2231,7 @@ useMultiTouchGestures({
             canRedo={hist.canRedo}
             hasSelection={sel.selectedElementIds.size > 0}
             onDeleteSelected={deleteSelectedElements}
-            onToggleAssetsLibrary={() => setShowAssetsLibrary(v => !v)}
+            onToggleAssetsLibrary={() => setShowAssetsLibrary((v) => !v)}
             isCalculatorOpen={isCalculatorOpen}
             onCalculatorToggle={() => setIsCalculatorOpen((v) => !v)}
             isReadOnly={userRole === 'viewer'}
@@ -2137,7 +2265,14 @@ useMultiTouchGestures({
             ═══════════════════════════════════════════════════════════════ */}
         <div
           ref={mdTableOverlaysRef}
-          style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', overflow: 'visible' }}
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            transformOrigin: '0 0',
+            pointerEvents: 'none',
+            overflow: 'visible',
+          }}
         >
           {canvasWidth > 0 &&
             el.elements
@@ -2188,8 +2323,6 @@ useMultiTouchGestures({
               })}
         </div>
 
-        
-
         {/* ═══════════════════════════════════════════════════════════════
             CANVAS — pointer-events: none
             Narzędzia mają własne pełnoekranowe overlaye powyżej canvasa.
@@ -2207,93 +2340,111 @@ useMultiTouchGestures({
           }}
         />
 
-          
-
         {/* ── EDYTOR KOMÓRKI TABELI ──────────────────────────── */}
-        {editingTableCell && (() => {
-          const table = el.elements.find((e) => e.id === editingTableCell.tableId) as TableElement | undefined;
-          if (!table) return null;
-          const cellValue = table.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
-          const isHeader = editingTableCell.row === 0 && (table.headerRow ?? false);
-          // Pozycja liczona dynamicznie z bieżącego vp.viewport — edytor zawsze
-          // zostaje wyrównany do komórki nawet po pan/zoom (brak frozen screen coords)
-          const cellW = table.width / table.cols;
-          const cellH = table.height / table.rows;
-          const tl = transformPoint(
-            { x: table.x + editingTableCell.col * cellW, y: table.y + editingTableCell.row * cellH },
-            vp.viewport, canvasWidth, canvasHeight
-          );
-          const br = transformPoint(
-            { x: table.x + (editingTableCell.col + 1) * cellW, y: table.y + (editingTableCell.row + 1) * cellH },
-            vp.viewport, canvasWidth, canvasHeight
-          );
-          const cellScreenW = br.x - tl.x;
-          const cellScreenH = br.y - tl.y;
-          // Wrapper: flex-center w pionie — textarea nie obsługuje align-self: center
-          return (
-            <div
-              className="absolute z-[100] border-2 border-blue-500"
-              style={{
-                left:           tl.x,
-                top:            tl.y,
-                width:          cellScreenW,
-                height:         cellScreenH,
-                display:        'flex',
-                alignItems:     'center',
-                justifyContent: 'center',
-                background:     isHeader ? (table.headerBgColor || '#f3f4f6') : '#fff',
-                boxSizing:      'border-box',
-                overflow:       'hidden',
-              }}
-            >
-              <textarea
-                ref={cellEditorInputRef}
-                defaultValue={cellValue}
-                onChange={(e) =>
-                  handleTableCellChange(
-                    editingTableCell.tableId,
-                    editingTableCell.row,
-                    editingTableCell.col,
-                    e.target.value
-                  )
-                }
-                onBlur={() => setEditingTableCell(null)}
-                onKeyDown={handleCellEditorKeyDown}
-                onInput={(e) => {
-                  const ta = e.target as HTMLTextAreaElement;
-                  ta.style.height = 'auto';
-                  ta.style.height = `${ta.scrollHeight}px`;
-                }}
-                className="outline-none resize-none no-scrollbar"
+        {editingTableCell &&
+          (() => {
+            const table = el.elements.find((e) => e.id === editingTableCell.tableId) as
+              | TableElement
+              | undefined;
+            if (!table) return null;
+            const cellValue = table.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
+            const isHeader = editingTableCell.row === 0 && (table.headerRow ?? false);
+            // Pozycja liczona dynamicznie z bieżącego vp.viewport — edytor zawsze
+            // zostaje wyrównany do komórki nawet po pan/zoom (brak frozen screen coords)
+            const cellW = table.width / table.cols;
+            const cellH = table.height / table.rows;
+            const tl = transformPoint(
+              {
+                x: table.x + editingTableCell.col * cellW,
+                y: table.y + editingTableCell.row * cellH,
+              },
+              vp.viewport,
+              canvasWidth,
+              canvasHeight
+            );
+            const br = transformPoint(
+              {
+                x: table.x + (editingTableCell.col + 1) * cellW,
+                y: table.y + (editingTableCell.row + 1) * cellH,
+              },
+              vp.viewport,
+              canvasWidth,
+              canvasHeight
+            );
+            const cellScreenW = br.x - tl.x;
+            const cellScreenH = br.y - tl.y;
+            // Wrapper: flex-center w pionie — textarea nie obsługuje align-self: center
+            return (
+              <div
+                className="absolute z-[100] border-2 border-blue-500"
                 style={{
-                  width:        '100%',
-                  background:   'transparent',
-                  // Kanoniczne źródło: table.fontSize (world units) × scale × 100
-                  fontSize:     Math.max(8, (table.fontSize ?? 0.12) * vp.viewport.scale * 100),
-                  fontFamily:   '-apple-system, BlinkMacSystemFont, sans-serif',
-                  fontWeight:   isHeader ? 700 : 400,
-                  color:        isHeader ? '#111827' : '#374151',
-                  paddingLeft:  3,
-                  paddingRight: 3,
-                  // canvas: ctx.textAlign = 'center'
-                  textAlign:    'center' as const,
-                  // canvas: lineHeight = fontSize * 1.2
-                  lineHeight:   '1.2',
-                  whiteSpace:   'pre-wrap',
-                  wordBreak:    'break-word',
-                  overflow:     'hidden',
-                  boxSizing:    'border-box',
+                  left: tl.x,
+                  top: tl.y,
+                  width: cellScreenW,
+                  height: cellScreenH,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: isHeader ? table.headerBgColor || '#f3f4f6' : '#fff',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
                 }}
-              />
-            </div>
-          );
-        })()}
+              >
+                <textarea
+                  ref={cellEditorInputRef}
+                  defaultValue={cellValue}
+                  onChange={(e) =>
+                    handleTableCellChange(
+                      editingTableCell.tableId,
+                      editingTableCell.row,
+                      editingTableCell.col,
+                      e.target.value
+                    )
+                  }
+                  onBlur={() => setEditingTableCell(null)}
+                  onKeyDown={handleCellEditorKeyDown}
+                  onInput={(e) => {
+                    const ta = e.target as HTMLTextAreaElement;
+                    ta.style.height = 'auto';
+                    ta.style.height = `${ta.scrollHeight}px`;
+                  }}
+                  className="outline-none resize-none no-scrollbar"
+                  style={{
+                    width: '100%',
+                    background: 'transparent',
+                    // Kanoniczne źródło: table.fontSize (world units) × scale × 100
+                    fontSize: Math.max(8, (table.fontSize ?? 0.12) * vp.viewport.scale * 100),
+                    fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif',
+                    fontWeight: isHeader ? 700 : 400,
+                    color: isHeader ? '#111827' : '#374151',
+                    paddingLeft: 3,
+                    paddingRight: 3,
+                    // canvas: ctx.textAlign = 'center'
+                    textAlign: 'center' as const,
+                    // canvas: lineHeight = fontSize * 1.2
+                    lineHeight: '1.2',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    overflow: 'hidden',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            );
+          })()}
 
         {/* ── KURSORY INNYCH UŻYTKOWNIKÓW ───────────────────────────────── */}
         {canvasWidth > 0 && (
           <div
             ref={remoteCursorsRef}
-            style={{ position: 'absolute', left: 0, top: 0, transformOrigin: '0 0', pointerEvents: 'none', overflow: 'visible' }}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transformOrigin: '0 0',
+              pointerEvents: 'none',
+              overflow: 'visible',
+            }}
           >
             {/* transform ustawiany synchronicznie w redrawCanvas — zero lagu */}
             <RemoteCursorsContainer />
@@ -2352,7 +2503,9 @@ useMultiTouchGestures({
 
         {bottomToastState && (
           <div className="fixed inset-x-0 bottom-8 z-[1200] pointer-events-none flex justify-center px-4">
-            <div className={`whiteboard-toast-base ${isBottomToastExiting ? 'whiteboard-toast-exit' : 'whiteboard-toast-enter'}`}>
+            <div
+              className={`whiteboard-toast-base ${isBottomToastExiting ? 'whiteboard-toast-exit' : 'whiteboard-toast-enter'}`}
+            >
               {bottomToastState.message}
             </div>
           </div>
@@ -2371,7 +2524,10 @@ useMultiTouchGestures({
 
         {/* ── PANEL BIBLIOTEKI SZABLONÓW ──────────────────────────────────── */}
         {showAssetsLibrary && (
-          <SavedAssetsPanel onClose={() => setShowAssetsLibrary(false)} refreshKey={assetsRefreshKey} />
+          <SavedAssetsPanel
+            onClose={() => setShowAssetsLibrary(false)}
+            refreshKey={assetsRefreshKey}
+          />
         )}
 
         {/* ── MODAL ZAPISU SZABLONU ────────────────────────────────────────── */}
@@ -2386,7 +2542,8 @@ useMultiTouchGestures({
               </div>
               <div className="p-4">
                 <p className="text-sm text-gray-600 mb-4">
-                  Nazwij ten szablon ({frozenElementsForAsset.length} elementów), aby zapisać go do szybciej biblioteki i używać na innych tablicach.
+                  Nazwij ten szablon ({frozenElementsForAsset.length} elementów), aby zapisać go do
+                  szybciej biblioteki i używać na innych tablicach.
                 </p>
                 <input
                   autoFocus
@@ -2419,7 +2576,6 @@ useMultiTouchGestures({
             </div>
           </div>
         )}
-
       </div>
     </div>
   );

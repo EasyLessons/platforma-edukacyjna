@@ -1,15 +1,15 @@
 /**
  * KOMPONENT BUTTON
- * 
+ *
  * Uniwersalny przycisk, który obsługuje różne warianty stylów, rozmiary oraz stany ładowania.
  * Dzięki niemu można łatwo tworzyć spójne i dostępne przyciski w całej aplikacji, bez konieczności powtarzania kodu CSS.
  * Zapobiega duplikacji kodu i zapewnia jednolity wygląd interfejsu użytkownika.
- * 
+ *
  * UWAGA:
- * Można nadpisywać style przycisku za pomocą propsa className, 
+ * Można nadpisywać style przycisku za pomocą propsa className,
  * ale należy ograniczać, aby utrzymać spójność designu.
  * Jeżeli wprowadzać zmiany to najlepiej globalnie tutaj lub dodać tu nowy wariant, jeżeli nowy przycisk.
-*/
+ */
 
 'use client';
 
@@ -41,11 +41,7 @@ const buttonVariants = cva(
           'hover-shine',
         ],
         // zielony przycisk główny w dashboard
-        primary: [
-          'bg-green-600 text-white',
-          'hover:bg-green-700',
-          'focus-visible:ring-green-600',
-        ],
+        primary: ['bg-green-600 text-white', 'hover:bg-green-700', 'focus-visible:ring-green-600'],
         // szary przycisk drugorzędny (anuluj, zamknij, ikony)
         secondary: [
           'bg-gray-200 text-gray-700',
@@ -61,11 +57,7 @@ const buttonVariants = cva(
           'hover-shine',
         ],
         // czerwony przycisk (usuwanie)
-        destructive: [
-          'bg-red-500 text-gray-200',
-          'hover:bg-red-600',
-          'focus:ring-red-50',
-        ],
+        destructive: ['bg-red-500 text-gray-200', 'hover:bg-red-600', 'focus:ring-red-50'],
         // sam tekst bez tła (linki, akcje w tekście)
         link: [
           'bg-transparent text-green-600 underline-offset-4',
@@ -152,14 +144,7 @@ function LoadingSpinner({ size }: { size?: ButtonProps['size'] }) {
       viewBox="0 0 24 24"
       aria-label="Loading"
     >
-      <circle
-        className="opacity-20"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        strokeWidth="4"
-      />
+      <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
       <path
         className="opacity-90"
         fill="currentColor"
@@ -168,6 +153,5 @@ function LoadingSpinner({ size }: { size?: ButtonProps['size'] }) {
     </svg>
   );
 }
-
 
 export { Button, buttonVariants };

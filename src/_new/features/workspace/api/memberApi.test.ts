@@ -8,10 +8,7 @@ import {
   getMyRole,
 } from './memberApi';
 import { AppError } from '@new/lib/errors/AppError';
-import {
-  mockWorkspaceMembersResponse,
-  mockMyRoleResponse,
-} from '@/test/mocks/fixtures';
+import { mockWorkspaceMembersResponse, mockMyRoleResponse } from '@/test/mocks/fixtures';
 
 vi.mock('@new/lib/auth', () => ({
   getAccessToken: vi.fn(() => null),

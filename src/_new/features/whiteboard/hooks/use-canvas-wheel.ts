@@ -2,11 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { ViewportTransform } from '../types';
-import {
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
-} from '../navigation/viewport-math';
+import { zoomViewport, panViewportWithWheel, constrainViewport } from '../navigation/viewport-math';
 
 interface UseCanvasWheelProps {
   overlayRef: React.RefObject<HTMLDivElement | null>;
@@ -41,22 +37,28 @@ export function useCanvasWheel({
 }: UseCanvasWheelProps): void {
   // Zamroź viewport w stabilnym recie — aktualizowany przy każdym renderze O(1)
   const internalViewportRef = useRef(viewport);
-  useEffect(() => { internalViewportRef.current = viewport; }, [viewport]);
+  useEffect(() => {
+    internalViewportRef.current = viewport;
+  }, [viewport]);
 
   // Zamroź callback — bez tego listener musiałby się re-subscribe przy każdej
   // zmianie referencji onViewportChange z rodzica
   const onViewportChangeRef = useRef(onViewportChange);
-  useEffect(() => { onViewportChangeRef.current = onViewportChange; }, [onViewportChange]);
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
 
   // Zamroź disabled — zmiana stanu popupa nie powoduje re-mount listenera
   const disabledRef = useRef(disabled ?? false);
-  useEffect(() => { disabledRef.current = disabled ?? false; }, [disabled]);
+  useEffect(() => {
+    disabledRef.current = disabled ?? false;
+  }, [disabled]);
 
   // Listener montowany dokładnie RAZ — viewport i callback celowo poza deps
   useEffect(() => {
     const overlay = overlayRef.current;
     if (!overlay) return; // DOM niegotowy — nie rejestruj (bez warunku na callback:
-                          // callback może pojawić się po mount, listener musi już być)
+    // callback może pojawić się po mount, listener musi już być)
 
     const handleWheel = (e: WheelEvent) => {
       if (disabledRef.current || !onViewportChangeRef.current) return;
@@ -69,13 +71,22 @@ export function useCanvasWheel({
 
       if (e.ctrlKey) {
         const rect = overlay.getBoundingClientRect();
-        onViewportChangeRef.current(constrainViewport(
-          zoomViewport(vp, e.deltaY, e.clientX - rect.left, e.clientY - rect.top, canvasWidth, canvasHeight)
-        ));
+        onViewportChangeRef.current(
+          constrainViewport(
+            zoomViewport(
+              vp,
+              e.deltaY,
+              e.clientX - rect.left,
+              e.clientY - rect.top,
+              canvasWidth,
+              canvasHeight
+            )
+          )
+        );
       } else {
-        onViewportChangeRef.current(constrainViewport(
-          panViewportWithWheel(vp, e.deltaX, e.deltaY)
-        ));
+        onViewportChangeRef.current(
+          constrainViewport(panViewportWithWheel(vp, e.deltaX, e.deltaY))
+        );
       }
     };
 

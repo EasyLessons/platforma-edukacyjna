@@ -110,15 +110,12 @@ export function useViewport(): UseViewportReturn {
   }, [followingUserId]);
 
   // ─── Follow mode ──────────────────────────────────────────────────────
-  const handleFollowUser = useCallback(
-    (userId: number, x: number, y: number, scale: number) => {
-      // Natychmiastowy skok przy pierwszym follow (żeby user od razu zobaczył cel)
-      setViewport({ x, y, scale });
-      followTargetRef.current = { x, y, scale };
-      setFollowingUserId(userId);
-    },
-    []
-  );
+  const handleFollowUser = useCallback((userId: number, x: number, y: number, scale: number) => {
+    // Natychmiastowy skok przy pierwszym follow (żeby user od razu zobaczył cel)
+    setViewport({ x, y, scale });
+    followTargetRef.current = { x, y, scale };
+    setFollowingUserId(userId);
+  }, []);
 
   const handleStopFollowing = useCallback(() => {
     setFollowingUserId(null);

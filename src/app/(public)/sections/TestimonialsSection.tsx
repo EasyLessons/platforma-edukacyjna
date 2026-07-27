@@ -13,45 +13,45 @@ const jakartaSans = Plus_Jakarta_Sans({
 
 const testimonials = [
   {
-    text: "EasyLesson całkowicie zmieniło sposób, w jaki uczę się matematyki. Tablica jest intuicyjna i wszystko działa naprawdę płynnie!",
-    highlight: "Tablica jest intuicyjna",
-    name: "Zosia",
-    role: "Uczennica",
+    text: 'EasyLesson całkowicie zmieniło sposób, w jaki uczę się matematyki. Tablica jest intuicyjna i wszystko działa naprawdę płynnie!',
+    highlight: 'Tablica jest intuicyjna',
+    name: 'Zosia',
+    role: 'Uczennica',
     avatar: 'https://i.pravatar.cc/150?img=47',
   },
   {
-    text: "Najlepsza platforma do prowadzenia korepetycji online. AI Tutor naprawdę pomaga w przygotowaniu materiałów.",
-    highlight: "AI Tutor naprawdę pomaga",
-    name: "Michał",
-    role: "Korepetytor",
+    text: 'Najlepsza platforma do prowadzenia korepetycji online. AI Tutor naprawdę pomaga w przygotowaniu materiałów.',
+    highlight: 'AI Tutor naprawdę pomaga',
+    name: 'Michał',
+    role: 'Korepetytor',
     avatar: 'https://i.pravatar.cc/150?img=11',
   },
   {
-    text: "Voice Chat i współbieżność to game changer. Mogę pracować z kilkoma uczniami jednocześnie bez problemu.",
-    highlight: "game changer",
-    name: "Anna",
-    role: "Nauczycielka",
+    text: 'Voice Chat i współbieżność to game changer. Mogę pracować z kilkoma uczniami jednocześnie bez problemu.',
+    highlight: 'game changer',
+    name: 'Anna',
+    role: 'Nauczycielka',
     avatar: 'https://i.pravatar.cc/150?img=32',
   },
   {
-    text: "SmartSearch wzorów matematycznych oszczędza mi mnóstwo czasu. Nie muszę szukać wzorów godzinami.",
-    highlight: "oszczędza mi mnóstwo czasu",
-    name: "Kuba",
-    role: "Uczeń",
+    text: 'SmartSearch wzorów matematycznych oszczędza mi mnóstwo czasu. Nie muszę szukać wzorów godzinami.',
+    highlight: 'oszczędza mi mnóstwo czasu',
+    name: 'Kuba',
+    role: 'Uczeń',
     avatar: 'https://i.pravatar.cc/150?img=53',
   },
   {
-    text: "Prostota i funkcjonalność w jednym. Polecam każdemu korepetytorowi, który chce pracować efektywnie.",
-    highlight: "Prostota i funkcjonalność w jednym",
-    name: "Magda",
-    role: "Korepetytorka",
+    text: 'Prostota i funkcjonalność w jednym. Polecam każdemu korepetytorowi, który chce pracować efektywnie.',
+    highlight: 'Prostota i funkcjonalność w jednym',
+    name: 'Magda',
+    role: 'Korepetytorka',
     avatar: 'https://i.pravatar.cc/150?img=25',
   },
   {
-    text: "Moi uczniowie są zachwyceni interaktywną tablicą. Lekcje stały się dużo ciekawsze!",
-    highlight: "Lekcje stały się dużo ciekawsze",
-    name: "Tomasz",
-    role: "Nauczyciel",
+    text: 'Moi uczniowie są zachwyceni interaktywną tablicą. Lekcje stały się dużo ciekawsze!',
+    highlight: 'Lekcje stały się dużo ciekawsze',
+    name: 'Tomasz',
+    role: 'Nauczyciel',
     avatar: 'https://i.pravatar.cc/150?img=60',
   },
 ];
@@ -75,7 +75,6 @@ export default function TestimonialsSection() {
 
   return (
     <div className={`${jakartaSans.className} w-full bg-white px-4 sm:px-6 lg:px-8 pb-8`}>
-
       <section
         className="relative w-full overflow-hidden py-12 sm:py-16"
         style={{
@@ -83,7 +82,6 @@ export default function TestimonialsSection() {
           background: 'linear-gradient(145deg, #1fb870 0%, #2bcc82 50%, #3dd99a 100%)',
         }}
       >
-
         {/* Dekoracyjne kółka */}
         <div
           className="absolute top-0 right-0 pointer-events-none"
@@ -114,7 +112,11 @@ export default function TestimonialsSection() {
         <div className="relative text-center mb-10 sm:mb-12 px-6">
           <p
             className="text-black font-semibold tracking-widest uppercase mb-3"
-            style={{ fontSize: 'clamp(0.6rem, 1vw, 0.72rem)', opacity: 0.75, letterSpacing: '0.14em' }}
+            style={{
+              fontSize: 'clamp(0.6rem, 1vw, 0.72rem)',
+              opacity: 0.75,
+              letterSpacing: '0.14em',
+            }}
           >
             CO MÓWIĄ UŻYTKOWNICY
           </p>
@@ -128,7 +130,6 @@ export default function TestimonialsSection() {
 
         {/* Karuzela */}
         <div className="relative overflow-hidden select-none">
-
           <div
             className="absolute left-0 top-0 bottom-0 w-24 sm:w-36 z-10 pointer-events-none"
             style={{ background: 'linear-gradient(to right, #1fb870, transparent)' }}
@@ -162,10 +163,7 @@ export default function TestimonialsSection() {
                   "
                 </div>
 
-                <p
-                  className="text-gray-600 leading-relaxed mb-5"
-                  style={{ fontSize: '0.95rem' }}
-                >
+                <p className="text-gray-600 leading-relaxed mb-5" style={{ fontSize: '0.95rem' }}>
                   {highlightedText(testimonial.text, testimonial.highlight)}
                 </p>
 
@@ -196,7 +194,6 @@ export default function TestimonialsSection() {
             ))}
           </div>
         </div>
-
       </section>
     </div>
   );

@@ -12,38 +12,73 @@ describe('collectGuidelinesFromImages', () => {
   it('elementy bez obrazków → []', () => {
     const elements: DrawingElement[] = [
       { id: '1', type: 'path', points: [], color: '#000', width: 1 },
-      { id: '2', type: 'shape', shapeType: 'rectangle', startX: 0, startY: 0, endX: 1, endY: 1, color: '#000', strokeWidth: 1, fill: false },
+      {
+        id: '2',
+        type: 'shape',
+        shapeType: 'rectangle',
+        startX: 0,
+        startY: 0,
+        endX: 1,
+        endY: 1,
+        color: '#000',
+        strokeWidth: 1,
+        fill: false,
+      },
     ];
     expect(collectGuidelinesFromImages(elements)).toEqual([]);
   });
 
   it('jeden obrazek → 6 guidelines (3 pionowe, 3 poziome)', () => {
-    const img: ImageElement = { id: 'img1', type: 'image', x: 10, y: 20, width: 100, height: 60, src: '' };
+    const img: ImageElement = {
+      id: 'img1',
+      type: 'image',
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+      src: '',
+    };
     const guides = collectGuidelinesFromImages([img]);
     expect(guides).toHaveLength(6);
-    expect(guides.filter(g => g.orientation === 'vertical')).toHaveLength(3);
-    expect(guides.filter(g => g.orientation === 'horizontal')).toHaveLength(3);
+    expect(guides.filter((g) => g.orientation === 'vertical')).toHaveLength(3);
+    expect(guides.filter((g) => g.orientation === 'horizontal')).toHaveLength(3);
   });
 
   it('wartości guidelines są prawidłowe: lewo, prawo, środekX, góra, dół, środekY', () => {
-    const img: ImageElement = { id: 'img1', type: 'image', x: 10, y: 20, width: 100, height: 60, src: '' };
+    const img: ImageElement = {
+      id: 'img1',
+      type: 'image',
+      x: 10,
+      y: 20,
+      width: 100,
+      height: 60,
+      src: '',
+    };
     const guides = collectGuidelinesFromImages([img]);
 
-    const verticals = guides.filter(g => g.orientation === 'vertical').map(g => g.value);
-    expect(verticals).toContain(10);        // lewa krawędź
-    expect(verticals).toContain(110);       // prawa krawędź (10+100)
-    expect(verticals).toContain(60);        // środek X (10+100/2)
+    const verticals = guides.filter((g) => g.orientation === 'vertical').map((g) => g.value);
+    expect(verticals).toContain(10); // lewa krawędź
+    expect(verticals).toContain(110); // prawa krawędź (10+100)
+    expect(verticals).toContain(60); // środek X (10+100/2)
 
-    const horizontals = guides.filter(g => g.orientation === 'horizontal').map(g => g.value);
-    expect(horizontals).toContain(20);      // górna krawędź
-    expect(horizontals).toContain(80);      // dolna krawędź (20+60)
-    expect(horizontals).toContain(50);      // środek Y (20+60/2)
+    const horizontals = guides.filter((g) => g.orientation === 'horizontal').map((g) => g.value);
+    expect(horizontals).toContain(20); // górna krawędź
+    expect(horizontals).toContain(80); // dolna krawędź (20+60)
+    expect(horizontals).toContain(50); // środek Y (20+60/2)
   });
 
   it('wszystkie guidelines mają prawidłowe sourceId', () => {
-    const img: ImageElement = { id: 'img1', type: 'image', x: 0, y: 0, width: 10, height: 10, src: '' };
+    const img: ImageElement = {
+      id: 'img1',
+      type: 'image',
+      x: 0,
+      y: 0,
+      width: 10,
+      height: 10,
+      src: '',
+    };
     const guides = collectGuidelinesFromImages([img]);
-    expect(guides.every(g => g.sourceId === 'img1')).toBe(true);
+    expect(guides.every((g) => g.sourceId === 'img1')).toBe(true);
   });
 
   it('dwa obrazki → 12 guidelines', () => {
@@ -62,7 +97,15 @@ const THRESHOLD = 0.15;
 
 function makeGuides() {
   // Obrazek: x=5, y=10, w=4, h=6
-  const img: ImageElement = { id: 'source', type: 'image', x: 5, y: 10, width: 4, height: 6, src: '' };
+  const img: ImageElement = {
+    id: 'source',
+    type: 'image',
+    x: 5,
+    y: 10,
+    width: 4,
+    height: 6,
+    src: '',
+  };
   return collectGuidelinesFromImages([img]);
 }
 

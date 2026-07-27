@@ -63,11 +63,11 @@ export function WhiteboardBoardSidebar({
   const { workspaces } = useWorkspaces();
   const workspace = workspaces.find((w) => w.id === selectedWorkspaceId);
   const workspaceName = workspace?.name ?? '';
-  const dashboardHref = selectedWorkspaceId ? `/dashboard?workspace=${selectedWorkspaceId}` : '/dashboard';
+  const dashboardHref = selectedWorkspaceId
+    ? `/dashboard?workspace=${selectedWorkspaceId}`
+    : '/dashboard';
 
-  const filtered = boards.filter((b) =>
-    b.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filtered = boards.filter((b) => b.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
   const handleBoardClick = (boardId: number) => {
     // Wymuszony pełny reload jak Ctrl+R, żeby cała tablica przeładowała stan.
@@ -168,8 +168,8 @@ export function WhiteboardBoardSidebar({
               letterSpacing: '0.06em',
               lineHeight: '1.4',
             }}
-            >
-              PRZESTRZEN / {workspaceName || '-'}
+          >
+            PRZESTRZEN / {workspaceName || '-'}
           </p>
         </div>
       </div>
@@ -233,84 +233,93 @@ export function WhiteboardBoardSidebar({
 
           <div style={{ flex: 1, overflowY: 'auto', padding: '0 8px 8px' }}>
             {loading && (
-              <p style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+              <p
+                style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}
+              >
                 Ladowanie tablic...
               </p>
             )}
             {error && (
-              <p style={{ padding: '16px', textAlign: 'center', color: '#ef4444', fontSize: '13px' }}>
+              <p
+                style={{ padding: '16px', textAlign: 'center', color: '#ef4444', fontSize: '13px' }}
+              >
                 Blad ladowania tablic
               </p>
             )}
             {!loading && !error && filtered.length === 0 && (
-              <p style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}>
+              <p
+                style={{ padding: '16px', textAlign: 'center', color: '#9ca3af', fontSize: '13px' }}
+              >
                 {searchQuery ? 'Brak wynikow' : 'Brak tablic w tej przestrzeni'}
               </p>
             )}
 
             {!loading &&
               filtered.map((board) => {
-            const isActive = activeBoardId
-              ? board.id === parseInt(activeBoardId, 10)
-              : false;
-            const IconComponent = getBoardIconComponent(board.icon);
-            const gradientClass = getGradientClass(board.bg_color);
+                const isActive = activeBoardId ? board.id === parseInt(activeBoardId, 10) : false;
+                const IconComponent = getBoardIconComponent(board.icon);
+                const gradientClass = getGradientClass(board.bg_color);
 
-            return (
-              <button
-                key={board.id}
-                onClick={() => handleBoardClick(board.id)}
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '10px',
-                  padding: '8px 10px',
-                  border: 'none',
-                  borderRadius: '8px',
-                  cursor: 'pointer',
-                  backgroundColor: isActive ? '#ececef' : 'transparent',
-                  textAlign: 'left',
-                  transition: 'background-color 0.15s',
-                }}
-                onMouseEnter={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = '#f0f0f2';
-                }}
-                onMouseLeave={(e) => {
-                  if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
-                }}
-              >
-                <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center flex-shrink-0`}>
-                  <IconComponent size={16} color="white" />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
+                return (
+                  <button
+                    key={board.id}
+                    onClick={() => handleBoardClick(board.id)}
                     style={{
-                      fontSize: '13px',
-                      fontWeight: isActive ? '600' : '500',
-                      color: '#111827',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '10px',
+                      padding: '8px 10px',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      backgroundColor: isActive ? '#ececef' : 'transparent',
+                      textAlign: 'left',
+                      transition: 'background-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isActive) e.currentTarget.style.backgroundColor = '#f0f0f2';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isActive) e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    {board.name}
-                  </div>
-                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
-                    {board.last_modified
-                      ? new Date(board.last_modified).toLocaleDateString('pl-PL', {
-                          day: 'numeric',
-                          month: 'short',
-                        })
-                        : '\u2014'}
-                  </div>
-                </div>
-                  {board.is_favourite && (
-                  <Star size={13} style={{ color: '#f59e0b', flexShrink: 0, fill: '#f59e0b' }} />
-                )}
-              </button>
-            );
-          })}
+                    <div
+                      className={`w-8 h-8 rounded-lg bg-gradient-to-br ${gradientClass} flex items-center justify-center flex-shrink-0`}
+                    >
+                      <IconComponent size={16} color="white" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontSize: '13px',
+                          fontWeight: isActive ? '600' : '500',
+                          color: '#111827',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {board.name}
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '1px' }}>
+                        {board.last_modified
+                          ? new Date(board.last_modified).toLocaleDateString('pl-PL', {
+                              day: 'numeric',
+                              month: 'short',
+                            })
+                          : '\u2014'}
+                      </div>
+                    </div>
+                    {board.is_favourite && (
+                      <Star
+                        size={13}
+                        style={{ color: '#f59e0b', flexShrink: 0, fill: '#f59e0b' }}
+                      />
+                    )}
+                  </button>
+                );
+              })}
           </div>
         </div>
       </div>

@@ -62,10 +62,7 @@ export function BoardEditModal({ isOpen, onClose, board, onSubmit }: BoardEditMo
 
   return createPortal(
     <div className="dashboard-modal-overlay">
-      <div
-        ref={modalRef}
-        className="dashboard-modal-surface max-w-lg"
-      >
+      <div ref={modalRef} className="dashboard-modal-surface max-w-lg">
         {/* Header */}
         <div className="dashboard-modal-header">
           <div>

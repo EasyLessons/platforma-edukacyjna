@@ -10,12 +10,12 @@ interface TooltipProps {
   tooltipClassName?: string; // Optional extra classes for the tooltip itself
 }
 
-export function Tooltip({ 
-  children, 
-  content, 
-  position = 'top', 
+export function Tooltip({
+  children,
+  content,
+  position = 'top',
   className = '',
-  tooltipClassName = '' 
+  tooltipClassName = '',
 }: TooltipProps) {
   const getPositionClasses = () => {
     switch (position) {
@@ -50,7 +50,7 @@ export function Tooltip({
   return (
     <div className={`relative group inline-flex items-center justify-center shrink-0 ${className}`}>
       {children}
-      <div 
+      <div
         className={`absolute ${getPositionClasses()} z-[1000] pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 ${tooltipClassName}`}
       >
         <div className="bg-gray-800 text-white text-xs font-medium px-2.5 py-1.5 rounded shadow-lg whitespace-nowrap">

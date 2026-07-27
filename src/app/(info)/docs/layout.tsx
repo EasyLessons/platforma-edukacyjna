@@ -8,15 +8,10 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
         {/* Sidebar */}
         <aside className="md:col-span-1">
           <nav className="sticky top-8 space-y-10">
-            <div className="text-sm font-bold text-black uppercase tracking-wide">
-              Dokumentacja
-            </div>
+            <div className="text-sm font-bold text-black uppercase tracking-wide">Dokumentacja</div>
             <ul className="space-y-2 text-sm">
               <li>
-                <Link
-                  href="/docs"
-                  className="text-black hover:text-blue-600 transition"
-                >
+                <Link href="/docs" className="text-black hover:text-blue-600 transition">
                   Wprowadzenie
                 </Link>
               </li>
@@ -53,10 +48,7 @@ export default function DocsLayout({ children }: { children: ReactNode }) {
                 <span className="text-black font-medium text-xs">POMOC</span>
                 <ul className="mt-2 ml-3 space-y-2 border-l border-gray-200 pl-4">
                   <li>
-                    <Link
-                      href="/docs/faq"
-                      className="text-black hover:text-blue-600 transition"
-                    >
+                    <Link href="/docs/faq" className="text-black hover:text-blue-600 transition">
                       FAQ
                     </Link>
                   </li>

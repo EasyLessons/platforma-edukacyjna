@@ -56,7 +56,7 @@ export function usePasswordReset() {
 
   const handleEmailChange = (value: string) => {
     setEmail(value);
-    setEmailErrors({})
+    setEmailErrors({});
     setEmailError('');
   };
 

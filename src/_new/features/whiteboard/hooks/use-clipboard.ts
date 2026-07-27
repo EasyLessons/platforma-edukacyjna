@@ -20,8 +20,18 @@
 
 import { useState, useCallback } from 'react';
 import { inverseTransformPoint } from '../navigation/viewport-math';
-import type { DrawingElement, DrawingPath, Shape, TextElement, ImageElement,
-  MarkdownNote, TableElement, FunctionPlot, PDFElement, ViewportTransform } from '../types';
+import type {
+  DrawingElement,
+  DrawingPath,
+  Shape,
+  TextElement,
+  ImageElement,
+  MarkdownNote,
+  TableElement,
+  FunctionPlot,
+  PDFElement,
+  ViewportTransform,
+} from '../types';
 import type { Command } from '../commands';
 import { CreateElementsCommand } from '../commands';
 
@@ -62,9 +72,21 @@ function generateId(): string {
 export function offsetElement(el: DrawingElement, dx: number, dy: number): DrawingElement {
   switch (el.type) {
     case 'path':
-      return { ...el, id: generateId(), points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })), bbox: undefined } as DrawingPath;
+      return {
+        ...el,
+        id: generateId(),
+        points: el.points.map((p) => ({ x: p.x + dx, y: p.y + dy })),
+        bbox: undefined,
+      } as DrawingPath;
     case 'shape':
-      return { ...el, id: generateId(), startX: el.startX + dx, startY: el.startY + dy, endX: el.endX + dx, endY: el.endY + dy } as Shape;
+      return {
+        ...el,
+        id: generateId(),
+        startX: el.startX + dx,
+        startY: el.startY + dy,
+        endX: el.endX + dx,
+        endY: el.endY + dy,
+      } as Shape;
     case 'text':
       return { ...el, id: generateId(), x: el.x + dx, y: el.y + dy } as TextElement;
     case 'image':
@@ -72,7 +94,13 @@ export function offsetElement(el: DrawingElement, dx: number, dy: number): Drawi
     case 'markdown':
       return { ...el, id: generateId(), x: el.x + dx, y: el.y + dy } as MarkdownNote;
     case 'table':
-      return { ...el, id: generateId(), x: el.x + dx, y: el.y + dy, cells: el.cells.map((row) => [...row]) } as TableElement;
+      return {
+        ...el,
+        id: generateId(),
+        x: el.x + dx,
+        y: el.y + dy,
+        cells: el.cells.map((row) => [...row]),
+      } as TableElement;
     case 'function':
       return { ...(el as FunctionPlot), id: generateId() } as FunctionPlot;
     case 'pdf':
@@ -84,17 +112,29 @@ export function offsetElement(el: DrawingElement, dx: number, dy: number): Drawi
 
 /** Oblicz środek grupy elementów w przestrzeni świata */
 function groupCenter(elements: DrawingElement[]): { x: number; y: number } {
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   elements.forEach((el) => {
     if (el.type === 'path') {
-      el.points.forEach((p) => { minX = Math.min(minX, p.x); minY = Math.min(minY, p.y); maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y); });
+      el.points.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      });
     } else if (el.type === 'shape') {
-      minX = Math.min(minX, el.startX, el.endX); minY = Math.min(minY, el.startY, el.endY);
-      maxX = Math.max(maxX, el.startX, el.endX); maxY = Math.max(maxY, el.startY, el.endY);
+      minX = Math.min(minX, el.startX, el.endX);
+      minY = Math.min(minY, el.startY, el.endY);
+      maxX = Math.max(maxX, el.startX, el.endX);
+      maxY = Math.max(maxY, el.startY, el.endY);
     } else if ('x' in el && 'y' in el) {
       const typed = el as { x: number; y: number; width?: number; height?: number };
-      minX = Math.min(minX, typed.x); minY = Math.min(minY, typed.y);
-      maxX = Math.max(maxX, typed.x + (typed.width ?? 0)); maxY = Math.max(maxY, typed.y + (typed.height ?? 0));
+      minX = Math.min(minX, typed.x);
+      minY = Math.min(minY, typed.y);
+      maxX = Math.max(maxX, typed.x + (typed.width ?? 0));
+      maxY = Math.max(maxY, typed.y + (typed.height ?? 0));
     }
   });
   return {
@@ -120,7 +160,6 @@ export function useClipboard({
   onLoadImage,
   onRecordCommand,
 }: UseClipboardOptions): UseClipboardReturn {
-
   const [copiedElements, setCopiedElements] = useState<DrawingElement[]>([]);
 
   // ─── Copy ──────────────────────────────────────────────────────────────
@@ -155,11 +194,11 @@ export function useClipboard({
         for (let i = 0; i < newElements.length; i += 50) {
           const chunk = newElements.slice(i, i + 50);
           await onBroadcastBatch(chunk);
-          await new Promise(r => setTimeout(r, 50));
+          await new Promise((r) => setTimeout(r, 50));
         }
       };
       broadcastInChunks();
-      newElements.forEach(el => {
+      newElements.forEach((el) => {
         if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
           onLoadImage(el.id, (el as ImageElement).src);
         }
@@ -178,7 +217,19 @@ export function useClipboard({
     }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [elementsRef, selectedElementIdsRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onRecordCommand]);
+  }, [
+    elementsRef,
+    selectedElementIdsRef,
+    boardIdRef,
+    onAddElements,
+    onBroadcastCreated,
+    onBroadcastBatch,
+    onMarkUnsaved,
+    onDebouncedSave,
+    onSelectElements,
+    onLoadImage,
+    onRecordCommand,
+  ]);
 
   // ─── Paste ─────────────────────────────────────────────────────────────
   const handlePaste = useCallback(() => {
@@ -208,11 +259,11 @@ export function useClipboard({
         for (let i = 0; i < newElements.length; i += 50) {
           const chunk = newElements.slice(i, i + 50);
           await onBroadcastBatch(chunk);
-          await new Promise(r => setTimeout(r, 50));
+          await new Promise((r) => setTimeout(r, 50));
         }
       };
       broadcastInChunks();
-      newElements.forEach(el => {
+      newElements.forEach((el) => {
         if (el.type === 'image' && (el as ImageElement).src && onLoadImage) {
           onLoadImage(el.id, (el as ImageElement).src);
         }
@@ -231,7 +282,20 @@ export function useClipboard({
     }
     if (boardIdRef.current) onDebouncedSave(boardIdRef.current);
     onSelectElements(newElements.map((e) => e.id));
-  }, [copiedElements, canvasRef, viewportRef, boardIdRef, onAddElements, onBroadcastCreated, onBroadcastBatch, onMarkUnsaved, onDebouncedSave, onSelectElements, onLoadImage, onRecordCommand]);
+  }, [
+    copiedElements,
+    canvasRef,
+    viewportRef,
+    boardIdRef,
+    onAddElements,
+    onBroadcastCreated,
+    onBroadcastBatch,
+    onMarkUnsaved,
+    onDebouncedSave,
+    onSelectElements,
+    onLoadImage,
+    onRecordCommand,
+  ]);
 
   return { copiedElements, handleCopy, handleDuplicate, handlePaste };
 }

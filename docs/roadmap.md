@@ -7,6 +7,7 @@ Rzeczy, które wiadomo że nadejdą, zanim jeszcze jest kod. Cel: żeby architek
 Trzeci stan usera obok zalogowany/niezalogowany. Szczegóły architektoniczne (model danych, warstwa autoryzacji, co zmienić na froncie) opisane w `docs/architecture/auth.md`, sekcja "Planowane: poziom subskrybenta". Status: **niezaczęte**, tylko zaplanowane.
 
 Otwarte pytania do rozstrzygnięcia przed startem prac (uzupełnić gdy będzie decyzja):
+
 - Dostawca płatności (Stripe czy inny)?
 - Co dokładnie odblokowuje subskrypcja (funkcje AI? liczba workspace'ów/boardów? coś innego)?
 - Czy plany darmowy/płatny, czy więcej poziomów?

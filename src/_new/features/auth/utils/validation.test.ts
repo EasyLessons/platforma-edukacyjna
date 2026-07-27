@@ -16,11 +16,17 @@ describe('validateEmail', () => {
   });
 
   it('zwraca błąd dla braku @', () => {
-    expect(validateEmail('notanemail')).toEqual({ valid: false, error: 'Nieprawidłowy format email' });
+    expect(validateEmail('notanemail')).toEqual({
+      valid: false,
+      error: 'Nieprawidłowy format email',
+    });
   });
 
   it('zwraca błąd dla braku TLD', () => {
-    expect(validateEmail('user@domain')).toEqual({ valid: false, error: 'Nieprawidłowy format email' });
+    expect(validateEmail('user@domain')).toEqual({
+      valid: false,
+      error: 'Nieprawidłowy format email',
+    });
   });
 
   it('zwraca valid: true dla poprawnego emaila', () => {
@@ -38,23 +44,38 @@ describe('validatePassword', () => {
   });
 
   it('zwraca błąd gdy hasło za krótkie', () => {
-    expect(validatePassword('Ab1')).toEqual({ valid: false, error: 'Hasło musi mieć co najmniej 6 znaków' });
+    expect(validatePassword('Ab1')).toEqual({
+      valid: false,
+      error: 'Hasło musi mieć co najmniej 6 znaków',
+    });
   });
 
   it('zwraca błąd gdy brak małej litery', () => {
-    expect(validatePassword('ABCDEF1')).toEqual({ valid: false, error: 'Hasło musi zawierać małą literę' });
+    expect(validatePassword('ABCDEF1')).toEqual({
+      valid: false,
+      error: 'Hasło musi zawierać małą literę',
+    });
   });
 
   it('zwraca błąd gdy brak wielkiej litery', () => {
-    expect(validatePassword('abcdef1')).toEqual({ valid: false, error: 'Hasło musi zawierać wielką literę' });
+    expect(validatePassword('abcdef1')).toEqual({
+      valid: false,
+      error: 'Hasło musi zawierać wielką literę',
+    });
   });
 
   it('zwraca błąd gdy brak cyfry', () => {
-    expect(validatePassword('Abcdefgh')).toEqual({ valid: false, error: 'Hasło musi zawierać cyfrę' });
+    expect(validatePassword('Abcdefgh')).toEqual({
+      valid: false,
+      error: 'Hasło musi zawierać cyfrę',
+    });
   });
 
   it('zwraca błąd gdy hasło zawiera spację', () => {
-    expect(validatePassword('Valid Pass1')).toEqual({ valid: false, error: 'Hasło nie może zawierać spacji' });
+    expect(validatePassword('Valid Pass1')).toEqual({
+      valid: false,
+      error: 'Hasło nie może zawierać spacji',
+    });
   });
 
   it('zwraca valid: true dla poprawnego hasła', () => {
@@ -88,11 +109,17 @@ describe('validateUsername', () => {
   });
 
   it('zwraca błąd gdy username za krótki', () => {
-    expect(validateUsername('ab')).toEqual({ valid: false, error: 'Login musi mieć co najmniej 3 znaki' });
+    expect(validateUsername('ab')).toEqual({
+      valid: false,
+      error: 'Login musi mieć co najmniej 3 znaki',
+    });
   });
 
   it('zwraca błąd gdy po trimie za krótki', () => {
-    expect(validateUsername('  x  ')).toEqual({ valid: false, error: 'Login musi mieć co najmniej 3 znaki' });
+    expect(validateUsername('  x  ')).toEqual({
+      valid: false,
+      error: 'Login musi mieć co najmniej 3 znaki',
+    });
   });
 
   it('zwraca valid: true dla poprawnego loginu', () => {

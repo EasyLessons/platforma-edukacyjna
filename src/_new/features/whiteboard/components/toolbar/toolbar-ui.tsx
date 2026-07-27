@@ -82,10 +82,7 @@ const ToolButton = ({
       disabled={disabled}
       className={`
         relative p-1.5 rounded-md transition-colors group
-        ${active
-          ? 'bg-blue-500/20 text-blue-600'
-          : 'text-gray-700 hover:bg-gray-100'
-        }
+        ${active ? 'bg-blue-500/20 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}
         ${disabled ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}
       `}
     >
@@ -152,16 +149,16 @@ export function ToolbarUI({
     <>
       {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
       <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
-        <div className={`flex flex-col items-center ${isCompactHeight ? 'gap-1 p-1.5' : 'gap-1.5 p-2'}`}>
+        <div
+          className={`flex flex-col items-center ${isCompactHeight ? 'gap-1 p-1.5' : 'gap-1.5 p-2'}`}
+        >
           {/* Main Tools — z rejestru (ALL_TOOLS, group 'main') */}
           <ToolModeButtons group="main" isReadOnly={isReadOnly} />
 
           <Divider />
 
           {/* Nowe narzędzia (group 'more') — UKRYTE w medium height */}
-          {!isMediumHeight && !isMobile && (
-            <ToolModeButtons group="more" isReadOnly={isReadOnly} />
-          )}
+          {!isMediumHeight && !isMobile && <ToolModeButtons group="more" isReadOnly={isReadOnly} />}
 
           {!isCompactHeight && (
             <>

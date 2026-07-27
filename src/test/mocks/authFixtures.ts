@@ -12,7 +12,8 @@ export const mockUser: User = {
 };
 
 export const mockLoginResponse: LoginResponse = {
-  access_token: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjo5OTk5OTk5OTk5LCJpYXQiOjE3MzAwMDAwMDB9.fakesig',
+  access_token:
+    'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjo5OTk5OTk5OTk5LCJpYXQiOjE3MzAwMDAwMDB9.fakesig',
   token_type: 'bearer',
   user: mockUser,
 };
@@ -24,5 +25,4 @@ export const mockRegisterResponse: RegisterResponse = {
 
 export const mockValidToken = mockLoginResponse.access_token;
 
-export const mockExpiredToken =
-  'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjoxLCJpYXQiOjF9.fakesig';
+export const mockExpiredToken = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjoxLCJpYXQiOjF9.fakesig';

@@ -7,10 +7,10 @@
 
 ## Dwa rodzaje narzędzi
 
-| Typ | Kiedy | Pole w ToolDefinition |
-|-----|-------|-----------------------|
-| **TRYB** | Narzędzie zajmuje ekran i obsługuje pointer/gesty (rysowanie, zaznaczanie) | `Overlay: ComponentType` |
-| **AKCJA** | Kliknięcie przycisku wykonuje jednorazową akcję, nie wchodzi w tryb | `onInvoke: (host) => void` |
+| Typ       | Kiedy                                                                      | Pole w ToolDefinition      |
+| --------- | -------------------------------------------------------------------------- | -------------------------- |
+| **TRYB**  | Narzędzie zajmuje ekran i obsługuje pointer/gesty (rysowanie, zaznaczanie) | `Overlay: ComponentType`   |
+| **AKCJA** | Kliknięcie przycisku wykonuje jednorazową akcję, nie wchodzi w tryb        | `onInvoke: (host) => void` |
 
 ---
 
@@ -20,17 +20,17 @@ Plik źródłowy: [tools/types.ts](../../../src/_new/features/whiteboard/tools/t
 
 ```ts
 export interface ToolDefinition {
-  id: ToolId;           // string — unikalny, np. 'pen', 'myTool'
-  label: string;        // tooltip przycisku, np. 'Rysuj (P)'
-  icon: LucideIcon;     // ikona z lucide-react
-  shortcut?: string;    // pojedynczy znak, np. 'p' — TOOL_SHORTCUTS rejestruje go auto
+  id: ToolId; // string — unikalny, np. 'pen', 'myTool'
+  label: string; // tooltip przycisku, np. 'Rysuj (P)'
+  icon: LucideIcon; // ikona z lucide-react
+  shortcut?: string; // pojedynczy znak, np. 'p' — TOOL_SHORTCUTS rejestruje go auto
   group?: 'main' | 'more'; // sekcja toolbara; brak = tylko overlay, bez przycisku
-  order?: number;       // kolejność w toolbarze (niższy = wyżej)
+  order?: number; // kolejność w toolbarze (niższy = wyżej)
   cursor?: CSSProperties['cursor']; // kursor gdy narzędzie aktywne
   availableTo?: UserRole[]; // ['owner','editor'] domyślnie; dodaj 'viewer' gdy potrzeba
-  iconFill?: number;    // 0–1 wypełnienie ikony (np. 1 dla select, 0.3 dla pen)
+  iconFill?: number; // 0–1 wypełnienie ikony (np. 1 dla select, 0.3 dla pen)
 
-  Overlay?: ComponentType;      // TRYB — komponent bez propsów, używa useToolHost()
+  Overlay?: ComponentType; // TRYB — komponent bez propsów, używa useToolHost()
   PropertiesPanel?: ComponentType; // opcjonalny panel właściwości obok toolbara
 
   onInvoke?: (host: ToolHostContextValue) => void; // AKCJA — zamiast Overlay
@@ -62,18 +62,18 @@ function MyToolOverlay() {
   const h = useToolHost();
   // Właściwości narzędzia czytaj ze store'a (nie z h), bo pan/zoom
   // nie re-renderuje toolbara i nie powinien re-renderować overlaya przez props
-  const color     = useToolStore((s) => s.color);
+  const color = useToolStore((s) => s.color);
   const lineWidth = useToolStore((s) => s.lineWidth);
 
   return (
     <MyToolComponent
       viewport={h.viewport}
-      viewportRef={h.viewportRef}        // stabilny ref — użyj zamiast viewport w event handlerach
+      viewportRef={h.viewportRef} // stabilny ref — użyj zamiast viewport w event handlerach
       canvasWidth={h.canvasWidth}
       canvasHeight={h.canvasHeight}
       color={color}
       lineWidth={lineWidth}
-      onMyCreate={h.onMyCreate}          // callback z ToolHostContext
+      onMyCreate={h.onMyCreate} // callback z ToolHostContext
       onViewportChange={h.onViewportChange}
       isGestureActive={h.isGestureActive} // OBOWIĄZKOWE — patrz canvas-architecture.md §4
     />
@@ -107,9 +107,9 @@ export const saveTemplateTool: ToolDefinition = {
   group: 'more',
   order: 20,
   onInvoke: (host) => {
-    const selected = [...host.selectedIds].map(id =>
-      host.elements.find(e => e.id === id)
-    ).filter(Boolean);
+    const selected = [...host.selectedIds]
+      .map((id) => host.elements.find((e) => e.id === id))
+      .filter(Boolean);
     host.onSaveGroupTemplate(selected);
   },
 };

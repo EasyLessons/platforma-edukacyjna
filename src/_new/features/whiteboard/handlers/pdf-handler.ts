@@ -27,16 +27,18 @@ export const PdfHandler: ElementHandler<PDFElement> = {
 
   isPointInElement(point, el) {
     return (
-      point.x >= el.x && point.x <= el.x + el.width &&
-      point.y >= el.y && point.y <= el.y + el.height
+      point.x >= el.x &&
+      point.x <= el.x + el.width &&
+      point.y >= el.y &&
+      point.y <= el.y + el.height
     );
   },
 
   resize(el, pivotX, pivotY, scaleX, scaleY) {
     return {
-      x:      pivotX + (el.x - pivotX) * scaleX,
-      y:      pivotY + (el.y - pivotY) * scaleY,
-      width:  Math.max(MIN_SIZE, el.width  * scaleX),
+      x: pivotX + (el.x - pivotX) * scaleX,
+      y: pivotY + (el.y - pivotY) * scaleY,
+      width: Math.max(MIN_SIZE, el.width * scaleX),
       height: Math.max(MIN_SIZE, el.height * scaleY),
     };
   },
@@ -46,12 +48,12 @@ export const PdfHandler: ElementHandler<PDFElement> = {
   },
 
   rotate(el, rotationAngle, pivot, cos, sin) {
-    const cx = el.x + el.width  / 2;
+    const cx = el.x + el.width / 2;
     const cy = el.y + el.height / 2;
     const newCenter = rotateAroundPivot({ x: cx, y: cy }, pivot, cos, sin);
     return {
-      x:        newCenter.x - el.width  / 2,
-      y:        newCenter.y - el.height / 2,
+      x: newCenter.x - el.width / 2,
+      y: newCenter.y - el.height / 2,
       rotation: (el.rotation ?? 0) + rotationAngle,
     };
   },

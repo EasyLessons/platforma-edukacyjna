@@ -92,7 +92,8 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
       try {
         const AudioCtx =
           window.AudioContext ||
-          (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+          (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+            .webkitAudioContext;
         if (!AudioCtx) return;
 
         const ctx = new AudioCtx();
@@ -461,7 +462,9 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
               : 'bg-transparent border-transparent shadow-none px-0 justify-end h-10 w-fit'
           }`}
         >
-          <div className={`flex items-center min-w-0 transition-all duration-500 ease-in-out ${isHovered ? 'gap-2' : 'gap-0'}`}>
+          <div
+            className={`flex items-center min-w-0 transition-all duration-500 ease-in-out ${isHovered ? 'gap-2' : 'gap-0'}`}
+          >
             <div className="flex -space-x-1.5">
               {participants.map((participant) => {
                 const avatarColorClass = getAvatarColorClass(participant.odUserId);
@@ -517,7 +520,9 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
           {areControlsMounted && (
             <div
               className={`flex items-center gap-1 transition-all duration-400 ease-in-out ${
-                isHovered ? 'opacity-100 translate-x-0 ml-6' : 'opacity-0 translate-x-2 ml-0 pointer-events-none'
+                isHovered
+                  ? 'opacity-100 translate-x-0 ml-6'
+                  : 'opacity-0 translate-x-2 ml-0 pointer-events-none'
               }`}
             >
               <div className="relative flex items-center gap-0">
@@ -547,7 +552,9 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
                     className="w-7 h-9 flex items-center justify-center text-gray-700 hover:bg-gray-200 border-l border-gray-300 transition-colors ease-in-out"
                     title="Menu mikrofonu"
                   >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showMicMenu ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform ${showMicMenu ? 'rotate-180' : ''}`}
+                    />
                   </button>
                 </div>
 
@@ -595,7 +602,7 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
                     </button>
                   </div>
                 )}
-            </div>
+              </div>
 
               <div className="relative flex items-center gap-0">
                 <div className="flex items-center rounded-lg border border-gray-300 bg-gray-100/90 overflow-hidden h-9 transition-all duration-300 ease-in-out">
@@ -624,7 +631,9 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
                     className="w-7 h-9 flex items-center justify-center text-gray-700 hover:bg-gray-200 border-l border-gray-300 transition-colors ease-in-out"
                     title="Menu sluchawek"
                   >
-                    <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showSpeakerMenu ? 'rotate-180' : ''}`} />
+                    <ChevronDown
+                      className={`w-3.5 h-3.5 transition-transform ${showSpeakerMenu ? 'rotate-180' : ''}`}
+                    />
                   </button>
                 </div>
 
@@ -666,7 +675,7 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
                     </button>
                   </div>
                 )}
-            </div>
+              </div>
 
               <Button
                 type="button"
@@ -693,7 +702,6 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
               </Button>
             </div>
           )}
-
         </div>
         <style jsx>{`
           @keyframes menuIn {
@@ -740,7 +748,9 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
             <span>
               Wycisz: <span className="font-medium">{avatarContextMenu.username}</span>
             </span>
-            {isRemoteMutedLocally(avatarContextMenu.userId) && <Check className="w-4 h-4 text-green-600" />}
+            {isRemoteMutedLocally(avatarContextMenu.userId) && (
+              <Check className="w-4 h-4 text-green-600" />
+            )}
           </button>
         </div>
       )}

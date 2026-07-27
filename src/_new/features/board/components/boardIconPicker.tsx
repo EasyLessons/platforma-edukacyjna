@@ -16,11 +16,7 @@ interface BoardIconPickerProps {
   disabled?: boolean;
 }
 
-export function BoardIconPicker({
-  selected,
-  onChange,
-  disabled = false,
-}: BoardIconPickerProps) {
+export function BoardIconPicker({ selected, onChange, disabled = false }: BoardIconPickerProps) {
   return (
     <div>
       {/* Label */}

@@ -21,14 +21,8 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
   };
 
   return (
-    <div
-      className="dashboard-modal-overlay"
-      onClick={onClose}
-    >
-      <div
-        className="dashboard-modal-surface max-w-md"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <div className="dashboard-modal-overlay" onClick={onClose}>
+      <div className="dashboard-modal-surface max-w-md" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="dashboard-modal-header">
           <div className="flex items-start gap-3">
@@ -40,7 +34,11 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
               <p className="mt-1 text-sm text-gray-600">Na konto Premium</p>
             </div>
           </div>
-          <DashboardButton variant="secondary" onClick={onClose} className="h-9 w-9 rounded-full p-0">
+          <DashboardButton
+            variant="secondary"
+            onClick={onClose}
+            className="h-9 w-9 rounded-full p-0"
+          >
             <X size={20} />
           </DashboardButton>
         </div>
@@ -126,10 +124,11 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
                 leftIcon={copied ? <Check size={18} /> : <Copy size={18} />}
                 onClick={handleCopy}
               >
-                {copied ? 
-                    <span className="hidden sm:inline">Skopiowano!</span>
-                 : <span className="hidden sm:inline">Kopiuj</span>
-                }
+                {copied ? (
+                  <span className="hidden sm:inline">Skopiowano!</span>
+                ) : (
+                  <span className="hidden sm:inline">Kopiuj</span>
+                )}
               </DashboardButton>
             </div>
           </div>

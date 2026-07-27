@@ -131,9 +131,7 @@ const SingleCursor = memo(function SingleCursor({
 });
 
 // Prezentacyjny komponent - memo
-const RemoteCursorsInner = memo(function RemoteCursorsInner({
-  cursors,
-}: RemoteCursorsProps) {
+const RemoteCursorsInner = memo(function RemoteCursorsInner({ cursors }: RemoteCursorsProps) {
   if (cursors.length === 0) return null;
 
   return (
@@ -141,13 +139,7 @@ const RemoteCursorsInner = memo(function RemoteCursorsInner({
       {cursors.map((cursor) => {
         const colorIndex = Math.abs(cursor.userId) % CURSOR_COLORS.length;
         const color = CURSOR_COLORS[colorIndex];
-        return (
-          <SingleCursor
-            key={cursor.userId}
-            cursor={cursor}
-            color={color}
-          />
-        );
+        return <SingleCursor key={cursor.userId} cursor={cursor} color={color} />;
       })}
     </div>
   );

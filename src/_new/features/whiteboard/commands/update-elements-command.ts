@@ -18,7 +18,7 @@ export class UpdateElementsCommand implements Command {
 
   constructor(
     private readonly before: readonly DrawingElement[],
-    private readonly after: readonly DrawingElement[],
+    private readonly after: readonly DrawingElement[]
   ) {}
 
   do(ctx: CommandContext): void {

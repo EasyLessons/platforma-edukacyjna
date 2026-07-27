@@ -4,14 +4,15 @@ Workspace service — CRUD workspace'ów.
 from datetime import datetime
 from typing import List
  
-from fastapi import HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, select as sa_select
+from api.v1.boards.service import BoardService
  
 from core.exceptions import NotFoundError, AppException
 from core.models import Board, User, Workspace, WorkspaceMember
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse,
-    WorkspaceListResponse, UserBasic,
+    UserBasic,
 )
 
 def _build_workspace_response(
@@ -48,9 +49,6 @@ def _build_workspace_response(
         role="owner" if is_owner else membership.role,
         is_favourite=membership.is_favourite,
     )
-
-from sqlalchemy import func, select as sa_select
-from api.v1.boards.service import BoardService
 
 def get_user_workspaces(db: Session, user_id: int) -> List[WorkspaceResponse]:
     """Pobiera wszystkie workspace'y w 1 zapytaniu SQL."""

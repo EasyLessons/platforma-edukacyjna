@@ -2,7 +2,10 @@ import Image from 'next/image';
 
 export default function ProductHero() {
   return (
-    <section className="relative w-full h-[35vh] min-h-[250px] overflow-hidden flex items-center justify-center" id="hero">
+    <section
+      className="relative w-full h-[35vh] min-h-[250px] overflow-hidden flex items-center justify-center"
+      id="hero"
+    >
       {/* Tło Video */}
       <video
         className="absolute inset-0 w-full h-full object-cover scale-[1.15]"
@@ -29,7 +32,8 @@ export default function ProductHero() {
           priority
         />
         <p className="text-base md:text-xl text-gray-200 max-w-2xl mx-auto font-bold drop-shadow">
-          Poznaj innowacyjną platformę edukacyjną, która łączy zaawansowany system zarządzania (Dashboard) z interaktywną przestrzenią do nauki (Tutoring Board).
+          Poznaj innowacyjną platformę edukacyjną, która łączy zaawansowany system zarządzania
+          (Dashboard) z interaktywną przestrzenią do nauki (Tutoring Board).
         </p>
       </div>
     </section>

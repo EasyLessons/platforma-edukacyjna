@@ -27,7 +27,11 @@ interface UseEditWorkspaceFormOptions {
   onClose: () => void;
 }
 
-export function useEditWorkspaceForm({ workspace, onSubmit, onClose }: UseEditWorkspaceFormOptions) {
+export function useEditWorkspaceForm({
+  workspace,
+  onSubmit,
+  onClose,
+}: UseEditWorkspaceFormOptions) {
   // STATE
   // ================================
   const [formData, setFormData] = useState<WorkspaceFormData>({

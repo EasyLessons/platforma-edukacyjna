@@ -44,9 +44,7 @@ export function PenProperties() {
             setColor(penColors[0]);
           }}
           className={`p-1.5 rounded-md transition-all cursor-pointer ${
-            penMode === 'pen'
-              ? 'bg-blue-500/20 text-blue-600'
-              : 'text-gray-700 hover:bg-gray-100'
+            penMode === 'pen' ? 'bg-blue-500/20 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
           }`}
           title="Pędzel"
         >

@@ -215,7 +215,7 @@ const groupElementsByAuthorAndTime = (
 
   for (const element of sorted) {
     const timestamp = new Date(element.created_at!);
-    
+
     // Jeśli id=0/puste, to nowo narysowany element przez obecnego usera jeszcze niezsynchronizowany
     let authorId = element.created_by_id || 0;
     let authorName = element.created_by_username || '';
@@ -480,8 +480,10 @@ const ActivityHistoryComponent = ({
       {groups.length > 0 && (
         <div className="px-4 py-2 bg-gray-50 border-t border-gray-100 flex-shrink-0">
           <p className="text-xs text-gray-500 text-center font-medium">
-            Łącznie: {groups.length} {groups.length === 1 ? 'grupa' : groups.length < 5 ? 'grupy' : 'grup'} •{' '}
-            {elements.length} {elements.length === 1 ? 'element' : elements.length < 5 ? 'elementy' : 'elementów'}
+            Łącznie: {groups.length}{' '}
+            {groups.length === 1 ? 'grupa' : groups.length < 5 ? 'grupy' : 'grup'} •{' '}
+            {elements.length}{' '}
+            {elements.length === 1 ? 'element' : elements.length < 5 ? 'elementy' : 'elementów'}
           </p>
         </div>
       )}
@@ -491,4 +493,3 @@ const ActivityHistoryComponent = ({
 
 export const ActivityHistory = memo(ActivityHistoryComponent);
 ActivityHistory.displayName = 'ActivityHistory';
-

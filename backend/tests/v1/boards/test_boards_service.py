@@ -3,7 +3,6 @@ Testy CRUD tablic
 api/v1/boards/service.py
 """
 import pytest
-from datetime import datetime
 
 from api.v1.boards.service import BoardService
 from api.v1.boards.schemas import (

@@ -107,12 +107,15 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   /** Synchronizuje refe, mapę, indeks i stan Reacta z jednej tablicy źródłowej */
-  const applyElements = useCallback((next: DrawingElement[]) => {
-    elementsRef.current = next;
-    elementsMapRef.current = toMap(next);
-    spatialIndex.rebuild(next);
-    setElements(next);
-  }, [spatialIndex]);
+  const applyElements = useCallback(
+    (next: DrawingElement[]) => {
+      elementsRef.current = next;
+      elementsMapRef.current = toMap(next);
+      spatialIndex.rebuild(next);
+      setElements(next);
+    },
+    [spatialIndex]
+  );
 
   useEffect(() => {
     unsavedElementsRef.current = unsavedElements;
@@ -225,7 +228,9 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
 
   // ─── Core save logic ──────────────────────────────────────────────────
   const boardIdRef = useRef<string>(boardId);
-  useEffect(() => { boardIdRef.current = boardId; }, [boardId]);
+  useEffect(() => {
+    boardIdRef.current = boardId;
+  }, [boardId]);
 
   const doSave = useCallback(async (boardIdNum: number) => {
     if (isSavingRef.current || unsavedElementsRef.current.size === 0) return;
@@ -262,15 +267,18 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
   }, []);
 
   // ─── Debounced save ────────────────────────────────────────────────────
-  const debouncedSave = useCallback((boardIdStr: string) => {
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+  const debouncedSave = useCallback(
+    (boardIdStr: string) => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
 
-    saveTimeoutRef.current = setTimeout(() => {
-      const boardIdNum = parseInt(boardIdStr);
-      if (isNaN(boardIdNum)) return;
-      doSave(boardIdNum);
-    }, SAVE_DEBOUNCE_MS);
-  }, [doSave]);
+      saveTimeoutRef.current = setTimeout(() => {
+        const boardIdNum = parseInt(boardIdStr);
+        if (isNaN(boardIdNum)) return;
+        doSave(boardIdNum);
+      }, SAVE_DEBOUNCE_MS);
+    },
+    [doSave]
+  );
 
   // ─── Wymuś zapis przy opuszczaniu strony ──────────────────────────────
   useEffect(() => {
@@ -347,104 +355,114 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
     [boardId, debouncedSave]
   );
 
-  const addElements = useCallback((newEls: DrawingElement[]) => {
-    // Dodaj do Mapy i indeksu — O(1) per element
-    for (const el of newEls) elementsMapRef.current.set(el.id, el);
-    spatialIndex.insert(newEls);
-    const next = [...elementsRef.current, ...newEls];
-    elementsRef.current = next;
-    setElements(next);
-
-    setElementsWithAuthor((prev) => [
-      ...prev,
-      ...newEls.map((el) => ({
-        element_id: el.id,
-        type: el.type,
-        data: el as unknown as Record<string, unknown>,
-        created_by_id: 0,
-        created_by_username: '',
-        created_at: new Date().toISOString(),
-      })),
-    ]);
-  }, [spatialIndex]);
-
-  const removeElement = useCallback((id: string) => {
-    if (!elementsMapRef.current.has(id)) return;
-    elementsMapRef.current.delete(id);
-    spatialIndex.remove(id);
-    const next = elementsRef.current.filter((el) => el.id !== id);
-    elementsRef.current = next;
-    setElements(next);
-    setElementsWithAuthor((prev) => prev.filter((el) => el.element_id !== id));
-  }, [spatialIndex]);
-
-  const updateElement = useCallback((updated: DrawingElement) => {
-    elementsMapRef.current.set(updated.id, updated);
-    spatialIndex.update(updated);
-
-    if (!elementsRef.current.some((e) => e.id === updated.id)) {
-      // Nieznany element — dodaj jako nowy
-      const next = [...elementsRef.current, updated];
+  const addElements = useCallback(
+    (newEls: DrawingElement[]) => {
+      // Dodaj do Mapy i indeksu — O(1) per element
+      for (const el of newEls) elementsMapRef.current.set(el.id, el);
+      spatialIndex.insert(newEls);
+      const next = [...elementsRef.current, ...newEls];
       elementsRef.current = next;
       setElements(next);
-    } else {
-      const next = elementsRef.current.map((el) => (el.id === updated.id ? updated : el));
+
+      setElementsWithAuthor((prev) => [
+        ...prev,
+        ...newEls.map((el) => ({
+          element_id: el.id,
+          type: el.type,
+          data: el as unknown as Record<string, unknown>,
+          created_by_id: 0,
+          created_by_username: '',
+          created_at: new Date().toISOString(),
+        })),
+      ]);
+    },
+    [spatialIndex]
+  );
+
+  const removeElement = useCallback(
+    (id: string) => {
+      if (!elementsMapRef.current.has(id)) return;
+      elementsMapRef.current.delete(id);
+      spatialIndex.remove(id);
+      const next = elementsRef.current.filter((el) => el.id !== id);
       elementsRef.current = next;
       setElements(next);
-    }
+      setElementsWithAuthor((prev) => prev.filter((el) => el.element_id !== id));
+    },
+    [spatialIndex]
+  );
 
-    setElementsWithAuthor((prev) =>
-      prev.map((el) =>
-        el.element_id === updated.id
-          ? { ...el, data: updated as unknown as Record<string, unknown> }
-          : el
-      )
-    );
-  }, [spatialIndex]);
+  const updateElement = useCallback(
+    (updated: DrawingElement) => {
+      elementsMapRef.current.set(updated.id, updated);
+      spatialIndex.update(updated);
 
-  const updateElements = useCallback((updates: DrawingElement[]) => {
-    const newElements: DrawingElement[] = [];
-
-    // O(1) per update — podmień w mapie i indeksie, zbierz nieznane jako nowe
-    for (const u of updates) {
-      if (elementsMapRef.current.has(u.id)) {
-        elementsMapRef.current.set(u.id, u);
-        spatialIndex.update(u);
+      if (!elementsRef.current.some((e) => e.id === updated.id)) {
+        // Nieznany element — dodaj jako nowy
+        const next = [...elementsRef.current, updated];
+        elementsRef.current = next;
+        setElements(next);
       } else {
-        elementsMapRef.current.set(u.id, u);
-        spatialIndex.insert([u]);
-        newElements.push(u);
+        const next = elementsRef.current.map((el) => (el.id === updated.id ? updated : el));
+        elementsRef.current = next;
+        setElements(next);
       }
-    }
 
-    // Przebuduj tablicę — istniejące biorą zaktualizowane wartości z mapy
-    const updateIds = new Set(updates.map((u) => u.id));
-    const updateMap = new Map(updates.map((u) => [u.id, u]));
+      setElementsWithAuthor((prev) =>
+        prev.map((el) =>
+          el.element_id === updated.id
+            ? { ...el, data: updated as unknown as Record<string, unknown> }
+            : el
+        )
+      );
+    },
+    [spatialIndex]
+  );
 
-    const next = elementsRef.current.map((e) =>
-      updateIds.has(e.id) ? updateMap.get(e.id)! : e
-    );
-    if (newElements.length > 0) next.push(...newElements);
+  const updateElements = useCallback(
+    (updates: DrawingElement[]) => {
+      const newElements: DrawingElement[] = [];
 
-    elementsRef.current = next;
-    setElements([...next]);
+      // O(1) per update — podmień w mapie i indeksie, zbierz nieznane jako nowe
+      for (const u of updates) {
+        if (elementsMapRef.current.has(u.id)) {
+          elementsMapRef.current.set(u.id, u);
+          spatialIndex.update(u);
+        } else {
+          elementsMapRef.current.set(u.id, u);
+          spatialIndex.insert([u]);
+          newElements.push(u);
+        }
+      }
 
-    setElementsWithAuthor((prev) => {
-      const updatedAuthors = prev.map((authorEl) => {
-        const u = updateMap.get(authorEl.element_id);
-        return u ? { ...authorEl, data: u as unknown as Record<string, unknown> } : authorEl;
+      // Przebuduj tablicę — istniejące biorą zaktualizowane wartości z mapy
+      const updateIds = new Set(updates.map((u) => u.id));
+      const updateMap = new Map(updates.map((u) => [u.id, u]));
+
+      const next = elementsRef.current.map((e) => (updateIds.has(e.id) ? updateMap.get(e.id)! : e));
+      if (newElements.length > 0) next.push(...newElements);
+
+      elementsRef.current = next;
+      setElements([...next]);
+
+      setElementsWithAuthor((prev) => {
+        const updatedAuthors = prev.map((authorEl) => {
+          const u = updateMap.get(authorEl.element_id);
+          return u ? { ...authorEl, data: u as unknown as Record<string, unknown> } : authorEl;
+        });
+        const newAuthors = newElements.map((el) => ({
+          element_id: el.id,
+          type: el.type,
+          data: el as unknown as Record<string, unknown>,
+          created_by_id: 0,
+          created_by_username: 'Ktoś inny',
+          created_at: new Date().toISOString(),
+        }));
+        return [...updatedAuthors, ...newAuthors];
       });
-      const newAuthors = newElements.map((el) => ({
-        element_id: el.id,
-        type: el.type,
-        data: el as unknown as Record<string, unknown>,
-        created_by_id: 0,
-        created_by_username: 'Ktoś inny',
-        created_at: new Date().toISOString(),
-      }));
-      return [...updatedAuthors, ...newAuthors];
-    });
-  }, [spatialIndex]);
+    },
+    [spatialIndex]
+  );
 
   const saveElementDirectly = useCallback(async (boardIdNum: number, element: DrawingElement) => {
     await saveBoardElementsBatch(boardIdNum, toSaveFormat([element]));

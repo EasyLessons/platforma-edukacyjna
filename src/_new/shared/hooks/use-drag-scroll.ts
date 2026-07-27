@@ -8,7 +8,9 @@ interface UseDragScrollReturn {
   scrollRef: RefObject<HTMLDivElement | null>;
 }
 
-export function useDragScroll({ autoScrollSpeed = 0.25 }: UseDragScrollOptions = {}): UseDragScrollReturn {
+export function useDragScroll({
+  autoScrollSpeed = 0.25,
+}: UseDragScrollOptions = {}): UseDragScrollReturn {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export function useDragScroll({ autoScrollSpeed = 0.25 }: UseDragScrollOptions =
       const dx = e.clientX - lastX;
 
       if (dt > 0) {
-        velocity = -dx / dt * 8;
+        velocity = (-dx / dt) * 8;
       }
 
       lastX = e.clientX;
@@ -104,7 +106,7 @@ export function useDragScroll({ autoScrollSpeed = 0.25 }: UseDragScrollOptions =
       const dx = e.touches[0].clientX - lastX;
 
       if (dt > 0) {
-        velocity = -dx / dt * 8;
+        velocity = (-dx / dt) * 8;
       }
 
       lastX = e.touches[0].clientX;

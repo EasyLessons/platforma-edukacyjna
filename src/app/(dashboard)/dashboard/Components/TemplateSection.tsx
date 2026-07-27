@@ -192,78 +192,85 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
       <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
           <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 ml-3 mb-2">Szablony</h2>
-          
+
           <div className="flex items-center gap-2">
             <div className="relative" ref={subjectDropdownRef}>
-            <button
-              onClick={() => {
-                setSubjectOpen((prev) => !prev);
-                setYearOpen(false);
-              }}
-              className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 my-auto">Zestaw szablonow:</span>
-              <span className="font-medium text-gray-900">{subject}</span>
-              <ChevronDown
-                size={14}
-                className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
-              />
-            </button>
+              <button
+                onClick={() => {
+                  setSubjectOpen((prev) => !prev);
+                  setYearOpen(false);
+                }}
+                className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 my-auto">
+                  Zestaw szablonow:
+                </span>
+                <span className="font-medium text-gray-900">{subject}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
 
-            {subjectOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 min-w-[220px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
-                {SUBJECTS.map((item) => (
-                  <button
-                    key={item}
-                    onClick={() => {
-                      setSubject(item);
-                      setSubjectOpen(false);
-                      setSelectedYear(null);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
-                      item === subject ? 'text-black font-medium' : 'text-gray-700'
-                    }`}
-                  >
-                    {item}
-                  </button>
-                ))}
-              </div>
-            )}
+              {subjectOpen && (
+                <div className="absolute left-0 top-full z-20 mt-1 min-w-[220px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                  {SUBJECTS.map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => {
+                        setSubject(item);
+                        setSubjectOpen(false);
+                        setSelectedYear(null);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                        item === subject ? 'text-black font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative" ref={yearDropdownRef}>
+              <button
+                onClick={() => {
+                  setYearOpen((prev) => !prev);
+                  setSubjectOpen(false);
+                }}
+                className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                  Rok:
+                </span>
+                <span className="font-medium text-gray-900">{effectiveYear ?? 'Wszystkie'}</span>
+                <ChevronDown
+                  size={14}
+                  className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {yearOpen && (
+                <div className="absolute left-0 top-full z-20 mt-1 min-w-[130px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                  {yearsForSubject.map((year) => (
+                    <button
+                      key={year}
+                      onClick={() => {
+                        setSelectedYear(year);
+                        setYearOpen(false);
+                      }}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                        year === effectiveYear ? 'text-black font-medium' : 'text-gray-700'
+                      }`}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-
-          <div className="relative" ref={yearDropdownRef}>
-            <button
-              onClick={() => {
-                setYearOpen((prev) => !prev);
-                setSubjectOpen(false);
-              }}
-              className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">Rok:</span>
-              <span className="font-medium text-gray-900">{effectiveYear ?? 'Wszystkie'}</span>
-              <ChevronDown size={14} className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`} />
-            </button>
-
-            {yearOpen && (
-              <div className="absolute left-0 top-full z-20 mt-1 min-w-[130px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
-                {yearsForSubject.map((year) => (
-                  <button
-                    key={year}
-                    onClick={() => {
-                      setSelectedYear(year);
-                      setYearOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
-                      year === effectiveYear ? 'text-black font-medium' : 'text-gray-700'
-                    }`}
-                  >
-                    {year}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
         </div>
 
         <div className="hidden items-center gap-1 md:flex">
@@ -282,13 +289,20 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
         </div>
       </div>
 
-      <div ref={scrollContainerRef} className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div
+        ref={scrollContainerRef}
+        className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
         <button
           onClick={() => createAndOpenBoard('Czysta tablica')}
           className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
         >
           <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white border border-dashed border-gray-300 flex items-center justify-center">
-            <img src={THUMBNAILS.whiteboard} alt="Czysta tablica" className="h-full w-full object-cover" />
+            <img
+              src={THUMBNAILS.whiteboard}
+              alt="Czysta tablica"
+              className="h-full w-full object-cover"
+            />
             <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
               <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
                 <Plus size={18} />
@@ -302,11 +316,17 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
         {templates.map((template) => (
           <button
             key={template.id}
-            onClick={() => createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)}
+            onClick={() =>
+              createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
+            }
             className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
           >
             <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
-              <img src={template.thumbnail} alt={template.title} className="h-full w-full object-cover" />
+              <img
+                src={template.thumbnail}
+                alt={template.title}
+                className="h-full w-full object-cover"
+              />
               <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
                   <Plus size={18} />

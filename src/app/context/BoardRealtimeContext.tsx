@@ -179,15 +179,27 @@ export function BoardRealtimeProvider({
     ((elementId: string, userId: number, username: string) => void) | null
   >(null);
   const elementsBatchHandlerRef = useRef<
-    ((elements: ElementBroadcastPayload[], userId: number, username: string, geometryOnly: boolean) => void) | null
+    | ((
+        elements: ElementBroadcastPayload[],
+        userId: number,
+        username: string,
+        geometryOnly: boolean
+      ) => void)
+    | null
   >(null);
   const cursorMoveHandlerRef = useRef<
     ((x: number, y: number, userId: number, username: string) => void) | null
   >(null);
   const syncRequestHandlerRef = useRef<((userId: number, username: string) => void) | null>(null);
-  const syncResponseHandlerRef = useRef<((elements: DrawingElement[], userId: number, username: string) => void) | null>(null);
+  const syncResponseHandlerRef = useRef<
+    ((elements: DrawingElement[], userId: number, username: string) => void) | null
+  >(null);
   // Bufor składania chunków sync-response od jednego sendera
-  const syncChunkBufferRef = useRef<{ chunks: DrawingElement[][]; totalChunks: number; fromUserId: number } | null>(null);
+  const syncChunkBufferRef = useRef<{
+    chunks: DrawingElement[][];
+    totalChunks: number;
+    fromUserId: number;
+  } | null>(null);
 
   // ───────────────────────────────────────────────────────────────────────
   // POŁĄCZENIE Z SUPABASE — samo łączenie i Presence robi useRealtimeChannel.
@@ -217,7 +229,10 @@ export function BoardRealtimeProvider({
       });
 
       if (realLeftUsers.length > 0) {
-        log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
+        log(
+          '🔴 Użytkownik wyszedł:',
+          realLeftUsers.map((p: any) => p.username)
+        );
         const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
 
         // Usuń kursory wychodzących użytkowników
@@ -249,11 +264,7 @@ export function BoardRealtimeProvider({
         // Ignoruj własne eventy (już mamy lokalnie)
         if (userId === currentUser.id) return;
 
-        log(
-          `📥 Otrzymano element-created od ${username}:`,
-          element.id,
-          `(typ: ${element.type})`
-        );
+        log(`📥 Otrzymano element-created od ${username}:`, element.id, `(typ: ${element.type})`);
 
         if (elementCreatedHandlerRef.current) {
           elementCreatedHandlerRef.current(element, userId, username);
@@ -288,7 +299,9 @@ export function BoardRealtimeProvider({
 
         if (userId === currentUser.id) return;
 
-        log(`📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów (geometryOnly: ${!!geometryOnly})`);
+        log(
+          `📥 Otrzymano elements-batch od ${username}: ${elements.length} elementów (geometryOnly: ${!!geometryOnly})`
+        );
 
         if (elementsBatchHandlerRef.current) {
           elementsBatchHandlerRef.current(elements, userId, username, !!geometryOnly);
@@ -416,7 +429,14 @@ export function BoardRealtimeProvider({
         if (syncRequestHandlerRef.current) syncRequestHandlerRef.current(userId, username);
       })
       .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
-        const { elements, targetUserId, userId, username, chunkIndex = 0, totalChunks = 1 } = payload as any;
+        const {
+          elements,
+          targetUserId,
+          userId,
+          username,
+          chunkIndex = 0,
+          totalChunks = 1,
+        } = payload as any;
         if (targetUserId !== currentUser.id) return;
 
         // Składamy paczki — inicjalizuj bufor na pierwszej paczce od danego sendera
@@ -428,14 +448,17 @@ export function BoardRealtimeProvider({
         buffer.chunks[chunkIndex] = elements;
 
         const received = buffer.chunks.filter(Boolean).length;
-        log(`📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`);
+        log(
+          `📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`
+        );
 
         if (received >= totalChunks) {
           // Wszystkie paczki dotarły — połącz i przekaż
           const allElements = (buffer.chunks as DrawingElement[][]).flat();
           syncChunkBufferRef.current = null;
           log(`📥 [SYNC] Kompletny stan od ${username}: ${allElements.length} elementów`);
-          if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(allElements, userId, username);
+          if (syncResponseHandlerRef.current)
+            syncResponseHandlerRef.current(allElements, userId, username);
         }
       });
 
@@ -451,7 +474,9 @@ export function BoardRealtimeProvider({
         (t) => now - t.lastSeen < TYPING_TIMEOUT_MS
       );
       if (typingUsersRef.current.length !== before) {
-        log(`✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`);
+        log(
+          `✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`
+        );
         notifyTypingSubscribers();
       }
     }, TYPING_CLEANUP_INTERVAL_MS);
@@ -459,7 +484,8 @@ export function BoardRealtimeProvider({
     // Funkcja sprzątająca — useRealtimeChannel wywoła ją przy rozłączaniu,
     // OBOK swojego własnego sprzątania (kanał, presence, heartbeat).
     return () => {
-      if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
+      if (pendingElementUpdateTimeoutRef.current)
+        clearTimeout(pendingElementUpdateTimeoutRef.current);
       if (typingCleanupIntervalRef.current) clearInterval(typingCleanupIntervalRef.current);
       remoteCursorsRef.current = [];
       typingUsersRef.current = [];
@@ -671,36 +697,42 @@ export function BoardRealtimeProvider({
     await safeBroadcast('sync-request', { userId: user.id, username: user.username });
   }, [user, safeBroadcast]);
 
-  const broadcastSyncResponse = useCallback(async (elements: DrawingElement[], targetUserId: number) => {
-    if (!user) return;
+  const broadcastSyncResponse = useCallback(
+    async (elements: DrawingElement[], targetUserId: number) => {
+      if (!user) return;
 
-    const totalChunks = Math.ceil(elements.length / SYNC_CHUNK_SIZE) || 1;
+      const totalChunks = Math.ceil(elements.length / SYNC_CHUNK_SIZE) || 1;
 
-    for (let i = 0; i < totalChunks; i++) {
-      const chunk = elements.slice(i * SYNC_CHUNK_SIZE, (i + 1) * SYNC_CHUNK_SIZE);
-      await safeBroadcast('sync-response', {
-        elements: chunk,
-        targetUserId,
-        userId: user.id,
-        username: user.username,
-        chunkIndex: i,
-        totalChunks,
-      });
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = elements.slice(i * SYNC_CHUNK_SIZE, (i + 1) * SYNC_CHUNK_SIZE);
+        await safeBroadcast('sync-response', {
+          elements: chunk,
+          targetUserId,
+          userId: user.id,
+          username: user.username,
+          chunkIndex: i,
+          totalChunks,
+        });
 
-      // Pauza między paczkami — nie bombarduj kanału
-      if (i < totalChunks - 1) {
-        await new Promise<void>((resolve) => setTimeout(resolve, SYNC_CHUNK_DELAY_MS));
+        // Pauza między paczkami — nie bombarduj kanału
+        if (i < totalChunks - 1) {
+          await new Promise<void>((resolve) => setTimeout(resolve, SYNC_CHUNK_DELAY_MS));
+        }
       }
-    }
-  }, [user, safeBroadcast]);
+    },
+    [user, safeBroadcast]
+  );
 
   const onRemoteSyncRequest = useCallback((handler: (userId: number, username: string) => void) => {
     syncRequestHandlerRef.current = handler;
   }, []);
 
-  const onRemoteSyncResponse = useCallback((handler: (elements: DrawingElement[], userId: number, username: string) => void) => {
-    syncResponseHandlerRef.current = handler;
-  }, []);
+  const onRemoteSyncResponse = useCallback(
+    (handler: (elements: DrawingElement[], userId: number, username: string) => void) => {
+      syncResponseHandlerRef.current = handler;
+    },
+    []
+  );
 
   // 🆕 SUBSKRYPCJA KURSORÓW - nie powoduje re-renderów context!
   const subscribeCursors = useCallback((callback: (cursors: RemoteCursor[]) => void) => {

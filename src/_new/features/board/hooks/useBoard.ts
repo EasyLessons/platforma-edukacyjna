@@ -11,7 +11,7 @@
  * - Toggle ulubione
  * - Inwalidacja/aktualizacja cache po mutacjach
  */
-'use client'
+'use client';
 
 import { useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -57,7 +57,9 @@ export function useBoards(options: UseBoardsOptions) {
 
   const boards: Board[] = data?.boards ?? [];
   const error: string | null = queryError
-    ? (queryError instanceof Error ? queryError.message : String(queryError))
+    ? queryError instanceof Error
+      ? queryError.message
+      : String(queryError)
     : null;
 
   // ── MUTATIONS ──────────────────────────────────────────────────────────────
@@ -79,12 +81,8 @@ export function useBoards(options: UseBoardsOptions) {
     onSuccess: (updated) => {
       // Optimistic cache update — zamień konkretny rekord bez round-tripu.
       if (workspace_id) {
-        queryClient.setQueryData<BoardListResponse>(
-          boardKeys.workspace(workspace_id),
-          (old) =>
-            old
-              ? { ...old, boards: old.boards.map((b) => (b.id === updated.id ? updated : b)) }
-              : old,
+        queryClient.setQueryData<BoardListResponse>(boardKeys.workspace(workspace_id), (old) =>
+          old ? { ...old, boards: old.boards.map((b) => (b.id === updated.id ? updated : b)) } : old
         );
       }
     },
@@ -94,12 +92,14 @@ export function useBoards(options: UseBoardsOptions) {
     mutationFn: (id: number) => apiDeleteBoard(id),
     onSuccess: (_, deletedId) => {
       if (workspace_id) {
-        queryClient.setQueryData<BoardListResponse>(
-          boardKeys.workspace(workspace_id),
-          (old) =>
-            old
-              ? { ...old, boards: old.boards.filter((b) => b.id !== deletedId), total: (old.total ?? 0) - 1 }
-              : old,
+        queryClient.setQueryData<BoardListResponse>(boardKeys.workspace(workspace_id), (old) =>
+          old
+            ? {
+                ...old,
+                boards: old.boards.filter((b) => b.id !== deletedId),
+                total: (old.total ?? 0) - 1,
+              }
+            : old
         );
       }
     },
@@ -110,12 +110,10 @@ export function useBoards(options: UseBoardsOptions) {
       apiToggleFavourite(id, is_favourite),
     onSuccess: (_, { id, is_favourite }) => {
       if (workspace_id) {
-        queryClient.setQueryData<BoardListResponse>(
-          boardKeys.workspace(workspace_id),
-          (old) =>
-            old
-              ? { ...old, boards: old.boards.map((b) => (b.id === id ? { ...b, is_favourite } : b)) }
-              : old,
+        queryClient.setQueryData<BoardListResponse>(boardKeys.workspace(workspace_id), (old) =>
+          old
+            ? { ...old, boards: old.boards.map((b) => (b.id === id ? { ...b, is_favourite } : b)) }
+            : old
         );
       }
     },
@@ -129,7 +127,8 @@ export function useBoards(options: UseBoardsOptions) {
   );
 
   const updateBoard = useCallback(
-    (id: number, data: BoardUpdateRequest): Promise<Board> => updateMutation.mutateAsync({ id, data }),
+    (id: number, data: BoardUpdateRequest): Promise<Board> =>
+      updateMutation.mutateAsync({ id, data }),
     [updateMutation]
   );
 

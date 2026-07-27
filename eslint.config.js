@@ -3,14 +3,7 @@ import reactHooks from 'eslint-plugin-react-hooks';
 
 export default [
   {
-    ignores: [
-      'node_modules/**',
-      '.next/**',
-      'out/**',
-      'dist/**',
-      'build/**',
-      '.git/**',
-    ],
+    ignores: ['node_modules/**', '.next/**', 'out/**', 'dist/**', 'build/**', '.git/**'],
   },
   {
     files: ['**/*.{js,jsx,ts,tsx}'],
@@ -24,9 +17,13 @@ export default [
         },
       },
     },
+    plugins: {
+      'react-hooks': reactHooks,
+    },
     rules: {
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
     },
   },
 ];

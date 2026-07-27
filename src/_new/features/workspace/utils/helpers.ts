@@ -1,6 +1,6 @@
 /**
  * WORKSPACE HELPERS
- * 
+ *
  * Funkcje które są używane w wielu miejscach w module workspace.
  * Unikamy duplikacji kodu i trzymamy logikę w jednym miejscu.
  */
@@ -30,7 +30,7 @@ export const getTextColorClass = (color: string): string => {
     'teal-500': 'text-teal-500',
     'cyan-500': 'text-cyan-500',
     'emerald-500': 'text-emerald-500',
-    'gray-500': 'text-gray-500'
+    'gray-500': 'text-gray-500',
   };
   return map[normalizeColorFormat(color)] || 'text-gray-500';
 };
@@ -55,9 +55,7 @@ export const getIconComponent = (iconName: string) => {
 // ================================
 
 // sortWorkspacesByFavourite - Sortuje workspace'y (ulubione na górze)
-export const sortWorkspacesByFavourite = (
-  workspaces: Workspace[]
-): Workspace[] => {
+export const sortWorkspacesByFavourite = (workspaces: Workspace[]): Workspace[] => {
   return [...workspaces].sort((a, b) => {
     // Ulubione na górze
     if (a.is_favourite && !b.is_favourite) return -1;
@@ -93,17 +91,12 @@ export const sortWorkspacesByCustomOrder = (
 // ================================
 
 // filterWorkspaceByQuery - Filtruje workspace'y po zapytaniu
-export const filterWorkspacesByQuery = (
-  workspaces: Workspace[],
-  query: string
-): Workspace[] => {
+export const filterWorkspacesByQuery = (workspaces: Workspace[], query: string): Workspace[] => {
   if (!query.trim()) return workspaces;
 
   const lowerQuery = query.toLowerCase();
 
-  return workspaces.filter((workspace) =>
-    workspace.name.toLowerCase().includes(lowerQuery)
-  );
+  return workspaces.filter((workspace) => workspace.name.toLowerCase().includes(lowerQuery));
 };
 
 // HELPERS - FORMATOWANIE
@@ -122,5 +115,3 @@ export const formatWorkspaceBoardCount = (count: number): string => {
   if (count < 5) return `${count} tablice`;
   return `${count} tablic`;
 };
-
-

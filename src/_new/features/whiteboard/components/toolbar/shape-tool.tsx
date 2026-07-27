@@ -76,7 +76,9 @@ export function ShapeTool({
   const getViewport = () => canvasViewportRef?.current ?? viewport;
   const [isDrawing, setIsDrawing] = useState(false);
   const isDrawingRef = useRef(false);
-  useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+  useEffect(() => {
+    isDrawingRef.current = isDrawing;
+  }, [isDrawing]);
 
   const [currentShape, setCurrentShape] = useState<Shape | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
@@ -102,11 +104,18 @@ export function ShapeTool({
     return () => overlay.removeEventListener('touchmove', handleTouchMove);
   }, []);
 
-  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange, viewportRefOverride: canvasViewportRef });
+  useCanvasWheel({
+    overlayRef,
+    canvasWidth,
+    canvasHeight,
+    viewport,
+    onViewportChange,
+    viewportRefOverride: canvasViewportRef,
+  });
 
   // Pointer down - rozpocznij rysowanie kształtu
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (isGestureActive) return; 
+    if (isGestureActive) return;
     // ✅ Blokuj środkowy (1) i prawy (2) przycisk, ale przepuść lewy (0) i pen (-1)
     if (e.button === 1 || e.button === 2) return;
 
@@ -135,7 +144,6 @@ export function ShapeTool({
 
   // Pointer move - kontynuuj rysowanie kształtu
   const handlePointerMove = (e: React.PointerEvent) => {
-
     if (!isDrawing || !currentShape) return;
 
     const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
@@ -331,4 +339,3 @@ export function ShapeTool({
     </div>
   );
 }
-

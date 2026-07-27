@@ -45,9 +45,7 @@ export default function AuthGroupLayout({ children }: { children: React.ReactNod
 
       {/* Wycentrowana zawartość strony */}
       <div className="relative z-10 flex-1 flex items-center justify-center py-8 sm:py-0">
-        <main className="w-full max-w-md px-6">
-          {children}
-        </main>
+        <main className="w-full max-w-md px-6">{children}</main>
       </div>
     </div>
   );
