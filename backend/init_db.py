@@ -4,7 +4,7 @@ Tworzy wszystkie tabele zdefiniowane w models.py
 """
 
 from core.database import engine, Base
-from core.models import User, Workspace, WorkspaceMember, Board, BoardUsers, WorkspaceInvite
+from core.models import User, Workspace, WorkspaceMember, Board, BoardUsers, WorkspaceInvite, BoardElement
 
 def init_database():
     """Tworzy wszystkie tabele w bazie danych"""
@@ -21,6 +21,7 @@ def init_database():
     print("  - boards")
     print("  - board_users")
     print("  - workspace_invites")
+    print("  - board_elements")
 
 if __name__ == "__main__":
     init_database()
