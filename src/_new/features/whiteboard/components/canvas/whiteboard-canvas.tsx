@@ -1741,8 +1741,7 @@ export default function WhiteboardCanvasNew({
       const editing = editingTableCellRef.current;
       if (!editing) return;
       const table = el.elementsRef.current.find((el) => el.id === editing.tableId) as
-        | TableElement
-        | undefined;
+        TableElement | undefined;
       if (!table) return;
 
       if (e.key === 'Tab') {
@@ -2344,8 +2343,7 @@ export default function WhiteboardCanvasNew({
         {editingTableCell &&
           (() => {
             const table = el.elements.find((e) => e.id === editingTableCell.tableId) as
-              | TableElement
-              | undefined;
+              TableElement | undefined;
             if (!table) return null;
             const cellValue = table.cells[editingTableCell.row]?.[editingTableCell.col] ?? '';
             const isHeader = editingTableCell.row === 0 && (table.headerRow ?? false);
