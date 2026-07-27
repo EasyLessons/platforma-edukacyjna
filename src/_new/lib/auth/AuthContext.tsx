@@ -1,6 +1,9 @@
 /**
  * AuthContext.tsx - Zarządzanie stanem logowania w całej aplikacji
- * 
+ *
+ * Przeniesiony z src/app/context/AuthContext.tsx (lipiec 2026) — logicznie
+ * należał do warstwy auth w src/_new, tylko był źle zaparkowany w routingu.
+ * Zero zmian w działaniu, tylko lokalizacja i ścieżki importów.
  */
 
 'use client';
@@ -18,8 +21,8 @@ import {
   removeAccessToken,
   setStoredUser,
   removeStoredUser,
-  refreshAccessToken,
-} from '@/_new/lib/auth';
+} from './tokenStore';
+import { refreshAccessToken } from './tokenService';
 import { getCurrentUser, logoutUser } from '@/_new/features/auth/api/authApi';
 import type { User } from '@/_new/shared/types/user';
 
@@ -35,12 +38,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
- 
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {    
+  useEffect(() => {
     const bootstrap = async () => {
       try {
         const userData = await getCurrentUser();

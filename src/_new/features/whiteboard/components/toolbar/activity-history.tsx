@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import type { BoardElementWithAuthor } from '../../api/whiteboardApi';
 import type { DrawingElement, ViewportTransform } from '@/_new/features/whiteboard/types';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 
 // ============================================================================
 // TYPY

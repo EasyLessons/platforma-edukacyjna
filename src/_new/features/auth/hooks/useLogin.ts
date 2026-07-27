@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 import { loginUser, checkUser } from '../api/authApi';
 import { validateEmail, validatePassword } from '../utils/validation';
 import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';

@@ -22,7 +22,7 @@ import { useVoiceChat } from '@/app/context/VoiceChatContext';
 import VoiceChatSettings from './voice-chat-settings';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { Button } from '@/_new/shared/ui/button';
-import { useAuth } from '@/app/context/AuthContext';
+import { useAuth } from '@/_new/lib/auth';
 
 interface VoiceChatProps {
   className?: string;

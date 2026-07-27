@@ -17,3 +17,5 @@ export {
   refreshAccessToken,
   logoutAndRedirect,
 } from './tokenService';
+
+export { AuthProvider, useAuth } from './AuthContext';
