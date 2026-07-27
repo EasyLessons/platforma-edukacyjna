@@ -119,7 +119,7 @@ export function useRegister() {
     try {
       const response = await registerUser(formData);
       router.push(
-        `/verify?userId=${response.user_id}&email=${encodeURIComponent(formData.email)}`
+        `/verify?userId=${response.user.id}&email=${encodeURIComponent(formData.email)}`
       );
     } catch (err) {
       setIsLoading(false);

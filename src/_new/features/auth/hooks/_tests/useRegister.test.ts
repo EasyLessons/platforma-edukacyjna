@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import { useRegister } from '../useRegister';
 import { registerUser, checkUser } from '../../api/authApi';
 import { AppError } from '@/_new/lib/errors';
+import { mockRegisterResponse, mockUser } from '@/test/mocks/authFixtures';
 
 const mockPush = vi.fn();
 
@@ -17,7 +18,7 @@ vi.mock('../../api/authApi', () => ({
 
 describe('useRegister', () => {
   beforeEach(() => {
-    vi.mocked(registerUser).mockResolvedValue({ user_id: 42, email: 'jan@example.com', message: 'OK' });
+    vi.mocked(registerUser).mockResolvedValue(mockRegisterResponse);
     vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: false, user_id: 42 });
   });
 
@@ -72,8 +73,7 @@ describe('useRegister', () => {
       const { result } = setup();
       fillForm(result);
       await act(async () => { await result.current.handleSubmit(fakeEvent); });
-      expect(mockPush).toHaveBeenCalledWith('/verify?userId=42&email=jan%40example.com');
-    });
+    expect(mockPush).toHaveBeenCalledWith(`/verify?userId=${mockUser.id}&email=jan%40example.com`);    });
   });
 
   describe('handleSubmit — konflikt 409', () => {
@@ -94,7 +94,7 @@ describe('useRegister', () => {
       const { result } = setup();
       fillForm(result);
       await act(async () => { await result.current.handleSubmit(fakeEvent); });
-      expect(mockPush).toHaveBeenCalledWith('/verify?userId=42&email=jan%40example.com');
+      expect(mockPush).toHaveBeenCalledWith(`/verify?userId=42&email=jan%40example.com`);
     });
   });
 });

@@ -72,8 +72,7 @@ export interface LoginResponse {
 }
 
 export interface RegisterResponse {
-  user_id: number;
-  email: string;
+  user: User;
   message: string;
 }
 

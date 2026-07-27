@@ -1,5 +1,5 @@
 import type { User } from '@new/shared/types/user';
-import type { LoginResponse } from '@new/features/auth/types';
+import type { LoginResponse, RegisterResponse } from '@new/features/auth/types';
 
 export const mockUser: User = {
   id: 1,
@@ -15,6 +15,11 @@ export const mockLoginResponse: LoginResponse = {
   access_token: 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxIiwiZXhwIjo5OTk5OTk5OTk5LCJpYXQiOjE3MzAwMDAwMDB9.fakesig',
   token_type: 'bearer',
   user: mockUser,
+};
+
+export const mockRegisterResponse: RegisterResponse = {
+  user: mockUser,
+  message: 'Użytkownik zarejestrowany. Sprawdź email.',
 };
 
 export const mockValidToken = mockLoginResponse.access_token;
