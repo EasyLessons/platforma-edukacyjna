@@ -27,14 +27,19 @@
  * 🧩 KROK 3 ROZBIJANIA (patrz docs/migration-status.md):
  * Samo otwieranie kanału Supabase, Presence (kto online) i reconnect
  * przeniosły się do `useRealtimeChannel` (src/_new/features/whiteboard/realtime/).
- * Ten plik teraz tylko REJESTRUJE, co ma się stać gdy przyjdzie dana wiadomość
- * (broadcast elementów/kursorów/typing/viewport/sync + presence "leave") —
- * resztę robi za nas hook. W kolejnych krokach i te rejestracje się wyprowadzi.
+ *
+ * 🧩 KROK 4 ROZBIJANIA: stan i logika kursorów/typing/viewportów/"kto wyszedł"
+ * przeniosły się do osobnych hooków (`useCursors`, `useTypingIndicator`,
+ * `useViewportTracking`, `usePresence` — wszystkie w tym samym folderze
+ * `realtime/`). Ten plik teraz tylko WOŁA te hooki i przekazuje ich wyniki
+ * do `channel.on(...)` (bo to JEDYNE miejsce, które ma dostęp do samego
+ * kanału Supabase) oraz do Contextu. Elementy (rysowanie) i sync nowego
+ * usera zostają tu na razie w całości — to Krok 5.
  */
 
 'use client';
 
-import { createContext, useContext, useCallback, useRef, ReactNode } from 'react';
+import { createContext, useContext, useCallback, useEffect, useRef, ReactNode } from 'react';
 import { useAuth } from '@/_new/lib/auth';
 import { DrawingElement } from '@/_new/features/whiteboard/types';
 
@@ -70,9 +75,6 @@ import {
   THROTTLE_MS,
   SYNC_CHUNK_SIZE,
   SYNC_CHUNK_DELAY_MS,
-  TYPING_TIMEOUT_MS,
-  TYPING_CLEANUP_INTERVAL_MS,
-  CURSOR_COLORS,
 } from '@/_new/features/whiteboard/realtime/constants';
 import { log, logWarn } from '@/_new/features/whiteboard/realtime/logger';
 import { useSafeBroadcast } from '@/_new/features/whiteboard/realtime/useSafeBroadcast';
@@ -80,6 +82,10 @@ import {
   useRealtimeChannel,
   type ChannelListenerSetup,
 } from '@/_new/features/whiteboard/realtime/useRealtimeChannel';
+import { usePresence } from '@/_new/features/whiteboard/realtime/usePresence';
+import { useCursors } from '@/_new/features/whiteboard/realtime/useCursors';
+import { useTypingIndicator } from '@/_new/features/whiteboard/realtime/useTypingIndicator';
+import { useViewportTracking } from '@/_new/features/whiteboard/realtime/useViewportTracking';
 
 // Re-eksport, żeby zewnętrzne pliki importujące te typy stąd
 // (np. use-realtime.ts, remote-cursors.tsx) nie musiały się jeszcze zmieniać —
@@ -119,56 +125,26 @@ export function BoardRealtimeProvider({
   // STANY
   // ───────────────────────────────────────────────────────────────────────
 
-  // 🆕 KURSORY - używamy ref + subscribers zamiast state
-  // To zapobiega re-renderom WhiteboardCanvas przy każdym ruchu kursora
-  const remoteCursorsRef = useRef<RemoteCursor[]>([]);
-  const cursorSubscribersRef = useRef<Set<(cursors: RemoteCursor[]) => void>>(new Set());
-
-  // 🆕 TYPING INDICATOR - ref + subscribers
-  const typingUsersRef = useRef<TypingUser[]>([]);
-  const typingSubscribersRef = useRef<Set<(typing: TypingUser[]) => void>>(new Set());
-
-  // 🆕 VIEWPORT TRACKING - ref + subscribers (dla Follow Mode)
-  const remoteViewportsRef = useRef<RemoteViewport[]>([]);
-  const viewportSubscribersRef = useRef<Set<(viewports: RemoteViewport[]) => void>>(new Set());
-
-  const typingCleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
-
   const { user } = useAuth();
+  // Wąski kształt usera, jakiego potrzebują hooki broadcastu (id + username) —
+  // ten sam obiekt co dawniej `user` z `useAuth()`, tylko nazwany inaczej dla
+  // jasności przy przekazywaniu do kilku hooków naraz.
+  const broadcastUser = user ? { id: user.id, username: user.username } : null;
 
-  // 🛡️ THROTTLE - Ref do przechowywania ostatnich czasów broadcast
+  // 🛡️ THROTTLE - Ref do przechowywania ostatniego czasu broadcastu update'u
+  // elementu. Throttle kursora/viewportu żyje teraz WEWNĄTRZ useCursors/
+  // useViewportTracking (Krok 4) — każdy pilnuje tylko swojego.
   const lastBroadcastTimeRef = useRef({
     elementUpdate: 0,
-    cursorMove: 0,
-    viewportChange: 0,
   });
 
   // 🛡️ TRAILING THROTTLE - przechowuj ostatnią wartość do wysłania
   const pendingElementUpdateRef = useRef<DrawingElement | null>(null);
   const pendingElementUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Funkcja do notyfikacji subscriberów o zmianie kursorów
-  const notifyCursorSubscribers = useCallback(() => {
-    cursorSubscribersRef.current.forEach((callback) => {
-      callback(remoteCursorsRef.current);
-    });
-  }, []);
-
-  // 🆕 Funkcja do notyfikacji subscriberów o zmianie typing
-  const notifyTypingSubscribers = useCallback(() => {
-    typingSubscribersRef.current.forEach((callback) => {
-      callback(typingUsersRef.current);
-    });
-  }, []);
-
-  // 🆕 Funkcja do notyfikacji subscriberów o zmianie viewportów
-  const notifyViewportSubscribers = useCallback(() => {
-    viewportSubscribersRef.current.forEach((callback) => {
-      callback(remoteViewportsRef.current);
-    });
-  }, []);
-
-  // Handlery dla eventów (refs żeby uniknąć re-renderów)
+  // Handlery dla eventów elementów/sync (refs żeby uniknąć re-renderów) —
+  // kursory/typing/viewport mają teraz swoje analogiczne handlery WEWNĄTRZ
+  // odpowiednich hooków (Krok 4). Elementy i sync zostają tu (Krok 5).
   const elementCreatedHandlerRef = useRef<
     ((element: DrawingElement, userId: number, username: string) => void) | null
   >(null);
@@ -180,9 +156,6 @@ export function BoardRealtimeProvider({
   >(null);
   const elementsBatchHandlerRef = useRef<
     ((elements: ElementBroadcastPayload[], userId: number, username: string, geometryOnly: boolean) => void) | null
-  >(null);
-  const cursorMoveHandlerRef = useRef<
-    ((x: number, y: number, userId: number, username: string) => void) | null
   >(null);
   const syncRequestHandlerRef = useRef<((userId: number, username: string) => void) | null>(null);
   const syncResponseHandlerRef = useRef<((elements: DrawingElement[], userId: number, username: string) => void) | null>(null);
@@ -202,40 +175,10 @@ export function BoardRealtimeProvider({
   // zależności (czyta ją przez ref w środku), więc nowa "kopia" tej funkcji
   // przy każdym renderze nikomu nie przeszkadza.
   const registerListeners: ChannelListenerSetup = (channel, currentUser) => {
+    // 🧩 KROK 4: filtrowanie "ghost leave" i fan-out do useCursors/
+    // useTypingIndicator przeniesione do usePresence.ts — tu tylko wołamy.
     channel.on('presence', { event: 'leave' }, ({ leftPresences }) => {
-      // 🛡️ Filtruj "ghost" leave events - sprawdź czy user naprawdę wyszedł
-      // Ghost leave może wystąpić przy reconnect kanału
-      const realLeftUsers = leftPresences.filter((p: any) => {
-        // Nie reaguj na własne leave
-        if (p.user_id === currentUser.id) return false;
-        // Sprawdź czy user nie jest już ponownie w presence state
-        const currentState = channel.presenceState();
-        const userStillPresent = Object.values(currentState).some((presences: any) =>
-          presences.some((presence: any) => presence.user_id === p.user_id)
-        );
-        return !userStillPresent; // Tylko jeśli naprawdę wyszedł
-      });
-
-      if (realLeftUsers.length > 0) {
-        log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
-        const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
-
-        // Usuń kursory wychodzących użytkowników
-        remoteCursorsRef.current = remoteCursorsRef.current.filter(
-          (c) => !leftUserIds.includes(c.userId)
-        );
-        notifyCursorSubscribers();
-
-        // Usuń wskaźniki pisania wychodzących użytkowników
-        // (typing-stopped nigdy nie dotrze jeśli ktoś zamknął kartę)
-        const beforeTyping = typingUsersRef.current.length;
-        typingUsersRef.current = typingUsersRef.current.filter(
-          (t) => !leftUserIds.includes(t.userId)
-        );
-        if (typingUsersRef.current.length !== beforeTyping) {
-          notifyTypingSubscribers();
-        }
-      }
+      presence.handlePresenceLeave(channel, currentUser.id, leftPresences);
     });
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -294,102 +237,30 @@ export function BoardRealtimeProvider({
           elementsBatchHandlerRef.current(elements, userId, username, !!geometryOnly);
         }
       })
+      // 🧩 KROK 4: stan kursorów/typing/viewportów przeniesiony do
+      // useCursors/useTypingIndicator/useViewportTracking — tu tylko
+      // filtrujemy własne eventy i wołamy odpowiedni handler.
       .on('broadcast', { event: 'cursor-moved' }, ({ payload }) => {
         const { x, y, userId, username } = payload as BoardEvent & { type: 'cursor-moved' };
-
         if (userId === currentUser.id) return;
-
-        // Automatycznie aktualizuj remote cursors (używamy ref zamiast state!)
-        const prev = remoteCursorsRef.current;
-        const existing = prev.find((c) => c.userId === userId);
-        const color = existing?.color || CURSOR_COLORS[userId % CURSOR_COLORS.length];
-
-        if (existing) {
-          remoteCursorsRef.current = prev.map((c) =>
-            c.userId === userId ? { ...c, x, y, lastUpdate: Date.now() } : c
-          );
-        } else {
-          remoteCursorsRef.current = [
-            ...prev,
-            { userId, username, x, y, color, lastUpdate: Date.now() },
-          ];
-        }
-
-        // Notyfikuj subscriberów (nie powoduje re-rendera context!)
-        notifyCursorSubscribers();
-
-        if (cursorMoveHandlerRef.current) {
-          cursorMoveHandlerRef.current(x, y, userId, username);
-        }
+        cursors.handleCursorMoved(x, y, userId, username);
       })
-      // 🆕 TYPING INDICATOR - ktoś zaczął edytować
       .on('broadcast', { event: 'typing-started' }, ({ payload }) => {
         const { elementId, userId, username } = payload as BoardEvent & { type: 'typing-started' };
-
-        log(`✏️ [TYPING] ${username} zaczął edytować element ${elementId}`);
-
         if (userId === currentUser.id) return;
-
-        const now = Date.now();
-        const existingIndex = typingUsersRef.current.findIndex(
-          (t) => t.userId === userId && t.elementId === elementId
-        );
-
-        if (existingIndex === -1) {
-          // Nowy wpis — dodaj z aktualnym timestampem
-          typingUsersRef.current = [
-            ...typingUsersRef.current,
-            { userId, username, elementId, lastSeen: now },
-          ];
-        } else {
-          // Już istnieje — odśwież lastSeen żeby timer nie usunął aktywnego użytkownika
-          typingUsersRef.current = typingUsersRef.current.map((t, i) =>
-            i === existingIndex ? { ...t, lastSeen: now } : t
-          );
-        }
-
-        log(`✏️ [TYPING] Aktualna lista:`, typingUsersRef.current);
-        notifyTypingSubscribers();
+        typing.handleTypingStarted(elementId, userId, username);
       })
-      // 🆕 TYPING INDICATOR - ktoś skończył edytować
       .on('broadcast', { event: 'typing-stopped' }, ({ payload }) => {
         const { elementId, userId } = payload as BoardEvent & { type: 'typing-stopped' };
-
-        log(`✏️ [TYPING] User ${userId} skończył edytować element ${elementId}`);
-
         if (userId === currentUser.id) return;
-
-        // Usuń z listy
-        typingUsersRef.current = typingUsersRef.current.filter(
-          (t) => !(t.userId === userId && t.elementId === elementId)
-        );
-        log(`✏️ [TYPING] Aktualna lista po usunięciu:`, typingUsersRef.current);
-        notifyTypingSubscribers();
+        typing.handleTypingStopped(elementId, userId);
       })
-      // 🆕 VIEWPORT CHANGED - ktoś zmienił swój viewport (dla Follow Mode)
       .on('broadcast', { event: 'viewport-changed' }, ({ payload }) => {
         const { x, y, scale, userId, username } = payload as BoardEvent & {
           type: 'viewport-changed';
         };
-
         if (userId === currentUser.id) return;
-
-        // Aktualizuj lub dodaj viewport użytkownika
-        const prev = remoteViewportsRef.current;
-        const existing = prev.find((v) => v.userId === userId);
-
-        if (existing) {
-          remoteViewportsRef.current = prev.map((v) =>
-            v.userId === userId ? { ...v, x, y, scale, lastUpdate: Date.now() } : v
-          );
-        } else {
-          remoteViewportsRef.current = [
-            ...prev,
-            { userId, username, x, y, scale, lastUpdate: Date.now() },
-          ];
-        }
-
-        notifyViewportSubscribers();
+        viewportTracking.handleViewportChanged(x, y, scale, userId, username);
       })
       .on('broadcast', { event: 'sync-request' }, ({ payload }) => {
         const { userId, username } = payload as any;
@@ -439,33 +310,18 @@ export function BoardRealtimeProvider({
         }
       });
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // ⏰ AUTO-CLEANUP WSKAŹNIKÓW PISANIA
-    // ═══════════════════════════════════════════════════════════════════════
-    // Co 5 sekund usuwa wpisy starsze niż TYPING_TIMEOUT_MS.
-    // Zabezpiecza przed "duchami" gdy użytkownik rozłączy się bez typing-stopped.
-    typingCleanupIntervalRef.current = setInterval(() => {
-      const now = Date.now();
-      const before = typingUsersRef.current.length;
-      typingUsersRef.current = typingUsersRef.current.filter(
-        (t) => now - t.lastSeen < TYPING_TIMEOUT_MS
-      );
-      if (typingUsersRef.current.length !== before) {
-        log(`✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`);
-        notifyTypingSubscribers();
-      }
-    }, TYPING_CLEANUP_INTERVAL_MS);
+    // Auto-cleanup wskaźników pisania (interval) żyje teraz WEWNĄTRZ
+    // useTypingIndicator (własny useEffect, patrz komentarz w tamtym pliku
+    // o drobnej, celowej różnicy: interval jest teraz związany z cyklem
+    // życia komponentu, nie z (re)connectem kanału).
 
     // Funkcja sprzątająca — useRealtimeChannel wywoła ją przy rozłączaniu,
     // OBOK swojego własnego sprzątania (kanał, presence, heartbeat).
     return () => {
       if (pendingElementUpdateTimeoutRef.current) clearTimeout(pendingElementUpdateTimeoutRef.current);
-      if (typingCleanupIntervalRef.current) clearInterval(typingCleanupIntervalRef.current);
-      remoteCursorsRef.current = [];
-      typingUsersRef.current = [];
       pendingElementUpdateRef.current = null;
-      // Notyfikuj subscriberów o pustej liście kursorów
-      cursorSubscribersRef.current.forEach((callback) => callback([]));
+      cursors.reset();
+      typing.reset();
     };
   };
 
@@ -483,6 +339,30 @@ export function BoardRealtimeProvider({
   // src/_new/features/whiteboard/realtime/useSafeBroadcast.ts (krok 2 rozbijania,
   // patrz docs/migration-status.md). Zero zmian w zachowaniu.
   const safeBroadcast = useSafeBroadcast(channelRef);
+
+  // 🧩 KROK 4: kursory/typing/viewporty/presence-leave — patrz komentarz na
+  // górze pliku. `registerListeners` (wyżej) odwołuje się do `cursors`/
+  // `typing`/`viewportTracking`/`presence` przez domknięcie (closure) — to
+  // bezpieczne, bo `registerListeners` jest tylko WARTOŚCIĄ przekazywaną do
+  // `useRealtimeChannel` i faktycznie WYKONA się dopiero później (w efekcie
+  // tamtego hooka, już PO zakończeniu tego renderu — czyli już PO tym, jak
+  // poniższe stałe zostaną przypisane). Zweryfikowane `tsc --noEmit`.
+  const cursors = useCursors({ user: broadcastUser, safeBroadcast });
+  const typing = useTypingIndicator({ user: broadcastUser, safeBroadcast });
+  const viewportTracking = useViewportTracking({ user: broadcastUser, safeBroadcast });
+  const presence = usePresence();
+
+  // Spina usePresence (fan-out "user wyszedł") z czyszczeniem stanu w
+  // useCursors/useTypingIndicator — te dwa hooki nic o sobie nawzajem nie
+  // wiedzą, usePresence jest wspólnym miejscem subskrypcji.
+  useEffect(() => {
+    const unsubscribeCursors = presence.onPresenceLeave(cursors.handlePresenceLeave);
+    const unsubscribeTyping = presence.onPresenceLeave(typing.handlePresenceLeave);
+    return () => {
+      unsubscribeCursors();
+      unsubscribeTyping();
+    };
+  }, [presence, cursors.handlePresenceLeave, typing.handlePresenceLeave]);
 
   const broadcastElementCreated = useCallback(
     async (element: DrawingElement) => {
@@ -594,28 +474,6 @@ export function BoardRealtimeProvider({
     [user, safeBroadcast]
   );
 
-  const broadcastCursorMove = useCallback(
-    async (x: number, y: number) => {
-      if (!user) return;
-
-      // 🛡️ THROTTLE: ograniczenie częstotliwości kursorów
-      const now = Date.now();
-      if (now - lastBroadcastTimeRef.current.cursorMove < THROTTLE_MS.CURSOR_MOVE) {
-        return; // Zbyt szybko - pomiń
-      }
-
-      lastBroadcastTimeRef.current.cursorMove = now;
-
-      await safeBroadcast('cursor-moved', {
-        x,
-        y,
-        userId: user.id,
-        username: user.username,
-      });
-    },
-    [user, safeBroadcast]
-  );
-
   // ───────────────────────────────────────────────────────────────────────
   // REJESTRACJA HANDLERÓW (dla komponentów)
   // ───────────────────────────────────────────────────────────────────────
@@ -651,13 +509,6 @@ export function BoardRealtimeProvider({
       ) => void
     ) => {
       elementsBatchHandlerRef.current = handler;
-    },
-    []
-  );
-
-  const onRemoteCursorMove = useCallback(
-    (handler: (x: number, y: number, userId: number, username: string) => void) => {
-      cursorMoveHandlerRef.current = handler;
     },
     []
   );
@@ -702,130 +553,34 @@ export function BoardRealtimeProvider({
     syncResponseHandlerRef.current = handler;
   }, []);
 
-  // 🆕 SUBSKRYPCJA KURSORÓW - nie powoduje re-renderów context!
-  const subscribeCursors = useCallback((callback: (cursors: RemoteCursor[]) => void) => {
-    // Dodaj subscriber
-    cursorSubscribersRef.current.add(callback);
-
-    // Od razu wywołaj z aktualnym stanem
-    callback(remoteCursorsRef.current);
-
-    // Zwróć funkcję do anulowania subskrypcji
-    return () => {
-      cursorSubscribersRef.current.delete(callback);
-    };
-  }, []);
-
-  // ───────────────────────────────────────────────────────────────────────
-  // 🆕 TYPING INDICATOR FUNCTIONS
-  // ───────────────────────────────────────────────────────────────────────
-
-  const broadcastTypingStarted = useCallback(
-    async (elementId: string) => {
-      if (!user) return;
-
-      await safeBroadcast('typing-started', {
-        elementId,
-        userId: user.id,
-        username: user.username,
-      });
-    },
-    [user, safeBroadcast]
-  );
-
-  const broadcastTypingStopped = useCallback(
-    async (elementId: string) => {
-      if (!user) return;
-
-      await safeBroadcast('typing-stopped', {
-        elementId,
-        userId: user.id,
-        username: user.username,
-      });
-    },
-    [user, safeBroadcast]
-  );
-
-  // 🆕 SUBSKRYPCJA TYPING - dla komponentów które chcą wiedzieć kto edytuje
-  const subscribeTyping = useCallback((callback: (typingUsers: TypingUser[]) => void) => {
-    // Dodaj subscriber
-    typingSubscribersRef.current.add(callback);
-
-    // Od razu wywołaj z aktualnym stanem
-    callback(typingUsersRef.current);
-
-    // Zwróć funkcję do anulowania subskrypcji
-    return () => {
-      typingSubscribersRef.current.delete(callback);
-    };
-  }, []);
-
-  // ───────────────────────────────────────────────────────────────────────
-  // 🆕 VIEWPORT TRACKING FUNCTIONS (dla Follow Mode)
-  // ───────────────────────────────────────────────────────────────────────
-
-  const broadcastViewportChange = useCallback(
-    async (x: number, y: number, scale: number) => {
-      if (!user) return;
-
-      // 🛡️ THROTTLE: ograniczenie częstotliwości viewport updates
-      const now = Date.now();
-      if (now - lastBroadcastTimeRef.current.viewportChange < THROTTLE_MS.VIEWPORT_CHANGE) {
-        return; // Zbyt szybko - pomiń
-      }
-
-      lastBroadcastTimeRef.current.viewportChange = now;
-
-      await safeBroadcast('viewport-changed', {
-        x,
-        y,
-        scale,
-        userId: user.id,
-        username: user.username,
-      });
-    },
-    [user, safeBroadcast]
-  );
-
-  // 🆕 SUBSKRYPCJA VIEWPORTÓW - dla Follow Mode
-  const subscribeViewports = useCallback((callback: (viewports: RemoteViewport[]) => void) => {
-    // Dodaj subscriber
-    viewportSubscribersRef.current.add(callback);
-
-    // Od razu wywołaj z aktualnym stanem
-    callback(remoteViewportsRef.current);
-
-    // Zwróć funkcję do anulowania subskrypcji
-    return () => {
-      viewportSubscribersRef.current.delete(callback);
-    };
-  }, []);
-
   // ───────────────────────────────────────────────────────────────────────
   // PROVIDER
   // ───────────────────────────────────────────────────────────────────────
+  // 🧩 KROK 4: broadcast/subscribe dla kursorów, typing i viewportów idą
+  // teraz z osobnych hooków (useCursors/useTypingIndicator/useViewportTracking)
+  // zamiast być definiowane tutaj — patrz góra pliku.
 
   return (
     <BoardRealtimeContext.Provider
       value={{
         onlineUsers,
         isConnected,
-        subscribeCursors,
-        subscribeTyping,
-        subscribeViewports,
+        subscribeCursors: cursors.subscribeCursors,
+        subscribeTyping: typing.subscribeTyping,
+        subscribeViewports: viewportTracking.subscribeViewports,
         broadcastElementCreated,
         broadcastElementUpdated,
         broadcastElementDeleted,
         broadcastElementsBatch,
-        broadcastCursorMove,
-        broadcastTypingStarted,
-        broadcastTypingStopped,
-        broadcastViewportChange,
+        broadcastCursorMove: cursors.broadcastCursorMove,
+        broadcastTypingStarted: typing.broadcastTypingStarted,
+        broadcastTypingStopped: typing.broadcastTypingStopped,
+        broadcastViewportChange: viewportTracking.broadcastViewportChange,
         onRemoteElementCreated,
         onRemoteElementUpdated,
         onRemoteElementDeleted,
         onRemoteElementsBatch,
-        onRemoteCursorMove,
+        onRemoteCursorMove: cursors.onRemoteCursorMove,
         broadcastSyncRequest,
         broadcastSyncResponse,
         onRemoteSyncRequest,
