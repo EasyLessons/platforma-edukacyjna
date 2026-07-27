@@ -9,11 +9,12 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 5. **`docs/architecture/auth.md`** — architektura logowania, stany zalogowany/niezalogowany, plan na subskrybenta.
 6. **`docs/architecture/dashboard.md`** — funkcje i budowa panelu użytkownika.
 7. **`docs/architecture/pipelines.md`** — jak dane przepływają przez system dla każdej ważnej operacji (logowanie, sync tablicy, powiadomienia, AI chat, voice chat, SmartSearch).
-8. **`docs/ai-context/whiteboard/`** — osobny, szczegółowy zestaw dokumentów o silniku tablicy (`canvas-architecture.md`, `how-to-add-tool.md`, `use-canvas-wheel-spec.md`) — zaglądaj tu dopiero przy pracy konkretnie nad tablicą.
-9. **`docs/testing.md`** — jak wygląda pokrycie testami (backend + frontend).
-10. **`docs/migration-status.md`** — co z migracji na architekturę feature-based zostało zrobione, co zostaje do zrobienia. Sprawdź to **zanim** zaczniesz zmieniać coś w `src/app/context/*` albo w folderze `src/_new`.
-11. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
-12. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
+8. **`docs/architecture/ci-cd.md`** — jak pracujemy z `main` (branch → PR → CI → merge), co sprawdza `ci.yml`, jak to odpalić lokalnie przed pushem, co robić przy zablokowanym pushu przez sekret scanning.
+9. **`docs/ai-context/whiteboard/`** — osobny, szczegółowy zestaw dokumentów o silniku tablicy (`canvas-architecture.md`, `how-to-add-tool.md`, `use-canvas-wheel-spec.md`) — zaglądaj tu dopiero przy pracy konkretnie nad tablicą.
+10. **`docs/testing.md`** — jak wygląda pokrycie testami (backend + frontend).
+11. **`docs/migration-status.md`** — co z migracji na architekturę feature-based zostało zrobione, co zostaje do zrobienia. Sprawdź to **zanim** zaczniesz zmieniać coś w `src/app/context/*` albo w folderze `src/_new`.
+12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
+13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
 
 ## Zasada utrzymania
 
