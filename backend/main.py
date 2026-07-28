@@ -122,7 +122,8 @@ async def app_exception_handler(request, exc: AppException):
         content=ApiResponse(
             success=False,
             error=exc.message,
-            code=exc.code
+            code=exc.code,
+            data=exc.details
         ).model_dump(mode='json')
     )
 

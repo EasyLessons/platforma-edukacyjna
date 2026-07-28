@@ -20,10 +20,10 @@ from .dependencies import get_current_user
 from .schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
-    VerifyEmail, ResendCode, CheckUser,
+    VerifyEmail, ResendCode,
     UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
-    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
+    ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
     UserResponse, RefreshResponse, MeResponse
 )
 from .service import AuthService
@@ -125,20 +125,6 @@ async def login(
     return ApiResponse(success=True, data=result)
 
 # === USER CHECKS & SEARCH ===
-
-@router.post(
-    "/check-user",
-    response_model=ApiResponse[CheckUserResponse],
-    summary="Check if user exists",
-    description="Sprawdza czy email jest zarejestrowany",
-    responses={200: {"description": "User existence status"}}
-)
-async def check_user(check_data: CheckUser, db: Session = Depends(get_db)):
-    """Sprawdza czy użytkownik istnieje - zwraca exists i verified flags"""
-    service = AuthService(db)
-    result = await service.check_user(check_data.email)
-    return ApiResponse(success=True, data=result)
-
 
 @router.get(
     "/users/search",
