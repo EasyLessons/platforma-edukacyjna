@@ -1,4 +1,4 @@
-from fastapi import Depends, Request
+from fastapi import Request
 
 from core.exceptions import AppException
 from redis.exceptions import ConnectionError, TimeoutError
