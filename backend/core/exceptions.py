@@ -4,10 +4,11 @@ Custom exception hierarchy dla aplikacji
 
 class AppException(Exception):
     """Base application exception"""
-    def __init__(self, message: str, code: str = "APP_ERROR", status_code: int = 400):
+    def __init__(self, message: str, code: str = "APP_ERROR", status_code: int = 400, details: dict | None = None):
         self.message = message
         self.code = code
         self.status_code = status_code
+        self.details = details
         super().__init__(self.message)
 
 class ValidationError(AppException):
@@ -27,5 +28,5 @@ class NotFoundError(AppException):
 
 class ConflictError(AppException):
     """Resource conflict"""
-    def __init__(self, message: str):
-        super().__init__(message, code="CONFLICT", status_code=409)
+    def __init__(self, message: str, details: dict | None = None):
+        super().__init__(message, code="CONFLICT", status_code=409, details=details)

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLogin } from '../useLogin';
-import { loginUser, checkUser } from '../../api/authApi';
+import { loginUser } from '../../api/authApi';
 import { AppError } from '@/_new/lib/errors';
 import { mockLoginResponse } from '@/test/mocks/authFixtures';
 
@@ -18,13 +18,11 @@ vi.mock('@/_new/lib/auth', () => ({
 
 vi.mock('../../api/authApi', () => ({
   loginUser: vi.fn(),
-  checkUser: vi.fn(),
 }));
 
 describe('useLogin', () => {
   beforeEach(() => {
     vi.mocked(loginUser).mockResolvedValue(mockLoginResponse);
-    vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: false, user_id: 5 });
   });
 
   const setup = () => renderHook(() => useLogin());
@@ -130,7 +128,9 @@ describe('useLogin', () => {
     });
 
     it('przekierowuje na /verify przy 403 gdy konto niezweryfikowane', async () => {
-      vi.mocked(loginUser).mockRejectedValue(new AppError('Forbidden', 'AUTH_ERROR', 403));
+      vi.mocked(loginUser).mockRejectedValue(
+        new AppError('Forbidden', 'AUTH_ERROR', 403, { user_id: 5 })
+      );
       const { result } = setup();
       fillForm(result);
       await act(async () => {
@@ -139,9 +139,8 @@ describe('useLogin', () => {
       expect(mockPush).toHaveBeenCalledWith('/verify?userId=5&email=test%40example.com');
     });
 
-    it('ustawia generalError przy 403 gdy checkUser nie zwraca user_id', async () => {
+    it('ustawia generalError przy 403 gdy błąd nie ma user_id w details', async () => {
       vi.mocked(loginUser).mockRejectedValue(new AppError('Forbidden', 'AUTH_ERROR', 403));
-      vi.mocked(checkUser).mockResolvedValue({ exists: false, verified: false });
       const { result } = setup();
       fillForm(result);
       await act(async () => {

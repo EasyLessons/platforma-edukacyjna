@@ -22,7 +22,7 @@ from .schemas import (
     RegisterUser, LoginData, VerifyEmail, UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     RegisterResponse, AuthResponse, UserResponse,
-    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
+    ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
     MeResponse
 )
 from .utils import (
@@ -109,6 +109,8 @@ class AuthService:
 
         if existing_user:
             if existing_user.email == user_data.email:
+                if not existing_user.is_active:
+                    raise ConflictError("Email zajęty", details={"user_id": existing_user.id, "verified": False})
                 raise ConflictError("Email zajęty")
             raise ConflictError("Nazwa użytkownika zajęta")
 
@@ -225,7 +227,7 @@ class AuthService:
             raise AuthenticationError("Błędny login lub hasło")
 
         if not user.is_active:
-            raise AppException("Konto niezaktywne", code="AUTH_ERROR", status_code=403)
+            raise AppException("Konto nieaktywne", code="AUTH_ERROR", status_code=403, details={"user_id": user.id})
 
         logger.info(f"User zalogowany (user_id={user.id})")
 
@@ -256,34 +258,6 @@ class AuthService:
         logger.info(f"Nowy kod wysłany (user_id={user.id})")
 
         return ResendCodeResponse(message="Nowy kod wysłany")
-
-    async def check_user(self, email: str) -> CheckUserResponse:
-        """Sprawdza czy user istnieje"""
-
-        user = self.db.query(User).filter(User.email == email).first()
-
-        if not user:
-            return CheckUserResponse(exists=False, verified=False)
-        if user.is_active:
-            return CheckUserResponse(exists=True, verified=True)
-        
-        verification_code = generate_verification_code()
-        await self._store_verification_code(self._email_verify_key(user.id), verification_code)
-
-        await send_verification_email(
-            user.email,
-            user.username,
-            verification_code,
-            self.settings.resend_api_key,
-            self.settings.from_email
-        )
-
-        return CheckUserResponse(
-            exists=True,
-            verified=False,
-            user_id=user.id,
-            message="Nowy kod wysłany"
-        )
 
     def search_users(self, query: str, current_user_id: int, limit: int = 10) -> List[UserSearchResult]:
         """Wyszukuje użytkowników po username lub email"""

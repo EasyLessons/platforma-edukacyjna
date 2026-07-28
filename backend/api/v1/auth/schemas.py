@@ -49,10 +49,6 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
-class CheckUser(BaseModel):
-    """Schema do sprawdzania czy user istnieje"""
-    email: EmailStr
-
 class RegisterResponse(BaseModel):
     """Response po rejestracji"""
     user: UserResponse
@@ -95,14 +91,6 @@ class ResetPassword(BaseModel):
 class ResendCodeResponse(BaseModel):
     """Response po ponownym wysłaniu kodu"""
     message: str
-
-
-class CheckUserResponse(BaseModel):
-    """Response sprawdzenia czy user istnieje"""
-    exists: bool
-    verified: bool
-    user_id: Optional[int] = None
-    message: Optional[str] = None
 
 
 class MessageResponse(BaseModel):

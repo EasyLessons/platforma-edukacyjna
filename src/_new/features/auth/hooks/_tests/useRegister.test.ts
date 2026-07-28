@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useRegister } from '../useRegister';
-import { registerUser, checkUser } from '../../api/authApi';
+import { registerUser } from '../../api/authApi';
 import { AppError } from '@/_new/lib/errors';
 import { mockRegisterResponse, mockUser } from '@/test/mocks/authFixtures';
 
@@ -13,13 +13,11 @@ vi.mock('next/navigation', () => ({
 
 vi.mock('../../api/authApi', () => ({
   registerUser: vi.fn(),
-  checkUser: vi.fn(),
 }));
 
 describe('useRegister', () => {
   beforeEach(() => {
     vi.mocked(registerUser).mockResolvedValue(mockRegisterResponse);
-    vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: false, user_id: 42 });
   });
 
   const setup = () => renderHook(() => useRegister());
@@ -109,12 +107,10 @@ describe('useRegister', () => {
   });
 
   describe('handleSubmit — konflikt 409', () => {
-    beforeEach(() => {
-      vi.mocked(registerUser).mockRejectedValue(new AppError('Konflikt', 'CONFLICT', 409));
-    });
-
     it('pokazuje błąd gdy konto już istnieje i jest zweryfikowane', async () => {
-      vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: true, user_id: 42 });
+      vi.mocked(registerUser).mockRejectedValue(
+        new AppError('Konflikt', 'CONFLICT', 409, { verified: true })
+      );
       const { result } = setup();
       fillForm(result);
       await act(async () => {
@@ -125,12 +121,26 @@ describe('useRegister', () => {
     });
 
     it('przekierowuje na /verify gdy konto istnieje ale niezweryfikowane', async () => {
+      vi.mocked(registerUser).mockRejectedValue(
+        new AppError('Konflikt', 'CONFLICT', 409, { user_id: 42, verified: false })
+      );
       const { result } = setup();
       fillForm(result);
       await act(async () => {
         await result.current.handleSubmit(fakeEvent);
       });
       expect(mockPush).toHaveBeenCalledWith(`/verify?userId=42&email=jan%40example.com`);
+    });
+
+    it('pokazuje ogólny błąd gdy 409 bez details', async () => {
+      vi.mocked(registerUser).mockRejectedValue(new AppError('Konflikt', 'CONFLICT', 409));
+      const { result } = setup();
+      fillForm(result);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(result.current.generalError).toBe('Email już zajęty');
+      expect(mockPush).not.toHaveBeenCalled();
     });
   });
 });

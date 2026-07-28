@@ -41,15 +41,6 @@ export const resendVerificationCode = (data: ResendCodeRequest): Promise<ResendC
 export const loginUser = (data: LoginRequest): Promise<LoginResponse> =>
   apiClient.post<LoginResponse>('/api/v1/auth/login', data).then((res) => res.data);
 
-export const checkUser = (
-  email: string
-): Promise<{
-  exists: boolean;
-  verified: boolean;
-  user_id?: number;
-  message?: string;
-}> => apiClient.post('/api/v1/auth/check-user', { email }).then((res) => res.data);
-
 // RESET HASŁA
 
 export const requestPasswordReset = (data: PasswordResetRequest): Promise<PasswordResetResponse> =>

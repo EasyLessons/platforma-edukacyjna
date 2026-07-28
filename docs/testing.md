@@ -17,7 +17,6 @@ backend/tests/
       test_verify_email.py
       test_password_reset.py
       test_refresh.py
-      test_check_user.py
       test_logout.py
       test_me.py
       test_google_login.py
