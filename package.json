@@ -18,6 +18,9 @@
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },
+  "lint-staged": {
+    "src/**/*.{ts,tsx,js,jsx,json,css,md}": "prettier --write"
+  },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@mdx-js/loader": "^3.1.1",
@@ -69,6 +72,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "husky": "^9.1.7",
     "jsdom": "^25.0.1",
+    "lint-staged": "^17.2.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4",
     "typescript": "^5",
