@@ -15,6 +15,7 @@ from core.database import get_db
 from core.responses import ApiResponse
 from core.exceptions import AppException, AuthenticationError
 from core.logging import get_logger
+from core.rate_limit import rate_limit
 from .dependencies import get_current_user
 from .schemas import (
     RegisterUser, RegisterResponse,
@@ -54,7 +55,11 @@ def _set_refresh_cookie(response: Response, token: str, settings) -> None:
     description="Tworzy nowe konto użytkownika oraz przestrzeń roboczą",
     responses={400: {"description": "Email or username already exists"}}
 )
-async def register(user_data: RegisterUser, db: Session = Depends(get_db)):
+async def register(
+    user_data: RegisterUser, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("register", limit=5, window_seconds=600, identifier_field="email"))
+):
     """Rejestracja nowego użytkownika i utworzenie przestrzeni roboczej"""
     service = AuthService(db)
     result = await service.register_user(user_data)
@@ -68,7 +73,12 @@ async def register(user_data: RegisterUser, db: Session = Depends(get_db)):
     description="Weryfikuje email użytkownika za pomocą 6-znakowego kodu",
     responses={400: {"description": "Invalid or expired code"}, 404: {"description": "User not found"}}
 )
-async def verify_email(verify_data: VerifyEmail, response: Response, db: Session = Depends(get_db)):
+async def verify_email(
+    verify_data: VerifyEmail, 
+    response: Response, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("verify_email", limit=10, window_seconds=600, identifier_field="user_id"))
+):
     """Weryfikacja emaila - aktywuje konto i zwraca token JWT + ustawia refresh cookie"""
     service = AuthService(db)
     result, refresh_token = await service.verify_email(verify_data)
@@ -83,7 +93,11 @@ async def verify_email(verify_data: VerifyEmail, response: Response, db: Session
     description="Wysyła nowy kod weryfikacyjny na email",
     responses={404: {"description": "User not found"}}
 )
-async def resend_code(resend_data: ResendCode, db: Session = Depends(get_db)):
+async def resend_code(
+    resend_data: ResendCode, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("resend_code", limit=3, window_seconds=600, identifier_field="user_id"))
+):
     """Ponowne wysłanie kodu weryfikacyjnego na email"""
     service = AuthService(db)
     result = await service.resend_code(resend_data.user_id)
@@ -98,7 +112,12 @@ async def resend_code(resend_data: ResendCode, db: Session = Depends(get_db)):
     description="Loguje użytkownika za pomocą nazwy użytkownika/emaila i hasła",
     responses={401: {"description": "Invalid email/username or password"}, 403: {"description": "Account not verified"}}
 )
-async def login(login_data: LoginData, response: Response, db: Session = Depends(get_db)):
+async def login(
+    login_data: LoginData, 
+    response: Response, 
+    db: Session = Depends(get_db), 
+    _: None = Depends(rate_limit("login", limit=10, window_seconds=300, identifier_field="login"))
+):
     """Logowanie użytkownika - zwraca token JWT i ustawia refresh cookie"""
     service = AuthService(db)
     result, refresh_token = await service.login_user(login_data)
@@ -152,7 +171,11 @@ async def search_users(
     description="Wysyła kod resetowania hasła na email",
     responses={403: {"description": "Account not verified"}}
 )
-async def request_password_reset(reset_data: RequestPasswordReset, db: Session = Depends(get_db)):
+async def request_password_reset(
+    reset_data: RequestPasswordReset, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("request_password_reset", limit=3, window_seconds=600, identifier_field="email"))
+):
     """Wysyła kod resetowania hasła na email (nie ujawnia czy email istnieje)"""
     service = AuthService(db)
     result = await service.request_password_reset(reset_data)
@@ -166,7 +189,11 @@ async def request_password_reset(reset_data: RequestPasswordReset, db: Session =
     description="Weryfikuje kod resetowania hasła",
     responses={400: {"description": "Invalid or expired code"}, 403: {"description": "Account not verified"}}
 )
-async def verify_reset_code(verify_data: VerifyPasswordResetCode, db: Session = Depends(get_db)):
+async def verify_reset_code(
+    verify_data: VerifyPasswordResetCode, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("verify_reset_code", limit=10, window_seconds=600, identifier_field="email"))
+):
     """Weryfikuje kod resetowania hasła - zwraca status valid=true/false"""
     service = AuthService(db)
     result = await service.verify_reset_code(verify_data)
@@ -180,7 +207,11 @@ async def verify_reset_code(verify_data: VerifyPasswordResetCode, db: Session = 
     description="Resetuje hasło użytkownika",
     responses={400: {"description": "Invalid code, password, or passwords don't match"}, 403: {"description": "Account not verified"}}
 )
-async def reset_password(reset_data: ResetPassword, db: Session = Depends(get_db)):
+async def reset_password(
+    reset_data: ResetPassword, 
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("reset_password", limit=5, window_seconds=600, identifier_field="email"))
+):
     """Resetuje hasło użytkownika za pomocą kodu weryfikacyjnego"""
     service = AuthService(db)
     result = await service.reset_password(reset_data)
