@@ -1,0 +1,1 @@
+"""Onboarding module - konfiguracja startowych zasobów dla nowych użytkowników."""

@@ -61,6 +61,31 @@ def _build_board_response(
         online_users=online_users or []
     )
 
+def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
+    """Tworzy domyślną tablicę dla nowego workspace'a. Nie commituje - wołający zarządza transakcją."""
+    board = Board(
+        name="Moja pierwsza tablica",
+        icon="PenTool",
+        bg_color="bg-gray-500",
+        workspace_id=workspace_id,
+        created_by=user_id,
+        created_at=datetime.utcnow(),
+        last_modified=datetime.utcnow(),
+        last_modified_by=user_id,
+    )
+    db.add(board)
+    db.flush()
+
+    board_user = BoardUsers(
+        board_id=board.id,
+        user_id=user_id,
+        is_favourite=False,
+        is_online=False,
+        last_opened=datetime.utcnow(),
+    )
+    db.add(board_user)
+    return board
+
 
 class BoardService:
 
