@@ -15,6 +15,30 @@ from .schemas import (
     UserBasic,
 )
 
+def _build_workspace_with_owner(
+        db: Session, *, name: str, icon: str, bg_color: str, user_id: int, is_favourite: bool
+) -> tuple[Workspace, WorkspaceMember]:
+    """Tworzy Workspace + WorkspaceMember (owner). Nie commituje - wołający zarządza transakcją."""
+    workspace = Workspace(
+        name=name,
+        icon=icon,
+        bg_color=bg_color,
+        created_by=user_id,
+        created_at=datetime.utcnow(),
+    )
+    db.add(workspace)
+    db.flush()
+
+    membership = WorkspaceMember(
+        workspace_id=workspace.id,
+        user_id=user_id,
+        role="owner",
+        is_favourite=is_favourite,
+        joined_at=datetime.utcnow(),
+    )
+    db.add(membership)
+    return workspace, membership
+
 def _build_workspace_response(
     db: Session, workspace: Workspace, user_id: int, membership: WorkspaceMember
 ) -> WorkspaceResponse:
@@ -155,24 +179,13 @@ def get_workspace_by_id(db: Session, workspace_id: int, user_id: int) -> Workspa
 
 def create_workspace(db: Session, data: WorkspaceCreate, user_id: int) -> WorkspaceResponse:
     """Tworzy nowy workspace z membership ownerem."""
-    new_ws = Workspace(
-        name=data.name,
-        icon=data.icon or "Home",
-        bg_color=data.bg_color or "bg-green-500",
-        created_by=user_id,
-        created_at=datetime.utcnow(),
+    new_ws, membership = _build_workspace_with_owner(
+        db, name=data.name, 
+        icon=data.icon or "Home", 
+        bg_color=data.bg_color or "bg-green-500", 
+        user_id=user_id, 
+        is_favourite=False
     )
-    db.add(new_ws)
-    db.flush()
- 
-    membership = WorkspaceMember(
-        workspace_id=new_ws.id,
-        user_id=user_id,
-        role="owner",
-        is_favourite=False,
-        joined_at=datetime.utcnow(),
-    )
-    db.add(membership)
     db.commit()
     db.refresh(new_ws)
     db.refresh(membership)
@@ -194,6 +207,18 @@ def create_workspace(db: Session, data: WorkspaceCreate, user_id: int) -> Worksp
         role="owner",
         is_favourite=False,
     )
+
+def create_starter_workspace(db: Session, user_id: int) -> Workspace:
+    """Tworzy domyślny workspace dla nowego użytkownika. Nie commituje."""
+    workspace, _ = _build_workspace_with_owner(
+        db, 
+        name="Moja przestrzeń", 
+        icon="Home", 
+        bg_color="bg-green-500",
+        user_id=user_id,
+        is_favourite=True,
+    )
+    return workspace
 
 def update_workspace(
     db: Session, workspace_id: int, data: WorkspaceUpdate, user_id: int

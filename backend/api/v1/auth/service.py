@@ -17,7 +17,7 @@ import redis.asyncio as redis
 from redis.exceptions import ConnectionError, TimeoutError
 from sqlalchemy.exc import OperationalError, IntegrityError
 
-from core.models import User, Workspace, WorkspaceMember, RefreshToken
+from core.models import User, RefreshToken
 from .schemas import (
     RegisterUser, LoginData, VerifyEmail, UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
@@ -31,6 +31,7 @@ from .utils import (
     send_password_reset_email,
     generate_refresh_token, hash_refresh_token
 )
+from api.v1.onboarding.service import OnboardingService
 
 logger = get_logger(__name__)
 
@@ -130,24 +131,7 @@ class AuthService:
             self.db.flush()
             logger.info(f"User utworzony (ID: {new_user.id})")
 
-            starter_workspace = Workspace(
-                name="Moja Przestrzeń",
-                icon="Home",
-                bg_color="bg-green-500",
-                created_by=new_user.id,
-                created_at=datetime.utcnow()
-            )
-            self.db.add(starter_workspace)
-            self.db.flush()
-
-            membership = WorkspaceMember(
-                workspace_id=starter_workspace.id,
-                user_id=new_user.id,
-                role="owner",
-                is_favourite=True,
-                joined_at=datetime.utcnow()
-            )
-            self.db.add(membership)
+            starter_workspace = OnboardingService(self.db).setup_new_user(new_user.id)
             new_user.active_workspace_id = starter_workspace.id
             
             self.db.commit()
@@ -506,25 +490,7 @@ class AuthService:
                     self.db.flush()
                     logger.info(f"Nowy użytkownik Google (ID: {user.id})")
 
-                    starter_workspace = Workspace(
-                        name="Moja Przestrzeń",
-                        icon="Home",
-                        bg_color="bg-green-500",
-                        created_by=user.id,
-                        created_at=datetime.utcnow()
-                    )
-                    self.db.add(starter_workspace)
-                    self.db.flush()
-
-                    membership = WorkspaceMember(
-                        workspace_id=starter_workspace.id,
-                        user_id=user.id,
-                        role="owner",
-                        is_favourite=True,
-                        joined_at=datetime.utcnow()
-                    )
-                    self.db.add(membership)
-
+                    starter_workspace = OnboardingService(self.db).setup_new_user(user.id)
                     user.active_workspace_id = starter_workspace.id
 
                     self.db.commit()
@@ -538,7 +504,7 @@ class AuthService:
             self.db.refresh(user)
         except OperationalError:
             self.db.rollback()
-            logger.exception("❌ Błąd połączenia z bazą podczas Google OAuth")
+            logger.exception("Błąd połączenia z bazą podczas Google OAuth")
             raise AppException(
                 "Baza danych chwilowo niedostępna. Spróbuj ponownie za moment.",
                 code="DB_ERROR",

@@ -82,7 +82,7 @@ class TestRegisterSuccess:
             Workspace.created_by == db_user.id
         ).first()
         assert workspace is not None
-        assert workspace.name == "Moja Przestrzeń"
+        assert workspace.name == "Moja przestrzeń"
         assert db_user.active_workspace_id == workspace.id
 
     @pytest.mark.asyncio
