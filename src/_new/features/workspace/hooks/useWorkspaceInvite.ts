@@ -14,11 +14,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { searchUsers } from '../../auth/api/authApi';
-import type { UserSearchResult } from '../../auth/api/authApi';
-import { createInvite, checkUsersInviteStatusBatch } from '../api/inviteApi';
+import { createInvite, checkUsersInviteStatusBatch, searchWorkspaceUsers } from '../api/inviteApi';
 import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
-import type { InviteStatusResponse } from '../types';
+import type { InviteStatusResponse, UserSearchResult } from '../types';
 
 export interface UserWithStatus extends UserSearchResult {
   is_member?: boolean;
@@ -62,7 +60,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
 
   const usersQuery = useQuery<UserSearchResult[]>({
     queryKey: ['workspace-invite-users', workspace_id, debouncedQuery],
-    queryFn: () => searchUsers(debouncedQuery, 10),
+    queryFn: () => searchWorkspaceUsers(workspace_id, debouncedQuery, 10),
     enabled: isOpen && debouncedQuery.length >= 2,
   });
 

@@ -58,19 +58,6 @@ export const resetPassword = (data: ResetPasswordRequest): Promise<PasswordReset
     .post<PasswordResetResponse>('/api/v1/auth/reset-password', data)
     .then((res) => res.data);
 
-// WYSZUKIWANIE UŻYTKOWNIKÓW
-
-export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & {
-  full_name?: string;
-};
-
-export const searchUsers = (query: string, limit = 10): Promise<UserSearchResult[]> =>
-  apiClient
-    .get<UserSearchResult[]>('/api/v1/auth/users/search', {
-      params: { query, limit },
-    })
-    .then((res) => res.data);
-
 // SESJA
 
 export const getCurrentUser = (): Promise<User> =>

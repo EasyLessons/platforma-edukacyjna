@@ -20,7 +20,6 @@ backend/tests/
       test_logout.py
       test_me.py
       test_google_login.py
-      test_search_users.py
       test_resend_code.py
       test_integration.py
     boards/
@@ -31,6 +30,7 @@ backend/tests/
       test_workspaces_service.py
       test_members_service.py
       test_invites_service.py
+      test_search_users.py
     notifications/
       test_notifications_router.py   # testy HTTP routera (~8 testów)
       test_notifications_service.py

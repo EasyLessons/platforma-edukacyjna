@@ -1,13 +1,14 @@
 """
 Members service — zarządzanie członkami workspace'a.
 """
+from typing import List
 from sqlalchemy.orm import Session, joinedload
  
 from core.exceptions import NotFoundError, AppException
 from core.models import User, Workspace, WorkspaceMember
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
-    MyRoleResponse, RemoveMemberResponse,
+    MyRoleResponse, RemoveMemberResponse, UserSearchResult
 )
 
 def get_workspace_members(
@@ -137,3 +138,36 @@ def get_user_role(
         is_owner=is_owner,
         workspace_id=workspace_id,
     )
+
+def search_workspace_users(
+        db: Session, 
+        workspace_id: int, 
+        query: str, 
+        current_user_id: int, 
+        limit: int = 10
+) -> List[UserSearchResult]:
+    """Wyszukuje użytkowników do zaproszenia - wyklucza siebie i obecnych członków."""
+    query = query.strip().lower()
+    if len(query) < 2:
+        return []
+
+    member_ids_subquery = (
+        db.query(WorkspaceMember.user_id)
+        .filter(WorkspaceMember.workspace_id == workspace_id)
+    )
+
+    users = (
+        db.query(User)
+        .filter(
+            (User.username.ilike(f"%{query}%")) |
+            (User.email.ilike(f"%{query}%")) |
+            (User.full_name.ilike(f"%{query}%"))
+        )
+        .filter(User.id != current_user_id)
+        .filter(User.id.notin_(member_ids_subquery))
+        .filter(User.is_active == True)
+        .limit(limit)
+        .all()
+    )
+
+    return [UserSearchResult.model_validate(u) for u in users]

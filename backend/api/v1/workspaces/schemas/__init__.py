@@ -14,6 +14,7 @@ from .members import (
     UpdateMemberRoleRequest,
     MyRoleResponse,
     RemoveMemberResponse,
+    UserSearchResult,
 )
 from .invites import (
     InviteCreate,
@@ -31,6 +32,6 @@ __all__ = [
     "WorkspaceListResponse", "ToggleFavouriteRequest", "SetActiveResponse",
     "MessageResponse", "WorkspaceMemberResponse", "WorkspaceMembersListResponse",
     "UpdateMemberRoleRequest", "MyRoleResponse", "RemoveMemberResponse",
-    "InviteCreate", "InviteResponse", "PendingInviteResponse",
+    "UserSearchResult", "InviteCreate", "InviteResponse", "PendingInviteResponse",
     "InviteStatusResponse", "InviteStatusBatchRequest", "InviteStatusBatchResponse", "AcceptInviteResponse",
 ]
