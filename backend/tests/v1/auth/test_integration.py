@@ -9,9 +9,7 @@ from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import RegisterUser, LoginData, VerifyEmail, ResetPassword, RequestPasswordReset
 from core.models import User, Workspace, WorkspaceMember
 
-MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
-MOCK_RESET = "api.v1.auth.service.send_password_reset_email"
-
+MOCK_EMAIL = "api.v1.auth.service.send_email"
 
 class TestRegistrationToLoginFlow:
 
@@ -90,7 +88,7 @@ class TestPasswordResetFlow:
         service = AuthService(db_session, redis_client)
 
         # 1. Żądanie resetu
-        with patch(MOCK_RESET, new_callable=AsyncMock):
+        with patch(MOCK_EMAIL, new_callable=AsyncMock):
             await service.request_password_reset(
                 RequestPasswordReset(email=test_user.email)
             )
@@ -124,7 +122,7 @@ class TestPasswordResetFlow:
         """Stare hasło nie działa po resecie"""
         service = AuthService(db_session, redis_client)
 
-        with patch(MOCK_RESET, new_callable=AsyncMock):
+        with patch(MOCK_EMAIL, new_callable=AsyncMock):
             await service.request_password_reset(
                 RequestPasswordReset(email=test_user.email)
             )

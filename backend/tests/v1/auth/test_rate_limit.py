@@ -12,7 +12,7 @@ from core.exceptions import AppException
 from main import app
 from core.database import get_db
 
-MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
+MOCK_EMAIL = "api.v1.auth.service.send_email"
 
 
 def make_request(client_host: str, body: dict):

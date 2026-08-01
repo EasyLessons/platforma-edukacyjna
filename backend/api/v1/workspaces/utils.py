@@ -1,4 +1,6 @@
-import resend
+"""Utility funkcje modułu workspace."""
+from core.email import send_email
+from core.email.templates.workspace import workspace_invite_email
 
 async def send_workspace_invite_email(
     invited_email: str,
@@ -10,111 +12,7 @@ async def send_workspace_invite_email(
     from_email: str,
     frontend_url: str = "https://easylesson.app"
 ) -> bool:
-    resend.api_key = resend_api_key
-    
+    """Wysyła email z zaproszeniem do workspace'a."""
     invite_link = f"{frontend_url}/invite/{invite_token}"
-    
-    try:
-        params = {
-            "from": from_email,
-            "to": [invited_email],
-            "subject": f"{inviter_name} zaprasza Cię do workspace'a {workspace_name}",
-            "html": f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta charset="UTF-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            </head>
-            <body style="margin: 0; padding: 0; font-family: Arial, sans-serif; background-color: #f5f5f5;">
-                <div style="max-width: 600px; margin: 0 auto; background-color: white;">
-                    
-                    <!-- Header -->
-                    <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 40px 20px; text-align: center;">
-                        <h1 style="color: white; margin: 0; font-size: 28px;">
-                            📬 Masz zaproszenie!
-                        </h1>
-                    </div>
-                    
-                    <!-- Content -->
-                    <div style="padding: 40px 30px;">
-                        <h2 style="color: #1f2937; margin-top: 0;">
-                            Cześć, {invited_name}!
-                        </h2>
-                        
-                        <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                            <strong>{inviter_name}</strong> zaprasza Cię do dołączenia do workspace'a:
-                        </p>
-                        
-                        <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 20px; margin: 30px 0; border-radius: 4px;">
-                            <h3 style="color: #059669; margin: 0 0 10px 0; font-size: 20px;">
-                                🏢 {workspace_name}
-                            </h3>
-                            <p style="color: #065f46; margin: 0; font-size: 14px;">
-                                Współpracuj, twórz i zarządzaj projektami razem z zespołem
-                            </p>
-                        </div>
-                        
-                        <p style="color: #4b5563; font-size: 16px; line-height: 1.6;">
-                            Kliknij poniższy przycisk, aby zaakceptować zaproszenie:
-                        </p>
-                        
-                        <!-- CTA Button -->
-                        <div style="text-align: center; margin: 40px 0;">
-                            <a href="{invite_link}" 
-                               style="background-color: #10b981; 
-                                      color: white; 
-                                      padding: 16px 40px; 
-                                      text-decoration: none; 
-                                      border-radius: 8px; 
-                                      font-weight: bold; 
-                                      font-size: 16px;
-                                      display: inline-block;
-                                      box-shadow: 0 4px 6px rgba(16, 185, 129, 0.3);">
-                                ✅ Akceptuj zaproszenie
-                            </a>
-                        </div>
-                        
-                        <p style="color: #6b7280; font-size: 14px; line-height: 1.6;">
-                            Lub skopiuj i wklej poniższy link do przeglądarki:
-                        </p>
-                        
-                        <div style="background-color: #f9fafb; 
-                                    padding: 12px; 
-                                    border-radius: 6px; 
-                                    word-break: break-all;
-                                    font-family: monospace;
-                                    font-size: 12px;
-                                    color: #374151;
-                                    margin-bottom: 30px;">
-                            {invite_link}
-                        </div>
-                        
-                        <div style="border-top: 1px solid #e5e7eb; padding-top: 20px; margin-top: 30px;">
-                            <p style="color: #9ca3af; font-size: 13px; margin: 0;">
-                                ⏱️ Zaproszenie wygasa po 7 dniach
-                            </p>
-                            <p style="color: #9ca3af; font-size: 13px; margin: 5px 0 0 0;">
-                                ❓ Nie rozpoznajesz tego zaproszenia? Możesz je bezpiecznie zignorować.
-                            </p>
-                        </div>
-                    </div>
-                    
-                    <!-- Footer -->
-                    <div style="background-color: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-                        <p style="color: #6b7280; font-size: 12px; margin: 0;">
-                            © 2024 EasyLesson. Wszystkie prawa zastrzeżone.
-                        </p>
-                    </div>
-                    
-                </div>
-            </body>
-            </html>
-            """
-        }
-        
-        resend.Emails.send(params)
-        return True
-        
-    except Exception:
-        raise
+    subject, html = workspace_invite_email(invited_name, inviter_name, workspace_name, invite_link)
+    return await send_email(invited_email, subject, html, resend_api_key, from_email)

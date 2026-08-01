@@ -26,12 +26,12 @@ from .schemas import (
     MeResponse
 )
 from .utils import (
-    hash_password, verify_password, create_access_token,
-    generate_verification_code, send_verification_email,
-    send_password_reset_email,
-    generate_refresh_token, hash_refresh_token
+    hash_password, verify_password, create_access_token, hash_refresh_token,
+    generate_verification_code, generate_refresh_token,
 )
 from api.v1.onboarding.service import OnboardingService
+from core.email import send_email
+from core.email.templates.auth import verification_email, password_reset_email
 
 logger = get_logger(__name__)
 
@@ -51,6 +51,16 @@ class AuthService:
     def _password_reset_key(self, user_id: int) -> str:
         """Generuje klucz Redis dla kodu resetowania hasła"""
         return f"auth:password_reset:{user_id}"
+
+    async def _send_code_email(self, email: str, subject: str, html: str) -> None:
+        """Wysyła mail, nie wywracając wywołującego flow przy błędzie."""
+        if not self.settings.resend_api_key or self.settings.resend_api_key == "SKIP":
+            logger.warning("Email nie został wysłany (brak konfiguracji Resend)")
+            return
+        try:
+            await send_email(email, subject, html, self.settings.resend_api_key, self.settings.from_email)
+        except Exception:
+            logger.warning(f"Wysyłka emaila nie powiodła się (to={email})")
 
     async def _store_verification_code(self, key: str, code: str) -> None:
         """Zapisuje kod w Redis z TTL; przy błędzie połączenia rzuca 503."""
@@ -149,19 +159,8 @@ class AuthService:
             raise AppException("Błąd serwera", status_code=500)
 
         await self._store_verification_code(self._email_verify_key(new_user.id), verification_code)
-
-        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
-            try:
-                await send_verification_email(
-                    new_user.email,
-                    new_user.username,
-                    verification_code,
-                    self.settings.resend_api_key,
-                    self.settings.from_email
-                )
-                logger.info(f"Email wysłany (user_id={new_user.id})")
-            except Exception:
-                logger.exception(f"Błąd wysyłania emaila (user_id={new_user.id})")
+        subject, html = verification_email(new_user.username, verification_code)
+        await self._send_code_email(new_user.email, subject, html)
 
         return RegisterResponse(
             user=UserResponse.model_validate(new_user),
@@ -230,14 +229,9 @@ class AuthService:
 
         verification_code = generate_verification_code()
         await self._store_verification_code(self._email_verify_key(user.id), verification_code)
-
-        await send_verification_email(
-            user.email,
-            user.username,
-            verification_code,
-            self.settings.resend_api_key,
-            self.settings.from_email
-        )
+        
+        subject, html = verification_email(user.username, verification_code)
+        await self._send_code_email(user.email, subject, html)
 
         logger.info(f"Nowy kod wysłany (user_id={user.id})")
 
@@ -279,20 +273,8 @@ class AuthService:
         reset_code = generate_verification_code()
         await self._store_verification_code(self._password_reset_key(user.id), reset_code)
 
-        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
-            try:
-                await send_password_reset_email(
-                    user.email,
-                    user.username,
-                    reset_code,
-                    self.settings.resend_api_key,
-                    self.settings.from_email
-                )
-                logger.info(f"Email z kodem resetu wysłany (user_id={user.id})")
-            except Exception:
-                logger.exception(f"Błąd wysyłania emaila (user_id={user.id})")
-        else:
-            logger.warning(f"Email NIE wysłany (RESEND_API_KEY=SKIP), user_id={user.id}")
+        subject, html = password_reset_email(user.username, reset_code)
+        await self._send_code_email(user.email, subject, html)
 
         return MessageResponse(message="Jeśli email istnieje, kod został wysłany")
 

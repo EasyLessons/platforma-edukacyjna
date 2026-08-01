@@ -11,7 +11,7 @@ from api.v1.auth.utils import verify_password
 from core.exceptions import ConflictError
 from core.models import User, Workspace, WorkspaceMember
 
-MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
+MOCK_EMAIL = "api.v1.auth.service.send_email"
 
 VALID_DATA = dict(
     username="newuser",
@@ -112,13 +112,12 @@ class TestRegisterSuccess:
         mock_send.assert_called_once()
         call_args = mock_send.call_args[0]
         assert call_args[0] == "newuser@example.com"
-        assert call_args[1] == "newuser"
 
     @pytest.mark.asyncio
-    async def test_skips_email_when_resend_skip(self, db_session, redis_client):
+    async def test_skips_email_when_resend_skip(self, db_session, redis_client, monkeypatch):
         """Nie wysyła emaila gdy RESEND_API_KEY=SKIP"""
         service = AuthService(db_session, redis_client)
-        service.settings.resend_api_key = "SKIP"
+        monkeypatch.setattr(service.settings, "resend_api_key", "SKIP")
 
         with patch(MOCK_EMAIL, new_callable=AsyncMock) as mock_send:
             await service.register_user(make_user_data())
