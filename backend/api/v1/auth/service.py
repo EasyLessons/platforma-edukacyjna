@@ -10,7 +10,6 @@ from core.exceptions import (
     ConflictError, ValidationError, AuthenticationError,
     NotFoundError, AppException
 )
-from typing import List
 import httpx
 import hashlib
 import redis.asyncio as redis
