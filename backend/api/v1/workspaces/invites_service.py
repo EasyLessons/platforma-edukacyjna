@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from core.config import get_settings
 from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import User, Workspace, WorkspaceInvite, WorkspaceMember
+from core.logging import get_logger
 from api.v1.notifications.service import create_notification
 from .realtime import broadcast_notification
 from .utils import send_workspace_invite_email
@@ -19,6 +20,14 @@ from .schemas import (
     InviteResponse, PendingInviteResponse,
     InviteStatusResponse, AcceptInviteResponse,
 )
+
+logger = get_logger(__name__)
+
+def _log_invite_email_failure(task: asyncio.Task) -> None:
+    """Loguje błąd wysyłki maila zaproszenia z fire-and-forget taska."""
+    exc = task.exception()
+    if exc:
+        logger.error(f"Błąd wysyłania emaila zaproszenia: {exc}", exc_info=exc)
 
 async def create_invite(
     db: Session,
@@ -109,8 +118,7 @@ async def create_invite(
  
         settings = get_settings()
         if send_email and settings.resend_api_key and settings.resend_api_key != "SKIP":
-            try:
-                asyncio.create_task(send_workspace_invite_email(
+            task = asyncio.create_task(send_workspace_invite_email(
                     invited_email=invited_user.email,
                     invited_name=invited_user.username,
                     inviter_name=inviter_name,
@@ -120,9 +128,8 @@ async def create_invite(
                     from_email=settings.from_email,
                     frontend_url="https://easylesson.app",
                 ))
-            except Exception as e:
-                print(f"❌ Błąd wysyłania emaila: {e}")
- 
+            task.add_done_callback(_log_invite_email_failure)
+
         return InviteResponse(
             id=new_invite.id,
             workspace_id=new_invite.workspace_id,

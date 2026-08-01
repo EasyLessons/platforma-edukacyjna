@@ -1,0 +1,1 @@
+"""Szablony maili, uporządkowane per domena."""

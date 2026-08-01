@@ -9,7 +9,7 @@ from api.v1.auth.service import AuthService
 from api.v1.auth.schemas import ResendCodeResponse
 from core.exceptions import NotFoundError, ValidationError
 
-MOCK_EMAIL = "api.v1.auth.service.send_verification_email"
+MOCK_EMAIL = "api.v1.auth.service.send_email"
 
 
 class TestResendCodeSuccess:
@@ -73,3 +73,15 @@ class TestResendCodeErrors:
             await AuthService(db_session, redis_client).resend_code(test_user.id)
         assert exc.value.status_code == 400
         assert "zweryfikowane" in exc.value.message
+
+    @pytest.mark.asyncio
+    async def test_skips_email_when_resend_skip(self, db_session, redis_client, unverified_user, monkeypatch):
+        """Nie wysyła emaila gdy RESEND_API_KEY=SKIP"""
+        service = AuthService(db_session, redis_client)
+        monkeypatch.setattr(service.settings, "resend_api_key", "SKIP")
+
+        with patch(MOCK_EMAIL, new_callable=AsyncMock) as mock_send:
+            result = await service.resend_code(unverified_user.id)
+
+        mock_send.assert_not_called()
+        assert isinstance(result, ResendCodeResponse)
