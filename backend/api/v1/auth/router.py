@@ -3,7 +3,7 @@ AUTH ROUTES - /api/v1/auth/*
 Endpointy dotyczące autentykacji i autoryzacji
 Wszystkie endpointy zwracają ApiResponse[T] z timestamp i metadata
 """
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -21,7 +21,6 @@ from .schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
     VerifyEmail, ResendCode,
-    UserSearchResult,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
     UserResponse, RefreshResponse, MeResponse
@@ -123,30 +122,6 @@ async def login(
     result, refresh_token = await service.login_user(login_data)
     _set_refresh_cookie(response, refresh_token, service.settings)
     return ApiResponse(success=True, data=result)
-
-# === USER CHECKS & SEARCH ===
-
-@router.get(
-    "/users/search",
-    response_model=list[UserSearchResult],
-    summary="Search users",
-    description="Wyszukuje aktywnych użytkowników po username, email lub full_name",
-    responses={400: {"description": "Query too short (minimum 2 characters)"}}
-)
-async def search_users(
-    query: str = Query(..., min_length=2, description="Search query (min 2 chars)"),
-    limit: int = Query(10, ge=1, le=50, description="Result limit"),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Wyszukuje użytkowników po username, email lub full_name.
-    Wymaga: aktualne token JWT.
-    Wyklucza bieżącego użytkownika i niezweryfikowanych użytkowników.
-    """
-    service = AuthService(db)
-    result = service.search_users(query, current_user.id, limit)
-    return result
 
 # === PASSWORD RESET ===
 

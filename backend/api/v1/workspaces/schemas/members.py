@@ -35,3 +35,12 @@ class MyRoleResponse(BaseModel):
 
 class RemoveMemberResponse(BaseModel):
     message: str
+
+class UserSearchResult(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True

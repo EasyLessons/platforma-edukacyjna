@@ -16,6 +16,7 @@ import {
   InviteStatusResponse,
   AcceptInviteResponse,
   PendingInviteResponse,
+  UserSearchResult,
 } from '../types';
 
 export const createInvite = (
@@ -58,3 +59,14 @@ export const checkUsersInviteStatusBatch = (
       statuses: Record<number, InviteStatusResponse>;
     }>(`/api/v1/workspaces/${workspace_id}/members/check-batch`, { user_ids })
     .then((res) => res.data.statuses);
+
+export const searchWorkspaceUsers = (
+  workspace_id: number,
+  query: string,
+  limit: 10
+): Promise<UserSearchResult[]> =>
+  apiClient
+    .get<UserSearchResult[]>(`/api/v1/workspaces/${workspace_id}/member/search`, {
+      params: { query, limit },
+    })
+    .then((res) => res.data);

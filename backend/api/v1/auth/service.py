@@ -19,7 +19,7 @@ from sqlalchemy.exc import OperationalError, IntegrityError
 
 from core.models import User, RefreshToken
 from .schemas import (
-    RegisterUser, LoginData, VerifyEmail, UserSearchResult,
+    RegisterUser, LoginData, VerifyEmail,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     RegisterResponse, AuthResponse, UserResponse,
     ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
@@ -236,27 +236,6 @@ class AuthService:
         logger.info(f"Nowy kod wysłany (user_id={user.id})")
 
         return ResendCodeResponse(message="Nowy kod wysłany")
-
-    def search_users(self, query: str, current_user_id: int, limit: int = 10) -> List[UserSearchResult]:
-        """Wyszukuje użytkowników po username lub email"""
-        query = query.strip().lower()
-        if len(query) < 2:
-            return []
-
-        users = (
-            self.db.query(User)
-            .filter(
-                (User.username.ilike(f"%{query}%")) |
-                (User.email.ilike(f"%{query}%")) |
-                (User.full_name.ilike(f"%{query}%"))
-            )
-            .filter(User.id != current_user_id)
-            .filter(User.is_active == True)
-            .limit(limit)
-            .all()
-        )
-
-        return [UserSearchResult.model_validate(u) for u in users]
 
     # === PASSWORD RESET ===
 

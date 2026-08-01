@@ -6,7 +6,7 @@
  * IDEA: typy zawarte w pliku są wspódzielone przez różne komponenty.
  */
 
-import type { UserBasic } from '@/_new/shared/types/user';
+import type { User, UserBasic } from '@/_new/shared/types/user';
 
 // CORE WORKSPACE TYPES
 export interface Workspace {
@@ -42,6 +42,7 @@ export interface WorkspaceFormData {
 }
 
 export type WorkspaceErrors = Partial<Record<keyof WorkspaceFormData, string>>;
+export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & { full_name?: string };
 
 // API REQUEST TYPES
 export interface WorkspaceCreateRequest {

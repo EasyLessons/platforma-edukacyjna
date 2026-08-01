@@ -31,7 +31,7 @@ PRZEGLĄDARKA
 4. Jeśli refresh też się nie powiedzie — `isLoggedIn = false`, strony wymagające zalogowania przekierowują na `/login`.
 
 Frontend: `src/app/context/AuthContext.tsx` (Provider + `useAuth()`) woła funkcje z `src/_new/lib/auth` (przechowywanie access tokenu) i `src/_new/features/auth/api/authApi.ts` (`getCurrentUser`, `logoutUser`).
-Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/search-users`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google-login`, `/google-callback`, `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`.
+Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google-login`, `/google-callback`, `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`.
 
 ## Dwa stany aplikacji: zalogowany / niezalogowany
 

@@ -54,16 +54,6 @@ class RegisterResponse(BaseModel):
     user: UserResponse
     message: str
 
-class UserSearchResult(BaseModel):
-    """Wynik wyszukiwania użytkownika"""
-    id: int
-    username: str
-    email: str
-    full_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
-
 class RequestPasswordReset(BaseModel):
     """Schema dla żądania resetu hasła"""
     email: EmailStr
