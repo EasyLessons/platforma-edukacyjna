@@ -4,16 +4,11 @@ Endpointy dotyczące autentykacji i autoryzacji
 Wszystkie endpointy zwracają ApiResponse[T] z timestamp i metadata
 """
 from fastapi import APIRouter, Depends, Request, Response, status
-from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-import json
-import base64
-from urllib.parse import quote_plus
 
 from core.database import get_db
 from core.responses import ApiResponse
-from core.exceptions import AppException, AuthenticationError
+from core.exceptions import AuthenticationError
 from core.logging import get_logger
 from core.rate_limit import rate_limit
 from .dependencies import get_current_user
@@ -23,7 +18,8 @@ from .schemas import (
     VerifyEmail, ResendCode,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
     ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
-    UserResponse, RefreshResponse, MeResponse
+    UserResponse, RefreshResponse, MeResponse,
+    GoogleLoginRequest, AvatarUpdate
 )
 from .service import AuthService
 from core.models import User
@@ -180,73 +176,24 @@ async def reset_password(
 
 # === GOOGLE OAUTH ===
 
-@router.get(
+@router.post(
     "/google",
-    summary="Redirect to Google login",
-    description="Przekierowuje do Google OAuth consent screen",
-    responses={307: {"description": "Redirect to Google OAuth"}}
+    response_model=ApiResponse[AuthResponse],
+    summary="Login with Google ID token",
+    description="Weryfikuje ID token z Google Identity Services i loguje/rejestruje użytkownika.",
+    responses={401: {"description": "Invalid Google credential"}}
 )
-async def google_login(db: Session = Depends(get_db)):
-    """
-    Przekierowuje użytkownika do Google OAuth consent screen.
-    Użytkownik zostanie przekierowany powrotem na /google/callback po autoryzacji.
-    """
-    service = AuthService(db)
-    authorization_url = await service.get_google_auth_url()
-    return RedirectResponse(authorization_url)
-
-
-@router.get(
-    "/google/callback",
-    summary="Google OAuth callback",
-    description="Obsługuje callback z Google OAuth",
-    responses={307: {"description": "Redirect to frontend with token and user data"}}
-)
-async def google_callback(
-    code: str | None = None,
-    error: str | None = None,
-    error_description: str | None = None,
-    db: Session = Depends(get_db)
+async def google_login(
+    payload: GoogleLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("google_login", limit=10, window_seconds=300, identifier_field="credential"))
 ):
-    """
-    Callback od Google po autoryzacji.
-    - Jeśli użytkownik istnieje: loguje do systemu
-    - Jeśli nie istnieje: tworzy nowe konto
-    - Zwraca: RedirectResponse na frontend z token i user data w base64
-    """
+    """Logowanie/rejestracja przez Google ID token"""
     service = AuthService(db)
-
-    if error:
-        logger.warning("⚠️ Google OAuth zwrócił error=%s description=%s", error, error_description)
-        frontend_url = service.settings.frontend_url
-        safe_error = quote_plus(error_description or error)
-        return RedirectResponse(f"{frontend_url}/auth/callback?error={safe_error}")
-
-    if not code:
-        raise AuthenticationError("Brak kodu autoryzacji Google")
-
-    try:
-        result, refresh_token = await service.google_login(code)
-
-        # Zakoduj dane użytkownika do base64 (dla przesłania w URL)
-        user_json = json.dumps(result.user.model_dump(mode="json"), default=str)
-        user_encoded = base64.b64encode(user_json.encode()).decode()
-
-        # Przekieruj na frontend z tokenem i danymi + ustaw refresh cookie
-        frontend_url = service.settings.frontend_url
-        redirect_resp = RedirectResponse(f"{frontend_url}/auth/callback?token={result.access_token}&user={user_encoded}")
-        _set_refresh_cookie(redirect_resp, refresh_token, service.settings)
-        return redirect_resp
-    except AppException:
-        raise
-    except Exception as exc:
-        logger.exception("❌ Nieobsłużony wyjątek w callback Google OAuth: %s", exc)
-        frontend_url = service.settings.frontend_url
-        safe_error = quote_plus("Błąd logowania przez Google")
-        return RedirectResponse(f"{frontend_url}/auth/callback?error={safe_error}")
-
-class AvatarUpdate(BaseModel):
-    avatar_url: str
+    result, refresh_token = await service.google_login(payload.credential)
+    _set_refresh_cookie(response, refresh_token, service.settings)
+    return ApiResponse(success=True, data=result)
 
 @router.put("/users/me", response_model=ApiResponse[UserResponse])
 async def update_user_profile(
@@ -257,10 +204,7 @@ async def update_user_profile(
     current_user.avatar_url = update_data.avatar_url
     db.commit()
     db.refresh(current_user)
-    return ApiResponse(
-        success=True,
-        data=UserResponse.model_validate(current_user)
-    )
+    return ApiResponse(success=True, data=UserResponse.model_validate(current_user))
 
 # === SESJA / REFRESH / ME / LOGOUT ===
 

@@ -102,3 +102,11 @@ class RefreshResponse(BaseModel):
 class MeResponse(BaseModel):
     """Response z danymi aktualnie zalogowanego użytkownika"""
     user: UserResponse
+
+class GoogleLoginRequest(BaseModel):
+    """Schema dla logowania przez Google ID token"""
+    credential: str
+
+class AvatarUpdate(BaseModel):
+    """Schema dla aktualizacji avatara użytkownika"""
+    avatar_url: str

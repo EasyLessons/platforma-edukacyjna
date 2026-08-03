@@ -41,6 +41,9 @@ export const resendVerificationCode = (data: ResendCodeRequest): Promise<ResendC
 export const loginUser = (data: LoginRequest): Promise<LoginResponse> =>
   apiClient.post<LoginResponse>('/api/v1/auth/login', data).then((res) => res.data);
 
+export const loginWithGoogle = (credential: string): Promise<LoginResponse> =>
+  apiClient.post<LoginResponse>('/api/v1/auth/google', { credential }).then((res) => res.data);
+
 // RESET HASŁA
 
 export const requestPasswordReset = (data: PasswordResetRequest): Promise<PasswordResetResponse> =>

@@ -31,7 +31,7 @@ PRZEGLĄDARKA
 4. Jeśli refresh też się nie powiedzie — `isLoggedIn = false`, strony wymagające zalogowania przekierowują na `/login`.
 
 Frontend: `src/app/context/AuthContext.tsx` (Provider + `useAuth()`) woła funkcje z `src/_new/lib/auth` (przechowywanie access tokenu) i `src/_new/features/auth/api/authApi.ts` (`getCurrentUser`, `logoutUser`).
-Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google-login`, `/google-callback`, `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`.
+Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google` (POST), `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`.
 
 ## Dwa stany aplikacji: zalogowany / niezalogowany
 
@@ -52,7 +52,7 @@ W przyszłości dojdzie trzeci stan poza zalogowany/niezalogowany: **subskrybent
 
 ## Google OAuth
 
-`Authlib` po stronie backendu. Flow: `GET /google-login` (przekierowanie do Google) → `GET /google-callback` (Google odsyła z kodem, backend wymienia go na dane usera, tworzy/loguje konto, ustawia cookies) → frontend `src/app/(auth)/auth/callback/page.tsx` (`useAuthCallback` z `src/_new/features/auth/hooks`) odbiera i kończy logowanie po stronie klienta.
+Google Identity Services (`@react-oauth/google`) po stronie frontendu — brak redirectu, brak backendowej wymiany kodu. Flow: frontend renderuje natywny przycisk Google (`GoogleOAuthButton`, `src/_new/features/auth/components/googleOAuthButton.tsx`), po zalogowaniu dostaje podpisany ID token bezpośrednio od Google i jednym `POST /api/v1/auth/google` wysyła go do backendu. Backend weryfikuje podpis/`aud`/`iss` lokalnie (`google.oauth2.id_token.verify_oauth2_token`, bez sieciowego round-tripu do Google) w `AuthService._verify_google_credential` (`backend/api/v1/auth/service.py`), następnie znajduje/tworzy usera (`_find_or_create_google_user`) i zwraca zwykły `AuthResponse` + refresh cookie, tak samo jak `login`/`verify-email`.
 
 ## Znane do zrobienia
 
