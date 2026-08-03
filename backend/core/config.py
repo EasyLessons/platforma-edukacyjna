@@ -40,8 +40,6 @@ class Settings(BaseSettings):
 
     # === GOOGLE OAUTH ===
     google_client_id: str  # WYMAGANE - Client ID z Google Cloud Console
-    google_client_secret: str  # WYMAGANE - Client Secret z Google Cloud Console
-    google_redirect_uri: str  # WYMAGANE - URI callback (np. http://localhost:8000/api/v1/auth/google/callback)
     frontend_url: str = "http://localhost:3000"  # Opcjonalne - URL frontendu (do przekierowania po logowaniu)
 
         # === REDIS (kody weryfikacyjne) ===

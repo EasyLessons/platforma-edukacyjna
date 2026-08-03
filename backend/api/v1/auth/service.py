@@ -10,11 +10,12 @@ from core.exceptions import (
     ConflictError, ValidationError, AuthenticationError,
     NotFoundError, AppException
 )
-import httpx
 import hashlib
 import redis.asyncio as redis
 from redis.exceptions import ConnectionError, TimeoutError
 from sqlalchemy.exc import OperationalError, IntegrityError
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
 from core.models import User, RefreshToken
 from .schemas import (
@@ -352,66 +353,28 @@ class AuthService:
 
     # === GOOGLE OAUTH ===
 
-    async def get_google_auth_url(self) -> str:
-        """Generuje URL do autoryzacji Google OAuth"""
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"client_id={self.settings.google_client_id}&"
-            f"redirect_uri={self.settings.google_redirect_uri}&"
-            f"response_type=code&"
-            f"scope=openid%20email%20profile&"
-            f"access_type=offline"
-        )
-        logger.info("🔗 Wygenerowano URL autoryzacji Google")
-        return auth_url
+    def _verify_google_credential(self, credential: str) -> tuple[str, str, str, str | None]:
+        """Weryfikuje ID token z Google Identity Services (podpis, aud, exp). Zwraca (google_id, email, name, picture)."""
+        try:
+            idinfo = id_token.verify_oauth2_token(credential, google_requests.Request(), self.settings.google_client_id)
+        except ValueError:
+            logger.warning("Nieprawidłowy token Google ID")
+            raise AuthenticationError("Nieprawidłowy token logowania Google")
 
-    async def google_login(self, code: str) -> AuthResponse:
-        """Logowanie przez Google OAuth"""
-        logger.info("🔐 Rozpoczęto logowanie przez Google")
-
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            "code": code,
-            "client_id": self.settings.google_client_id,
-            "client_secret": self.settings.google_client_secret,
-            "redirect_uri": self.settings.google_redirect_uri,
-            "grant_type": "authorization_code"
-        }
-
-        async with httpx.AsyncClient() as client:
-            token_response = await client.post(token_url, data=token_data)
-
-            if token_response.status_code != 200:
-                logger.error(f"Błąd wymiany kodu Google (status={token_response.status_code})")
-                raise AuthenticationError("Błąd autoryzacji Google")
-
-            tokens = token_response.json()
-            access_token = tokens.get("access_token")
-
-            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            userinfo_response = await client.get(userinfo_url, headers=headers)
-
-            if userinfo_response.status_code != 200:
-                logger.error(f"Błąd pobierania danych Google (status={userinfo_response.status_code})")
-                raise AuthenticationError("Błąd pobierania danych użytkownika")
-
-            user_info = userinfo_response.json()
-
-        google_id = user_info.get("id")
-        email = user_info.get("email")
-        name = user_info.get("name", "")
-        picture = user_info.get("picture")
+        google_id = idinfo.get("sub")
+        email = idinfo.get("email")
+        name = idinfo.get("name", "")
+        picture = idinfo.get("picture")
 
         if not google_id or not email:
-            logger.error(
-                "Brak wymaganych danych z Google userinfo (has_id=%s, has_email=%s)",
-                bool(google_id), bool(email),
-            )
             raise AuthenticationError("Google nie zwrócił wymaganych danych konta")
+        if not idinfo.get("email_verified", False):
+            raise AuthenticationError("Email Google niezweryfikowany")
 
-        logger.info(f"Dane Google (google_id={google_id})")
+        return google_id, email, name, picture
 
+    def _find_or_create_google_user(self, google_id: str, email: str, name: str, picture: str | None) -> User:
+        """Znajduje istniejącego usera po google_id/email albo tworzy nowego."""
         try:
             user = self.db.query(User).filter(
                 (User.google_id == google_id) | (User.email == email)
@@ -424,53 +387,48 @@ class AuthService:
                     user.profile_picture = picture
                     user.is_active = True
                     self.db.commit()
-                    logger.info(f"Zaktualizowano użytkownika (user_id={user.id})")
-                logger.info(f"Logowanie istniejącego użytkownika (user_id={user.id})")
-            else:
-                username = email.split("@")[0]
-                counter = 1
-                original_username = username
-                while self.db.query(User).filter(User.username == username).first():
-                    username = f"{original_username}{counter}"
-                    counter += 1
+                    logger.info(f"Logowanie istniejącego użytkownika (user_id={user.id})")
+                return user
 
-                user = User(
-                    username=username,
-                    email=email,
-                    full_name=name,
-                    google_id=google_id,
-                    auth_provider="google",
-                    profile_picture=picture,
-                    is_active=True,
-                    hashed_password=None
-                )
+            username = email.split("@")[0]
+            counter = 1
+            original_username = username
+            while self.db.query(User).filter(User.username == username).first():
+                username = f"{original_username}{counter}"
+                counter += 1
 
-                try:
-                    self.db.add(user)
-                    self.db.flush()
-                    logger.info(f"Nowy użytkownik Google (ID: {user.id})")
+            user = User(
+                username=username, 
+                email=email, 
+                full_name=name, 
+                google_id=google_id, 
+                auth_provider="google", 
+                profile_picture=picture, 
+                is_active=True, 
+                hashed_password=None)
+            self.db.add(user)
+            self.db.flush()
+            logger.info(f"Nowy użytkownik Google (ID: {user.id})")
 
-                    starter_workspace = OnboardingService(self.db).setup_new_user(user.id)
-                    user.active_workspace_id = starter_workspace.id
-
-                    self.db.commit()
-                    logger.info(f"Workspace utworzony (user_id={user.id})")
-
-                except Exception:
-                    self.db.rollback()
-                    logger.exception("Błąd tworzenia użytkownika Google")
-                    raise AppException("Błąd tworzenia konta", status_code=500)
-
+            starter_workspace = OnboardingService(self.db).setup_new_user(user.id)
+            user.active_workspace_id = starter_workspace.id
+            self.db.commit()
             self.db.refresh(user)
+            logger.info(f"Workspace utworzony (user_id={user.id})")
+            return user
+        
         except OperationalError:
             self.db.rollback()
             logger.exception("Błąd połączenia z bazą podczas Google OAuth")
-            raise AppException(
-                "Baza danych chwilowo niedostępna. Spróbuj ponownie za moment.",
-                code="DB_ERROR",
-                status_code=503,
-            )
+            raise AppException("Baza danych chwilowo niedostępna", code="DB_ERROR", status_code=503)
+        except Exception:
+            self.db.rollback()
+            logger.exception("Błąd tworzenia użytkownika Google")
+            raise AppException("Błąd tworzenia konta", status_code=500)
 
+    async def google_login(self, credential: str) -> tuple[AuthResponse, str]:
+        """Logowanie przez Google (ID token z Google Identity Services)."""
+        google_id, email, name, picture = self._verify_google_credential(credential)
+        user = self._find_or_create_google_user(google_id, email, name, picture)
         logger.info(f"Token wygenerowany (user_id={user.id})")
-
         return self._create_session(user)
