@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from core.database import get_db
 from core.responses import ApiResponse
-from core.exceptions import AppException, AuthenticationError
+from core.exceptions import AuthenticationError
 from core.logging import get_logger
 from core.rate_limit import rate_limit
 from .dependencies import get_current_user
