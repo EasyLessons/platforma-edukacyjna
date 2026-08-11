@@ -14,53 +14,58 @@ from .schemas import (
     WorkspaceListResponse, ToggleFavouriteRequest,
     SetActiveResponse, MessageResponse,
 )
-from .service import (
-    get_user_workspaces, get_workspace_by_id, create_workspace,
-    update_workspace, delete_workspace, toggle_workspace_favourite,
-    leave_workspace, set_active_workspace, get_dashboard_init_data
-)
+from .service import WorkspaceService
 
 router = APIRouter(tags=["Workspaces"])
 
 @router.get("/init", response_model=ApiResponse[dict])
 async def get_dashboard_initial_data(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """Pobiera bootstrap całego dasha z 1 strzałem SQL (złączone tabele Workspaces i Boards)"""
-    init_data = await get_dashboard_init_data(db, current_user.id)
+    service = WorkspaceService(db)
+    init_data = await service.get_dashboard_init_data(current_user.id)
     return ApiResponse(success=True, data=init_data)
 
 @router.get("", response_model=ApiResponse[WorkspaceListResponse])
 async def get_workspaces(db=Depends(get_db), current_user=Depends(get_current_user)):
-    workspaces = get_user_workspaces(db, current_user.id)
+    service = WorkspaceService(db)
+    workspaces = service.get_user_workspaces(current_user.id)
     return ApiResponse(success=True, data=WorkspaceListResponse(workspaces=workspaces, total=len(workspaces)))
 
 @router.get("/{workspace_id}", response_model=ApiResponse[WorkspaceResponse])
 async def get_workspace(workspace_id: int, db=Depends(get_db), current_user=Depends(get_current_user)):
-    return ApiResponse(success=True, data=get_workspace_by_id(db, workspace_id, current_user.id))
+    service = WorkspaceService(db)
+    return ApiResponse(success=True, data=service.get_workspace_by_id(workspace_id, current_user.id))
 
 @router.post("", response_model=ApiResponse[WorkspaceResponse], status_code=status.HTTP_201_CREATED)
 async def create_new_workspace(workspace_data: WorkspaceCreate, db=Depends(get_db), current_user=Depends(get_current_user)):
-    return ApiResponse(success=True, data=create_workspace(db, workspace_data, current_user.id))
+    service = WorkspaceService(db)
+    return ApiResponse(success=True, data=service.create_workspace(workspace_data, current_user.id))
 
 @router.put("/{workspace_id}", response_model=ApiResponse[WorkspaceResponse])
 async def update_existing_workspace(workspace_id: int, workspace_data: WorkspaceUpdate, db=Depends(get_db), current_user=Depends(get_current_user)):
-    return ApiResponse(success=True, data=update_workspace(db, workspace_id, workspace_data, current_user.id))
+    service = WorkspaceService(db)
+    return ApiResponse(success=True, data=service.update_workspace(workspace_id, workspace_data, current_user.id))
 
 @router.delete("/{workspace_id}", response_model=ApiResponse[MessageResponse])
 async def delete_existing_workspace(workspace_id: int, db=Depends(get_db), current_user=Depends(get_current_user)):
-    result = delete_workspace(db, workspace_id, current_user.id)
+    service = WorkspaceService(db)
+    result = service.delete_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=MessageResponse(**result))
 
 @router.delete("/{workspace_id}/leave", response_model=ApiResponse[MessageResponse])
 async def leave_existing_workspace(workspace_id: int, db=Depends(get_db), current_user=Depends(get_current_user)):
-    result = leave_workspace(db, workspace_id, current_user.id)
+    service = WorkspaceService(db)
+    result = service.leave_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=MessageResponse(**result))
 
 @router.patch("/{workspace_id}/favourite", response_model=ApiResponse[MessageResponse])
 async def toggle_favourite(workspace_id: int, request: ToggleFavouriteRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
-    result = toggle_workspace_favourite(db, workspace_id, current_user.id, request.is_favourite)
+    service = WorkspaceService(db)
+    result = service.toggle_workspace_favourite(workspace_id, current_user.id, request.is_favourite)
     return ApiResponse(success=True, data=MessageResponse(message=result["message"]))
 
 @router.patch("/{workspace_id}/set-active", response_model=ApiResponse[SetActiveResponse])
 async def set_active(workspace_id: int, db=Depends(get_db), current_user=Depends(get_current_user)):
-    result = set_active_workspace(db, workspace_id, current_user)
+    service = WorkspaceService(db)
+    result = service.set_active_workspace(workspace_id, current_user)
     return ApiResponse(success=True, data=SetActiveResponse(**result))
