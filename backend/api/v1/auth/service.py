@@ -21,9 +21,8 @@ from core.models import User, RefreshToken
 from .schemas import (
     RegisterUser, LoginData, VerifyEmail,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
-    RegisterResponse, AuthResponse, UserResponse,
-    ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
-    MeResponse
+    RegisterResponse, AuthResponse, UserResponse, 
+    MessageResponse, VerifyResetCodeResponse, MeResponse
 )
 from .utils import (
     hash_password, verify_password, create_access_token, hash_refresh_token,
@@ -216,7 +215,7 @@ class AuthService:
 
         return self._create_session(user)
 
-    async def resend_code(self, user_id: int) -> ResendCodeResponse:
+    async def resend_code(self, user_id: int) -> MessageResponse:
         """Ponowne wysłanie kodu"""
         logger.info(f"Resend dla user_id={user_id}")
 
@@ -235,7 +234,7 @@ class AuthService:
 
         logger.info(f"Nowy kod wysłany (user_id={user.id})")
 
-        return ResendCodeResponse(message="Nowy kod wysłany")
+        return MessageResponse(message="Nowy kod wysłany")
 
     # === PASSWORD RESET ===
 
