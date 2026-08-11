@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch, AsyncMock
 
 from api.v1.auth.service import AuthService
-from api.v1.auth.schemas import ResendCodeResponse
+from api.v1.auth.schemas import MessageResponse
 from core.exceptions import NotFoundError, ValidationError
 
 MOCK_EMAIL = "api.v1.auth.service.send_email"
@@ -20,7 +20,7 @@ class TestResendCodeSuccess:
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
             result = await AuthService(db_session, redis_client).resend_code(unverified_user.id)
 
-        assert isinstance(result, ResendCodeResponse)
+        assert isinstance(result, MessageResponse)
         assert "wysłany" in result.message.lower() or "wysłano" in result.message.lower()
 
     @pytest.mark.asyncio
@@ -84,4 +84,4 @@ class TestResendCodeErrors:
             result = await service.resend_code(unverified_user.id)
 
         mock_send.assert_not_called()
-        assert isinstance(result, ResendCodeResponse)
+        assert isinstance(result, MessageResponse)

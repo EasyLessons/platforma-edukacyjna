@@ -78,11 +78,6 @@ class ResetPassword(BaseModel):
 
 # === RESPONSE SCHEMAS (API output) ===
 
-class ResendCodeResponse(BaseModel):
-    """Response po ponownym wysłaniu kodu"""
-    message: str
-
-
 class MessageResponse(BaseModel):
     """Generic response z wiadomością"""
     message: str

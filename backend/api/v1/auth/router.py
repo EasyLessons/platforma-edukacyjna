@@ -16,8 +16,8 @@ from .schemas import (
     RegisterUser, RegisterResponse,
     LoginData, AuthResponse,
     VerifyEmail, ResendCode,
-    RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
-    ResendCodeResponse, MessageResponse, VerifyResetCodeResponse,
+    RequestPasswordReset, VerifyPasswordResetCode, ResetPassword, 
+    MessageResponse, VerifyResetCodeResponse,
     UserResponse, RefreshResponse, MeResponse,
     GoogleLoginRequest, AvatarUpdate
 )
@@ -83,7 +83,7 @@ async def verify_email(
 
 @router.post(
     "/resend-code",
-    response_model=ApiResponse[ResendCodeResponse],
+    response_model=ApiResponse[MessageResponse],
     summary="Resend verification code",
     description="Wysyła nowy kod weryfikacyjny na email",
     responses={404: {"description": "User not found"}}
