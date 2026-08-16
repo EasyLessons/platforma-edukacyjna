@@ -6,7 +6,7 @@ FastAPI, moduł per domenę pod `backend/api/v1/`. Każdy moduł ma ten sam kszt
 
 - **auth/** — rejestracja, logowanie, weryfikacja emaila (kod 6-cyfrowy), reset hasła, Google OAuth, refresh/logout, `/me`, wyszukiwanie userów. Pełny opis przepływu: `docs/architecture/auth.md`.
 - **boards/** — CRUD boardu, dołączanie do boardu, ulubione, ustawienia boardu, lista członków boardu.
-- **workspaces/** — CRUD workspace'u, `/init` (dane startowe dashboardu), ulubione, ustawienie aktywnego workspace'u, opuszczanie workspace'u. Plus podmoduły: `invites_router.py`/`invites_service.py` (zaproszenia), `members_router.py`/`members_service.py` (członkowie), `realtime.py` (wysyłanie eventów Broadcast do frontendu — patrz `pipelines.md`).
+- **workspaces/** — CRUD workspace'u (`GET /workspaces/{id}` zwraca workspace razem z jego boardami — komponuje `BoardService`), ulubione, opuszczanie workspace'u. Plus podmoduły: `invites_router.py`/`invites_service.py` (zaproszenia), `members_router.py`/`members_service.py` (członkowie), `realtime.py` (wysyłanie eventów Broadcast do frontendu — patrz `pipelines.md`).
 - **notifications/** — lista powiadomień, oznaczanie jako przeczytane (pojedynczo/wszystkie), usuwanie.
 - **whiteboard/** — endpointy związane z elementami tablicy (`board_elements`).
 - **assets/** — zapisane szablony/assety użytkownika (`saved_assets`).
@@ -17,7 +17,7 @@ Poza `api/v1/`: **backend/core/** (config, database — połączenie z Postgrese
 
 10 tabel. Motyw ogólny: znormalizowane relacje tam gdzie struktura jest stała (users/workspaces/boards), JSONB tam gdzie dane są zmienne kształtem (elementy tablicy, payload powiadomień, ustawienia).
 
-- **User** — konto. `hashed_password` nullable (bo Google OAuth nie ma hasła), `auth_provider` rozróżnia `"email"`/`"google"`. `active_workspace_id` — który workspace user ma aktualnie otwarty w UI. `is_active=False` domyślnie — aktywacja po weryfikacji emaila.
+- **User** — konto. `hashed_password` nullable (bo Google OAuth nie ma hasła), `auth_provider` rozróżnia `"email"`/`"google"`. `is_active=False` domyślnie — aktywacja po weryfikacji emaila.
 - **Workspace** — kontener na boardy. `created_by` → właściciel.
 - **WorkspaceMember** — tabela łącząca User↔Workspace (many-to-many) z dodatkowymi atrybutami: `role` (`owner`/`editor`), `is_favourite`, `joined_at`.
 - **Board** — należy do workspace'u. `settings` jako JSONB (elastyczna konfiguracja boardu bez migracji schematu przy każdej nowej opcji).

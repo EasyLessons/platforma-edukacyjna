@@ -140,8 +140,7 @@ class AuthService:
             self.db.flush()
             logger.info(f"User utworzony (ID: {new_user.id})")
 
-            starter_workspace = OnboardingService(self.db).setup_new_user(new_user.id)
-            new_user.active_workspace_id = starter_workspace.id
+            OnboardingService(self.db).setup_new_user(new_user.id)
             
             self.db.commit()
             self.db.refresh(new_user)
@@ -409,8 +408,7 @@ class AuthService:
             self.db.flush()
             logger.info(f"Nowy użytkownik Google (ID: {user.id})")
 
-            starter_workspace = OnboardingService(self.db).setup_new_user(user.id)
-            user.active_workspace_id = starter_workspace.id
+            OnboardingService(self.db).setup_new_user(user.id)
             self.db.commit()
             self.db.refresh(user)
             logger.info(f"Workspace utworzony (user_id={user.id})")

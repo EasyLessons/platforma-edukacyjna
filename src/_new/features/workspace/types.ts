@@ -6,7 +6,7 @@
  * IDEA: typy zawarte w pliku są wspódzielone przez różne komponenty.
  */
 
-import type { User, UserBasic } from '@/_new/shared/types/user';
+import type { User } from '@/_new/shared/types/user';
 
 // CORE WORKSPACE TYPES
 export interface Workspace {
@@ -14,12 +14,7 @@ export interface Workspace {
   name: string;
   icon: string;
   bg_color: string;
-  created_by: number;
-  creator?: UserBasic;
-  member_count: number;
-  board_count: number;
   is_owner: boolean;
-  role: string;
   is_favourite: boolean;
 }
 

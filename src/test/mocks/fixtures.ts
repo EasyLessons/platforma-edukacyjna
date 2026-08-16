@@ -57,11 +57,7 @@ export const mockWorkspace: Workspace = {
   name: 'Test Workspace',
   icon: 'Home',
   bg_color: 'green-500',
-  created_by: 1,
-  member_count: 2,
-  board_count: 1,
   is_owner: true,
-  role: 'owner',
   is_favourite: false,
 };
 

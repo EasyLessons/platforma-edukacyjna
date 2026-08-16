@@ -1,15 +1,7 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
-
-class UserBasic(BaseModel):
-    id: int
-    username: str
-    email: str
-    full_name: Optional[str] = None
-
-    class Config:
-        from_attributes = True
+from api.v1.boards.schemas import BoardListResponse
 
 
 class WorkspaceCreate(BaseModel):
@@ -29,16 +21,15 @@ class WorkspaceResponse(BaseModel):
     name: str
     icon: str
     bg_color: str
-    created_by: int
-    creator: Optional[UserBasic] = None
-    member_count: int = 0
-    board_count: int = 0
     is_owner: bool = False
-    role: str = "editor"
     is_favourite: bool = False
 
     class Config:
         from_attributes = True
+
+
+class WorkspaceWithBoardsResponse(WorkspaceResponse):
+    boards: BoardListResponse
 
 
 class WorkspaceListResponse(BaseModel):
@@ -49,10 +40,6 @@ class WorkspaceListResponse(BaseModel):
 class ToggleFavouriteRequest(BaseModel):
     is_favourite: bool
 
-
-class SetActiveResponse(BaseModel):
-    message: str
-    active_workspace_id: int
 
 class MessageResponse(BaseModel):
     """Generic response z wiadomością"""

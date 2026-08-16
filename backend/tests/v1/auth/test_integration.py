@@ -77,8 +77,6 @@ class TestRegistrationToLoginFlow:
         assert membership.role == "owner"
         assert membership.is_favourite is True
 
-        assert db_user.active_workspace_id == workspace.id
-
 
 class TestPasswordResetFlow:
 

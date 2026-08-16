@@ -72,7 +72,7 @@ class TestRegisterSuccess:
 
     @pytest.mark.asyncio
     async def test_creates_starter_workspace(self, db_session, redis_client):
-        """Tworzy starter workspace i ustawia go jako aktywny"""
+        """Tworzy starter workspace."""
         with patch(MOCK_EMAIL, new_callable=AsyncMock):
             result = await AuthService(db_session, redis_client).register_user(make_user_data())
 
@@ -83,7 +83,6 @@ class TestRegisterSuccess:
         ).first()
         assert workspace is not None
         assert workspace.name == "Moja przestrzeń"
-        assert db_user.active_workspace_id == workspace.id
 
     @pytest.mark.asyncio
     async def test_creates_owner_membership(self, db_session, redis_client):
