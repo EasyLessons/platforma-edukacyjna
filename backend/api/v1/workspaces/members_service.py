@@ -69,13 +69,11 @@ class MemberService:
         if not membership:
             raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
 
-        user = db.query(User).filter(User.id == member_user_id).first()
-        username = user.username if user else "Użytkownik"
-
         db.delete(membership)
         db.commit()
+        
         return RemoveMemberResponse(
-            message=f"Użytkownik {username} został usunięty z workspace'a"
+            message=f"Użytkownik id:{member_user_id} został usunięty z workspace'a"
         )
 
     def update_member_role(
@@ -99,14 +97,11 @@ class MemberService:
         if not membership:
             raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
 
-        user = db.query(User).filter(User.id == member_user_id).first()
-        username = user.username if user else "Użytkownik"
-        old_role = membership.role
-
         membership.role = new_role
         db.commit()
+        
         return {
-            "message": f"Zmieniono rolę użytkownika {username} z '{old_role}' na '{new_role}'",
+            "message": f"Zmieniono rolę użytkownika id:{member_user_id} na '{new_role}'",
             "new_role": new_role,
             "user_id": member_user_id,
         }

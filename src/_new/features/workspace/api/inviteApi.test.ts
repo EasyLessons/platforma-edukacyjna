@@ -8,6 +8,7 @@ import {
   rejectInvite,
   checkUserInviteStatus,
   checkUsersInviteStatusBatch,
+  searchWorkspaceUsers,
 } from './inviteApi';
 import { AppError } from '@new/lib/errors/AppError';
 import {
@@ -147,5 +148,20 @@ describe('checkUsersInviteStatusBatch', () => {
     const result = await checkUsersInviteStatusBatch(10, [2, 3]);
     expect(result[2].can_invite).toBe(true);
     expect(result[3].is_member).toBe(true);
+  });
+});
+
+// ─── searchWorkspaceUsers ──────────────────────────────────────────────────
+
+describe('searchWorkspaceUsers', () => {
+  it('zwraca listę userów pasujących do zapytania', async () => {
+    const users = [{ id: 2, username: 'testuser2', email: 'test2@example.com' }];
+    mock.onGet('/api/v1/workspaces/10/members/search').reply(200, {
+      success: true,
+      data: users,
+    });
+    const result = await searchWorkspaceUsers(10, 'testuser', 10);
+    expect(result).toHaveLength(1);
+    expect(result[0].username).toBe('testuser2');
   });
 });

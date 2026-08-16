@@ -66,7 +66,7 @@ export const searchWorkspaceUsers = (
   limit: 10
 ): Promise<UserSearchResult[]> =>
   apiClient
-    .get<UserSearchResult[]>(`/api/v1/workspaces/${workspace_id}/member/search`, {
+    .get<UserSearchResult[]>(`/api/v1/workspaces/${workspace_id}/members/search`, {
       params: { query, limit },
     })
     .then((res) => res.data);
