@@ -43,18 +43,19 @@ async def reject_workspace_invite(token: str, db=Depends(get_db), current_user=D
     return ApiResponse(success=True, data=MessageResponse(**result))
 
 @router.get("/{workspace_id}/members/check/{user_id}", response_model=ApiResponse[InviteStatusResponse])
-async def check_user_invite_status(workspace_id: int, user_id: int, db=Depends(get_db)):
+async def check_user_invite_status(workspace_id: int, user_id: int, db=Depends(get_db), current_user: User = Depends(get_current_user)):
     service = InviteService(db)
-    return ApiResponse(success=True, data=service.check_invite_status(workspace_id, user_id))
+    return ApiResponse(success=True, data=service.check_invite_status(workspace_id, user_id, current_user.id))
 
 @router.post("/{workspace_id}/members/check-batch", response_model=ApiResponse[InviteStatusBatchResponse])
 async def check_users_invite_status_batch(
     workspace_id: int,
     payload: InviteStatusBatchRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     service = InviteService(db)
-    statuses = service.check_invite_status_batch(workspace_id, payload.user_ids)
+    statuses = service.check_invite_status_batch(workspace_id, payload.user_ids, current_user.id)
     return ApiResponse(success=True, data=InviteStatusBatchResponse(statuses=statuses))
 
 @router.get("/{workspace_id}/members/search", response_model=ApiResponse[List[UserSearchResult]])

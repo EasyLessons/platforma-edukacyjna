@@ -4,8 +4,9 @@ Members service — zarządzanie członkami workspace'a.
 from typing import List
 from sqlalchemy.orm import Session, joinedload
 
+from core.models import User, WorkspaceMember
 from core.exceptions import NotFoundError, AppException
-from core.models import User, Workspace, WorkspaceMember
+from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
     MyRoleResponse, RemoveMemberResponse, UserSearchResult
@@ -21,16 +22,7 @@ class MemberService:
     ) -> WorkspaceMembersListResponse:
         """Pobiera listę członków — dostępna dla każdego członka workspace'a."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-
-        caller_membership = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not caller_membership:
-            raise NotFoundError("Nie masz dostępu do tego workspace'a")
+        workspace, _ = require_membership(db, workspace_id, user_id)
 
         memberships = (
             db.query(WorkspaceMember)
@@ -62,11 +54,8 @@ class MemberService:
     ) -> RemoveMemberResponse:
         """Usuwa członka — tylko owner, nie może usunąć siebie."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-        if workspace.created_by != current_user_id:
-            raise AppException("Tylko właściciel może usuwać członków", status_code=403)
+        require_owner(db, workspace_id, current_user_id, "Tylko właściciel może usuwać członków")
+
         if member_user_id == current_user_id:
             raise AppException(
                 "Nie możesz usunąć siebie. Użyj opcji 'Opuść workspace'.",
@@ -98,11 +87,8 @@ class MemberService:
     ) -> dict:
         """Zmienia rolę członka — tylko owner, nie może zmienić własnej roli."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-        if workspace.created_by != current_user_id:
-            raise AppException("Tylko właściciel może zmieniać role", status_code=403)
+        require_owner(db, workspace_id, current_user_id, "Tylko właściciel może zmieniać role członków")
+
         if member_user_id == current_user_id:
             raise AppException("Nie możesz zmienić własnej roli", status_code=400)
 
@@ -130,16 +116,7 @@ class MemberService:
     ) -> MyRoleResponse:
         """Pobiera rolę zalogowanego usera w danym workspace'ie."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-
-        membership = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not membership:
-            raise NotFoundError("Nie jesteś członkiem tego workspace'a")
+        workspace, membership = require_membership(db, workspace_id, user_id)
 
         is_owner = workspace.created_by == user_id
         return MyRoleResponse(
@@ -157,6 +134,8 @@ class MemberService:
     ) -> List[UserSearchResult]:
         """Wyszukuje użytkowników do zaproszenia - wyklucza siebie i obecnych członków."""
         db = self.db
+        require_membership(db, workspace_id, current_user_id)
+
         query = query.strip().lower()
         if len(query) < 2:
             return []

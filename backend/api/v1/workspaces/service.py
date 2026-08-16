@@ -7,8 +7,9 @@ from typing import List
 from sqlalchemy.orm import Session
 from api.v1.boards.service import BoardService
 
-from core.exceptions import NotFoundError, AppException
+from core.exceptions import AppException
 from core.models import Workspace, WorkspaceMember
+from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, 
     WorkspaceResponse, WorkspaceWithBoardsResponse,
@@ -82,21 +83,7 @@ class WorkspaceService:
     async def get_workspace_with_boards(self, workspace_id: int, user_id: int, boards_limit: int = 50, boards_offset: int = 0) -> WorkspaceWithBoardsResponse:
         """Pobiera workspace wraz z listą boardów. Sprawdza, czy użytkownik jest członkiem workspace'a."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-
-        membership = (
-            db.query(WorkspaceMember)
-            .filter(
-                WorkspaceMember.workspace_id == workspace_id,
-                WorkspaceMember.user_id == user_id,
-            )
-            .first()
-        )
-        if not membership:
-            raise NotFoundError("Nie masz dostępu do tego workspace'a")
+        workspace, membership = require_membership(db, workspace_id, user_id)
 
         workspace_response = WorkspaceResponse(
             id=workspace.id,
@@ -143,11 +130,7 @@ class WorkspaceService:
     ) -> WorkspaceResponse:
         """Aktualizuje workspace — tylko owner."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-        if workspace.created_by != user_id:
-            raise AppException("Tylko właściciel może edytować workspace", status_code=403)
+        workspace = require_owner(db, workspace_id, user_id, "Tylko właściciel może edytować workspace")
 
         if data.name is not None:
             workspace.name = data.name
@@ -175,11 +158,7 @@ class WorkspaceService:
     def delete_workspace(self, workspace_id: int, user_id: int) -> dict:
         """Usuwa workspace — tylko owner."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie został znaleziony")
-        if workspace.created_by != user_id:
-            raise AppException("Tylko właściciel może usunąć workspace", status_code=403)
+        workspace = require_owner(db, workspace_id, user_id, "Tylko właściciel może usunąć workspace")
 
         db.delete(workspace)
         db.commit()
@@ -190,12 +169,7 @@ class WorkspaceService:
     ) -> dict:
         """Zmienia status ulubionego dla workspace'a."""
         db = self.db
-        membership = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not membership:
-            raise NotFoundError("Nie jesteś członkiem tego workspace'a")
+        _, membership = require_membership(db, workspace_id, user_id)
 
         membership.is_favourite = is_favourite
         db.commit()
@@ -204,15 +178,9 @@ class WorkspaceService:
     def leave_workspace(self, workspace_id: int, user_id: int) -> dict:
         """Opuszczenie workspace'a — owner nie może opuścić."""
         db = self.db
-        membership = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not membership:
-            raise NotFoundError("Nie jesteś członkiem tego workspace'a")
+        workspace, membership = require_membership(db, workspace_id, user_id)
 
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if workspace and workspace.created_by == user_id:
+        if workspace.created_by == user_id:
             raise AppException(
                 "Właściciel nie może opuścić workspace'a. Musisz go usunąć.",
                 status_code=403,

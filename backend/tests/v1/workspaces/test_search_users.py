@@ -3,9 +3,12 @@ Testy wyszukiwania użytkowników do zaproszenia
 GET /api/v1/workspaces/{workspace_id}/members/search
 """
 
+import pytest
+
 from api.v1.workspaces.members_service import MemberService
 from api.v1.workspaces.schemas import UserSearchResult
 from api.v1.auth.utils import hash_password
+from core.exceptions import NotFoundError
 from core.models import User
 
 
@@ -130,3 +133,17 @@ class TestSearchUsersEdgeCases:
         service = MemberService(db_session)
         results = service.search_workspace_users(test_workspace.id, "xqznonexistent", test_user.id, limit=10)
         assert results == []
+
+
+class TestSearchUsersAuthorization:
+
+    def test_non_member_caller_raises_not_found(self, db_session, test_workspace, test_user3):
+        """Caller niebędący członkiem workspace'a nie może przeszukiwać jego userów"""
+        service = MemberService(db_session)
+        with pytest.raises(NotFoundError):
+            service.search_workspace_users(test_workspace.id, "testuser", test_user3.id, limit=10)
+
+    def test_nonexistent_workspace_raises_not_found(self, db_session, test_user):
+        service = MemberService(db_session)
+        with pytest.raises(NotFoundError):
+            service.search_workspace_users(99999, "testuser", test_user.id, limit=10)

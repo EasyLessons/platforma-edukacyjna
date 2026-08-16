@@ -14,6 +14,7 @@ from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import User, Workspace, WorkspaceInvite, WorkspaceMember
 from core.logging import get_logger
 from api.v1.notifications.service import create_notification
+from .authorization import get_workspace_or_404, require_membership
 from .realtime import broadcast_notification
 from .utils import send_workspace_invite_email
 from .schemas import (
@@ -44,16 +45,8 @@ class InviteService:
     ) -> InviteResponse:
         """Tworzy zaproszenie + powiadomienie + opcjonalnie email."""
         db = self.db
-        workspace = db.query(Workspace).filter(Workspace.id == workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie istnieje")
-
-        if not db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first():
-            raise AppException("Nie jesteś członkiem workspace'a", status_code=403)
-
+        workspace, _ = require_membership(db, workspace_id, user_id)
+        
         invited_user = db.query(User).filter(User.id == invited_user_id).first()
         if not invited_user:
             raise NotFoundError("Użytkownik nie istnieje")
@@ -166,9 +159,7 @@ class InviteService:
         if invite.is_used:
             raise ConflictError("Zaproszenie już użyte")
 
-        workspace = db.query(Workspace).filter(Workspace.id == invite.workspace_id).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie istnieje")
+        workspace = get_workspace_or_404(db, invite.workspace_id)
 
         if db.query(WorkspaceMember).filter(
             WorkspaceMember.workspace_id == invite.workspace_id,
@@ -240,6 +231,7 @@ class InviteService:
                 continue
             inviter = db.query(User).filter(User.id == invite.invited_by).first()
             invited_user = db.query(User).filter(User.id == invite.invited_id).first()
+
             result.append(PendingInviteResponse(
                 id=invite.id,
                 workspace_id=invite.workspace_id,
@@ -257,10 +249,13 @@ class InviteService:
         return result
 
     def check_invite_status(
-        self, workspace_id: int, user_id: int
+        self, workspace_id: int, user_id: int, current_user_id: int
     ) -> InviteStatusResponse:
         """Sprawdza czy user jest członkiem lub ma aktywne zaproszenie."""
         db = self.db
+
+        require_membership(db, workspace_id, current_user_id)
+        
         is_member = db.query(WorkspaceMember).filter(
             WorkspaceMember.workspace_id == workspace_id,
             WorkspaceMember.user_id == user_id,
@@ -280,9 +275,10 @@ class InviteService:
         )
 
     def check_invite_status_batch(
-        self, workspace_id: int, user_ids: List[int]
+        self, workspace_id: int, user_ids: List[int], current_user_id: int
     ) -> Dict[int, InviteStatusResponse]:
         db = self.db
+        require_membership(db, workspace_id, current_user_id)  # Sprawdzenie członkostwa dla pierwszego użytkownika
         unique_user_ids = sorted(set(user_ids))
         if not unique_user_ids:
             return {}
