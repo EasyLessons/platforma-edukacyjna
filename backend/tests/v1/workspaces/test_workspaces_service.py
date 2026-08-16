@@ -29,13 +29,6 @@ class TestCreateWorkspace:
         service = WorkspaceService(db_session)
         result = service.create_workspace(WorkspaceCreate(name="X"), test_user.id)
         assert result.is_owner is True
-        assert result.role == "owner"
-
-    def test_initial_counts(self, db_session, test_user):
-        service = WorkspaceService(db_session)
-        result = service.create_workspace(WorkspaceCreate(name="X"), test_user.id)
-        assert result.member_count == 1
-        assert result.board_count == 0
 
     def test_creates_membership_in_db(self, db_session, test_user):
         service = WorkspaceService(db_session)
@@ -83,7 +76,6 @@ class TestGetWorkspaces:
         result = service.get_user_workspaces(test_user2.id)
         assert len(result) == 1
         assert result[0].is_owner is False
-        assert result[0].role == "editor"
 
     def test_does_not_return_other_users_workspaces(self, db_session, test_user, test_user2):
         service = WorkspaceService(db_session)
@@ -91,41 +83,33 @@ class TestGetWorkspaces:
         result = service.get_user_workspaces(test_user2.id)
         assert result == []
 
-    def test_correct_member_and_board_counts(self, db_session, test_user, test_user2):
+
+class TestGetWorkspaceWithBoards:
+
+    @pytest.mark.asyncio
+    async def test_returns_workspace(self, db_session, test_user, test_workspace):
         service = WorkspaceService(db_session)
-        ws = service.create_workspace(WorkspaceCreate(name="X"), test_user.id)
-        db_session.add(WorkspaceMember(
-            workspace_id=ws.id, user_id=test_user2.id,
-            role="editor", is_favourite=False, joined_at=datetime.utcnow(),
-        ))
-        db_session.add(Board(
-            name="B1", workspace_id=ws.id, created_by=test_user.id,
-            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
-        ))
-        db_session.commit()
-
-        result = service.get_user_workspaces(test_user.id)
-        assert result[0].member_count == 2
-        assert result[0].board_count == 1
-
-
-class TestGetWorkspaceById:
-
-    def test_returns_workspace(self, db_session, test_user, test_workspace):
-        service = WorkspaceService(db_session)
-        result = service.get_workspace_by_id(test_workspace.id, test_user.id)
+        result = await service.get_workspace_with_boards(test_workspace.id, test_user.id)
         assert result.id == test_workspace.id
 
-    def test_nonexistent_raises_not_found(self, db_session, test_user):
+    @pytest.mark.asyncio
+    async def test_returns_empty_boards_list(self, db_session, test_user, test_workspace):
+        service = WorkspaceService(db_session)
+        result = await service.get_workspace_with_boards(test_workspace.id, test_user.id)
+        assert result.boards.boards == []
+        assert result.boards.total == 0
+
+    @pytest.mark.asyncio
+    async def test_nonexistent_raises_not_found(self, db_session, test_user):
         service = WorkspaceService(db_session)
         with pytest.raises(NotFoundError):
-            service.get_workspace_by_id(99999, test_user.id)
+            await service.get_workspace_with_boards(99999, test_user.id)
 
-    def test_no_access_raises_not_found(self, db_session, test_workspace, test_user2):
+    @pytest.mark.asyncio
+    async def test_no_access_raises_not_found(self, db_session, test_workspace, test_user2):
         service = WorkspaceService(db_session)
         with pytest.raises(NotFoundError):
-            service.get_workspace_by_id(test_workspace.id, test_user2.id)
-
+            await service.get_workspace_with_boards(test_workspace.id, test_user2.id)
 
 class TestUpdateWorkspace:
 

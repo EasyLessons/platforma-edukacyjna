@@ -53,7 +53,6 @@ class TestGoogleLoginNewUser:
         workspace = db_session.query(Workspace).filter(Workspace.created_by == user.id).first()
 
         assert workspace is not None
-        assert user.active_workspace_id == workspace.id
 
     @pytest.mark.asyncio
     async def test_username_conflict_resolved(self, db_session):
