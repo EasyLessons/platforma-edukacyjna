@@ -8,7 +8,7 @@ from datetime import datetime
 from api.v1.workspaces.service import WorkspaceService
 from api.v1.workspaces.schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
 from core.exceptions import NotFoundError, AppException
-from core.models import Workspace, WorkspaceMember, Board
+from core.models import Workspace, WorkspaceMember
 
 
 class TestCreateWorkspace:

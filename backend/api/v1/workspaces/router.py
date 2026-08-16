@@ -2,11 +2,9 @@
 Workspace CRUD router — /api/v1/workspaces/*
 """
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
-from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
