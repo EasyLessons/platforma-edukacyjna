@@ -8,15 +8,23 @@ import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
 import WorkspaceTopNav from './Components/workspace-top-nav';
 import RecentsView from './Components/RecentsView';
-import { useWorkspaces, useDashboardInit } from '@/_new/features/workspace/hooks/useWorkspaces';
+import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
+
+const ACTIVE_WORKSPACE_STORAGE_KEY = 'dashboard:activeWorkspaceId';
+
+function readStoredWorkspaceId(): number | null {
+  if (typeof window === 'undefined') return null;
+  const raw = window.localStorage.getItem(ACTIVE_WORKSPACE_STORAGE_KEY);
+  if (!raw) return null;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
 export default function Dashboard() {
-  // --- 1. BOOTSTRAP DASHBOARD ---
-  // To zapewnia tylko jeden call do /init na starcie.
-  const { isLoading: initLoading } = useDashboardInit();
+  const { loading: workspacesLoading } = useWorkspaces();
 
-  if (initLoading) {
-    // Globalny loader na całą stronę dopóki Megabundle ładuje dane z init.
+  if (workspacesLoading) {
+    // Globalny loader na całą stronę dopóki lista workspace'ów się ładuje.
     return (
       <div className="h-screen w-full flex items-center justify-center bg-gray-50/50">
         <div className="flex flex-col items-center">
@@ -44,7 +52,7 @@ function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  // Zaciągną dane prosto z cache zasiane przez useDashboardInit
+  // Ten sam query key co w Dashboard (nadrzędnym) — React Query dedupluje, zero dodatkowego requestu
   const {
     workspaces,
     loading,
@@ -101,7 +109,11 @@ function DashboardContent() {
     const defaultWorkspaceId = firstFavourite ? firstFavourite.id : workspaces[0].id;
 
     if (!activeWorkspaceId) {
-      setActiveWorkspaceId(defaultWorkspaceId);
+      const storedWorkspaceId = readStoredWorkspaceId();
+      const storedExists =
+        storedWorkspaceId !== null &&
+        workspaces.some((workspace) => workspace.id === storedWorkspaceId);
+      setActiveWorkspaceId(storedExists ? storedWorkspaceId : defaultWorkspaceId);
       return;
     }
 
@@ -110,6 +122,13 @@ function DashboardContent() {
       setActiveWorkspaceId(defaultWorkspaceId);
     }
   }, [workspaces, activeWorkspaceId, workspaceIdFromUrl, appliedUrlWorkspaceId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (activeWorkspaceId) {
+      window.localStorage.setItem(ACTIVE_WORKSPACE_STORAGE_KEY, activeWorkspaceId.toString());
+    }
+  }, [activeWorkspaceId]);
 
   const activeWorkspaceName = useMemo(() => {
     if (!activeWorkspaceId) return undefined;

@@ -5,7 +5,6 @@
  *
  * FUNKCJE:
  * - fetchWorkspaces() → Pobiera listę workspace'ów użytkownika
- * - fetchWorkspaceById() → Pobiera jeden workspace
  * - createWorkspace() → Tworzy nowy workspace
  * - updateWorkspace() → Aktualizuje workspace
  * - deleteWorkspace() → Usuwa workspace
@@ -23,12 +22,6 @@ import type {
 export const fetchWorkspaces = (): Promise<WorkspaceListResponse> =>
   apiClient.get<WorkspaceListResponse>('/api/v1/workspaces').then((res) => res.data);
 
-export const getDashboardInit = (): Promise<any> =>
-  apiClient.get<any>('/api/v1/workspaces/init').then((res) => res.data);
-
-export const fetchWorkspaceById = (id: number): Promise<Workspace> =>
-  apiClient.get<Workspace>('/api/v1/workspaces/${id}').then((res) => res.data);
-
 export const createWorkspace = (data: WorkspaceCreateRequest): Promise<Workspace> =>
   apiClient.post<Workspace>('/api/v1/workspaces', data).then((res) => res.data);
 
@@ -43,6 +36,3 @@ export const leaveWorkspace = (id: number): Promise<{ message: string }> =>
 
 export const toggleWorkspaceFavourite = (id: number, is_favourite: boolean): Promise<void> =>
   apiClient.patch(`/api/v1/workspaces/${id}/favourite`, { is_favourite }).then(() => undefined);
-
-export const setActiveWorkspace = (id: number): Promise<void> =>
-  apiClient.patch(`/api/v1/workspaces/${id}/set-active`).then(() => undefined);

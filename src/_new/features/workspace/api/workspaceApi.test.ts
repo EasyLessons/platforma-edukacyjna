@@ -8,7 +8,6 @@ import {
   deleteWorkspace,
   leaveWorkspace,
   toggleWorkspaceFavourite,
-  setActiveWorkspace,
 } from './workspaceApi';
 import { AppError } from '@new/lib/errors/AppError';
 import { mockWorkspace, mockWorkspaceListResponse } from '@/test/mocks/fixtures';
@@ -119,14 +118,5 @@ describe('toggleWorkspaceFavourite', () => {
   it('kończy się bez błędu przy sukcesie', async () => {
     mock.onPatch('/api/v1/workspaces/10/favourite').reply(200, { success: true, data: null });
     await expect(toggleWorkspaceFavourite(10, true)).resolves.toBeUndefined();
-  });
-});
-
-// ─── setActiveWorkspace ────────────────────────────────────────────────────
-
-describe('setActiveWorkspace', () => {
-  it('kończy się bez błędu przy sukcesie', async () => {
-    mock.onPatch('/api/v1/workspaces/10/set-active').reply(200, { success: true, data: null });
-    await expect(setActiveWorkspace(10)).resolves.toBeUndefined();
   });
 });

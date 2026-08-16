@@ -27,14 +27,14 @@ import type {
 
 export const fetchBoards = (
   workspace_id: number,
-  limit = 10,
+  limit = 50,
   offset = 0
 ): Promise<BoardListResponse> =>
   apiClient
-    .get<BoardListResponse>('/api/v1/boards', {
-      params: { workspace_id, limit, offset },
+    .get<{ boards: BoardListResponse }>(`/api/v1/workspaces/${workspace_id}`, {
+      params: { boards_limit: limit, boards_offset: offset },
     })
-    .then((res) => res.data);
+    .then((res) => res.data.boards);
 
 export const fetchBoardById = (id: number): Promise<Board> =>
   apiClient.get<Board>(`/api/v1/boards/${id}`).then((res) => res.data);

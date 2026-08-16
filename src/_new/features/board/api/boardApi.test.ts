@@ -37,14 +37,16 @@ afterAll(() => mock.restore());
 
 describe('fetchBoards', () => {
   it('zwraca BoardListResponse przy sukcesie', async () => {
-    mock.onGet('/api/v1/boards').reply(200, { success: true, data: mockBoardListResponse });
+    mock
+      .onGet('/api/v1/workspaces/10')
+      .reply(200, { success: true, data: { boards: mockBoardListResponse } });
     const result = await fetchBoards(10);
     expect(result).toEqual(mockBoardListResponse);
   });
 
   it('rzuca AppError przy 403', async () => {
     window.location.pathname = '/login';
-    mock.onGet('/api/v1/boards').reply(403, { success: false, error: 'Brak dostępu' });
+    mock.onGet('/api/v1/workspaces/10').reply(403, { success: false, error: 'Brak dostępu' });
     await expect(fetchBoards(10)).rejects.toBeInstanceOf(AppError);
   });
 });
