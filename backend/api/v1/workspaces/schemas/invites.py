@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Dict, List
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -38,18 +38,15 @@ class PendingInviteResponse(BaseModel):
         from_attributes = True
 
 
-class InviteStatusResponse(BaseModel):
-    is_member: bool
-    has_pending_invite: bool
-    can_invite: bool
+class UserSearchResult(BaseModel):
+    id: int
+    username: str
+    email: str
+    full_name: Optional[str] = None
+    has_pending_invite: bool = False
 
-
-class InviteStatusBatchRequest(BaseModel):
-    user_ids: List[int]
-
-
-class InviteStatusBatchResponse(BaseModel):
-    statuses: Dict[int, InviteStatusResponse]
+    class Config:
+        from_attributes = True
 
 
 class AcceptInviteResponse(BaseModel):

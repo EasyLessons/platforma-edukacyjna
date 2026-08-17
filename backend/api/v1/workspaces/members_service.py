@@ -1,15 +1,14 @@
 """
 Members service — zarządzanie członkami workspace'a.
 """
-from typing import List
 from sqlalchemy.orm import Session, joinedload
 
-from core.models import User, WorkspaceMember
+from core.models import WorkspaceMember
 from core.exceptions import NotFoundError, AppException
 from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
-    MyRoleResponse, RemoveMemberResponse, UserSearchResult
+    MyRoleResponse, RemoveMemberResponse
 )
 
 
@@ -119,39 +118,3 @@ class MemberService:
             is_owner=is_owner,
             workspace_id=workspace_id,
         )
-
-    def search_workspace_users(
-        self,
-        workspace_id: int,
-        query: str,
-        current_user_id: int,
-        limit: int = 10
-    ) -> List[UserSearchResult]:
-        """Wyszukuje użytkowników do zaproszenia - wyklucza siebie i obecnych członków."""
-        db = self.db
-        require_membership(db, workspace_id, current_user_id)
-
-        query = query.strip().lower()
-        if len(query) < 2:
-            return []
-
-        member_ids_subquery = (
-            db.query(WorkspaceMember.user_id)
-            .filter(WorkspaceMember.workspace_id == workspace_id)
-        )
-
-        users = (
-            db.query(User)
-            .filter(
-                (User.username.ilike(f"%{query}%")) |
-                (User.email.ilike(f"%{query}%")) |
-                (User.full_name.ilike(f"%{query}%"))
-            )
-            .filter(User.id != current_user_id)
-            .filter(User.id.notin_(member_ids_subquery))
-            .filter(User.is_active == True)
-            .limit(limit)
-            .all()
-        )
-
-        return [UserSearchResult.model_validate(u) for u in users]

@@ -37,7 +37,10 @@ export interface WorkspaceFormData {
 }
 
 export type WorkspaceErrors = Partial<Record<keyof WorkspaceFormData, string>>;
-export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & { full_name?: string };
+export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & {
+  full_name?: string;
+  has_pending_invite: boolean;
+};
 
 // API REQUEST TYPES
 export interface WorkspaceCreateRequest {
@@ -93,12 +96,6 @@ export interface AcceptInviteResponse {
   workspace_id: number;
   workspace_name: string;
   role: string;
-}
-
-export interface InviteStatusResponse {
-  is_member: boolean;
-  has_pending_invite: boolean;
-  can_invite: boolean;
 }
 
 export interface MyRoleResponse {

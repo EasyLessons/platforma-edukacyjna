@@ -234,19 +234,11 @@ class TestAcceptInvite:
         assert r.status_code in (400, 404, 410)
 
 
-# ─── GET/POST /workspaces/{id}/members/check(-batch) ──────────────────────────
+# ─── GET /workspaces/{id}/invite/users ─────────────────────────────────────────
 
-class TestCheckInviteStatusAuth:
+class TestSearchInvitableUsersAuth:
 
-    def test_check_401_bez_tokenu(self, client, test_workspace, test_user):
-        """GET /{id}/members/check/{user_id} bez Authorization → 401"""
-        r = client.get(f"/api/v1/workspaces/{test_workspace.id}/members/check/{test_user.id}")
-        assert r.status_code == 401
-
-    def test_check_batch_401_bez_tokenu(self, client, test_workspace, test_user):
-        """POST /{id}/members/check-batch bez Authorization → 401"""
-        r = client.post(
-            f"/api/v1/workspaces/{test_workspace.id}/members/check-batch",
-            json={"user_ids": [test_user.id]},
-        )
+    def test_401_bez_tokenu(self, client, test_workspace):
+        """GET /{id}/invite/users bez Authorization → 401"""
+        r = client.get(f"/api/v1/workspaces/{test_workspace.id}/invite/users?query=test")
         assert r.status_code == 401

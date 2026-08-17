@@ -4,7 +4,6 @@ import type {
   WorkspaceListResponse,
   WorkspaceMembersResponse,
   InviteResponse,
-  InviteStatusResponse,
   PendingInviteResponse,
   AcceptInviteResponse,
   MyRoleResponse,
@@ -112,12 +111,6 @@ export const mockAcceptInviteResponse: AcceptInviteResponse = {
   workspace_id: 10,
   workspace_name: 'Test Workspace',
   role: 'editor',
-};
-
-export const mockInviteStatus: InviteStatusResponse = {
-  is_member: false,
-  has_pending_invite: false,
-  can_invite: true,
 };
 
 export const mockMyRoleResponse: MyRoleResponse = {

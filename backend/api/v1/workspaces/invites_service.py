@@ -4,7 +4,7 @@ Invites service — zaproszenia do workspace'ów.
 import asyncio
 import secrets
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import List
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
@@ -19,7 +19,7 @@ from .realtime import broadcast_notification
 from .utils import send_workspace_invite_email
 from .schemas import (
     InviteResponse, PendingInviteResponse,
-    InviteStatusResponse, AcceptInviteResponse,
+    UserSearchResult, AcceptInviteResponse,
 )
 
 logger = get_logger(__name__)
@@ -144,6 +144,68 @@ class InviteService:
             db.rollback()
             raise AppException(f"Błąd tworzenia zaproszenia: {str(e)}", status_code=500)
 
+    def search_invitable_users(
+        self,
+        workspace_id: int,
+        query: str,
+        current_user_id: int,
+        limit: int = 10
+    ) -> List[UserSearchResult]:
+        """Wyszukuje użytkowników do zaproszenia - 
+        wyklucza siebie i obecnych członków, oznacza już zaproszonych."""
+        db = self.db
+        require_membership(db, workspace_id, current_user_id)
+
+        query = query.strip().lower()
+        if len(query) < 2:
+            return []
+
+        members_ids_subquery = (
+            db.query(WorkspaceMember.user_id)
+            .filter(WorkspaceMember.workspace_id == workspace_id)
+        )
+
+        users = (
+            db.query(User)
+            .filter(
+                (User.username.ilike(f"%{query}%")) |
+                (User.email.ilike(f"%{query}%")) |
+                (User.full_name.ilike(f"%{query}%"))
+            )
+            .filter(User.id != current_user_id)
+            .filter(User.id.notin_(members_ids_subquery))
+            .filter(User.is_active == True)
+            .limit(limit)
+            .all()
+        )
+
+        if not users:
+            return []
+
+        user_ids = [u.id for u in users]
+        pending_ids = {
+            row[0]
+            for row in db.query(WorkspaceInvite.invited_id)
+            .filter(
+                WorkspaceInvite.workspace_id == workspace_id,
+                WorkspaceInvite.invited_id.in_(user_ids),
+                WorkspaceInvite.expires_at > datetime.utcnow(),
+                WorkspaceInvite.is_used == False
+            )
+            .all()
+        }
+
+        return [
+            UserSearchResult(
+                id=u.id,
+                username=u.username,
+                email=u.email,
+                full_name=u.full_name,
+                has_pending_invite=u.id in pending_ids,
+            )
+            for u in users
+        ]
+        
     def accept_invite(self, invite_token: str, user_id: int) -> AcceptInviteResponse:
         """Akceptuje zaproszenie — dodaje usera do workspace'a jako editor."""
         db = self.db
@@ -247,69 +309,3 @@ class InviteService:
                 created_at=invite.created_at,
             ))
         return result
-
-    def check_invite_status(
-        self, workspace_id: int, user_id: int, current_user_id: int
-    ) -> InviteStatusResponse:
-        """Sprawdza czy user jest członkiem lub ma aktywne zaproszenie."""
-        db = self.db
-
-        require_membership(db, workspace_id, current_user_id)
-        
-        is_member = db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first() is not None
-
-        has_pending = db.query(WorkspaceInvite).filter(
-            WorkspaceInvite.workspace_id == workspace_id,
-            WorkspaceInvite.invited_id == user_id,
-            WorkspaceInvite.expires_at > datetime.utcnow(),
-            WorkspaceInvite.is_used == False,
-        ).first() is not None
-
-        return InviteStatusResponse(
-            is_member=is_member,
-            has_pending_invite=has_pending,
-            can_invite=not is_member and not has_pending,
-        )
-
-    def check_invite_status_batch(
-        self, workspace_id: int, user_ids: List[int], current_user_id: int
-    ) -> Dict[int, InviteStatusResponse]:
-        db = self.db
-        require_membership(db, workspace_id, current_user_id)  # Sprawdzenie członkostwa dla pierwszego użytkownika
-        unique_user_ids = sorted(set(user_ids))
-        if not unique_user_ids:
-            return {}
-
-        member_ids = {
-            row[0]
-            for row in db.query(WorkspaceMember.user_id)
-            .filter(
-                WorkspaceMember.workspace_id == workspace_id,
-                WorkspaceMember.user_id.in_(unique_user_ids),
-            )
-            .all()
-        }
-
-        pending_ids = {
-            row[0]
-            for row in db.query(WorkspaceInvite.invited_id)
-            .filter(
-                WorkspaceInvite.workspace_id == workspace_id,
-                WorkspaceInvite.invited_id.in_(unique_user_ids),
-                WorkspaceInvite.expires_at > datetime.utcnow(),
-                WorkspaceInvite.is_used == False,
-            )
-            .all()
-        }
-
-        return {
-            user_id: InviteStatusResponse(
-                is_member=user_id in member_ids,
-                has_pending_invite=user_id in pending_ids,
-                can_invite=(user_id not in member_ids and user_id not in pending_ids),
-            )
-            for user_id in unique_user_ids
-        }
