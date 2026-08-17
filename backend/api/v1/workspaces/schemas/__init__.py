@@ -5,12 +5,14 @@ from .workspace import (
     WorkspaceWithBoardsResponse,
     WorkspaceListResponse,
     ToggleFavouriteRequest,
+    ToggleFavouriteResponse,
     MessageResponse,
 )
 from .members import (
     WorkspaceMemberResponse,
     WorkspaceMembersListResponse,
     UpdateMemberRoleRequest,
+    UpdateMemberRoleResponse,
     MyRoleResponse,
     RemoveMemberResponse,
 )
@@ -24,9 +26,9 @@ from .invites import (
 
 __all__ = [
     "WorkspaceCreate", "WorkspaceUpdate", "WorkspaceResponse", "WorkspaceWithBoardsResponse",
-    "WorkspaceListResponse", "ToggleFavouriteRequest",
+    "WorkspaceListResponse", "ToggleFavouriteRequest", "ToggleFavouriteResponse",
     "MessageResponse", "WorkspaceMemberResponse", "WorkspaceMembersListResponse",
-    "UpdateMemberRoleRequest", "MyRoleResponse", "RemoveMemberResponse",
+    "UpdateMemberRoleRequest", "UpdateMemberRoleResponse", "MyRoleResponse", "RemoveMemberResponse",
     "UserSearchResult", "InviteCreate", "InviteResponse", "PendingInviteResponse",
     "AcceptInviteResponse",
 ]

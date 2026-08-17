@@ -41,6 +41,11 @@ class ToggleFavouriteRequest(BaseModel):
     is_favourite: bool
 
 
+class ToggleFavouriteResponse(BaseModel):
+    message: str
+    is_favourite: bool
+
+
 class MessageResponse(BaseModel):
     """Generic response z wiadomością"""
     message: str
