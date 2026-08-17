@@ -16,7 +16,7 @@ import { useModal } from '@/_new/shared/hooks/use-modal';
 import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
 import { useWorkspaceInvite } from '../hooks/useWorkspaceInvite';
 import { Workspace } from '../types';
-import { UserWithStatus } from '../hooks/useWorkspaceInvite';
+import type { UserSearchResult } from '../types';
 
 interface WorkspaceInviteModalProps {
   isOpen: boolean;
@@ -62,15 +62,7 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
 
   // HELPERS
   // ================================
-  const getUserStatusBadge = (user: UserWithStatus) => {
-    if (!user.status_checked) return null;
-    if (user.is_member)
-      return (
-        <div className="flex items-center gap-1 px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
-          <Check size={12} />
-          <span>Członek</span>
-        </div>
-      );
+  const getUserStatusBadge = (user: UserSearchResult) => {
     if (user.has_pending_invite)
       return (
         <div className="flex items-center gap-1 px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">
@@ -138,7 +130,7 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
           ) : users.length > 0 ? (
             <div className="divide-y divide-[var(--dash-border)]">
               {users.map((user) => {
-                const canInvite = user.can_invite !== false;
+                const canInvite = !user.has_pending_invite;
                 const justInvited = invitedUserIds.has(user.id);
 
                 return (

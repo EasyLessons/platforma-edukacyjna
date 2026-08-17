@@ -14,16 +14,9 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { createInvite, checkUsersInviteStatusBatch, searchWorkspaceUsers } from '../api/inviteApi';
+import { createInvite, searchWorkspaceUsers } from '../api/inviteApi';
 import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
-import type { InviteStatusResponse, UserSearchResult } from '../types';
-
-export interface UserWithStatus extends UserSearchResult {
-  is_member?: boolean;
-  has_pending_invite?: boolean;
-  can_invite?: boolean;
-  status_checked?: boolean;
-}
+import type { UserSearchResult } from '../types';
 
 interface UseWorkspaceInviteOptions {
   workspace_id: number;
@@ -36,7 +29,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
   const [invitingUserId, setInvitingUserId] = useState<number | null>(null);
   const [invitedUserIds, setInvitedUserIds] = useState<Set<number>>(new Set());
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [statusOverrides, setStatusOverrides] = useState<Record<number, InviteStatusResponse>>({});
+  const [pendingOverrides, setPendingOverrides] = useState<Set<number>>(new Set());
 
   const { handleError } = useErrorHandler({ onError: setSearchError });
 
@@ -47,7 +40,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
       setSearchError('');
       setInvitedUserIds(new Set());
       setDebouncedQuery('');
-      setStatusOverrides({});
+      setPendingOverrides(new Set());
     }
   }, [isOpen]);
 
@@ -66,42 +59,18 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
 
   const users = usersQuery.data ?? [];
 
-  const statusesQuery = useQuery<Record<number, InviteStatusResponse>>({
-    queryKey: ['workspace-invite-statuses', workspace_id, users.map((user) => user.id).join(',')],
-    queryFn: () =>
-      checkUsersInviteStatusBatch(
-        workspace_id,
-        users.map((user) => user.id)
-      ),
-    enabled: isOpen && users.length > 0,
-  });
-
-  const mergedStatuses = useMemo(() => {
-    const base = statusesQuery.data ?? {};
-    return { ...base, ...statusOverrides };
-  }, [statusesQuery.data, statusOverrides]);
-
-  const usersWithStatus = useMemo<UserWithStatus[]>(() => {
-    return users.map((user) => {
-      const status = mergedStatuses[user.id];
-      if (!status) {
-        return { ...user, status_checked: false };
-      }
-      return { ...user, ...status, status_checked: true };
-    });
-  }, [users, mergedStatuses]);
+  const usersWithStatus = useMemo<UserSearchResult[]>(() => {
+    return users.map((user) => ({
+      ...user,
+      has_pending_invite: user.has_pending_invite || pendingOverrides.has(user.id),
+    }));
+  }, [users, pendingOverrides]);
 
   useEffect(() => {
     if (usersQuery.error) {
       void handleError(usersQuery.error);
     }
   }, [usersQuery.error, handleError]);
-
-  useEffect(() => {
-    if (statusesQuery.error) {
-      void handleError(statusesQuery.error);
-    }
-  }, [statusesQuery.error, handleError]);
 
   const invite = async (user_id: number) => {
     try {
@@ -111,14 +80,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
       await createInvite(workspace_id, user_id);
 
       setInvitedUserIds((prev) => new Set(prev).add(user_id));
-      setStatusOverrides((prev) => ({
-        ...prev,
-        [user_id]: {
-          is_member: false,
-          has_pending_invite: true,
-          can_invite: false,
-        },
-      }));
+      setPendingOverrides((prev) => new Set(prev).add(user_id));
 
       setTimeout(() => {
         setInvitedUserIds((prev) => {
@@ -139,11 +101,7 @@ export function useWorkspaceInvite({ workspace_id, isOpen }: UseWorkspaceInviteO
     searchQuery,
     setSearchQuery,
     users: usersWithStatus,
-    searchLoading:
-      usersQuery.isLoading ||
-      statusesQuery.isLoading ||
-      usersQuery.isFetching ||
-      statusesQuery.isFetching,
+    searchLoading: usersQuery.isLoading || usersQuery.isFetching,
     searchError,
     // Invite
     invite,

@@ -6,7 +6,7 @@ Panel użytkownika po zalogowaniu: `src/app/(dashboard)/`. Odpowiada za zarządz
 
 - **Workspace'y** — kontenery na boardy. User może mieć wiele workspace'ów, każdy z rolą (`owner`/`editor` — patrz `WorkspaceMember` w `backend-structure.md`). Jeden workspace jest "aktywny" — to ten, którego zawartość widać w dashboardzie po wejściu. Wybór jest czysto klienckim stanem (URL param `?workspace=`, z fallbackiem do `localStorage`, dalej do pierwszego ulubionego/pierwszego z listy) — backend niczego tu nie persystuje.
 - **Boardy** — tablice wewnątrz workspace'u. Widoki: lista ostatnich (`RecentsView`), lista wg sekcji/szablonów (`TemplateSection`), pełna lista z sortowaniem/filtrowaniem (`BoardsSection`).
-- **Zaproszenia** — właściciel/edytor workspace'u zaprasza innego usera (po emailu/username, wyszukiwanie przez `/search-users`). Zaproszony dostaje powiadomienie (patrz `pipelines.md` — przepływ powiadomień) i może zaakceptować przez link `/invite/[token]`.
+- **Zaproszenia** — właściciel/edytor workspace'u zaprasza innego usera (po emailu/username, wyszukiwanie przez `GET /{workspace_id}/invite/users` — zwraca kandydatów razem z informacją, czy już mają aktywne zaproszenie). Zaproszony dostaje powiadomienie (patrz `pipelines.md` — przepływ powiadomień) i może zaakceptować przez link `/invite/[token]`.
 - **Ulubione** — zarówno workspace, jak i pojedynczy board można oznaczyć jako ulubiony (`is_favourite` w `WorkspaceMember` i `BoardUsers` — dwa niezależne pola, bo to dwa niezależne poziomy ulubionych).
 - **Profil (`account/`)** — edycja danych podstawowych, avatar.
 

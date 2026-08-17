@@ -10,7 +10,6 @@ from api.v1.workspaces.invites_service import InviteService
 from api.v1.workspaces.schemas import (
     InviteResponse,
     AcceptInviteResponse,
-    InviteStatusResponse,
 )
 from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import WorkspaceInvite, WorkspaceMember
@@ -219,61 +218,3 @@ class TestGetPendingInvites:
         result = service.get_user_pending_invites(test_user2.id)
         assert result[0].workspace_name is not None
         assert result[0].inviter_name is not None
-
-class TestCheckInviteStatus:
-
-    def test_can_invite_new_user(self, db_session, test_workspace, test_user, test_user2):
-        service = InviteService(db_session)
-        result = service.check_invite_status(test_workspace.id, test_user2.id, test_user.id)
-        assert isinstance(result, InviteStatusResponse)
-        assert result.is_member is False
-        assert result.has_pending_invite is False
-        assert result.can_invite is True
-
-    def test_cannot_invite_existing_member(self, db_session, test_workspace, test_user):
-        service = InviteService(db_session)
-        result = service.check_invite_status(test_workspace.id, test_user.id, test_user.id)
-        assert result.is_member is True
-        assert result.can_invite is False
-
-    def test_cannot_invite_with_pending_invite(self, db_session, test_invite, test_user, test_user2):
-        service = InviteService(db_session)
-        result = service.check_invite_status(test_invite.workspace_id, test_user2.id, test_user.id)
-        assert result.has_pending_invite is True
-        assert result.can_invite is False
-
-    def test_non_member_caller_raises_not_found(self, db_session, test_workspace, test_user2, test_user3):
-        service = InviteService(db_session)
-        with pytest.raises(NotFoundError):
-            service.check_invite_status(test_workspace.id, test_user2.id, test_user3.id)
-
-    def test_nonexistent_workspace_raises_not_found(self, db_session, test_user):
-        service = InviteService(db_session)
-        with pytest.raises(NotFoundError):
-            service.check_invite_status(99999, test_user.id, test_user.id)
-
-
-class TestCheckInviteStatusBatch:
-
-    def test_returns_statuses_for_multiple_users(self, db_session, test_workspace, test_user, test_user2):
-        service = InviteService(db_session)
-        result = service.check_invite_status_batch(
-            test_workspace.id, [test_user.id, test_user2.id], test_user.id
-        )
-        assert result[test_user.id].is_member is True
-        assert result[test_user2.id].is_member is False
-
-    def test_empty_user_ids_returns_empty_dict(self, db_session, test_workspace, test_user):
-        service = InviteService(db_session)
-        result = service.check_invite_status_batch(test_workspace.id, [], test_user.id)
-        assert result == {}
-
-    def test_non_member_caller_raises_not_found(self, db_session, test_workspace, test_user2, test_user3):
-        service = InviteService(db_session)
-        with pytest.raises(NotFoundError):
-            service.check_invite_status_batch(test_workspace.id, [test_user2.id], test_user3.id)
-
-    def test_nonexistent_workspace_raises_not_found(self, db_session, test_user):
-        service = InviteService(db_session)
-        with pytest.raises(NotFoundError):
-            service.check_invite_status_batch(99999, [test_user.id], test_user.id)
