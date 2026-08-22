@@ -4,7 +4,6 @@ import type {
   WorkspaceListResponse,
   WorkspaceMembersResponse,
   InviteResponse,
-  PendingInviteResponse,
   AcceptInviteResponse,
   MyRoleResponse,
 } from '@new/features/workspace/types';
@@ -86,21 +85,6 @@ export const mockInviteResponse: InviteResponse = {
   workspace_id: 10,
   invited_by: 1,
   invited_id: 2,
-  invite_token: 'abc-token-123',
-  expires_at: '2024-12-31T00:00:00Z',
-  created_at: '2024-06-01T00:00:00Z',
-};
-
-export const mockPendingInvite: PendingInviteResponse = {
-  id: 1,
-  workspace_id: 10,
-  workspace_name: 'Test Workspace',
-  workspace_icon: 'Home',
-  workspace_bg_color: 'green-500',
-  invited_by: 1,
-  inviter_name: 'testuser',
-  invited_id: 2,
-  invited_user_name: 'otheruser',
   invite_token: 'abc-token-123',
   expires_at: '2024-12-31T00:00:00Z',
   created_at: '2024-06-01T00:00:00Z',

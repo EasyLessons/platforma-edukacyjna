@@ -11,7 +11,7 @@ from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
-    InviteCreate, InviteResponse, PendingInviteResponse,
+    InviteCreate, InviteResponse,
     AcceptInviteResponse, MessageResponse, UserSearchResult
 )
 from .invites_service import InviteService
@@ -23,11 +23,6 @@ async def create_workspace_invite(workspace_id: int, invite_data: InviteCreate, 
     service = InviteService(db)
     result = await service.create_invite(workspace_id=workspace_id, user_id=current_user.id, invited_user_id=invite_data.invited_user_id)
     return ApiResponse(success=True, data=result)
-
-@router.get("/invites/pending", response_model=ApiResponse[List[PendingInviteResponse]])
-async def get_pending_invites(db=Depends(get_db), current_user=Depends(get_current_user)):
-    service = InviteService(db)
-    return ApiResponse(success=True, data=service.get_user_pending_invites(user_id=current_user.id))
 
 @router.post("/invites/accept/{token}", response_model=ApiResponse[AcceptInviteResponse])
 async def accept_workspace_invite(token: str, db=Depends(get_db), current_user=Depends(get_current_user)):

@@ -187,34 +187,3 @@ class TestRejectInvite:
         service = InviteService(db_session)
         with pytest.raises(ConflictError):
             service.reject_invite(invite.invite_token, test_user2.id)
-
-class TestGetPendingInvites:
-
-    def test_returns_pending_invites(self, db_session, test_invite, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert len(result) == 1
-        assert result[0].invite_token == test_invite.invite_token
-
-    def test_empty_for_no_invites(self, db_session, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_excludes_expired(self, db_session, test_workspace, test_user, test_user2):
-        make_invite(db_session, test_workspace.id, test_user.id, test_user2.id, expired=True)
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_excludes_used(self, db_session, test_workspace, test_user, test_user2):
-        make_invite(db_session, test_workspace.id, test_user.id, test_user2.id, used=True)
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_includes_workspace_info(self, db_session, test_invite, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result[0].workspace_name is not None
-        assert result[0].inviter_name is not None

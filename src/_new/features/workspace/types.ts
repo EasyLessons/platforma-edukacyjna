@@ -76,21 +76,6 @@ export interface InviteResponse {
   created_at: string;
 }
 
-export interface PendingInviteResponse {
-  id: number;
-  workspace_id: number;
-  workspace_name: string;
-  workspace_icon: string;
-  workspace_bg_color: string;
-  invited_by: number;
-  inviter_name: string;
-  invited_id: number;
-  invited_user_name: string;
-  invite_token: string;
-  expires_at: string;
-  created_at: string;
-}
-
 export interface AcceptInviteResponse {
   message: string;
   workspace_id: number;
