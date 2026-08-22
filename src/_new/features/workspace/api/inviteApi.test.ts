@@ -1,19 +1,9 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '@new/lib/api/client';
-import {
-  createInvite,
-  getPendingInvites,
-  acceptInvite,
-  rejectInvite,
-  searchWorkspaceUsers,
-} from './inviteApi';
+import { createInvite, acceptInvite, rejectInvite, searchWorkspaceUsers } from './inviteApi';
 import { AppError } from '@new/lib/errors/AppError';
-import {
-  mockInviteResponse,
-  mockPendingInvite,
-  mockAcceptInviteResponse,
-} from '@/test/mocks/fixtures';
+import { mockInviteResponse, mockAcceptInviteResponse } from '@/test/mocks/fixtures';
 
 vi.mock('@new/lib/auth', () => ({
   getAccessToken: vi.fn(() => null),
@@ -53,29 +43,6 @@ describe('createInvite', () => {
     await expect(createInvite(10, 2)).rejects.toSatisfy(
       (e: unknown) => e instanceof AppError && e.isConflict()
     );
-  });
-});
-
-// ─── getPendingInvites ─────────────────────────────────────────────────────
-
-describe('getPendingInvites', () => {
-  it('zwraca listę oczekujących zaproszeń', async () => {
-    mock.onGet('/api/v1/workspaces/invites/pending').reply(200, {
-      success: true,
-      data: [mockPendingInvite],
-    });
-    const result = await getPendingInvites();
-    expect(result).toHaveLength(1);
-    expect(result[0].invite_token).toBe('abc-token-123');
-  });
-
-  it('zwraca pustą tablicę gdy brak zaproszeń', async () => {
-    mock.onGet('/api/v1/workspaces/invites/pending').reply(200, {
-      success: true,
-      data: [],
-    });
-    const result = await getPendingInvites();
-    expect(result).toHaveLength(0);
   });
 });
 

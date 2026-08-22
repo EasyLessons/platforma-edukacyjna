@@ -20,24 +20,6 @@ class InviteResponse(BaseModel):
         from_attributes = True
 
 
-class PendingInviteResponse(BaseModel):
-    id: int
-    workspace_id: int
-    workspace_name: str
-    workspace_icon: str
-    workspace_bg_color: str
-    invited_by: int
-    inviter_name: str
-    invited_id: int
-    invited_user_name: str
-    invite_token: str
-    expires_at: datetime
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class UserSearchResult(BaseModel):
     id: int
     username: str
