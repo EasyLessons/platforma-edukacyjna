@@ -35,3 +35,8 @@ class MyRoleResponse(BaseModel):
 
 class RemoveMemberResponse(BaseModel):
     message: str
+
+
+class MessageResponse(BaseModel):
+    """Generic response z wiadomością"""
+    message: str

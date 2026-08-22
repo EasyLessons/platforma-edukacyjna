@@ -12,9 +12,8 @@ from core.responses import ApiResponse
 
 from .schemas import (
     InviteCreate, InviteResponse,
-    AcceptInviteResponse, UserSearchResult
+    AcceptInviteResponse, UserSearchResult, MessageResponse
 )
-from ..schemas import MessageResponse
 from .service import InviteService
 
 router = APIRouter(tags=["Invites"])

@@ -1,5 +1,5 @@
 """
-Members router — /api/v1/workspaces/{id}/members/*
+Members router — zarządzanie członkami workspace'a 
 """
 from fastapi import APIRouter, Depends
 
@@ -9,9 +9,8 @@ from core.responses import ApiResponse
 
 from .schemas import (
     WorkspaceMembersListResponse, UpdateMemberRoleRequest,
-    MyRoleResponse, RemoveMemberResponse,
+    MyRoleResponse, RemoveMemberResponse, MessageResponse
 )
-from ..schemas import MessageResponse
 from .service import MemberService
 
 router = APIRouter(tags=["Members"])
