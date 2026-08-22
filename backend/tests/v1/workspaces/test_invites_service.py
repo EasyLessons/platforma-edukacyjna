@@ -1,22 +1,22 @@
 """
 Testy systemu zaproszeń
-api/v1/workspaces/invites_service.py
+api/v1/workspaces/invites/service.py
 """
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock
 
-from api.v1.workspaces.invites_service import InviteService
-from api.v1.workspaces.schemas import (
+from api.v1.workspaces.invites.service import InviteService
+from api.v1.workspaces.invites.schemas import (
     InviteResponse,
     AcceptInviteResponse,
 )
 from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import WorkspaceInvite, WorkspaceMember
 
-MOCK_EMAIL = "api.v1.workspaces.invites_service.send_workspace_invite_email"
-MOCK_BROADCAST = "api.v1.workspaces.invites_service.broadcast_notification"
-MOCK_NOTIFICATION = "api.v1.workspaces.invites_service.create_notification"
+MOCK_EMAIL = "api.v1.workspaces.invites.service.send_workspace_invite_email"
+MOCK_BROADCAST = "api.v1.workspaces.invites.service.broadcast_notification"
+MOCK_NOTIFICATION = "api.v1.workspaces.invites.service.create_notification"
 
 
 def make_invite(db, workspace_id, invited_by, invited_id, *, expired=False, used=False):
@@ -187,34 +187,3 @@ class TestRejectInvite:
         service = InviteService(db_session)
         with pytest.raises(ConflictError):
             service.reject_invite(invite.invite_token, test_user2.id)
-
-class TestGetPendingInvites:
-
-    def test_returns_pending_invites(self, db_session, test_invite, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert len(result) == 1
-        assert result[0].invite_token == test_invite.invite_token
-
-    def test_empty_for_no_invites(self, db_session, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_excludes_expired(self, db_session, test_workspace, test_user, test_user2):
-        make_invite(db_session, test_workspace.id, test_user.id, test_user2.id, expired=True)
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_excludes_used(self, db_session, test_workspace, test_user, test_user2):
-        make_invite(db_session, test_workspace.id, test_user.id, test_user2.id, used=True)
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result == []
-
-    def test_includes_workspace_info(self, db_session, test_invite, test_user2):
-        service = InviteService(db_session)
-        result = service.get_user_pending_invites(test_user2.id)
-        assert result[0].workspace_name is not None
-        assert result[0].inviter_name is not None

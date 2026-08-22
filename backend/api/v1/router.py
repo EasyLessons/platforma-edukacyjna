@@ -7,8 +7,8 @@ from core.responses import ApiResponse
 from .auth.router import router as auth_router
 from .notifications.router import router as notifications_router
 from .workspaces.router import router as workspaces_router
-from .workspaces.members_router import router as members_router
-from .workspaces.invites_router import router as invites_router
+from .workspaces.members.router import router as members_router
+from .workspaces.invites.router import router as invites_router
 from .boards.router import router as boards_router
 from .whiteboard.router import router as whiteboard_router
 from .assets.router import router as assets_router

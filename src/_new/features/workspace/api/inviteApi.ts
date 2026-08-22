@@ -11,12 +11,7 @@
  */
 
 import { apiClient } from '@/_new/lib/api';
-import {
-  InviteResponse,
-  AcceptInviteResponse,
-  PendingInviteResponse,
-  UserSearchResult,
-} from '../types';
+import { InviteResponse, AcceptInviteResponse, UserSearchResult } from '../types';
 
 export const createInvite = (
   workspace_id: number,
@@ -24,11 +19,6 @@ export const createInvite = (
 ): Promise<InviteResponse> =>
   apiClient
     .post<InviteResponse>(`/api/v1/workspaces/${workspace_id}/invite`, { invited_user_id })
-    .then((res) => res.data);
-
-export const getPendingInvites = (): Promise<PendingInviteResponse[]> =>
-  apiClient
-    .get<PendingInviteResponse[]>('/api/v1/workspaces/invites/pending')
     .then((res) => res.data);
 
 export const acceptInvite = (invite_token: string): Promise<AcceptInviteResponse> =>

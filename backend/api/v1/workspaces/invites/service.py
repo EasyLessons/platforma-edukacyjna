@@ -6,20 +6,18 @@ import secrets
 from datetime import datetime, timedelta
 from typing import List
 
-from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from core.config import get_settings
 from core.exceptions import NotFoundError, ConflictError, AppException
-from core.models import User, Workspace, WorkspaceInvite, WorkspaceMember
+from core.models import User, WorkspaceInvite, WorkspaceMember
 from core.logging import get_logger
 from api.v1.notifications.service import create_notification
-from .authorization import get_workspace_or_404, require_membership
-from .realtime import broadcast_notification
+from api.v1.notifications.realtime import broadcast_notification
+from ..authorization import get_workspace_or_404, require_membership
 from .utils import send_workspace_invite_email
 from .schemas import (
-    InviteResponse, PendingInviteResponse,
-    UserSearchResult, AcceptInviteResponse,
+    InviteResponse, UserSearchResult, AcceptInviteResponse,
 )
 
 logger = get_logger(__name__)
@@ -267,41 +265,3 @@ class InviteService:
         except Exception as e:
             db.rollback()
             raise AppException(f"Błąd odrzucania: {str(e)}", status_code=500)
-
-    def get_user_pending_invites(self, user_id: int) -> List[PendingInviteResponse]:
-        """Pobiera aktywne (niewygasłe, nieużyte) zaproszenia usera."""
-        db = self.db
-        invites = (
-            db.query(WorkspaceInvite)
-            .filter(and_(
-                WorkspaceInvite.invited_id == user_id,
-                WorkspaceInvite.is_used == False,
-                WorkspaceInvite.expires_at > datetime.utcnow(),
-            ))
-            .order_by(WorkspaceInvite.created_at.desc())
-            .all()
-        )
-
-        result = []
-        for invite in invites:
-            workspace = db.query(Workspace).filter(Workspace.id == invite.workspace_id).first()
-            if not workspace:
-                continue
-            inviter = db.query(User).filter(User.id == invite.invited_by).first()
-            invited_user = db.query(User).filter(User.id == invite.invited_id).first()
-
-            result.append(PendingInviteResponse(
-                id=invite.id,
-                workspace_id=invite.workspace_id,
-                workspace_name=workspace.name,
-                workspace_icon=workspace.icon,
-                workspace_bg_color=workspace.bg_color,
-                invited_by=invite.invited_by,
-                inviter_name=inviter.username if inviter else "Nieznany",
-                invited_id=invite.invited_id,
-                invited_user_name=invited_user.username if invited_user else "Nieznany",
-                invite_token=invite.invite_token,
-                expires_at=invite.expires_at,
-                created_at=invite.created_at,
-            ))
-        return result

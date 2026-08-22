@@ -1,12 +1,12 @@
 """
 Testy zarządzania członkami workspace'ów
-api/v1/workspaces/members_service.py
+api/v1/workspaces/members/service.py
 """
 import pytest
 from datetime import datetime
 
-from api.v1.workspaces.members_service import MemberService
-from api.v1.workspaces.schemas import WorkspaceMembersListResponse, MyRoleResponse
+from api.v1.workspaces.members.service import MemberService
+from api.v1.workspaces.members.schemas import WorkspaceMembersListResponse, MyRoleResponse
 from core.exceptions import NotFoundError, AppException
 from core.models import WorkspaceMember
 

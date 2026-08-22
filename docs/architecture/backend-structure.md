@@ -6,8 +6,8 @@ FastAPI, moduł per domenę pod `backend/api/v1/`. Każdy moduł ma ten sam kszt
 
 - **auth/** — rejestracja, logowanie, weryfikacja emaila (kod 6-cyfrowy), reset hasła, Google OAuth, refresh/logout, `/me`, wyszukiwanie userów. Pełny opis przepływu: `docs/architecture/auth.md`.
 - **boards/** — CRUD boardu, dołączanie do boardu, ulubione, ustawienia boardu, lista członków boardu.
-- **workspaces/** — CRUD workspace'u (`GET /workspaces/{id}` zwraca workspace razem z jego boardami — komponuje `BoardService`), ulubione, opuszczanie workspace'u. Plus podmoduły: `invites_router.py`/`invites_service.py` (zaproszenia), `members_router.py`/`members_service.py` (członkowie), `realtime.py` (wysyłanie eventów Broadcast do frontendu — patrz `pipelines.md`).
-- **notifications/** — lista powiadomień, oznaczanie jako przeczytane (pojedynczo/wszystkie), usuwanie.
+- **workspaces/** — CRUD workspace'u (`GET /workspaces/{id}` zwraca workspace razem z jego boardami — komponuje `BoardService`), ulubione, opuszczanie workspace'u. Plus podmoduły: `invites/router.py`/`invites/service.py` (zaproszenia), `members/router.py`/`members/service.py` (członkowie).
+- **notifications/** — lista powiadomień, oznaczanie jako przeczytane (pojedynczo/wszystkie), usuwanie,`realtime.py` (wysyłanie eventów Broadcast do frontendu — patrz `pipelines.md`).
 - **whiteboard/** — endpointy związane z elementami tablicy (`board_elements`).
 - **assets/** — zapisane szablony/assety użytkownika (`saved_assets`).
 
