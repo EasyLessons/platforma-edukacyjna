@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from core.models import WorkspaceMember
 from core.exceptions import NotFoundError, AppException
-from .authorization import require_membership, require_owner
+from ..authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
     MyRoleResponse, RemoveMemberResponse

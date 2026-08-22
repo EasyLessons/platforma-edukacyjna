@@ -1,0 +1,1 @@
+"""Invites submodule — zarządzanie zaproszeniami do workspace'a"""

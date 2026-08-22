@@ -5,16 +5,17 @@ from typing import List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
-from ..auth.dependencies import get_current_user
+from ...auth.dependencies import get_current_user
 from core.database import get_db
 from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
     InviteCreate, InviteResponse,
-    AcceptInviteResponse, MessageResponse, UserSearchResult
+    AcceptInviteResponse, UserSearchResult
 )
-from .invites_service import InviteService
+from ..schemas import MessageResponse
+from .service import InviteService
 
 router = APIRouter(tags=["Invites"])
 

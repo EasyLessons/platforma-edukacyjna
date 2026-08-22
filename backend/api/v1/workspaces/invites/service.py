@@ -14,8 +14,8 @@ from core.models import User, WorkspaceInvite, WorkspaceMember
 from core.logging import get_logger
 from api.v1.notifications.service import create_notification
 from api.v1.notifications.realtime import broadcast_notification
-from .authorization import get_workspace_or_404, require_membership
-from .utils import send_workspace_invite_email
+from ..authorization import get_workspace_or_404, require_membership
+from ..utils import send_workspace_invite_email
 from .schemas import (
     InviteResponse, UserSearchResult, AcceptInviteResponse,
 )
