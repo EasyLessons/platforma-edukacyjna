@@ -109,7 +109,7 @@ class TestUpdateMemberRole:
         result = service.update_member_role(
             test_workspace.id, test_user2.id, "editor", test_user.id
         )
-        assert result["new_role"] == "editor"
+        assert result.new_role == "editor"
 
         db_session.expire_all()
         membership = db_session.query(WorkspaceMember).filter(
@@ -137,6 +137,13 @@ class TestUpdateMemberRole:
         service = MemberService(db_session)
         with pytest.raises(NotFoundError):
             service.update_member_role(test_workspace.id, test_user2.id, "editor", test_user.id)
+
+    def test_cannot_set_role_to_owner(self, db_session, test_user, test_workspace, test_user2):
+        add_member(db_session, test_workspace.id, test_user2.id, role="viewer")
+        service = MemberService(db_session)
+        with pytest.raises(AppException) as exc:
+            service.update_member_role(test_workspace.id, test_user2.id, "owner", test_user.id)
+        assert exc.value.status_code == 400
 
 
 class TestGetUserRole:

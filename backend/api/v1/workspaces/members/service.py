@@ -8,7 +8,7 @@ from core.exceptions import NotFoundError, AppException
 from ..authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
-    MyRoleResponse, RemoveMemberResponse
+    MyRoleResponse, RemoveMemberResponse, UpdateMemberRoleResponse
 )
 
 
@@ -68,8 +68,12 @@ class MemberService:
         if not membership:
             raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
 
-        db.delete(membership)
-        db.commit()
+        try:
+            db.delete(membership)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise AppException(f"Błąd usuwania członka: {str(e)}", status_code=500)
         
         return RemoveMemberResponse(
             message=f"Użytkownik id:{member_user_id} został usunięty z workspace'a"
@@ -81,13 +85,16 @@ class MemberService:
         member_user_id: int,
         new_role: str,
         current_user_id: int,
-    ) -> dict:
+    ) -> UpdateMemberRoleResponse:
         """Zmienia rolę członka — tylko owner, nie może zmienić własnej roli."""
         db = self.db
         require_owner(db, workspace_id, current_user_id, "Tylko właściciel może zmieniać role członków")
 
         if member_user_id == current_user_id:
             raise AppException("Nie możesz zmienić własnej roli", status_code=400)
+
+        if new_role not in ("editor", "viewer"):
+            raise AppException("Nieprawidłowa rola", status_code=400)
 
         membership = db.query(WorkspaceMember).filter(
             WorkspaceMember.workspace_id == workspace_id,
@@ -96,14 +103,18 @@ class MemberService:
         if not membership:
             raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
 
-        membership.role = new_role
-        db.commit()
-        
-        return {
-            "message": f"Zmieniono rolę użytkownika id:{member_user_id} na '{new_role}'",
-            "new_role": new_role,
-            "user_id": member_user_id,
-        }
+        try:
+            membership.role = new_role
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise AppException(f"Błąd zmiany roli: {str(e)}", status_code=500)
+
+        return UpdateMemberRoleResponse(
+            message=f"Zmieniono rolę użytkownika id:{member_user_id} na '{new_role}'",
+            new_role=new_role,
+            user_id=member_user_id,
+        )
 
     def get_user_role(
         self, workspace_id: int, user_id: int

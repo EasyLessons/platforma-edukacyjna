@@ -24,7 +24,7 @@ class WorkspaceMembersListResponse(BaseModel):
 
 
 class UpdateMemberRoleRequest(BaseModel):
-    role: str = Field(..., pattern="^(owner|editor|viewer)$")
+    role: str = Field(..., pattern="^(editor|viewer)$")
 
 
 class MyRoleResponse(BaseModel):
@@ -36,7 +36,7 @@ class MyRoleResponse(BaseModel):
 class RemoveMemberResponse(BaseModel):
     message: str
 
-
-class MessageResponse(BaseModel):
-    """Generic response z wiadomością"""
+class UpdateMemberRoleResponse(BaseModel):
     message: str
+    new_role: str
+    user_id: int

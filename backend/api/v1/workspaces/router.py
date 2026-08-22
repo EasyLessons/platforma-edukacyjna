@@ -10,7 +10,7 @@ from core.responses import ApiResponse
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse,
     WorkspaceWithBoardsResponse, WorkspaceListResponse, 
-    ToggleFavouriteRequest, MessageResponse,
+    ToggleFavouriteRequest, ToggleFavouriteResponse, MessageResponse,
 )
 from .service import WorkspaceService
 
@@ -57,8 +57,8 @@ async def leave_existing_workspace(workspace_id: int, db=Depends(get_db), curren
     result = service.leave_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=MessageResponse(**result))
 
-@router.patch("/{workspace_id}/favourite", response_model=ApiResponse[MessageResponse])
+@router.patch("/{workspace_id}/favourite", response_model=ApiResponse[ToggleFavouriteResponse])
 async def toggle_favourite(workspace_id: int, request: ToggleFavouriteRequest, db=Depends(get_db), current_user=Depends(get_current_user)):
     service = WorkspaceService(db)
     result = service.toggle_workspace_favourite(workspace_id, current_user.id, request.is_favourite)
-    return ApiResponse(success=True, data=MessageResponse(message=result["message"]))
+    return ApiResponse(success=True, data=result)

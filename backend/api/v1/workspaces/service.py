@@ -13,6 +13,7 @@ from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, 
     WorkspaceResponse, WorkspaceWithBoardsResponse,
+    ToggleFavouriteResponse,
 )
 
 def _build_workspace_with_owner(
@@ -166,14 +167,14 @@ class WorkspaceService:
 
     def toggle_workspace_favourite(
         self, workspace_id: int, user_id: int, is_favourite: bool
-    ) -> dict:
+    ) -> ToggleFavouriteResponse:
         """Zmienia status ulubionego dla workspace'a."""
         db = self.db
         _, membership = require_membership(db, workspace_id, user_id)
 
         membership.is_favourite = is_favourite
         db.commit()
-        return {"message": "Status ulubionego został zmieniony", "is_favourite": is_favourite}
+        return ToggleFavouriteResponse(message="Status ulubionego został zmieniony", is_favourite=is_favourite)
 
     def leave_workspace(self, workspace_id: int, user_id: int) -> dict:
         """Opuszczenie workspace'a — owner nie może opuścić."""

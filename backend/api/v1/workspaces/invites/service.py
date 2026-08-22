@@ -82,33 +82,29 @@ class InviteService:
             db.commit()
             db.refresh(new_invite)
 
+            notification_payload = {
+                "workspace_id": workspace.id,
+                "workspace_name": workspace.name,
+                "workspace_icon": workspace.icon,
+                "workspace_bg_color": workspace.bg_color,
+                "inviter_name": inviter_name,
+                "invite_token": invite_token,
+                "expires_at": expires_at.isoformat(),
+                "created_at": new_invite.created_at.isoformat(),
+            }
+
             notification = create_notification(
                 db=db,
                 user_id=invited_user_id,
                 type="invite",
-                payload={
-                    "workspace_id": workspace.id,
-                    "workspace_name": workspace.name,
-                    "workspace_icon": workspace.icon,
-                    "workspace_bg_color": workspace.bg_color,
-                    "inviter_name": inviter_name,
-                    "invite_token": invite_token,
-                    "expires_at": expires_at.isoformat(),
-                    "created_at": new_invite.created_at.isoformat(),
-                },
+                payload=notification_payload,
             )
 
             try:
                 await broadcast_notification(
                     user_id=invited_user_id,
                     event="new_invite",
-                    payload={
-                        "workspace_id": workspace.id,
-                        "workspace_name": workspace.name,
-                        "inviter_name": inviter_name,
-                        "invite_token": invite_token,
-                        "notification_id": notification.id,
-                    },
+                    payload={**notification_payload, "notification_id": notification.id}
                 )
             except Exception:
                 pass
@@ -123,7 +119,7 @@ class InviteService:
                         invite_token=invite_token,
                         resend_api_key=settings.resend_api_key,
                         from_email=settings.from_email,
-                        frontend_url="https://easylesson.app",
+                        frontend_url=settings.frontend_url,
                     ))
                 task.add_done_callback(_log_invite_email_failure)
 
