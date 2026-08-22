@@ -36,3 +36,8 @@ class AcceptInviteResponse(BaseModel):
     workspace_id: int
     workspace_name: str
     role: str
+
+
+class MessageResponse(BaseModel):
+    """Generic response z wiadomością"""
+    message: str

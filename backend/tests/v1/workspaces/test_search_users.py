@@ -6,8 +6,8 @@ GET /api/v1/workspaces/{workspace_id}/invite/users
 import pytest
 from datetime import datetime, timedelta
 
-from api.v1.workspaces.invites_service import InviteService
-from api.v1.workspaces.schemas import UserSearchResult
+from api.v1.workspaces.invites.service import InviteService
+from api.v1.workspaces.invites.schemas import UserSearchResult
 from api.v1.auth.utils import hash_password
 from core.exceptions import NotFoundError
 from core.models import User, WorkspaceInvite

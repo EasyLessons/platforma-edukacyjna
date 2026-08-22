@@ -1,17 +1,17 @@
 """
-Members router — /api/v1/workspaces/{id}/members/*
+Members router — zarządzanie członkami workspace'a 
 """
 from fastapi import APIRouter, Depends
 
-from ..auth.dependencies import get_current_user
+from ...auth.dependencies import get_current_user
 from core.database import get_db
 from core.responses import ApiResponse
 
 from .schemas import (
     WorkspaceMembersListResponse, UpdateMemberRoleRequest,
-    MyRoleResponse, RemoveMemberResponse, MessageResponse,
+    MyRoleResponse, RemoveMemberResponse, MessageResponse
 )
-from .members_service import MemberService
+from .service import MemberService
 
 router = APIRouter(tags=["Members"])
 

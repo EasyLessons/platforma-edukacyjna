@@ -33,7 +33,7 @@ Logika (hooki, typy, wywołania API) żyje w `src/_new/features/board`, `src/_ne
 
 ## Backend
 
-`backend/api/v1/workspaces/` — CRUD workspace'u. `GET /workspaces/{id}` zwraca workspace razem z jego boardami w jednym requeście (komponuje `BoardService.list_boards` z poziomu `WorkspaceService`) — klient (znający aktywny workspace z URL/`localStorage`) woła ten jeden endpoint zamiast osobnego bootstrap-requestu. Podmoduły: `invites_router.py`/`invites_service.py` (zaproszenia), `members_router.py`/`members_service.py` (zarządzanie członkami workspace'u).
+`backend/api/v1/workspaces/` — CRUD workspace'u. `GET /workspaces/{id}` zwraca workspace razem z jego boardami w jednym requeście (komponuje `BoardService.list_boards` z poziomu `WorkspaceService`) — klient (znający aktywny workspace z URL/`localStorage`) woła ten jeden endpoint zamiast osobnego bootstrap-requestu. Podmoduły: `invites/router.py`/`invites/service.py` (zaproszenia), `members/router.py`/`members/service.py` (zarządzanie członkami workspace'u).
 `backend/api/v1/boards/` — CRUD boardu, dołączanie, ulubione, ustawienia, lista członków boardu.
 `backend/dashboard/` — agregacja danych pomocnicza dla widoków dashboardu (jeśli logika przekracza to co naturalnie mieści się w `boards`/`workspaces`).
 

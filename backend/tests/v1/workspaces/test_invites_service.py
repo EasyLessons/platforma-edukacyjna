@@ -1,22 +1,22 @@
 """
 Testy systemu zaproszeń
-api/v1/workspaces/invites_service.py
+api/v1/workspaces/invites/service.py
 """
 import pytest
 from datetime import datetime, timedelta
 from unittest.mock import patch, AsyncMock
 
-from api.v1.workspaces.invites_service import InviteService
-from api.v1.workspaces.schemas import (
+from api.v1.workspaces.invites.service import InviteService
+from api.v1.workspaces.invites.schemas import (
     InviteResponse,
     AcceptInviteResponse,
 )
 from core.exceptions import NotFoundError, ConflictError, AppException
 from core.models import WorkspaceInvite, WorkspaceMember
 
-MOCK_EMAIL = "api.v1.workspaces.invites_service.send_workspace_invite_email"
-MOCK_BROADCAST = "api.v1.workspaces.invites_service.broadcast_notification"
-MOCK_NOTIFICATION = "api.v1.workspaces.invites_service.create_notification"
+MOCK_EMAIL = "api.v1.workspaces.invites.service.send_workspace_invite_email"
+MOCK_BROADCAST = "api.v1.workspaces.invites.service.broadcast_notification"
+MOCK_NOTIFICATION = "api.v1.workspaces.invites.service.create_notification"
 
 
 def make_invite(db, workspace_id, invited_by, invited_id, *, expired=False, used=False):

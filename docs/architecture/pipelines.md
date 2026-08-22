@@ -40,10 +40,10 @@ To jest inny pipeline niż tablica: tu event **inicjuje backend**, nie frontend 
 
 ```
 User A zaprasza User B do workspace'u
-  → POST /workspaces/{id}/invites (backend/api/v1/workspaces/invites_router.py)
-  → invites_service.py: tworzy wiersz WorkspaceInvite (token, expires_at) w Postgresie
+  → POST /workspaces/{id}/invites (backend/api/v1/workspaces/invites/router.py)
+  → invites/service.py: tworzy wiersz WorkspaceInvite (token, expires_at) w Postgresie
   → tworzy wiersz Notification (type="invite", payload={workspace_id, inviter_name, invite_token...})
-  → wywołuje broadcast_notification() (backend/api/v1/workspaces/realtime.py)
+  → wywołuje broadcast_notification() (backend/api/v1/notifications/realtime.py)
     → uderza w Supabase REST API (/realtime/v1/api/broadcast)
     → Supabase pushuje event przez WebSocket na kanał "notifications:{user_b_id}"
   → frontend User B: useNotifications hook (src/_new/features/notifications) odbiera event
