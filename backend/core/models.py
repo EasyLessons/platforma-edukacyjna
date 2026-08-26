@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -55,6 +55,7 @@ class Workspace(Base):
     members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
     boards = relationship("Board", back_populates="workspace", cascade="all, delete-orphan")
     invites = relationship("WorkspaceInvite", back_populates="workspace", cascade="all, delete-orphan")
+    share_links = relationship("WorkspaceShareLink", back_populates="workspace", cascade="all, delete-orphan")
 
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"
@@ -120,6 +121,28 @@ class WorkspaceInvite(Base):
     workspace = relationship("Workspace", back_populates="invites")
     inviter = relationship("User", foreign_keys=[invited_by], backref="sent_invites")
     invited_user = relationship("User", foreign_keys=[invited_id], backref="received_invites")
+
+class WorkspaceShareLink(Base):
+    __tablename__ = "workspace_share_links"
+    __table_args__ = (
+        Index(
+            "ix_workspace_share_links_active_target",
+            "workspace_id", "board_id",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+            sqlite_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    board_id = Column(Integer, ForeignKey("boards.id", ondelete="SET NULL"), nullable=True, index=True)
+    token = Column(String(100), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    workspace = relationship("Workspace", back_populates="share_links")
 
 class BoardElement(Base):
     """
