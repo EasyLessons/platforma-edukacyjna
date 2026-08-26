@@ -21,7 +21,6 @@ import type {
   BoardToggleFavouriteResponse,
   BoardMembersResponse,
   UpdateSettingsResponse,
-  JoinBoardResponse,
   BoardSettings,
 } from '../types';
 
@@ -78,6 +77,3 @@ export const updateBoardSettings = (
   apiClient
     .put<UpdateSettingsResponse>(`/api/v1/boards/${id}/settings`, { settings })
     .then((res) => res.data);
-
-export const joinBoardWorkspace = (id: number): Promise<JoinBoardResponse> =>
-  apiClient.post<JoinBoardResponse>(`/api/v1/boards/${id}/join`).then((res) => res.data);

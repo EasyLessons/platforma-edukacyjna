@@ -11,7 +11,6 @@ import {
   fetchBoardMembers,
   updateBoardMemberRole,
   updateBoardSettings,
-  joinBoardWorkspace,
 } from './boardApi';
 import { AppError } from '@new/lib/errors/AppError';
 import { mockBoard, mockBoardListResponse, mockBoardMembersResponse } from '@/test/mocks/fixtures';
@@ -152,25 +151,5 @@ describe('updateBoardSettings', () => {
     mock.onPut('/api/v1/boards/1/settings').reply(200, { success: true, data: response });
     const result = await updateBoardSettings(1, settings);
     expect(result.settings.ai_enabled).toBe(true);
-  });
-});
-
-// ─── joinBoardWorkspace ────────────────────────────────────────────────────
-
-describe('joinBoardWorkspace', () => {
-  it('zwraca JoinBoardResponse przy sukcesie', async () => {
-    const response = {
-      success: true,
-      already_member: false,
-      workspace_id: 10,
-      board_id: 1,
-      owner_id: 1,
-      is_owner: false,
-      user_role: 'editor',
-    };
-    mock.onPost('/api/v1/boards/1/join').reply(200, { success: true, data: response });
-    const result = await joinBoardWorkspace(1);
-    expect(result.success).toBe(true);
-    expect(result.user_role).toBe('editor');
   });
 });

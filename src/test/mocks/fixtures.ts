@@ -6,6 +6,9 @@ import type {
   InviteResponse,
   AcceptInviteResponse,
   MyRoleResponse,
+  ShareLinkResponse,
+  ShareLinkPreview,
+  JoinShareLinkResponse,
 } from '@new/features/workspace/types';
 import type { Notification, NotificationsListResponse } from '@new/features/notifications/types';
 
@@ -56,6 +59,7 @@ export const mockWorkspace: Workspace = {
   icon: 'Home',
   bg_color: 'green-500',
   is_owner: true,
+  role: 'editor',
   is_favourite: false,
 };
 
@@ -101,6 +105,30 @@ export const mockMyRoleResponse: MyRoleResponse = {
   role: 'owner',
   is_owner: true,
   workspace_id: 10,
+};
+
+export const mockShareLinkResponse: ShareLinkResponse = {
+  token: 'share-token-123',
+  workspace_id: 10,
+  board_id: null,
+};
+
+export const mockShareLinkPreview: ShareLinkPreview = {
+  workspace_id: 10,
+  workspace_name: 'Test Workspace',
+  workspace_icon: 'Home',
+  board_id: null,
+  board_name: null,
+  already_member: false,
+};
+
+export const mockJoinShareLinkResponse: JoinShareLinkResponse = {
+  message: "Dołączono do workspace'a 'Test Workspace'",
+  workspace_id: 10,
+  workspace_name: 'Test Workspace',
+  board_id: null,
+  role: 'editor',
+  already_member: false,
 };
 
 // ─── NOTIFICATION FIXTURES ─────────────────────────────────────────────────
