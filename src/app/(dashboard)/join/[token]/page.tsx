@@ -92,14 +92,14 @@ export default function JoinPage() {
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-semibold transition-colors"
+                className="px-6 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-semibold transition-colors cursor-pointer"
               >
                 Anuluj
               </button>
               <button
                 onClick={handleJoin}
                 disabled={joining}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors disabled:opacity-50 cursor-pointer"
               >
                 {joining ? 'Dołączanie...' : 'Dołącz'}
               </button>
@@ -112,13 +112,18 @@ export default function JoinPage() {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Już jesteś członkiem</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Jesteś członkiem przestrzeni {preview.workspace_name}
+            </h2>
             <p className="text-gray-600 mb-6">
-              Jesteś już częścią przestrzeni <strong>{preview.workspace_name}</strong>.
+              {preview.board_name
+                ? `Dołączasz do tablicy ${preview.board_name}.`
+                : `Zostanieś przekierowany do panelu użytkownika.`}{' '}
+              <br />
             </p>
             <button
               onClick={handleContinue}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors cursor-pointer"
             >
               {preview.board_name ? 'Przejdź do tablicy' : 'Przejdź do dashboardu'}
             </button>
@@ -148,7 +153,7 @@ export default function JoinPage() {
             <p className="text-gray-600 mb-6">{message}</p>
             <button
               onClick={() => router.push('/dashboard')}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors cursor-pointer"
             >
               Przejdź do dashboardu
             </button>
