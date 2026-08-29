@@ -7,9 +7,11 @@ import { mockLoginResponse } from '@/test/mocks/authFixtures';
 
 const mockPush = vi.fn();
 const mockAuthLogin = vi.fn();
+const mockSearchParamsGet = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }));
 
 vi.mock('@/_new/lib/auth', () => ({
@@ -23,6 +25,7 @@ vi.mock('../../api/authApi', () => ({
 describe('useLogin', () => {
   beforeEach(() => {
     vi.mocked(loginUser).mockResolvedValue(mockLoginResponse);
+    mockSearchParamsGet.mockReturnValue(null);
   });
 
   const setup = () => renderHook(() => useLogin());
@@ -106,6 +109,30 @@ describe('useLogin', () => {
     });
 
     it('przekierowuje na /dashboard', async () => {
+      const { result } = setup();
+      fillForm(result);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    });
+
+    it('przekierowuje na ?redirect gdy jest bezpieczny (ścieżka względna)', async () => {
+      mockSearchParamsGet.mockImplementation((key: string) =>
+        key === 'redirect' ? '/join/abc123' : null
+      );
+      const { result } = setup();
+      fillForm(result);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/join/abc123');
+    });
+
+    it('ignoruje redirect spoza aplikacji (ochrona przed open-redirect)', async () => {
+      mockSearchParamsGet.mockImplementation((key: string) =>
+        key === 'redirect' ? 'https://zla-strona.pl' : null
+      );
       const { result } = setup();
       fillForm(result);
       await act(async () => {
