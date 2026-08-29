@@ -1,6 +1,5 @@
 'use client';
 
-import './dashboard-theme.css';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import WorkspaceSidebar from './Components/workspace-sidebar';

@@ -38,3 +38,16 @@ def require_owner(
     if workspace.created_by != user_id:
         raise AppException(message, status_code=403)
     return workspace
+
+def require_editor_or_owner(
+    db: Session,
+    workspace_id: int,
+    user_id: int,
+    message: str = "Musisz być właścicielem lub edytorem, aby wykonać tę operację"
+) -> tuple[Workspace, WorkspaceMember]:
+    """Sprawdza czy workspace istnieje i user ma rolę 'editor' lub 'owner'.
+    Zwraca (workspace, membership) albo rzuca NotFoundError/AppException."""
+    workspace, membership = require_membership(db, workspace_id, user_id)
+    if membership.role not in ("owner", "editor"):
+        raise AppException(message, status_code=403)
+    return workspace, membership

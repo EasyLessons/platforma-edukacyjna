@@ -22,6 +22,7 @@ class WorkspaceResponse(BaseModel):
     icon: str
     bg_color: str
     is_owner: bool = False
+    role: str = "viewer"
     is_favourite: bool = False
 
     class Config:

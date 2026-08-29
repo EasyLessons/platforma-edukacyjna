@@ -15,6 +15,7 @@ export interface Workspace {
   icon: string;
   bg_color: string;
   is_owner: boolean;
+  role: string;
   is_favourite: boolean;
 }
 
@@ -87,6 +88,30 @@ export interface MyRoleResponse {
   role: string;
   is_owner: boolean;
   workspace_id: number;
+}
+
+export interface ShareLinkResponse {
+  token: string;
+  workspace_id: number;
+  board_id: number | null;
+}
+
+export interface ShareLinkPreview {
+  workspace_id: number;
+  workspace_name: string;
+  workspace_icon: string;
+  board_id: number | null;
+  board_name: string | null;
+  already_member: boolean;
+}
+
+export interface JoinShareLinkResponse {
+  message: string;
+  workspace_id: number;
+  workspace_name: string;
+  board_id: number | null;
+  role: string;
+  already_member: boolean;
 }
 
 // UI TYPES

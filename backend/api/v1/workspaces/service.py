@@ -40,6 +40,18 @@ def _build_workspace_with_owner(
     db.add(membership)
     return workspace, membership
 
+def _build_workspace_response(workspace: Workspace, membership: WorkspaceMember) -> WorkspaceResponse:
+    """Tworzy WorkspaceResponse z Workspace i WorkspaceMember."""
+    return WorkspaceResponse(
+        id=workspace.id,
+        name=workspace.name,
+        icon=workspace.icon,
+        bg_color=workspace.bg_color,
+        is_owner=workspace.created_by == membership.user_id,
+        role=membership.role,
+        is_favourite=membership.is_favourite,
+    )
+
 def create_starter_workspace(db: Session, user_id: int) -> Workspace:
     """Tworzy domyślny workspace dla nowego użytkownika. Nie commituje."""
     workspace, _ = _build_workspace_with_owner(
@@ -67,17 +79,10 @@ class WorkspaceService:
             .all()
         )
 
-        workspaces_data = []
-        for membership, workspace in rows:
-            is_owner = (workspace.created_by == user_id)
-            workspaces_data.append(WorkspaceResponse(
-                id=workspace.id,
-                name=workspace.name,
-                icon=workspace.icon,
-                bg_color=workspace.bg_color,
-                is_owner=is_owner,
-                is_favourite=membership.is_favourite,
-            ))
+        workspaces_data = [
+            _build_workspace_response(workspace, membership)
+            for membership, workspace in rows
+        ]
 
         return workspaces_data
 
@@ -86,14 +91,7 @@ class WorkspaceService:
         db = self.db
         workspace, membership = require_membership(db, workspace_id, user_id)
 
-        workspace_response = WorkspaceResponse(
-            id=workspace.id,
-            name=workspace.name,
-            icon=workspace.icon,
-            bg_color=workspace.bg_color,
-            is_owner=workspace.created_by == user_id,
-            is_favourite=membership.is_favourite,
-        )
+        workspace_response = _build_workspace_response(workspace, membership)
         boards = await BoardService(db).list_boards(
             workspace_id=workspace_id,
             user_id=user_id,
@@ -117,14 +115,7 @@ class WorkspaceService:
         db.refresh(new_ws)
         db.refresh(membership)
 
-        return WorkspaceResponse(
-            id=new_ws.id,
-            name=new_ws.name,
-            icon=new_ws.icon,
-            bg_color=new_ws.bg_color,
-            is_owner=True,
-            is_favourite=False,
-        )
+        return _build_workspace_response(new_ws, membership)
 
     def update_workspace(
         self, workspace_id: int, data: WorkspaceUpdate, user_id: int
@@ -147,14 +138,7 @@ class WorkspaceService:
             WorkspaceMember.user_id == user_id,
         ).first()
 
-        return WorkspaceResponse(
-            id=workspace.id,
-            name=workspace.name,
-            icon=workspace.icon,
-            bg_color=workspace.bg_color,
-            is_owner=workspace.created_by == user_id,
-            is_favourite=membership.is_favourite,
-        )
+        return _build_workspace_response(workspace, membership)
 
     def delete_workspace(self, workspace_id: int, user_id: int) -> dict:
         """Usuwa workspace — tylko owner."""

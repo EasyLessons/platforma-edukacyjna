@@ -14,7 +14,7 @@
 'use client';
 
 import { useState } from 'react';
-import { PanelLeftOpen, PanelLeftClose, MoreVertical } from 'lucide-react';
+import { PanelLeftOpen, PanelLeftClose, MoreVertical, Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -34,6 +34,7 @@ interface BoardHeaderProps {
   isSidebarOpen?: boolean;
   onSidebarToggle?: () => void;
   onSettingsClick?: () => void;
+  onShareClick?: () => void;
 }
 
 export function BoardHeader({
@@ -45,6 +46,7 @@ export function BoardHeader({
   isSidebarOpen = false,
   onSidebarToggle,
   onSettingsClick,
+  onShareClick,
 }: BoardHeaderProps) {
   const [showTooltip, setShowTooltip] = useState(false);
   const router = useRouter();
@@ -179,6 +181,34 @@ export function BoardHeader({
                   }}
                 >
                   <MoreVertical size={18} color="#6b7280" />
+                </button>
+              </Tooltip>
+            )}
+
+            {/* Przycisk udostępniania tablicy */}
+            {onShareClick && (
+              <Tooltip content="Udostępnij tablicę" position="bottom" className="ml-1">
+                <button
+                  onClick={onShareClick}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Link2 size={18} color="#6b7280" />
                 </button>
               </Tooltip>
             )}
@@ -375,6 +405,45 @@ export function BoardHeader({
                 </button>
               </Tooltip>
             )}
+
+            {onShareClick && (
+              <div
+                style={{
+                  marginLeft: '8px',
+                  marginRight: '8px',
+                  width: '1px',
+                  height: '28px',
+                  backgroundColor: '#e5e7eb',
+                }}
+              />
+            )}
+
+            {onShareClick && (
+              <Tooltip content="Udostępnij tablicę" position="bottom">
+                <button
+                  onClick={onShareClick}
+                  style={{
+                    padding: '8px',
+                    backgroundColor: 'transparent',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.backgroundColor = '#f0f0f2';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.backgroundColor = 'transparent';
+                  }}
+                >
+                  <Link2 size={18} color="#6b7280" />
+                </button>
+              </Tooltip>
+            )}
           </div>
         </div>
       )}
@@ -454,6 +523,35 @@ export function BoardHeader({
                 }}
               >
                 <MoreVertical size={metrics.boardHeader.fallbackIconSize} color="#6b7280" />
+              </button>
+            </Tooltip>
+          )}
+
+          {showSettingsInFallback && onShareClick && (
+            <Tooltip content="Udostępnij tablicę" position="right">
+              <button
+                onClick={onShareClick}
+                style={{
+                  width: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  height: `${metrics.boardHeader.fallbackButtonSize}px`,
+                  backgroundColor: 'white',
+                  border: '2px solid #e0e0e0',
+                  borderRadius: '12px',
+                  cursor: 'pointer',
+                  transition: 'box-shadow 0.15s',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.1)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+                }}
+              >
+                <Link2 size={metrics.boardHeader.fallbackIconSize} color="#6b7280" />
               </button>
             </Tooltip>
           )}

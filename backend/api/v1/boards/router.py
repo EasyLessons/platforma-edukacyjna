@@ -9,7 +9,6 @@ DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
 GET    /{id}/members            — członkowie (z workspace)
 PUT    /{id}/settings           — ustawienia (tylko owner)
-POST   /{id}/join               — dołączenie przez link
 """
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -24,7 +23,6 @@ from .schemas import (
     BoardResponse, BoardListResponse,
     ToggleFavouriteResponse, BoardMembersResponse,
     UpdateBoardSettings, DeleteBoardResponse,
-    JoinBoardResponse,
 )
 from .service import BoardService
 
@@ -124,15 +122,4 @@ async def update_settings(
 ):
     service = BoardService(db)
     result = await service.update_settings(board_id, body, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-@router.post("/{board_id}/join", response_model=ApiResponse[JoinBoardResponse])
-async def join_board(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Dołącza użytkownika do workspace powiązanego z tablicą."""
-    service = BoardService(db)
-    result = await service.join_board_workspace(board_id, current_user.id)
     return ApiResponse(success=True, data=result)

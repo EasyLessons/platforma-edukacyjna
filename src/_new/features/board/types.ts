@@ -107,17 +107,6 @@ export interface UpdateSettingsResponse {
   settings: BoardSettings;
 }
 
-export interface JoinBoardResponse {
-  success: boolean;
-  already_member: boolean;
-  workspace_id: number;
-  board_id: number;
-  owner_id: number;
-  is_owner: boolean;
-  user_role: string;
-  message?: string;
-}
-
 // UI TYPES
 
 export interface BoardCardActions {

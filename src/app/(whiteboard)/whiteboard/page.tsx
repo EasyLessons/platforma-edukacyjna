@@ -25,13 +25,14 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
-// [Etap 6] Nowa implementacja — podłączone wszystkie narzędzia
+
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '../../context/VoiceChatContext';
-import { joinBoardWorkspace, fetchBoardById } from '@/_new/features/board/api/boardApi';
+import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
+import { ShareLinkModal } from '@/_new/features/workspace/components/shareLinkModal';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
 import {
@@ -73,9 +74,8 @@ export function TablicaContent() {
   const [boardName, setBoardName] = useState<string>('Moja tablica');
   const [boardIcon, setBoardIcon] = useState<string>('PenTool');
   const [boardBgColor, setBoardBgColor] = useState<string>('gray-500');
-  const [isJoining, setIsJoining] = useState(false);
-  const [joinError, setJoinError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
+  const [accessDenied, setAccessDenied] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(() => {
     const workspaceParam = searchParams.get('workspace');
     if (!workspaceParam) return null;
@@ -87,6 +87,7 @@ export function TablicaContent() {
   const [isOwner, setIsOwner] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
   const [boardOwnerId, setBoardOwnerId] = useState<number | null>(null);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Sidebar tablicy
   const sidebar = useWhiteboardSidebar();
@@ -137,15 +138,15 @@ export function TablicaContent() {
           console.log('✅ Załadowano dane tablicy:', board.name);
           console.log('📦 Workspace ID:', board.workspace_id);
         } else {
-          console.warn(
-            '⚠️ fetchBoardById zwróciło null - spróbuj pobrać workspace_id z joinBoardWorkspace'
-          );
+          console.warn('⚠️ fetchBoardById zwróciło null dla tablicy', numericId);
         }
-      } catch (error) {
+      } catch (error: any) {
         // Bardziej szczegółowe logowanie błędów
-        if (error instanceof Error) {
+        if (error?.isForbidden?.() || error?.status === 403) {
+          console.error('❌ Brak dostępu do tablicy:', error.message);
+          setAccessDenied(true);
+        } else if (error instanceof Error) {
           console.error('❌ Błąd ładowania danych tablicy:', error.message);
-          // Nie przerywaj działania aplikacji - dane zostaną pobrane przez joinBoardWorkspace
         } else {
           console.error('❌ Nieznany błąd ładowania danych tablicy:', error);
         }
@@ -153,53 +154,6 @@ export function TablicaContent() {
     };
 
     loadBoardData();
-
-    // Automatyczne dołączenie do workspace przy wejściu przez link
-    const joinWorkspace = async () => {
-      if (id && id !== 'demo-board') {
-        const numericId = parseInt(id, 10);
-        if (!isNaN(numericId)) {
-          try {
-            setIsJoining(true);
-            const result = await joinBoardWorkspace(numericId);
-            console.log('✅ Join workspace result:', result);
-
-            // Ustaw workspace_id z wyniku join (fallback jeśli fetchBoardById zawiódł)
-            if (result.workspace_id && !workspaceId) {
-              setWorkspaceId(result.workspace_id);
-              console.log('📦 Workspace ID z join:', result.workspace_id);
-            }
-
-            // Ustaw rolę i ownership bezpośrednio z join — nie czekamy na fetchBoardById
-            if (result.is_owner !== undefined) {
-              setIsOwner(result.is_owner);
-              console.log('👑 Właściciel tablicy (z join):', result.is_owner);
-            }
-            if (result.owner_id !== undefined) {
-              setBoardOwnerId(result.owner_id);
-            }
-            if (result.user_role !== undefined) {
-              setUserRole(result.user_role as 'owner' | 'editor' | 'viewer');
-              console.log('👤 Rola użytkownika (z join):', result.user_role);
-            }
-
-            if (!result.already_member) {
-              console.log('🆕 Dołączono do nowego workspace!');
-            }
-          } catch (error: any) {
-            console.error('❌ Błąd dołączania do workspace:', error);
-            // Nie blokujemy - użytkownik może nie być zalogowany
-            if (error.message?.includes('Brak tokenu')) {
-              setJoinError('Zaloguj się, aby edytować tablicę');
-            }
-          } finally {
-            setIsJoining(false);
-          }
-        }
-      }
-    };
-
-    joinWorkspace();
   }, [searchParams]);
 
   // Pobierz rolę użytkownika po załadowaniu workspace_id
@@ -278,6 +232,25 @@ export function TablicaContent() {
     );
   }
 
+  if (accessDenied) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-white">
+        <div className="text-center max-w-sm px-4">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Nie masz dostępu do tej tablicy</h2>
+          <p className="text-gray-600 mb-6">
+            Poproś właściciela o link zapraszający, albo wróć do dashboardu.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
+          >
+            Przejdź do dashboardu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
@@ -287,19 +260,6 @@ export function TablicaContent() {
         overflow: 'hidden',
       }}
     >
-      {/* Komunikat o dołączaniu / błędzie */}
-      {isJoining && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-blue-100 text-blue-800 px-4 py-2 rounded-lg shadow-md z-[200] flex items-center gap-2">
-          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-          <span>Dołączanie do tablicy...</span>
-        </div>
-      )}
-      {joinError && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg shadow-md z-[200]">
-          {joinError}
-        </div>
-      )}
-
       {/* Cienki pasek z ikonami workspace'ów po lewej */}
       {/* Sidebar z listą tablic bieżącego workspace'u */}
       {workspaceId && (
@@ -349,6 +309,21 @@ export function TablicaContent() {
             onSettingsClick={
               boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined
             }
+            onShareClick={
+              boardId !== 'demo-board' && userRole !== 'viewer'
+                ? () => setShowShareModal(true)
+                : undefined
+            }
+          />
+        )}
+
+        {workspaceId && boardId && boardId !== 'demo-board' && (
+          <ShareLinkModal
+            isOpen={showShareModal}
+            onClose={() => setShowShareModal(false)}
+            workspaceId={workspaceId}
+            boardId={parseInt(boardId, 10)}
+            boardName={boardName}
           />
         )}
 
