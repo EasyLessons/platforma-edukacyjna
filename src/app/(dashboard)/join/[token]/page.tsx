@@ -10,7 +10,7 @@ import { Check, X, Loader2 } from 'lucide-react';
 export default function JoinPage() {
   const { token } = useParams();
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<'preview' | 'loading' | 'success' | 'error'>('loading');
   const [preview, setPreview] = useState<ShareLinkPreview | null>(null);
   const [joining, setJoining] = useState(false);
@@ -18,6 +18,7 @@ export default function JoinPage() {
 
   useEffect(() => {
     if (!token) return;
+    if (authLoading) return; // Poczekaj, aż stan logowania zostanie ustalony
 
     // Jeśli niezalogowany, przekieruj do logowania
     if (!isLoggedIn) {
@@ -37,7 +38,7 @@ export default function JoinPage() {
     };
 
     loadPreview();
-  }, [token, isLoggedIn, router]);
+  }, [token, isLoggedIn, authLoading, router]);
 
   const redirectAfterJoin = (workspace_id: number, board_id: number | null) => {
     if (board_id) {
