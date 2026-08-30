@@ -8,12 +8,10 @@ import {
   updateBoard,
   deleteBoard,
   toggleBoardFavourite,
-  fetchBoardMembers,
-  updateBoardMemberRole,
   updateBoardSettings,
 } from './boardApi';
 import { AppError } from '@new/lib/errors/AppError';
-import { mockBoard, mockBoardListResponse, mockBoardMembersResponse } from '@/test/mocks/fixtures';
+import { mockBoard, mockBoardListResponse } from '@/test/mocks/fixtures';
 
 vi.mock('@new/lib/auth', () => ({
   getAccessToken: vi.fn(() => null),
@@ -110,30 +108,6 @@ describe('toggleBoardFavourite', () => {
     mock.onPost('/api/v1/boards/1/toggle-favourite').reply(200, { success: true, data: response });
     const result = await toggleBoardFavourite(1, true);
     expect(result.is_favourite).toBe(true);
-  });
-});
-
-// ─── fetchBoardMembers ─────────────────────────────────────────────────────
-
-describe('fetchBoardMembers', () => {
-  it('zwraca listę członków tablicy', async () => {
-    mock
-      .onGet('/api/v1/boards/1/members')
-      .reply(200, { success: true, data: mockBoardMembersResponse });
-    const result = await fetchBoardMembers(1);
-    expect(result.members).toHaveLength(1);
-    expect(result.members[0].username).toBe('testuser');
-  });
-});
-
-// ─── updateBoardMemberRole ─────────────────────────────────────────────────
-
-describe('updateBoardMemberRole', () => {
-  it('zwraca nową rolę', async () => {
-    const response = { message: 'Rola zmieniona', new_role: 'editor' };
-    mock.onPatch('/api/v1/boards/1/members/2/role').reply(200, { success: true, data: response });
-    const result = await updateBoardMemberRole(1, 2, 'editor');
-    expect(result.new_role).toBe('editor');
   });
 });
 

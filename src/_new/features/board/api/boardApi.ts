@@ -19,7 +19,6 @@ import type {
   BoardUpdateRequest,
   BoardListResponse,
   BoardToggleFavouriteResponse,
-  BoardMembersResponse,
   UpdateSettingsResponse,
   BoardSettings,
 } from '../types';
@@ -53,21 +52,6 @@ export const toggleBoardFavourite = (
 ): Promise<BoardToggleFavouriteResponse> =>
   apiClient
     .post<BoardToggleFavouriteResponse>(`/api/v1/boards/${id}/toggle-favourite`, { is_favourite })
-    .then((res) => res.data);
-
-export const fetchBoardMembers = (id: number): Promise<BoardMembersResponse> =>
-  apiClient.get<BoardMembersResponse>(`/api/v1/boards/${id}/members`).then((res) => res.data);
-
-export const updateBoardMemberRole = (
-  id: number,
-  user_id: number,
-  role: 'editor' | 'viewer'
-): Promise<{ message: string; new_role: string }> =>
-  apiClient
-    .patch<{
-      message: string;
-      new_role: string;
-    }>(`/api/v1/boards/${id}/members/${user_id}/role`, { role })
     .then((res) => res.data);
 
 export const updateBoardSettings = (

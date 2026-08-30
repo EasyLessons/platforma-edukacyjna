@@ -289,6 +289,7 @@ export function TablicaContent() {
         {showBoardSettings && boardId && boardId !== 'demo-board' && (
           <BoardSettingsPanel
             boardId={parseInt(boardId, 10)}
+            workspaceId={workspaceId}
             isOwner={userRole === 'owner'}
             settings={boardSettings}
             onSettingsChange={setBoardSettings}
