@@ -17,15 +17,6 @@ export interface BoardSettings {
   toolbar_visible: boolean;
 }
 
-export interface BoardMember {
-  user_id: number;
-  username: string;
-  email: string;
-  role: 'owner' | 'editor' | 'viewer';
-  is_owner: boolean;
-  joined_at: string | null;
-}
-
 export interface OnlineUserInfo {
   user_id: number;
   username: string;
@@ -96,10 +87,6 @@ export interface BoardListResponse {
 export interface BoardToggleFavouriteResponse {
   is_favourite: boolean;
   message: string;
-}
-
-export interface BoardMembersResponse {
-  members: BoardMember[];
 }
 
 export interface UpdateSettingsResponse {

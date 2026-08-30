@@ -32,18 +32,16 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
-import type { BoardSettings, BoardMember } from '@/_new/features/board/types';
-import {
-  fetchBoardMembers,
-  updateBoardSettings,
-  updateBoardMemberRole,
-} from '@/_new/features/board/api/boardApi';
+import type { BoardSettings } from '@/_new/features/board/types';
+import { updateBoardSettings } from '@/_new/features/board/api/boardApi';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
+import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/useWorkspaceMember';
 
 // ─── TYPY ───────────────────────────────────────────────────────────────────
 
 interface BoardSettingsPanelProps {
   boardId: number;
+  workspaceId: number | null;
   isOwner: boolean;
   settings: BoardSettings;
   onSettingsChange: (settings: BoardSettings) => void;
@@ -53,6 +51,7 @@ interface BoardSettingsPanelProps {
 // ─── HELPERS ────────────────────────────────────────────────────────────────
 
 const ROLE_CONFIG = {
+  owner: { label: 'Właściciel', icon: Crown, color: '#92400e', bg: '#fef3c7' },
   editor: { label: 'Edytor', icon: Shield, color: '#3b82f6', bg: '#dbeafe' },
   viewer: { label: 'Obserwator', icon: Eye, color: '#8b5cf6', bg: '#ede9fe' },
 } as const;
@@ -150,12 +149,11 @@ function ToggleRow({ icon, label, description, value, disabled, onChange }: Togg
 interface RoleSelectProps {
   currentRole: Role;
   userId: number;
-  boardId: number;
   onRoleChange: (userId: number, newRole: 'editor' | 'viewer') => void;
   saving: boolean;
 }
 
-function RoleSelect({ currentRole, userId, boardId, onRoleChange, saving }: RoleSelectProps) {
+function RoleSelect({ currentRole, userId, onRoleChange, saving }: RoleSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -250,6 +248,7 @@ function RoleSelect({ currentRole, userId, boardId, onRoleChange, saving }: Role
 
 export function BoardSettingsPanel({
   boardId,
+  workspaceId,
   isOwner,
   settings,
   onSettingsChange,
@@ -257,20 +256,16 @@ export function BoardSettingsPanel({
 }: BoardSettingsPanelProps) {
   const { getAvatarColorClass, getInitials } = useUserAvatar();
   const [tab, setTab] = useState<'settings' | 'members'>('settings');
-  const [members, setMembers] = useState<BoardMember[]>([]);
-  const [membersLoading, setMembersLoading] = useState(false);
-  const [membersError, setMembersError] = useState<string | null>(null);
-  const [savingRoles, setSavingRoles] = useState<Set<number>>(new Set());
   const [settingsSaving, setSettingsSaving] = useState(false);
   const settingsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Załaduj członków przy otwarciu zakładki
-  useEffect(() => {
-    if (tab !== 'members') return;
-    setMembersLoading(true);
-    setMembersError(null);
-    fetchBoardMembers(boardId).then((res) => setMembers(res.members));
-  }, [tab, boardId]);
+  const {
+    members,
+    loading: membersLoading,
+    error: membersError,
+    changingRoleMemberId,
+    changeRole,
+  } = useWorkspaceMembers({ workspace_id: workspaceId, autoLoad: tab === 'members' });
 
   // Debounced save ustawień do backendu (tylko właściciel)
   const handleToggle = useCallback(
@@ -292,26 +287,6 @@ export function BoardSettingsPanel({
       }, 500);
     },
     [settings, isOwner, boardId, onSettingsChange]
-  );
-
-  const handleRoleChange = useCallback(
-    async (userId: number, newRole: 'editor' | 'viewer') => {
-      setSavingRoles((prev) => new Set(prev).add(userId));
-      try {
-        await updateBoardMemberRole(boardId, userId, newRole);
-        setMembers((prev) => prev.map((m) => (m.user_id === userId ? { ...m, role: newRole } : m)));
-      } catch (err: unknown) {
-        const message = err instanceof Error ? err.message : 'Błąd zmiany roli';
-        alert(message);
-      } finally {
-        setSavingRoles((prev) => {
-          const next = new Set(prev);
-          next.delete(userId);
-          return next;
-        });
-      }
-    },
-    [boardId]
   );
 
   return (
@@ -571,9 +546,8 @@ export function BoardSettingsPanel({
                           <RoleSelect
                             currentRole={m.role as Role}
                             userId={m.user_id}
-                            boardId={boardId}
-                            onRoleChange={handleRoleChange}
-                            saving={savingRoles.has(m.user_id)}
+                            onRoleChange={changeRole}
+                            saving={changingRoleMemberId === m.user_id}
                           />
                         ) : (
                           <RoleBadge role={(m.is_owner ? 'owner' : m.role) as Role} />

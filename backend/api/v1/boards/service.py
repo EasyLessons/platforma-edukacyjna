@@ -8,7 +8,6 @@ BoardService obsługuje:
   update_board()      — aktualizacja
   delete_board()      — usuwanie
   toggle_favourite()  — ulubione
-  get_members()       — lista członków (z workspace)
   update_settings()   — ustawienia tablicy
 """
 from datetime import datetime
@@ -21,8 +20,7 @@ from core.models import Board, BoardUsers, User, Workspace, WorkspaceMember
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse, BoardSettings,
-    ToggleFavouriteResponse, BoardMember, BoardMembersResponse,
-    UpdateBoardSettings, OnlineUserInfo
+    ToggleFavouriteResponse, UpdateBoardSettings, OnlineUserInfo
 )
 
 logger = get_logger(__name__)
@@ -309,31 +307,6 @@ class BoardService:
             is_favourite=board_user.is_favourite,
             message="Ulubiona tablica zaktualizowana.",
         )
-
-    async def get_members(self, board_id: int, user_id: int) -> BoardMembersResponse:
-        board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
-
-        ws_members = (
-            self.db.query(WorkspaceMember, User)
-            .join(User, User.id == WorkspaceMember.user_id)
-            .filter(WorkspaceMember.workspace_id == board.workspace_id)
-            .all()
-        )
-
-        members = []
-        for wm, u in ws_members:
-            is_owner = u.id == board.created_by
-            members.append(BoardMember(
-                user_id=u.id,
-                username=u.username,
-                email=u.email,
-                role="owner" if is_owner else wm.role,
-                is_owner=is_owner,
-                joined_at=wm.joined_at,
-            ))
-
-        return BoardMembersResponse(members=members)
 
     async def update_settings(
         self, board_id: int, body: UpdateBoardSettings, user_id: int

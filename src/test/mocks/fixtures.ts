@@ -1,4 +1,4 @@
-import type { Board, BoardListResponse, BoardMembersResponse } from '@new/features/board/types';
+import type { Board, BoardListResponse } from '@new/features/board/types';
 import type {
   Workspace,
   WorkspaceListResponse,
@@ -36,19 +36,6 @@ export const mockBoardListResponse: BoardListResponse = {
   total: 1,
   limit: 10,
   offset: 0,
-};
-
-export const mockBoardMembersResponse: BoardMembersResponse = {
-  members: [
-    {
-      user_id: 1,
-      username: 'testuser',
-      email: 'test@example.com',
-      role: 'owner',
-      is_owner: true,
-      joined_at: '2024-01-01T00:00:00Z',
-    },
-  ],
 };
 
 // ─── WORKSPACE FIXTURES ────────────────────────────────────────────────────
