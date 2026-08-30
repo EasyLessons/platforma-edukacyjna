@@ -7,7 +7,6 @@ GET    /{id}                    — pobierz tablicę
 PUT    /{id}                    — zaktualizuj
 DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
-GET    /{id}/members            — członkowie (z workspace)
 PUT    /{id}/settings           — ustawienia (tylko owner)
 """
 from fastapi import APIRouter, Depends, status
@@ -21,8 +20,7 @@ from core.responses import ApiResponse
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse,
-    ToggleFavouriteResponse, BoardMembersResponse,
-    UpdateBoardSettings, DeleteBoardResponse,
+    ToggleFavouriteResponse, UpdateBoardSettings, DeleteBoardResponse,
 )
 from .service import BoardService
 
@@ -99,17 +97,6 @@ async def toggle_favourite(
 ):
     service = BoardService(db)
     result = await service.toggle_favourite(board_id, toggle_data, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
-@router.get("/{board_id}/members", response_model=ApiResponse[BoardMembersResponse])
-async def get_members(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = BoardService(db)
-    result = await service.get_members(board_id, current_user.id)
     return ApiResponse(success=True, data=result)
 
 

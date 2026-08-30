@@ -44,22 +44,6 @@ class UpdateBoardSettings(BaseModel):
     settings: BoardSettings
 
 
-class BoardMember(BaseModel):
-    user_id: int
-    username: str
-    email: str
-    role: str
-    is_owner: bool
-    joined_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
-
-class BoardMembersResponse(BaseModel):
-    members: List[BoardMember]
-
-
 class BoardResponse(BaseModel):
     id: int
     name: str

@@ -211,27 +211,3 @@ class TestToggleFavourite:
             test_board.id, ToggleFavourite(is_favourite=True), test_user2.id
         )
         assert result.is_favourite is True
-
-
-class TestGetMembers:
-
-    @pytest.mark.asyncio
-    async def test_returns_members(self, db_session, test_user, test_board):
-        service = BoardService(db_session)
-        result = await service.get_members(test_board.id, test_user.id)
-        assert len(result.members) >= 1
-
-    @pytest.mark.asyncio
-    async def test_owner_marked_correctly(self, db_session, test_user, test_board):
-        service = BoardService(db_session)
-        result = await service.get_members(test_board.id, test_user.id)
-        owner = next(m for m in result.members if m.user_id == test_user.id)
-        assert owner.is_owner is True
-        assert owner.role == "owner"
-
-    @pytest.mark.asyncio
-    async def test_no_access_raises_403(self, db_session, test_board, test_user2):
-        service = BoardService(db_session)
-        with pytest.raises(AppException) as exc:
-            await service.get_members(test_board.id, test_user2.id)
-        assert exc.value.status_code == 403
