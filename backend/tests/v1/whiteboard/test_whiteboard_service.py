@@ -11,6 +11,7 @@ from api.v1.whiteboard.schemas import (
 )
 from core.exceptions import NotFoundError, AppException, ValidationError
 from core.models import BoardUsers, BoardElement
+from core.presence import PresenceService
 
 
 ELEMENT = {"element_id": "uuid-1", "type": "path", "data": {"color": "#000"}}
@@ -18,19 +19,10 @@ ELEMENT = {"element_id": "uuid-1", "type": "path", "data": {"color": "#000"}}
 
 class TestOnlinePresence:
 
-    def test_set_online_marks_user(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        service.set_online(test_board.id, test_user.id)
-
-        bu = db_session.query(BoardUsers).filter(
-            BoardUsers.board_id == test_board.id,
-            BoardUsers.user_id == test_user.id,
-        ).first()
-        assert bu.is_online is True
-
-    def test_set_online_updates_last_opened(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        service.set_online(test_board.id, test_user.id)
+    @pytest.mark.asyncio
+    async def test_mark_opened_updates_last_opened(self, db_session, redis_client, test_user, test_board):
+        service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
+        await service.mark_opened(test_board.id, test_user.id)
 
         bu = db_session.query(BoardUsers).filter(
             BoardUsers.board_id == test_board.id,
@@ -38,44 +30,21 @@ class TestOnlinePresence:
         ).first()
         assert bu.last_opened is not None
 
-    def test_set_online_no_access_raises_403(self, db_session, test_board, test_user2):
-        service = WhiteboardService(db_session)
+    @pytest.mark.asyncio
+    async def test_mark_opened_marks_presence_in_redis(self, db_session, redis_client, test_user, test_board):
+        presence = PresenceService(db_session, redis_client)
+        service = WhiteboardService(db_session, presence)
+        await service.mark_opened(test_board.id, test_user.id)
+
+        result = await presence.get_online_users([test_board.id])
+        assert any(u.user_id == test_user.id for u in result[test_board.id])
+
+    @pytest.mark.asyncio
+    async def test_mark_opened_no_access_raises_403(self, db_session, redis_client, test_board, test_user2):
+        service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
         with pytest.raises(AppException) as exc:
-            service.set_online(test_board.id, test_user2.id)
+            await service.mark_opened(test_board.id, test_user2.id)
         assert exc.value.status_code == 403
-
-    def test_set_offline_marks_user(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        service.set_online(test_board.id, test_user.id)
-        result = service.set_offline(test_board.id, test_user.id)
-        assert result is True
-
-        bu = db_session.query(BoardUsers).filter(
-            BoardUsers.board_id == test_board.id,
-            BoardUsers.user_id == test_user.id,
-        ).first()
-        assert bu.is_online is False
-
-    def test_set_offline_nonexistent_returns_false(self, db_session, test_user2, test_board):
-        service = WhiteboardService(db_session)
-        result = service.set_offline(test_board.id, test_user2.id)
-        assert result is False
-
-    def test_get_online_users(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        service.set_online(test_board.id, test_user.id)
-        result = service.get_online_users(test_board.id)
-        assert any(u.user_id == test_user.id for u in result)
-
-    def test_get_online_users_empty(self, db_session, test_board):
-        # Ustaw wszystkich offline
-        for bu in db_session.query(BoardUsers).filter(BoardUsers.board_id == test_board.id):
-            bu.is_online = False
-        db_session.commit()
-
-        service = WhiteboardService(db_session)
-        result = service.get_online_users(test_board.id)
-        assert result == []
 
 
 class TestBoardMetadata:
@@ -98,9 +67,10 @@ class TestBoardMetadata:
         assert isinstance(result, LastModifiedByInfo)
         assert result.user_id == test_user.id
 
-    def test_get_last_opened(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        service.set_online(test_board.id, test_user.id)
+    @pytest.mark.asyncio
+    async def test_get_last_opened(self, db_session, redis_client, test_user, test_board):
+        service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
+        await service.mark_opened(test_board.id, test_user.id)
         result = service.get_last_opened(test_board.id, test_user.id)
         assert result.user_id == test_user.id
         assert result.last_opened is not None

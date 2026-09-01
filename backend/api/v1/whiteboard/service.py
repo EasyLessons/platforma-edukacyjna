@@ -2,9 +2,7 @@
 Logika biznesowa sesji whiteboard.
 
 WhiteboardService obsługuje:
-  set_online()          — oznacz usera jako online
-  set_offline()         — oznacz usera jako offline
-  get_online_users()    — lista online
+  mark_opened()         — zanotuj otwarcie tablicy (last_opened + presence)
   get_owner_info()      — info o właścicielu
   get_last_modifier()   — info o ostatnim modyfikatorze
   get_last_opened()     — kiedy user ostatnio otworzył
@@ -25,10 +23,11 @@ from core.logging import get_logger
 from core.models import Board, BoardElement, BoardUsers, User, WorkspaceMember
 
 from .schemas import (
-    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
-    OnlineUserInfo, BoardElementWithAuthor, SaveElementsResponse,
+    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, OnlineUserInfo, 
+    BoardElementWithAuthor, SaveElementsResponse,
 )
 from .storage import upload_board_image, delete_board_image
+from core.presence import PresenceService
 
 logger = get_logger(__name__)
 
@@ -67,8 +66,9 @@ async def _cleanup_image_after_delay(src: str, delay_seconds: float = IMAGE_DELE
 
 class WhiteboardService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, presence: PresenceService | None = None):
         self.db = db
+        self.presence = presence or PresenceService(db)
 
     def _get_board_or_404(self, board_id: int) -> Board:
         board = self.db.query(Board).filter(Board.id == board_id).first()
@@ -86,7 +86,8 @@ class WhiteboardService:
 
     # ── Online presence ────────────────────────────────────────────────────
 
-    def set_online(self, board_id: int, user_id: int) -> bool:
+    async def mark_opened(self, board_id: int, user_id: int) -> bool:
+        """Notuje otwarcie tablicy: last_opened w Postgresie + presence w Redisie."""
         board = self._get_board_or_404(board_id)
         self._check_access(board, user_id)
 
@@ -96,72 +97,18 @@ class WhiteboardService:
         ).first()
 
         if board_user:
-            board_user.is_online = True
             board_user.last_opened = datetime.utcnow()
         else:
             self.db.add(BoardUsers(
-                board_id=board_id, user_id=user_id,
-                is_online=True, is_favourite=False,
+                board_id=board_id,
+                user_id=user_id,
+                is_favourite=False,
                 last_opened=datetime.utcnow(),
             ))
 
         self.db.commit()
+        await self.presence.mark_online(board_id, user_id)
         return True
-
-    def set_offline(self, board_id: int, user_id: int) -> bool:
-        board_user = self.db.query(BoardUsers).filter(
-            BoardUsers.board_id == board_id,
-            BoardUsers.user_id == user_id,
-        ).first()
-        if not board_user:
-            return False
-        board_user.is_online = False
-        self.db.commit()
-        return True
-
-    def get_online_users(
-        self, board_id: int, limit: int = 50, offset: int = 0
-    ) -> List[OnlineUserInfo]:
-        from datetime import timedelta, datetime
-        active_threshold = datetime.utcnow() - timedelta(minutes=2)
-
-        rows = (
-            self.db.query(BoardUsers, User)
-            .join(User, User.id == BoardUsers.user_id)
-            .filter(
-                BoardUsers.board_id == board_id, 
-                BoardUsers.is_online == True,
-                BoardUsers.last_opened >= active_threshold
-            )
-            .offset(offset).limit(limit)
-            .all()
-        )
-        return [OnlineUserInfo(user_id=u.id, username=u.username, avatar_url=u.avatar_url) for _, u in rows]
-
-    def get_online_users_batch(self, board_ids: List[int]) -> Dict[int, List[OnlineUserInfo]]:
-        unique_board_ids = sorted(set(board_ids))
-        if not unique_board_ids:
-            return {}
-
-        from datetime import timedelta, datetime
-        active_threshold = datetime.utcnow() - timedelta(minutes=2)
-
-        rows = (
-            self.db.query(BoardUsers.board_id, User)
-            .join(User, User.id == BoardUsers.user_id)
-            .filter(
-                BoardUsers.board_id.in_(unique_board_ids),
-                BoardUsers.is_online == True,
-                BoardUsers.last_opened >= active_threshold
-            )
-            .all()
-        )
-
-        by_board: Dict[int, List[OnlineUserInfo]] = {board_id: [] for board_id in unique_board_ids}
-        for board_id, user in rows:
-            by_board[board_id].append(OnlineUserInfo(user_id=user.id, username=user.username, avatar_url=user.avatar_url))
-
-        return by_board
 
     # ── Board metadata ─────────────────────────────────────────────────────
 

@@ -1,9 +1,7 @@
 """
 Whiteboard router — /api/v1/whiteboard/{board_id}/*
 
-POST   /{id}/online                 — oznacz jako online
-DELETE /{id}/online                 — oznacz jako offline
-GET    /{id}/online-users           — lista online
+POST   /{id}/opened                 — zanotuj otwarcie tablicy (last_opened + presence)
 GET    /{id}/owner                  — info o właścicielu
 GET    /{id}/last-modified-by       — ostatni modyfikator
 GET    /{id}/last-opened            — ostatnie otwarcie (dla aktualnego usera)
@@ -18,14 +16,12 @@ from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
-from core.exceptions import NotFoundError
 from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
-    OnlineUserInfo, OnlineStatusResponse, OnlineUsersBatchRequest, OnlineUsersBatchResponse,
-    BoardElementWithAuthor,
+    OnlineStatusResponse, BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
 )
 from .service import WhiteboardService
@@ -35,54 +31,17 @@ router = APIRouter(tags=["Whiteboard"])
 
 # ── Online presence ────────────────────────────────────────────────────────
 
-@router.post("/{board_id}/online", response_model=ApiResponse[OnlineStatusResponse])
-async def mark_online(
+@router.post("/{board_id}/opened", response_model=ApiResponse[OnlineStatusResponse])
+async def mark_opened(
     board_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     service = WhiteboardService(db)
-    service.set_online(board_id, current_user.id)
+    await service.mark_opened(board_id, current_user.id)
     return ApiResponse(success=True, data=OnlineStatusResponse(
         status="online", board_id=board_id, user_id=current_user.id
     ))
-
-
-@router.delete("/{board_id}/online", response_model=ApiResponse[OnlineStatusResponse])
-async def mark_offline(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = WhiteboardService(db)
-    if not service.set_offline(board_id, current_user.id):
-        raise NotFoundError("Tablica nie znaleziona lub brak dostępu")
-    return ApiResponse(success=True, data=OnlineStatusResponse(
-        status="offline", board_id=board_id, user_id=current_user.id
-    ))
-
-
-@router.get("/{board_id}/online-users", response_model=ApiResponse[List[OnlineUserInfo]])
-async def get_online_users(
-    board_id: int,
-    limit: int = 50,
-    offset: int = 0,
-    db: Session = Depends(get_db),
-):
-    service = WhiteboardService(db)
-    result = service.get_online_users(board_id, limit, offset)
-    return ApiResponse(success=True, data=result)
-
-
-@router.post("/online-users/batch", response_model=ApiResponse[OnlineUsersBatchResponse])
-async def get_online_users_batch(
-    payload: OnlineUsersBatchRequest,
-    db: Session = Depends(get_db),
-):
-    service = WhiteboardService(db)
-    result = service.get_online_users_batch(payload.board_ids)
-    return ApiResponse(success=True, data=OnlineUsersBatchResponse(online_users_by_board=result))
-
 
 # ── Board metadata ─────────────────────────────────────────────────────────
 
