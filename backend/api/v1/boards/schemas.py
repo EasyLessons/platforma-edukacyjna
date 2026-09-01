@@ -1,12 +1,9 @@
 """Schemas dla modułu boards (CRUD tablicy)."""
 from datetime import datetime
-from typing import Optional, List
+from typing import Dict, Optional, List
 from pydantic import BaseModel, Field
 
-class OnlineUserInfo(BaseModel):
-    user_id: int
-    username: str
-    avatar_url: Optional[str] = None
+from api.v1.whiteboard.schemas import OnlineUserInfo
 
 class CreateBoard(BaseModel):
     name: str = Field(..., min_length=1, max_length=50)
@@ -59,7 +56,6 @@ class BoardResponse(BaseModel):
     last_opened: Optional[datetime]
     created_at: datetime
     created_by: str
-    online_users: List[OnlineUserInfo] = []
 
     class Config:
         from_attributes = True
@@ -79,3 +75,11 @@ class DeleteBoardResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     message: str
+
+
+class OnlineUsersRequest(BaseModel):
+    board_ids: List[int]
+
+
+class OnlineUsersResponse(BaseModel):
+    online_users_by_board: Dict[int, List[OnlineUserInfo]]

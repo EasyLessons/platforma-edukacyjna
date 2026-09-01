@@ -97,7 +97,6 @@ class BoardUsers(Base):
     id = Column(Integer, primary_key=True, index=True)
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    is_online = Column(Boolean, default=False, index=True)
     is_favourite = Column(Boolean, default=False)
     last_opened = Column(DateTime, nullable=True)
     
