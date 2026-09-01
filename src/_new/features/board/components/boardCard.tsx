@@ -156,14 +156,7 @@ export function BoardCard({
 
         {/* Online users — col 2 */}
         <div className="col-span-2 flex justify-center">
-          {(() => {
-            const activeUsers =
-              board.online_users && board.online_users.length > 0
-                ? board.online_users
-                : onlineUsers;
-
-            return activeUsers.length > 0 && <BoardOnlineUsers users={activeUsers} />;
-          })()}
+          {onlineUsers.length > 0 && <BoardOnlineUsers users={onlineUsers} />}
         </div>
 
         {/* Actions — col 2 */}

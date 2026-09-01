@@ -9,7 +9,7 @@ BoardService obsługuje:
   delete_board()      — usuwanie
   toggle_favourite()  — ulubione
   update_settings()   — ustawienia tablicy
-  get_online_users()  — kto jest online (deleguje do core.presence.PresenceService)
+  get_online_users_by_workspace()  — kto jest online (deleguje do core.presence.PresenceService)
 """
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
@@ -17,6 +17,9 @@ from sqlalchemy.orm import Session, joinedload
 from core.exceptions import NotFoundError, AppException
 from core.logging import get_logger
 from core.models import Board, BoardUsers, User, Workspace, WorkspaceMember
+from core.presence import PresenceService
+
+from api.v1.workspaces.authorization import require_membership
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -268,9 +271,15 @@ class BoardService:
         self.db.refresh(board)
         return {"success": True, "settings": board.settings}
 
-    async def get_online_users(self, board_ids: list[int]) -> OnlineUsersResponse:
-        """Kto jest online na podanych tablicach - deleguje do core.presence.PresenceService."""
-        from core.presence import PresenceService
+    async def get_online_users_by_workspace(self, workspace_id: int, user_id: int) -> OnlineUsersResponse:
+        """Kto jest online na podanych tablicach workspace'u."""
+        require_membership(self.db, workspace_id, user_id)
+
+        board_ids = [
+            b.id for b in self.db.query(Board.id)
+                .filter(Board.workspace_id == workspace_id).all()
+        ]
+
         presence = PresenceService(self.db)
         result = await presence.get_online_users(board_ids)
         return OnlineUsersResponse(online_users_by_board=result)

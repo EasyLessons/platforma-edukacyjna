@@ -3,12 +3,12 @@ Boards router — /api/v1/boards/*
 
 POST   /                        — utwórz tablicę
 GET    /                        — lista tablic w workspace
+GET    /online-users            — kto jest online na tablicach workspace'u
 GET    /{id}                    — pobierz tablicę
 PUT    /{id}                    — zaktualizuj
 DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
 PUT    /{id}/settings           — ustawienia (tylko owner)
-POST   /online-users            — kto jest online na podanych tablicach
 """
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
@@ -21,8 +21,8 @@ from core.responses import ApiResponse
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse,
-    ToggleFavouriteResponse, UpdateBoardSettings, DeleteBoardResponse,
-    OnlineUsersRequest, OnlineUsersResponse
+    ToggleFavouriteResponse, UpdateBoardSettings, DeleteBoardResponse, 
+    OnlineUsersResponse
 )
 from .service import BoardService
 
@@ -53,6 +53,16 @@ async def list_boards(
 ):
     service = BoardService(db)
     result = await service.list_boards(workspace_id, current_user.id, limit, offset)
+    return ApiResponse(success=True, data=result)
+
+@router.get("/online-users", response_model=ApiResponse[OnlineUsersResponse])
+async def get_online_users(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = BoardService(db)
+    result = await service.get_online_users_by_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=result)
 
 
@@ -111,14 +121,4 @@ async def update_settings(
 ):
     service = BoardService(db)
     result = await service.update_settings(board_id, body, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-@router.post("/online-users", response_model=ApiResponse[OnlineUsersResponse])
-async def get_online_users(
-    payload: OnlineUsersRequest,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = BoardService(db)
-    result = await service.get_online_users(payload.board_ids)
     return ApiResponse(success=True, data=result)

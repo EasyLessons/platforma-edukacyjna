@@ -23,7 +23,7 @@ from core.logging import get_logger
 from core.models import Board, BoardElement, BoardUsers, User, WorkspaceMember
 
 from .schemas import (
-    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, OnlineUserInfo, 
+    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, 
     BoardElementWithAuthor, SaveElementsResponse,
 )
 from .storage import upload_board_image, delete_board_image

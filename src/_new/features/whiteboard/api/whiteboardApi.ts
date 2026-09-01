@@ -8,12 +8,6 @@
  */
 import { apiClient } from '@/_new/lib/api';
 
-export interface OnlineUser {
-  user_id: number;
-  username: string;
-  avatar_url?: string | null;
-}
-
 export interface BoardElement {
   element_id: string;
   type: string;
@@ -31,22 +25,8 @@ export interface SaveElementsResponse {
   saved: number;
 }
 
-export const markUserOnline = (id: number): Promise<void> =>
-  apiClient.post(`/api/v1/whiteboard/${id}/online`).then(() => undefined);
-
-export const fetchOnlineUsers = (id: number, limit = 50, offset = 0): Promise<OnlineUser[]> =>
-  apiClient
-    .get<OnlineUser[]>(`/api/v1/whiteboard/${id}/online-users`, {
-      params: { limit, offset },
-    })
-    .then((res) => res.data);
-
-export const fetchOnlineUsersBatch = (board_ids: number[]): Promise<Record<number, OnlineUser[]>> =>
-  apiClient
-    .post<{
-      online_users_by_board: Record<number, OnlineUser[]>;
-    }>('/api/v1/whiteboard/online-users/batch', { board_ids })
-    .then((res) => res.data.online_users_by_board);
+export const markOpened = (id: number): Promise<void> =>
+  apiClient.post<void>(`/api/v1/whiteboard/${id}/opened`).then(() => undefined);
 
 export const saveBoardElementsBatch = (
   id: number,

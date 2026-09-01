@@ -39,8 +39,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { markUserOnline } from '@/_new/features/whiteboard/api/whiteboardApi';
-import { apiClient } from '@/_new/lib/api';
+import { markOpened } from '@/_new/features/whiteboard/api/whiteboardApi';
 import type { OnlineUser } from './types';
 import { PRESENCE_HEARTBEAT_MS, PRESENCE_SYNC_DEBOUNCE_MS } from './constants';
 import { log, logWarn, logDebug } from './logger';
@@ -242,12 +241,12 @@ export function useRealtimeChannel(
           trackPresence({ x, y, scale });
         };
 
-        markUserOnline(Number(boardId)).catch(() => {});
+        markOpened(Number(boardId)).catch(() => {});
 
         if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
         presenceHeartbeatRef.current = setInterval(() => {
           trackPresence();
-          markUserOnline(Number(boardId)).catch(() => {});
+          markOpened(Number(boardId)).catch(() => {});
         }, PRESENCE_HEARTBEAT_MS);
       } else if (status === 'CHANNEL_ERROR') {
         if (reconnectAttemptRef.current === 0) {
@@ -271,14 +270,6 @@ export function useRealtimeChannel(
     channelRef.current = channel;
 
     return () => {
-      log('🔌 Rozłączanie z kanału tablicy');
-      try {
-        // Ignorujemy błędy — przy zamykaniu karty (np. w Edge) fetch bywa przerywany
-        apiClient.delete(`/api/v1/whiteboard/${boardId}/online`).catch(() => {});
-      } catch (e) {
-        console.error('Cleanup error:', e);
-      }
-
       extraCleanup();
 
       if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
