@@ -1,6 +1,6 @@
 """Schemas dla modułu whiteboard (sesja tablicy)."""
 from datetime import datetime
-from typing import Optional, List, Any, Dict
+from typing import Optional, Any, Dict
 from pydantic import BaseModel
 
 
@@ -11,14 +11,6 @@ class OnlineUserInfo(BaseModel):
 
     class Config:
         from_attributes = True
-
-
-class OnlineUsersBatchRequest(BaseModel):
-    board_ids: List[int]
-
-
-class OnlineUsersBatchResponse(BaseModel):
-    online_users_by_board: Dict[int, List[OnlineUserInfo]]
 
 
 class OnlineStatusResponse(BaseModel):

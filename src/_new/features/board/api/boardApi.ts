@@ -22,6 +22,7 @@ import type {
   UpdateSettingsResponse,
   BoardSettings,
 } from '../types';
+import type { OnlineUser } from '@/_new/shared/types/user';
 
 export const fetchBoards = (
   workspace_id: number,
@@ -61,3 +62,10 @@ export const updateBoardSettings = (
   apiClient
     .put<UpdateSettingsResponse>(`/api/v1/boards/${id}/settings`, { settings })
     .then((res) => res.data);
+
+export const fetchOnlineUsers = (workspace_id: number): Promise<Record<number, OnlineUser[]>> =>
+  apiClient
+    .get<{
+      online_users_by_board: Record<number, OnlineUser[]>;
+    }>('/api/v1/boards/online-users', { params: { workspace_id } })
+    .then((res) => res.data.online_users_by_board);

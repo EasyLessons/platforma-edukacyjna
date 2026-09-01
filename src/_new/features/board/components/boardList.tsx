@@ -12,7 +12,7 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Layout } from 'lucide-react';
 import { BoardCard } from './boardCard';
-import { fetchOnlineUsersBatch } from '../../whiteboard/api/whiteboardApi';
+import { fetchOnlineUsers } from '../api/boardApi';
 import { sortBoards, filterBoards } from '../utils/helpers';
 import type { Board, BoardCardActions } from '../types';
 import type { SortBy, FilterOwner } from '../utils/helpers';
@@ -25,6 +25,7 @@ interface BoardListProps {
   sortBy: SortBy;
   filterOwner: FilterOwner;
   currentUsername: string;
+  workspaceId: number;
   onSelect: (boardId: number, workspaceId?: number) => void;
   onAction: BoardCardActions;
   onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
@@ -38,6 +39,7 @@ export function BoardList({
   sortBy,
   filterOwner,
   currentUsername,
+  workspaceId,
   onAction,
   onSelect,
   onToggleFavourite,
@@ -46,19 +48,10 @@ export function BoardList({
   // DATA
   // ================================
 
-  const boardIdsKey = useMemo(
-    () =>
-      boards
-        .map((b) => b.id)
-        .sort((a, b) => a - b)
-        .join(','),
-    [boards]
-  );
-  const boardIds = useMemo(() => boards.map((b) => b.id), [boards]);
   const onlineUsersQuery = useQuery<Record<number, OnlineUser[]>>({
-    queryKey: ['board-online-users-batch', boardIdsKey],
-    queryFn: () => fetchOnlineUsersBatch(boardIds),
-    enabled: onlineUsersEnabled && boardIds.length > 0,
+    queryKey: ['board-online-users', workspaceId],
+    queryFn: () => fetchOnlineUsers(workspaceId),
+    enabled: onlineUsersEnabled && boards.length > 0,
   });
   const onlineUsersMap = onlineUsersQuery.data ?? {};
 
