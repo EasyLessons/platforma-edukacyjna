@@ -177,6 +177,7 @@ export default function BoardsSection({
         sortBy={sortBy}
         filterOwner={filterOwner}
         currentUsername={currentUsername}
+        workspaceId={workspace_id}
         onlineUsersEnabled
         onAction={cardActions}
         onSelect={handleSelect}

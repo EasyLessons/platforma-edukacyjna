@@ -77,9 +77,5 @@ class MessageResponse(BaseModel):
     message: str
 
 
-class OnlineUsersRequest(BaseModel):
-    board_ids: List[int]
-
-
 class OnlineUsersResponse(BaseModel):
     online_users_by_board: Dict[int, List[OnlineUserInfo]]
