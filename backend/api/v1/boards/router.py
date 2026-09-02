@@ -10,7 +10,7 @@ DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
 PUT    /{id}/settings           — ustawienia (tylko owner)
 """
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -46,8 +46,8 @@ async def create_board(
 @router.get("", response_model=ApiResponse[BoardListResponse])
 async def list_boards(
     workspace_id: int,
-    limit: int = 10,
-    offset: int = 0,
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):

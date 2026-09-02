@@ -16,10 +16,10 @@ from sqlalchemy.orm import Session, joinedload
 
 from core.exceptions import NotFoundError, AppException
 from core.logging import get_logger
-from core.models import Board, BoardUsers, User, Workspace, WorkspaceMember
+from core.models import Board, BoardUsers, User, WorkspaceMember
 from core.presence import PresenceService
 
-from api.v1.workspaces.authorization import require_membership
+from api.v1.workspaces.authorization import require_membership, require_editor_or_owner
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -107,11 +107,7 @@ class BoardService:
             raise AppException("Brak dostępu do tej tablicy", status_code=403)
 
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
-        workspace = self.db.query(Workspace).filter(
-            Workspace.id == board_data.workspace_id
-        ).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie znaleziony")
+        require_editor_or_owner(self.db, board_data.workspace_id, user_id)
 
         board = Board(
             name=board_data.name,
@@ -147,6 +143,8 @@ class BoardService:
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0
     ) -> BoardListResponse:
+        require_membership(self.db, workspace_id, user_id)
+
         base_query = self.db.query(Board).filter(Board.workspace_id == workspace_id)
         total = base_query.count()
 
@@ -235,13 +233,15 @@ class BoardService:
     async def toggle_favourite(
         self, board_id: int, toggle_data: ToggleFavourite, user_id: int
     ) -> ToggleFavouriteResponse:
+        board = self._get_board_or_404(board_id)
+        self._check_access(board, user_id)
+
         board_user = self.db.query(BoardUsers).filter(
             BoardUsers.board_id == board_id,
             BoardUsers.user_id == user_id,
         ).first()
 
         if not board_user:
-            self._get_board_or_404(board_id)
             board_user = BoardUsers(
                 board_id=board_id, 
                 user_id=user_id,
