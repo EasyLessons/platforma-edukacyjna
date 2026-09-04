@@ -14,12 +14,12 @@ BoardService obsługuje:
 from datetime import datetime
 from sqlalchemy.orm import Session, joinedload
 
-from core.exceptions import NotFoundError, AppException
+from core.exceptions import NotFoundError
 from core.logging import get_logger
-from core.models import Board, BoardUsers, User, WorkspaceMember
+from core.models import Board, BoardUsers, User
 from core.presence import PresenceService
 
-from api.v1.workspaces.authorization import require_membership, require_editor_or_owner
+from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -85,6 +85,23 @@ def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
     db.add(board_user)
     return board
 
+def reassign_boards_on_member_removal(
+    db: Session, 
+    workspace_id: int, 
+    departing_user_id: int, 
+    new_owner_id: int
+) -> None:
+    """Przypisuje tablice użytkownika, który opuszcza workspace, do nowego właściciela."""
+    now = datetime.utcnow()
+    db.query(Board).filter(
+        Board.workspace_id == workspace_id,
+        Board.created_by == departing_user_id
+    ).update({
+        "created_by": new_owner_id,
+        "last_modified": now,
+        "last_modified_by": new_owner_id,
+    })
+
 
 class BoardService:
 
@@ -96,15 +113,6 @@ class BoardService:
         if not board:
             raise NotFoundError("Tablica nie znaleziona")
         return board
-
-    def _check_access(self, board: Board, user_id: int) -> None:
-        """Rzuca 403 jeśli user nie ma dostępu do tablicy."""
-        member = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == board.workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not member and board.created_by != user_id:
-            raise AppException("Brak dostępu do tej tablicy", status_code=403)
 
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
         require_editor_or_owner(self.db, board_data.workspace_id, user_id)
@@ -137,7 +145,7 @@ class BoardService:
 
     async def get_board(self, board_id: int, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
         return _build_board_response(self.db, board, user_id)
 
     async def list_boards(
@@ -194,8 +202,8 @@ class BoardService:
 
     async def update_board(self, board_id: int, data: UpdateBoard, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
-
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją edytować")
+        
         if data.name is not None:
             board.name = data.name
         if data.icon is not None:
@@ -213,9 +221,8 @@ class BoardService:
 
     async def delete_board(self, board_id: int, user_id: int) -> dict:
         board = self._get_board_or_404(board_id)
-        if board.created_by != user_id:
-            raise AppException("Tylko właściciel może usunąć tablicę", status_code=403)
-
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją usunąć")
+        
         self.db.delete(board)
         self.db.commit()
 
@@ -234,7 +241,7 @@ class BoardService:
         self, board_id: int, toggle_data: ToggleFavourite, user_id: int
     ) -> ToggleFavouriteResponse:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         board_user = self.db.query(BoardUsers).filter(
             BoardUsers.board_id == board_id,
@@ -263,8 +270,7 @@ class BoardService:
         self, board_id: int, body: UpdateBoardSettings, user_id: int
     ) -> dict:
         board = self._get_board_or_404(board_id)
-        if board.created_by != user_id:
-            raise AppException("Tylko właściciel może zmieniać ustawienia", status_code=403)
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może zmienić jej ustawienia")
 
         board.settings = body.settings.model_dump()
         self.db.commit()

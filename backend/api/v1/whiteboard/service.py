@@ -18,9 +18,9 @@ from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
-from core.exceptions import NotFoundError, AppException, ValidationError
+from core.exceptions import NotFoundError, ValidationError
 from core.logging import get_logger
-from core.models import Board, BoardElement, BoardUsers, User, WorkspaceMember
+from core.models import Board, BoardElement, BoardUsers, User
 
 from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, 
@@ -28,6 +28,7 @@ from .schemas import (
 )
 from .storage import upload_board_image, delete_board_image
 from core.presence import PresenceService
+from api.v1.workspaces.authorization import require_membership
 
 logger = get_logger(__name__)
 
@@ -76,20 +77,12 @@ class WhiteboardService:
             raise NotFoundError("Tablica nie znaleziona")
         return board
 
-    def _check_access(self, board: Board, user_id: int) -> None:
-        member = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == board.workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not member and board.created_by != user_id:
-            raise AppException("Brak dostępu do tej tablicy", status_code=403)
-
     # ── Online presence ────────────────────────────────────────────────────
 
     async def mark_opened(self, board_id: int, user_id: int) -> bool:
         """Notuje otwarcie tablicy: last_opened w Postgresie + presence w Redisie."""
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         board_user = self.db.query(BoardUsers).filter(
             BoardUsers.board_id == board_id,
@@ -155,7 +148,7 @@ class WhiteboardService:
             raise ValidationError("Zbyt wiele elementów (maksymalnie 100)")
 
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         saved = 0
         for el in elements:
@@ -193,7 +186,7 @@ class WhiteboardService:
         self, board_id: int, user_id: int
     ) -> List[BoardElementWithAuthor]:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         elements = self.db.query(BoardElement).filter(
             BoardElement.board_id == board_id
@@ -233,7 +226,7 @@ class WhiteboardService:
         Realtime Broadcast, żeby nie łamać limitu 256 KB na wiadomość.
         """
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
         return await upload_board_image(board_id, file_bytes, content_type)
 
     def delete_element(
@@ -244,7 +237,7 @@ class WhiteboardService:
         background_tasks: Optional[BackgroundTasks] = None,
     ) -> dict:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         element = self.db.query(BoardElement).filter(
             BoardElement.board_id == board_id,

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session
-from api.v1.boards.service import BoardService
+from api.v1.boards.service import BoardService, reassign_boards_on_member_removal
 
 from core.exceptions import AppException
 from core.models import Workspace, WorkspaceMember
@@ -170,6 +170,7 @@ class WorkspaceService:
                 "Właściciel nie może opuścić workspace'a. Musisz go usunąć.",
                 status_code=403,
             )
+        reassign_boards_on_member_removal(db, workspace_id, user_id, workspace.created_by)
 
         db.delete(membership)
         db.commit()

@@ -9,7 +9,7 @@ from api.v1.whiteboard.schemas import (
     BoardOwnerInfo, LastModifiedByInfo,
     SaveElementsResponse, BoardElementWithAuthor,
 )
-from core.exceptions import NotFoundError, AppException, ValidationError
+from core.exceptions import NotFoundError, ValidationError
 from core.models import BoardUsers, BoardElement
 from core.presence import PresenceService
 
@@ -40,11 +40,10 @@ class TestOnlinePresence:
         assert any(u.user_id == test_user.id for u in result[test_board.id])
 
     @pytest.mark.asyncio
-    async def test_mark_opened_no_access_raises_403(self, db_session, redis_client, test_board, test_user2):
+    async def test_mark_opened_no_access_raises_404(self, db_session, redis_client, test_board, test_user2):
         service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
-        with pytest.raises(AppException) as exc:
+        with pytest.raises(NotFoundError):
             await service.mark_opened(test_board.id, test_user2.id)
-        assert exc.value.status_code == 403
 
 
 class TestBoardMetadata:
@@ -126,11 +125,10 @@ class TestSaveElements:
         with pytest.raises(ValidationError):
             service.save_elements(test_board.id, elements, test_user.id)
 
-    def test_no_access_raises_403(self, db_session, test_board, test_user2):
+    def test_no_access_raises_404(self, db_session, test_board, test_user2):
         service = WhiteboardService(db_session)
-        with pytest.raises(AppException) as exc:
+        with pytest.raises(NotFoundError):
             service.save_elements(test_board.id, [ELEMENT], test_user2.id)
-        assert exc.value.status_code == 403
 
     def test_updates_board_last_modified(self, db_session, test_user, test_board):
         original = test_board.last_modified
@@ -162,11 +160,10 @@ class TestLoadElements:
         assert result[0].created_by_id == test_user.id
         assert result[0].created_by_username == test_user.username
 
-    def test_no_access_raises_403(self, db_session, test_board, test_user2):
+    def test_no_access_raises_404(self, db_session, test_board, test_user2):
         service = WhiteboardService(db_session)
-        with pytest.raises(AppException) as exc:
+        with pytest.raises(NotFoundError):
             service.load_elements(test_board.id, test_user2.id)
-        assert exc.value.status_code == 403
 
 
 class TestDeleteElement:
@@ -195,9 +192,8 @@ class TestDeleteElement:
         with pytest.raises(NotFoundError):
             service.delete_element(test_board.id, "nonexistent", test_user.id)
 
-    def test_no_access_raises_403(self, db_session, test_user, test_board, test_user2):
+    def test_no_access_raises_404(self, db_session, test_user, test_board, test_user2):
         service = WhiteboardService(db_session)
         service.save_elements(test_board.id, [ELEMENT], test_user.id)
-        with pytest.raises(AppException) as exc:
+        with pytest.raises(NotFoundError):
             service.delete_element(test_board.id, "uuid-1", test_user2.id)
-        assert exc.value.status_code == 403
