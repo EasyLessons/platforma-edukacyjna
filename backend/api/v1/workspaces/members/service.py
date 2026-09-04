@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from core.models import WorkspaceMember
 from core.exceptions import NotFoundError, AppException
 from ..authorization import require_membership, require_owner
+from api.v1.boards.service import reassign_boards_on_member_removal
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
     MyRoleResponse, RemoveMemberResponse, UpdateMemberRoleResponse
@@ -53,7 +54,7 @@ class MemberService:
     ) -> RemoveMemberResponse:
         """Usuwa członka — tylko owner, nie może usunąć siebie."""
         db = self.db
-        require_owner(db, workspace_id, current_user_id, "Tylko właściciel może usuwać członków")
+        workspace = require_owner(db, workspace_id, current_user_id, "Tylko właściciel może usuwać członków")
 
         if member_user_id == current_user_id:
             raise AppException(
@@ -69,6 +70,7 @@ class MemberService:
             raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
 
         try:
+            reassign_boards_on_member_removal(db, workspace_id, member_user_id, workspace.created_by)
             db.delete(membership)
             db.commit()
         except Exception as e:

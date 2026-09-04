@@ -5,7 +5,7 @@ Używane przez WorkspaceService, InviteService i MemeberService.
 from sqlalchemy.orm import Session
 
 from core.exceptions import NotFoundError, AppException
-from core.models import Workspace, WorkspaceMember
+from core.models import Board, Workspace, WorkspaceMember
 
 
 def get_workspace_or_404(db: Session, workspace_id: int) -> Workspace:
@@ -51,3 +51,14 @@ def require_editor_or_owner(
     if membership.role not in ("owner", "editor"):
         raise AppException(message, status_code=403)
     return workspace, membership
+
+def require_board_owner(
+    db: Session,
+    board: Board,
+    user_id: int, 
+    message: str = "Tylko właściciel tablicy może wykonać tę oprerację"
+) -> None:
+    """Sprawdza czy user jest twórcą tablicy."""
+    require_membership(db, board.workspace_id, user_id)
+    if board.created_by != user_id:
+        raise AppException(message, status_code=403)

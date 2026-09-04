@@ -8,7 +8,7 @@ from datetime import datetime
 from api.v1.workspaces.service import WorkspaceService
 from api.v1.workspaces.schemas import WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse
 from core.exceptions import NotFoundError, AppException
-from core.models import Workspace, WorkspaceMember
+from core.models import Board, Workspace, WorkspaceMember
 
 
 class TestCreateWorkspace:
@@ -224,3 +224,26 @@ class TestLeaveWorkspace:
         service = WorkspaceService(db_session)
         with pytest.raises(NotFoundError):
             service.leave_workspace(test_workspace.id, test_user2.id)
+
+    def test_transfers_board_ownership_to_workspace_owner(
+        self, db_session, test_user, test_workspace, test_user2
+    ):
+        db_session.add(WorkspaceMember(
+            workspace_id=test_workspace.id, user_id=test_user2.id,
+            role="editor", is_favourite=False, joined_at=datetime.utcnow(),
+        ))
+        board = Board(
+            name="User2's board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=test_workspace.id, created_by=test_user2.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user2.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
+        service = WorkspaceService(db_session)
+        service.leave_workspace(test_workspace.id, test_user2.id)
+
+        db_session.refresh(board)
+        assert board.created_by == test_user.id
