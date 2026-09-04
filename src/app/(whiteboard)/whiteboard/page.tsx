@@ -142,7 +142,12 @@ export function TablicaContent() {
         }
       } catch (error: any) {
         // Bardziej szczegółowe logowanie błędów
-        if (error?.isForbidden?.() || error?.status === 403) {
+        if (
+          error?.isForbidden?.() ||
+          error?.isNotFound?.() ||
+          error?.status === 403 ||
+          error?.status === 404
+        ) {
           console.error('❌ Brak dostępu do tablicy:', error.message);
           setAccessDenied(true);
         } else if (error instanceof Error) {

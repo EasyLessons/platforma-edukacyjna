@@ -8,7 +8,7 @@ from datetime import datetime
 from api.v1.workspaces.members.service import MemberService
 from api.v1.workspaces.members.schemas import WorkspaceMembersListResponse, MyRoleResponse
 from core.exceptions import NotFoundError, AppException
-from core.models import WorkspaceMember
+from core.models import Board, WorkspaceMember
 
 
 def add_member(db, workspace_id, user_id, role="editor"):
@@ -99,7 +99,26 @@ class TestRemoveWorkspaceMember:
         service = MemberService(db_session)
         with pytest.raises(NotFoundError):
             service.remove_workspace_member(test_workspace.id, test_user2.id, test_user.id)
+    
+    def test_transfers_board_ownership_to_workspace_owner(
+        self, db_session, test_user, test_workspace, test_user2
+    ):
+        add_member(db_session, test_workspace.id, test_user2.id)
+        board = Board(
+            name="User2's board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=test_workspace.id, created_by=test_user2.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user2.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
 
+        service = MemberService(db_session)
+        service.remove_workspace_member(test_workspace.id, test_user2.id, test_user.id)
+
+        db_session.refresh(board)
+        assert board.created_by == test_user.id
 
 class TestUpdateMemberRole:
 
