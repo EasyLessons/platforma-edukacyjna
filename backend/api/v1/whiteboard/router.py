@@ -5,6 +5,8 @@ POST   /{id}/opened                 — zanotuj otwarcie tablicy (last_opened + 
 GET    /{id}/owner                  — info o właścicielu
 GET    /{id}/last-modified-by       — ostatni modyfikator
 GET    /{id}/last-opened            — ostatnie otwarcie (dla aktualnego usera)
+GET    /{id}/settings               — ustawienia tablicy
+PUT    /{id}/settings               — aktualizacja ustawień tablicy
 POST   /{id}/elements/batch         — batch save elementów
 GET    /{id}/elements               — załaduj wszystkie elementy
 DELETE /{id}/elements/{element_id}  — usuń element
@@ -23,6 +25,7 @@ from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
     OnlineStatusResponse, BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
+    BoardSettings, BoardSettingsPatch
 )
 from .service import WhiteboardService
 
@@ -65,6 +68,27 @@ async def get_last_opened(
 ):
     service = WhiteboardService(db)
     return ApiResponse(success=True, data=service.get_last_opened(board_id, current_user.id))
+
+
+@router.get("/{board_id}/settings", response_model=ApiResponse[BoardSettings])
+async def get_settings(
+    board_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = WhiteboardService(db)
+    return ApiResponse(success=True, data=service.get_settings(board_id, current_user.id))
+
+
+@router.put("/{board_id}/settings", response_model=ApiResponse[BoardSettings])
+async def update_settings(
+    board_id: int,
+    patch: BoardSettingsPatch,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = WhiteboardService(db)
+    return ApiResponse(success=True, data=service.update_settings(board_id, patch, current_user.id))
 
 
 # ── Elements ───────────────────────────────────────────────────────────────

@@ -72,3 +72,17 @@ class DeleteElementResponse(BaseModel):
 class UploadImageResponse(BaseModel):
     """Zwracana po udanym uploadzie obrazu do Supabase Storage — patrz storage.py"""
     url: str
+
+
+class BoardSettings(BaseModel):
+    ai_enabled: bool = True
+    grid_visible: bool = True
+    smartsearch_visible: bool = True
+    toolbar_visible: bool = True
+
+
+class BoardSettingsPatch(BaseModel):
+    ai_enabled: Optional[bool] = None
+    grid_visible: Optional[bool] = None
+    smartsearch_visible: Optional[bool] = None
+    toolbar_visible: Optional[bool] = None

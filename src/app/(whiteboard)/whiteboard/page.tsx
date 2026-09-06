@@ -39,7 +39,8 @@ import {
   useWhiteboardSidebar,
   SIDEBAR_WIDTH,
 } from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
-import type { BoardSettings } from '@/_new/features/board/types';
+import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 
 // Helper do odczytania user_id z JWT (payload.sub)
 function getUserIdFromToken(): number | null {
@@ -129,8 +130,11 @@ export function TablicaContent() {
           const currentUserId = getUserIdFromToken();
           setIsOwner(!!currentUserId && board.owner_id === currentUserId);
           // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
-          if (board.settings) {
-            setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...board.settings });
+          try {
+            const s = await fetchBoardSettings(numericId);
+            setBoardSettings({ ...DEFAULT_BOARD_SETTINGS, ...s });
+          } catch (e) {
+            console.warn('Nie udało się wczytać ustawień tablicy, używam domyślnych', e);
           }
           import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) =>
             addRecentBoard(board)

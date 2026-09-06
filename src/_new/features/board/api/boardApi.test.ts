@@ -8,7 +8,6 @@ import {
   updateBoard,
   deleteBoard,
   toggleBoardFavourite,
-  updateBoardSettings,
 } from './boardApi';
 import { AppError } from '@new/lib/errors/AppError';
 import { mockBoard, mockBoardListResponse } from '@/test/mocks/fixtures';
@@ -108,22 +107,5 @@ describe('toggleBoardFavourite', () => {
     mock.onPost('/api/v1/boards/1/toggle-favourite').reply(200, { success: true, data: response });
     const result = await toggleBoardFavourite(1, true);
     expect(result.is_favourite).toBe(true);
-  });
-});
-
-// ─── updateBoardSettings ───────────────────────────────────────────────────
-
-describe('updateBoardSettings', () => {
-  it('zwraca zaktualizowane ustawienia', async () => {
-    const settings = {
-      ai_enabled: true,
-      grid_visible: false,
-      smartsearch_visible: true,
-      toolbar_visible: true,
-    };
-    const response = { success: true, settings };
-    mock.onPut('/api/v1/boards/1/settings').reply(200, { success: true, data: response });
-    const result = await updateBoardSettings(1, settings);
-    expect(result.settings.ai_enabled).toBe(true);
   });
 });

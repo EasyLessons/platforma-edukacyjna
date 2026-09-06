@@ -8,7 +8,6 @@ GET    /{id}                    — pobierz tablicę
 PUT    /{id}                    — zaktualizuj
 DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
-PUT    /{id}/settings           — ustawienia (tylko owner)
 """
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
@@ -21,7 +20,7 @@ from core.responses import ApiResponse
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse,
-    ToggleFavouriteResponse, UpdateBoardSettings, DeleteBoardResponse, 
+    ToggleFavouriteResponse, DeleteBoardResponse, 
     OnlineUsersResponse
 )
 from .service import BoardService
@@ -109,16 +108,4 @@ async def toggle_favourite(
 ):
     service = BoardService(db)
     result = await service.toggle_favourite(board_id, toggle_data, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
-@router.put("/{board_id}/settings", response_model=ApiResponse[dict])
-async def update_settings(
-    board_id: int,
-    body: UpdateBoardSettings,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = BoardService(db)
-    result = await service.update_settings(board_id, body, current_user.id)
     return ApiResponse(success=True, data=result)

@@ -10,13 +10,6 @@ import type { FormErrors } from '../auth/types';
 
 // CORE TYPES
 
-export interface BoardSettings {
-  ai_enabled: boolean;
-  grid_visible: boolean;
-  smartsearch_visible: boolean;
-  toolbar_visible: boolean;
-}
-
 export interface Board {
   id: number;
   name: string;
@@ -26,7 +19,6 @@ export interface Board {
   owner_id: number;
   owner_username: string;
   is_favourite: boolean;
-  settings: BoardSettings | null;
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
@@ -62,10 +54,6 @@ export interface BoardToggleFavouriteRequest {
   is_favourite: boolean;
 }
 
-export interface UpdateBoardSettingsRequest {
-  settings: BoardSettings;
-}
-
 // API RESPONSE TYPES
 
 export interface BoardListResponse {
@@ -78,11 +66,6 @@ export interface BoardListResponse {
 export interface BoardToggleFavouriteResponse {
   is_favourite: boolean;
   message: string;
-}
-
-export interface UpdateSettingsResponse {
-  success: boolean;
-  settings: BoardSettings;
 }
 
 // UI TYPES

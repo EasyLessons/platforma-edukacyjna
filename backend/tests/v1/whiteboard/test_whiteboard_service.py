@@ -2,15 +2,17 @@
 Testy serwisu whiteboard (sesja tablicy)
 api/v1/whiteboard/service.py
 """
+from datetime import datetime
 import pytest
 
 from api.v1.whiteboard.service import WhiteboardService
 from api.v1.whiteboard.schemas import (
     BoardOwnerInfo, LastModifiedByInfo,
     SaveElementsResponse, BoardElementWithAuthor,
+    BoardSettings, BoardSettingsPatch
 )
-from core.exceptions import NotFoundError, ValidationError
-from core.models import BoardUsers, BoardElement
+from core.exceptions import NotFoundError, AppException, ValidationError
+from core.models import Board, BoardUsers, BoardElement
 from core.presence import PresenceService
 
 
@@ -167,14 +169,6 @@ class TestLoadElements:
 
 
 class TestDeleteElement:
-    # 🛠️ delete_element zostaje sync (`def`) — sprzątanie Storage dla
-    # obrazów jest teraz zaplanowane w tle z opóźnieniem (BackgroundTasks),
-    # nie robione synchronicznie tutaj. Patrz docs/known-issues.md #2,
-    # Aktualizacja 9: natychmiastowe kasowanie pliku psuło undo (Ctrl+Z
-    # przywracał element z martwym URL-em → szary blok zamiast obrazka).
-    # Te testy nie przekazują background_tasks (domyślnie None), więc
-    # sprzątanie Storage jest w nich pomijane — testowane osobno by
-    # wymagało realnego klienta Supabase Storage.
 
     def test_deletes_element(self, db_session, test_user, test_board):
         service = WhiteboardService(db_session)
@@ -197,3 +191,50 @@ class TestDeleteElement:
         service.save_elements(test_board.id, [ELEMENT], test_user.id)
         with pytest.raises(NotFoundError):
             service.delete_element(test_board.id, "uuid-1", test_user2.id)
+
+
+class TestBoardSettings:
+
+    def test_get_defaults_when_null(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        result = service.get_settings(test_board.id, test_user.id)
+        assert result == BoardSettings()  # wszystko True
+
+    def test_get_merges_partial(self, db_session, test_user, test_board):
+        test_board.settings = {"ai_enabled": False}
+        db_session.commit()
+        service = WhiteboardService(db_session)
+        result = service.get_settings(test_board.id, test_user.id)
+        assert result.ai_enabled is False
+        assert result.grid_visible is True
+
+    def test_update_patches_single_field(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        r1 = service.update_settings(test_board.id, BoardSettingsPatch(grid_visible=False), test_user.id)
+        assert r1.grid_visible is False
+        assert r1.ai_enabled is True
+
+        r2 = service.update_settings(test_board.id, BoardSettingsPatch(ai_enabled=False), test_user.id)
+        assert r2.ai_enabled is False
+        assert r2.grid_visible is False  # poprzedni patch nie skasowany
+
+    def test_update_non_member_raises_404(self, db_session, test_board, test_user2):
+        service = WhiteboardService(db_session)
+        with pytest.raises(NotFoundError):
+            service.update_settings(test_board.id, BoardSettingsPatch(ai_enabled=False), test_user2.id)
+
+    def test_update_member_non_owner_raises_403(self, db_session, test_user, test_user2, shared_workspace):
+        board = Board(
+            name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=shared_workspace.id, created_by=test_user.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
+        service = WhiteboardService(db_session)
+        with pytest.raises(AppException) as exc:
+            service.update_settings(board.id, BoardSettingsPatch(ai_enabled=False), test_user2.id)
+        assert exc.value.status_code == 403 

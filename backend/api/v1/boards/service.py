@@ -8,7 +8,6 @@ BoardService obsługuje:
   update_board()      — aktualizacja
   delete_board()      — usuwanie
   toggle_favourite()  — ulubione
-  update_settings()   — ustawienia tablicy
   get_online_users_by_workspace()  — kto jest online (deleguje do core.presence.PresenceService)
 """
 from datetime import datetime
@@ -21,11 +20,12 @@ from core.models import Board, BoardUsers
 from core.presence import PresenceService
 
 from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
+from api.v1.whiteboard.storage import delete_board_folder
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
-    BoardResponse, BoardListResponse, BoardSettings,
-    ToggleFavouriteResponse, UpdateBoardSettings, OnlineUsersResponse
+    BoardResponse, BoardListResponse,
+    ToggleFavouriteResponse, OnlineUsersResponse
 )
 
 logger = get_logger(__name__)
@@ -47,7 +47,6 @@ def _build_board_response(
         owner_id=board.created_by,
         owner_username=owner.username if owner else "Unknown",
         is_favourite=board_user.is_favourite if board_user else False,
-        settings=BoardSettings(**(board.settings or {})),
         last_modified=board.last_modified,
         last_modified_by=modifier.username if modifier else None,
         last_opened=board_user.last_opened if board_user else None,
@@ -219,15 +218,9 @@ class BoardService:
         self.db.delete(board)
         self.db.commit()
 
-        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
-        # o "zapychanie się" Storage. Bez tego obrazy skasowanej tablicy
-        # zostałyby tam na zawsze (sieroty). Best-effort, PO commicie do bazy
-        # (usunięcie tablicy z bazy jest tym co naprawdę musi się udać;
-        # nieudane sprzątnięcie plików to dużo mniejszy problem).
-        from api.v1.whiteboard.storage import delete_board_folder
         await delete_board_folder(board_id)
 
-        logger.info(f"✅ Tablica usunięta: {board_id}")
+        logger.info(f"Tablica usunięta: {board_id}")
         return {"success": True, "message": "Tablica została pomyślnie usunięta."}
 
     async def toggle_favourite(
@@ -258,17 +251,6 @@ class BoardService:
             is_favourite=board_user.is_favourite,
             message="Ulubiona tablica zaktualizowana.",
         )
-
-    async def update_settings(
-        self, board_id: int, body: UpdateBoardSettings, user_id: int
-    ) -> dict:
-        board = self._get_board_or_404(board_id)
-        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może zmienić jej ustawienia")
-
-        board.settings = body.settings.model_dump()
-        self.db.commit()
-        self.db.refresh(board)
-        return {"success": True, "settings": board.settings}
 
     async def get_online_users_by_workspace(self, workspace_id: int, user_id: int) -> OnlineUsersResponse:
         """Kto jest online na podanych tablicach workspace'u."""

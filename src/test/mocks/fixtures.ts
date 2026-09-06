@@ -23,7 +23,6 @@ export const mockBoard: Board = {
   owner_id: 1,
   owner_username: 'testuser',
   is_favourite: false,
-  settings: null,
   last_modified: '2024-06-01T12:00:00Z',
   last_modified_by: null,
   last_opened: null,
