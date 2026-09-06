@@ -101,10 +101,10 @@ export function BoardEditModal({ isOpen, onClose, board, onSubmit }: BoardEditMo
               placeholder="Nazwa tablicy"
               label="Nazwa tablicy"
               error={errors.name}
-              maxLength={50}
+              maxLength={200}
               disabled={isSubmitting}
             />
-            <div className="text-right text-xs text-gray-400 mt-1">{formData.name.length}/50</div>
+            <div className="text-right text-xs text-gray-400 mt-1">{formData.name.length}/200</div>
           </div>
 
           {/* Icon Picker */}
