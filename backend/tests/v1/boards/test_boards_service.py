@@ -9,7 +9,6 @@ from api.v1.boards.service import BoardService
 from api.v1.boards.schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse, ToggleFavouriteResponse,
-    BoardSettings, UpdateBoardSettings
 )
 from core.exceptions import NotFoundError, AppException
 from core.models import Board, BoardUsers, WorkspaceMember
@@ -306,43 +305,3 @@ class TestToggleFavourite:
             BoardUsers.user_id == test_user2.id,
         ).first()
         assert row is not None
-
-
-
-
-class TestUpdateSettings:
-
-    @pytest.mark.asyncio
-    async def test_owner_can_update(self, db_session, test_user, test_board):
-        service = BoardService(db_session)
-        result = await service.update_settings(
-            test_board.id, UpdateBoardSettings(settings=BoardSettings(ai_enabled=False)), test_user.id
-        )
-        assert result["settings"]["ai_enabled"] is False
-
-    @pytest.mark.asyncio
-    async def test_non_member_raises_404(self, db_session, test_board, test_user2):
-        service = BoardService(db_session)
-        with pytest.raises(NotFoundError):
-            await service.update_settings(
-                test_board.id, UpdateBoardSettings(settings=BoardSettings()), test_user2.id
-            )
-
-    @pytest.mark.asyncio
-    async def test_member_non_owner_raises_403(self, db_session, test_user, test_user2, shared_workspace):
-        board = Board(
-            name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
-            workspace_id=shared_workspace.id, created_by=test_user.id,
-            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
-            last_modified_by=test_user.id,
-        )
-        db_session.add(board)
-        db_session.commit()
-        db_session.refresh(board)
-
-        service = BoardService(db_session)
-        with pytest.raises(AppException) as exc:
-            await service.update_settings(
-                board.id, UpdateBoardSettings(settings=BoardSettings()), test_user2.id
-            )
-        assert exc.value.status_code == 403

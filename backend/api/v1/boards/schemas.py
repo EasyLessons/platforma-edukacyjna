@@ -30,17 +30,6 @@ class ToggleFavouriteResponse(BaseModel):
         from_attributes = True
 
 
-class BoardSettings(BaseModel):
-    ai_enabled: bool = True
-    grid_visible: bool = True
-    smartsearch_visible: bool = True
-    toolbar_visible: bool = True
-
-
-class UpdateBoardSettings(BaseModel):
-    settings: BoardSettings
-
-
 class BoardResponse(BaseModel):
     id: int
     name: str
@@ -50,7 +39,6 @@ class BoardResponse(BaseModel):
     owner_id: int
     owner_username: str
     is_favourite: bool
-    settings: Optional[BoardSettings] = None
     last_modified: datetime
     last_modified_by: Optional[str]
     last_opened: Optional[datetime]

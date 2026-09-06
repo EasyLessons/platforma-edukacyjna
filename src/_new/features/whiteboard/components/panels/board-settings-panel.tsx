@@ -32,8 +32,8 @@ import {
   Check,
   Loader2,
 } from 'lucide-react';
-import type { BoardSettings } from '@/_new/features/board/types';
-import { updateBoardSettings } from '@/_new/features/board/api/boardApi';
+import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { updateBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/useWorkspaceMember';
 
@@ -278,7 +278,7 @@ export function BoardSettingsPanel({
       settingsTimerRef.current = setTimeout(async () => {
         setSettingsSaving(true);
         try {
-          await updateBoardSettings(boardId, next);
+          await updateBoardSettings(boardId, { [key]: value });
         } catch {
           // silent fail — UI already updated locally
         } finally {

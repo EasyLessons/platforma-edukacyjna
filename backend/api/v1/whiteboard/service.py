@@ -25,10 +25,11 @@ from core.models import Board, BoardElement, BoardUsers, User
 from .schemas import (
     BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, 
     BoardElementWithAuthor, SaveElementsResponse,
+    BoardSettings, BoardSettingsPatch
 )
 from .storage import upload_board_image, delete_board_image
 from core.presence import PresenceService
-from api.v1.workspaces.authorization import require_membership
+from api.v1.workspaces.authorization import require_membership, require_board_owner
 
 logger = get_logger(__name__)
 
@@ -133,6 +134,21 @@ class WhiteboardService:
             username=user.username if user else "Unknown",
             last_opened=board_user.last_opened,
         )
+
+    def get_settings(self, board_id: int, user_id: int) -> BoardSettings:
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+        return BoardSettings(**(board.settings or {}))
+
+    def update_settings(self, board_id: int, patch: BoardSettingsPatch, user_id: int) -> BoardSettings:
+        board = self._get_board_or_404(board_id)
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może zmienić jej ustawienia")
+
+        effective = BoardSettings(**(board.settings or {})).model_dump()
+        board.settings = {**effective, **patch.model_dump(exclude_unset=True)}
+        self.db.commit()
+        self.db.refresh(board)
+        return BoardSettings(**board.settings)
 
     # ── Elements ───────────────────────────────────────────────────────────
 

@@ -19,8 +19,6 @@ import type {
   BoardUpdateRequest,
   BoardListResponse,
   BoardToggleFavouriteResponse,
-  UpdateSettingsResponse,
-  BoardSettings,
 } from '../types';
 import type { OnlineUser } from '@/_new/shared/types/user';
 
@@ -53,14 +51,6 @@ export const toggleBoardFavourite = (
 ): Promise<BoardToggleFavouriteResponse> =>
   apiClient
     .post<BoardToggleFavouriteResponse>(`/api/v1/boards/${id}/toggle-favourite`, { is_favourite })
-    .then((res) => res.data);
-
-export const updateBoardSettings = (
-  id: number,
-  settings: BoardSettings
-): Promise<UpdateSettingsResponse> =>
-  apiClient
-    .put<UpdateSettingsResponse>(`/api/v1/boards/${id}/settings`, { settings })
     .then((res) => res.data);
 
 export const fetchOnlineUsers = (workspace_id: number): Promise<Record<number, OnlineUser[]>> =>
