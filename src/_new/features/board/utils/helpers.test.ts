@@ -93,8 +93,6 @@ function makeBoard(overrides: Partial<Board>): Board {
     last_modified: new Date().toISOString(),
     last_modified_by: null,
     last_opened: null,
-    created_at: new Date().toISOString(),
-    created_by: 'user',
     ...overrides,
   };
 }

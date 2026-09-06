@@ -27,8 +27,6 @@ export const mockBoard: Board = {
   last_modified: '2024-06-01T12:00:00Z',
   last_modified_by: null,
   last_opened: null,
-  created_at: '2024-01-01T00:00:00Z',
-  created_by: 'testuser',
 };
 
 export const mockBoardListResponse: BoardListResponse = {

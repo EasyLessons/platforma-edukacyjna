@@ -12,11 +12,12 @@ BoardService obsługuje:
   get_online_users_by_workspace()  — kto jest online (deleguje do core.presence.PresenceService)
 """
 from datetime import datetime
+from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 
 from core.exceptions import NotFoundError
 from core.logging import get_logger
-from core.models import Board, BoardUsers, User
+from core.models import Board, BoardUsers
 from core.presence import PresenceService
 
 from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
@@ -31,18 +32,11 @@ logger = get_logger(__name__)
 
 
 def _build_board_response(
-    db: Session, board: Board, user_id: int
+    board: Board, board_user: Optional[BoardUsers]
 ) -> BoardResponse:
     """Helper — buduje BoardResponse z ORM obiektu."""
-    owner = db.query(User).filter(User.id == board.created_by).first()
-    modifier = (
-        db.query(User).filter(User.id == board.last_modified_by).first()
-        if board.last_modified_by else owner
-    )
-    board_user = db.query(BoardUsers).filter(
-        BoardUsers.board_id == board.id,
-        BoardUsers.user_id == user_id,
-    ).first()
+    owner = board.creator
+    modifier = board.last_modifier or owner
 
     return BoardResponse(
         id=board.id,
@@ -57,16 +51,22 @@ def _build_board_response(
         last_modified=board.last_modified,
         last_modified_by=modifier.username if modifier else None,
         last_opened=board_user.last_opened if board_user else None,
-        created_at=board.created_at,
-        created_by=owner.username if owner else "Unknown",
     )
 
-def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
-    """Tworzy domyślną tablicę dla nowego workspace'a. Nie commituje - wołający zarządza transakcją."""
+def _new_board_with_owner(
+    db: Session,
+    *,
+    name: str,
+    icon: str,
+    bg_color: str,
+    workspace_id: int,
+    user_id: int
+) -> Board:
+    """Tworzy Board + BoardUsers. Nie commituje - wołający zarządza transakcją."""
     board = Board(
-        name="Moja pierwsza tablica",
-        icon="PenTool",
-        bg_color="bg-gray-500",
+        name=name,
+        icon=icon,
+        bg_color=bg_color,
         workspace_id=workspace_id,
         created_by=user_id,
         created_at=datetime.utcnow(),
@@ -84,6 +84,17 @@ def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
     )
     db.add(board_user)
     return board
+
+def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
+    """Tworzy domyślną tablicę dla nowego workspace'a. Nie commituje - wołający zarządza transakcją."""
+    return _new_board_with_owner(
+        db,
+        name="Moja pierwsza tablica",
+        icon="PenTool",
+        bg_color="bg-gray-500",
+        workspace_id=workspace_id,
+        user_id=user_id
+    )
 
 def reassign_boards_on_member_removal(
     db: Session, 
@@ -117,36 +128,32 @@ class BoardService:
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
         require_editor_or_owner(self.db, board_data.workspace_id, user_id)
 
-        board = Board(
+        board = _new_board_with_owner(
+            self.db,
             name=board_data.name,
             icon=board_data.icon or "PenTool",
             bg_color=board_data.bg_color or "bg-gray-500",
             workspace_id=board_data.workspace_id,
-            created_by=user_id,
-            created_at=datetime.utcnow(),
-            last_modified=datetime.utcnow(),
-            last_modified_by=user_id,
+            user_id=user_id
         )
-        self.db.add(board)
-        self.db.flush()
-
-        board_user = BoardUsers(
-            board_id=board.id,
-            user_id=user_id,
-            is_favourite=False,
-            last_opened=datetime.utcnow(),
-        )
-        self.db.add(board_user)
         self.db.commit()
         self.db.refresh(board)
         
         logger.info(f"Tablica utworzona: {board.id} przez {user_id}")
-        return _build_board_response(self.db, board, user_id)
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def get_board(self, board_id: int, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
         require_membership(self.db, board.workspace_id, user_id)
-        return _build_board_response(self.db, board, user_id)
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0
@@ -157,13 +164,12 @@ class BoardService:
         total = base_query.count()
 
         boards_data = (
-            self.db.query(Board, BoardUsers.is_favourite, BoardUsers.last_opened)
+            base_query.add_columns(BoardUsers)
             .outerjoin(BoardUsers, (Board.id == BoardUsers.board_id) & (BoardUsers.user_id == user_id))
             .options(
                 joinedload(Board.creator),
                 joinedload(Board.last_modifier)
             )
-            .filter(Board.workspace_id == workspace_id)
             .order_by(Board.last_modified.desc())
             .offset(offset)
             .limit(limit)
@@ -171,33 +177,16 @@ class BoardService:
         )
     
         responses = []
-        for board, is_favourite, last_opened in boards_data:
+        skipped = 0
+        for board, board_user in boards_data:
             try:
-                owner = board.creator
-                modifier = board.last_modifier or owner
-                
-                responses.append(BoardResponse(
-                    id=board.id,
-                    name=board.name,
-                    icon=board.icon,
-                    bg_color=board.bg_color,
-                    workspace_id=board.workspace_id,
-                    owner_id=board.created_by,
-                    owner_username=owner.username if owner else "Unknown",
-                    is_favourite=is_favourite or False,
-                    settings=BoardSettings(**(board.settings or {})),
-                    last_modified=board.last_modified,
-                    last_modified_by=modifier.username if modifier else None,
-                    last_opened=last_opened,
-                    created_at=board.created_at,
-                    created_by=owner.username if owner else "Unknown",
-                ))
+                responses.append(_build_board_response(board, board_user))
             except Exception as e:
                 logger.error(f"Błąd budowania BoardResponse dla {board.id}: {e}")
-                continue
+                skipped += 1
 
         return BoardListResponse(
-            boards=responses, total=total, limit=limit, offset=offset
+            boards=responses, total=total - skipped, limit=limit, offset=offset
         )
 
     async def update_board(self, board_id: int, data: UpdateBoard, user_id: int) -> BoardResponse:
@@ -217,7 +206,11 @@ class BoardService:
         self.db.refresh(board)
 
         logger.info(f"Tablica zaktualizowana: {board_id}")
-        return _build_board_response(self.db, board, user_id)
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def delete_board(self, board_id: int, user_id: int) -> dict:
         board = self._get_board_or_404(board_id)

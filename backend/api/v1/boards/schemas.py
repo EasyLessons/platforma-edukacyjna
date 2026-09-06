@@ -54,8 +54,6 @@ class BoardResponse(BaseModel):
     last_modified: datetime
     last_modified_by: Optional[str]
     last_opened: Optional[datetime]
-    created_at: datetime
-    created_by: str
 
     class Config:
         from_attributes = True

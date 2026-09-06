@@ -182,6 +182,23 @@ class TestUpdateBoard:
             await service.update_board(test_board.id, UpdateBoard(name="X"), test_user2.id)
 
     @pytest.mark.asyncio
+    async def test_member_non_owner_raises_403(self, db_session, test_user, test_user2, shared_workspace):
+        board = Board(
+            name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=shared_workspace.id, created_by=test_user.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
+        service = BoardService(db_session)
+        with pytest.raises(AppException) as exc:
+            await service.update_board(board.id, UpdateBoard(name="X"), test_user2.id)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_nonexistent_raises_not_found(self, db_session, test_user):
         service = BoardService(db_session)
         with pytest.raises(NotFoundError):
