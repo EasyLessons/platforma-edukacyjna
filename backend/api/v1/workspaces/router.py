@@ -1,15 +1,14 @@
 """
 Workspace CRUD router — /api/v1/workspaces/*
 """
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, status
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
 from core.responses import ApiResponse
 
 from .schemas import (
-    WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse,
-    WorkspaceWithBoardsResponse, WorkspaceListResponse, 
+    WorkspaceCreate, WorkspaceUpdate, WorkspaceResponse, WorkspaceListResponse, 
     ToggleFavouriteRequest, ToggleFavouriteResponse, MessageResponse,
 )
 from .service import WorkspaceService
@@ -22,17 +21,15 @@ async def get_workspaces(db=Depends(get_db), current_user=Depends(get_current_us
     workspaces = service.get_user_workspaces(current_user.id)
     return ApiResponse(success=True, data=WorkspaceListResponse(workspaces=workspaces, total=len(workspaces)))
 
-@router.get("/{workspace_id}", response_model=ApiResponse[WorkspaceWithBoardsResponse])
+@router.get("/{workspace_id}", response_model=ApiResponse[WorkspaceResponse])
 async def get_workspace(
     workspace_id: int, 
-    boards_limit: int = Query(50, ge=1, le=100),
-    boards_offset: int = Query(0, ge=0),
     db=Depends(get_db), 
     current_user=Depends(get_current_user),
 
 ):
     service = WorkspaceService(db)
-    result = await service.get_workspace_with_boards(workspace_id, current_user.id, boards_limit, boards_offset)
+    result = service.get_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=result)
 
 @router.post("", response_model=ApiResponse[WorkspaceResponse], status_code=status.HTTP_201_CREATED)

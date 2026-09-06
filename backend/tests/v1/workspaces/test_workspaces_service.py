@@ -84,32 +84,24 @@ class TestGetWorkspaces:
         assert result == []
 
 
-class TestGetWorkspaceWithBoards:
+class TestGetWorkspace:
 
-    @pytest.mark.asyncio
-    async def test_returns_workspace(self, db_session, test_user, test_workspace):
+    def test_returns_workspace(self, db_session, test_user, test_workspace):
         service = WorkspaceService(db_session)
-        result = await service.get_workspace_with_boards(test_workspace.id, test_user.id)
+        result = service.get_workspace(test_workspace.id, test_user.id)
         assert result.id == test_workspace.id
+        assert result.is_owner is True
 
-    @pytest.mark.asyncio
-    async def test_returns_empty_boards_list(self, db_session, test_user, test_workspace):
-        service = WorkspaceService(db_session)
-        result = await service.get_workspace_with_boards(test_workspace.id, test_user.id)
-        assert result.boards.boards == []
-        assert result.boards.total == 0
-
-    @pytest.mark.asyncio
-    async def test_nonexistent_raises_not_found(self, db_session, test_user):
+    def test_nonexistent_raises_not_found(self, db_session, test_user):
         service = WorkspaceService(db_session)
         with pytest.raises(NotFoundError):
-            await service.get_workspace_with_boards(99999, test_user.id)
+            service.get_workspace(99999, test_user.id)
 
-    @pytest.mark.asyncio
-    async def test_no_access_raises_not_found(self, db_session, test_workspace, test_user2):
+    def test_no_access_raises_not_found(self, db_session, test_workspace, test_user2):
         service = WorkspaceService(db_session)
         with pytest.raises(NotFoundError):
-            await service.get_workspace_with_boards(test_workspace.id, test_user2.id)
+            service.get_workspace(test_workspace.id, test_user2.id)
+
 
 class TestUpdateWorkspace:
 

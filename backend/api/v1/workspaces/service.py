@@ -5,15 +5,14 @@ from datetime import datetime
 from typing import List
 
 from sqlalchemy.orm import Session
-from api.v1.boards.service import BoardService, reassign_boards_on_member_removal
+from api.v1.boards.service import reassign_boards_on_member_removal
 
 from core.exceptions import AppException
 from core.models import Workspace, WorkspaceMember
 from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, 
-    WorkspaceResponse, WorkspaceWithBoardsResponse,
-    ToggleFavouriteResponse,
+    WorkspaceResponse, ToggleFavouriteResponse,
 )
 
 def _build_workspace_with_owner(
@@ -86,20 +85,10 @@ class WorkspaceService:
 
         return workspaces_data
 
-    async def get_workspace_with_boards(self, workspace_id: int, user_id: int, boards_limit: int = 50, boards_offset: int = 0) -> WorkspaceWithBoardsResponse:
-        """Pobiera workspace wraz z listą boardów. Sprawdza, czy użytkownik jest członkiem workspace'a."""
-        db = self.db
-        workspace, membership = require_membership(db, workspace_id, user_id)
-
-        workspace_response = _build_workspace_response(workspace, membership)
-        boards = await BoardService(db).list_boards(
-            workspace_id=workspace_id,
-            user_id=user_id,
-            limit=boards_limit,
-            offset=boards_offset
-        )
-
-        return WorkspaceWithBoardsResponse(**workspace_response.model_dump(), boards=boards)
+    def get_workspace(self, workspace_id: int, user_id: int) -> WorkspaceResponse:
+        """Pobiera pojedynczy workspace. Sprawdza, czy użytkownik jest członkiem workspace'a."""
+        workspace, membership = require_membership(self.db, workspace_id, user_id)
+        return _build_workspace_response(workspace, membership)
 
     def create_workspace(self, data: WorkspaceCreate, user_id: int) -> WorkspaceResponse:
         """Tworzy nowy workspace z membership ownerem."""

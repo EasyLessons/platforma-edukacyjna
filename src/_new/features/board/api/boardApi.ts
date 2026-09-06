@@ -28,10 +28,10 @@ export const fetchBoards = (
   offset = 0
 ): Promise<BoardListResponse> =>
   apiClient
-    .get<{ boards: BoardListResponse }>(`/api/v1/workspaces/${workspace_id}`, {
-      params: { boards_limit: limit, boards_offset: offset },
+    .get<BoardListResponse>(`/api/v1/boards`, {
+      params: { workspace_id, limit, offset },
     })
-    .then((res) => res.data.boards);
+    .then((res) => res.data);
 
 export const fetchBoardById = (id: number): Promise<Board> =>
   apiClient.get<Board>(`/api/v1/boards/${id}`).then((res) => res.data);

@@ -7,7 +7,7 @@
  */
 
 // validateBoardName - Waliduje nazwę tablicy.
-// Backend: min_length=1, max_length=50
+// Backend: min_length=1, max_length=200
 export const validateBoardName = (name: string): { valid: boolean; error?: string } => {
   const trimmed = name.trim();
 
@@ -15,8 +15,8 @@ export const validateBoardName = (name: string): { valid: boolean; error?: strin
     return { valid: false, error: 'Nazwa tablicy jest wymagana' };
   }
 
-  if (trimmed.length > 50) {
-    return { valid: false, error: 'Nazwa może mieć maksymalnie 50 znaków' };
+  if (trimmed.length > 200) {
+    return { valid: false, error: 'Nazwa może mieć maksymalnie 200 znaków' };
   }
 
   return { valid: true };

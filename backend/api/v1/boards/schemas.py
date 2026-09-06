@@ -6,14 +6,14 @@ from pydantic import BaseModel, Field
 from api.v1.whiteboard.schemas import OnlineUserInfo
 
 class CreateBoard(BaseModel):
-    name: str = Field(..., min_length=1, max_length=50)
+    name: str = Field(..., min_length=1, max_length=200)
     icon: Optional[str] = Field("PenTool", max_length=50)
     bg_color: Optional[str] = Field("bg-gray-500", max_length=50)
     workspace_id: int
 
 
 class UpdateBoard(BaseModel):
-    name: Optional[str] = Field(None, max_length=50)
+    name: Optional[str] = Field(None, max_length=200)
     icon: Optional[str] = Field(None, max_length=50)
     bg_color: Optional[str] = Field(None, max_length=50)
 
@@ -25,9 +25,6 @@ class ToggleFavourite(BaseModel):
 class ToggleFavouriteResponse(BaseModel):
     is_favourite: bool
     message: str
-
-    class Config:
-        from_attributes = True
 
 
 class BoardResponse(BaseModel):
@@ -56,10 +53,6 @@ class BoardListResponse(BaseModel):
 
 class DeleteBoardResponse(BaseModel):
     success: bool
-    message: str
-
-
-class MessageResponse(BaseModel):
     message: str
 
 
