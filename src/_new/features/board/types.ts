@@ -30,8 +30,6 @@ export interface Board {
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
-  created_at: string;
-  created_by: string;
 }
 
 // FORM DATA TYPES
