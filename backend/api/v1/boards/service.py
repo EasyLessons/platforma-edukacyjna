@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from core.exceptions import NotFoundError
 from core.logging import get_logger
-from core.models import Board, BoardUsers, User
+from core.models import Board, BoardUsers
 from core.presence import PresenceService
 
 from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
