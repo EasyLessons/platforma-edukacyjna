@@ -3,9 +3,6 @@ Logika biznesowa sesji whiteboard.
 
 WhiteboardService obsługuje:
   mark_opened()         — zanotuj otwarcie tablicy (last_opened + presence)
-  get_owner_info()      — info o właścicielu
-  get_last_modifier()   — info o ostatnim modyfikatorze
-  get_last_opened()     — kiedy user ostatnio otworzył
   save_elements()       — batch save elementów
   load_elements()       — ładowanie wszystkich elementów
   delete_element()      — usuń jeden element
@@ -23,7 +20,6 @@ from core.logging import get_logger
 from core.models import Board, BoardElement, BoardUsers, User
 
 from .schemas import (
-    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo, 
     BoardElementWithAuthor, SaveElementsResponse,
     BoardSettings, BoardSettingsPatch
 )
@@ -33,10 +29,6 @@ from api.v1.workspaces.authorization import require_membership, require_board_ow
 
 logger = get_logger(__name__)
 
-# Ile sekund czekamy po usunięciu elementu-obrazu, zanim NAPRAWDĘ skasujemy
-# plik ze Storage — patrz docs/known-issues.md #2, Aktualizacja 9: usera
-# undo (Ctrl+Z) przywraca element z tym samym URL-em, więc jeśli plik
-# zniknąłby natychmiast, undo pokazywałoby szary/pusty blok zamiast obrazka.
 IMAGE_DELETE_GRACE_PERIOD_SECONDS = 90.0
 
 
@@ -78,7 +70,7 @@ class WhiteboardService:
             raise NotFoundError("Tablica nie znaleziona")
         return board
 
-    # ── Online presence ────────────────────────────────────────────────────
+    # Online presence --------------------------------------------------
 
     async def mark_opened(self, board_id: int, user_id: int) -> bool:
         """Notuje otwarcie tablicy: last_opened w Postgresie + presence w Redisie."""
@@ -104,36 +96,7 @@ class WhiteboardService:
         await self.presence.mark_online(board_id, user_id)
         return True
 
-    # ── Board metadata ─────────────────────────────────────────────────────
-
-    def get_owner_info(self, board_id: int) -> BoardOwnerInfo:
-        board = self._get_board_or_404(board_id)
-        owner = self.db.query(User).filter(User.id == board.created_by).first()
-        if not owner:
-            raise NotFoundError("Właściciel tablicy nie znaleziony")
-        return BoardOwnerInfo(user_id=owner.id, username=owner.username)
-
-    def get_last_modifier(self, board_id: int) -> LastModifiedByInfo:
-        board = self._get_board_or_404(board_id)
-        uid = board.last_modified_by or board.created_by
-        user = self.db.query(User).filter(User.id == uid).first()
-        if not user:
-            raise NotFoundError("Ostatni modyfikator nie znaleziony")
-        return LastModifiedByInfo(user_id=user.id, username=user.username)
-
-    def get_last_opened(self, board_id: int, user_id: int) -> LastOpenedInfo:
-        board_user = self.db.query(BoardUsers).filter(
-            BoardUsers.board_id == board_id,
-            BoardUsers.user_id == user_id,
-        ).first()
-        if not board_user or not board_user.last_opened:
-            raise NotFoundError("Brak informacji o ostatnim otwarciu")
-        user = self.db.query(User).filter(User.id == user_id).first()
-        return LastOpenedInfo(
-            user_id=user_id,
-            username=user.username if user else "Unknown",
-            last_opened=board_user.last_opened,
-        )
+    # Settings --------------------------------------------------
 
     def get_settings(self, board_id: int, user_id: int) -> BoardSettings:
         board = self._get_board_or_404(board_id)
@@ -150,7 +113,7 @@ class WhiteboardService:
         self.db.refresh(board)
         return BoardSettings(**board.settings)
 
-    # ── Elements ───────────────────────────────────────────────────────────
+    # Elements --------------------------------------------------
 
     def save_elements(
         self,
@@ -263,16 +226,6 @@ class WhiteboardService:
         if not element:
             raise NotFoundError("Element nie znaleziony")
 
-        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
-        # o "zapychanie się" Storage. Obraz raz wgrany do Storage zostałby tam
-        # na zawsze, gdybyśmy kasowali tylko wiersz w bazie.
-        #
-        # NIE kasujemy pliku od razu — zaplanowane w tle z opóźnieniem
-        # (_cleanup_image_after_delay), bo natychmiastowe kasowanie psuło
-        # undo (patrz Aktualizacja 9): Ctrl+Z przywraca element z tym samym
-        # URL-em, a jeśli plik już zniknął, obrazek wraca jako szary/pusty
-        # blok. Background task sam sprawdzi tuż przed kasowaniem, czy URL
-        # nie wrócił na tablicę w międzyczasie.
         if element.type == "image" and background_tasks is not None:
             src = (element.data or {}).get("src")
             if isinstance(src, str) and src:

@@ -19,31 +19,6 @@ class OnlineStatusResponse(BaseModel):
     user_id: int
 
 
-class BoardOwnerInfo(BaseModel):
-    user_id: int
-    username: str
-
-    class Config:
-        from_attributes = True
-
-
-class LastModifiedByInfo(BaseModel):
-    user_id: int
-    username: str
-
-    class Config:
-        from_attributes = True
-
-
-class LastOpenedInfo(BaseModel):
-    user_id: int
-    username: str
-    last_opened: datetime
-
-    class Config:
-        from_attributes = True
-
-
 class BoardElement(BaseModel):
     element_id: str
     type: str

@@ -7,7 +7,6 @@ import pytest
 
 from api.v1.whiteboard.service import WhiteboardService
 from api.v1.whiteboard.schemas import (
-    BoardOwnerInfo, LastModifiedByInfo,
     SaveElementsResponse, BoardElementWithAuthor,
     BoardSettings, BoardSettingsPatch
 )
@@ -46,40 +45,6 @@ class TestOnlinePresence:
         service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
         with pytest.raises(NotFoundError):
             await service.mark_opened(test_board.id, test_user2.id)
-
-
-class TestBoardMetadata:
-
-    def test_get_owner_info(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        result = service.get_owner_info(test_board.id)
-        assert isinstance(result, BoardOwnerInfo)
-        assert result.user_id == test_user.id
-        assert result.username == test_user.username
-
-    def test_get_owner_nonexistent_raises_not_found(self, db_session):
-        service = WhiteboardService(db_session)
-        with pytest.raises(NotFoundError):
-            service.get_owner_info(99999)
-
-    def test_get_last_modifier(self, db_session, test_user, test_board):
-        service = WhiteboardService(db_session)
-        result = service.get_last_modifier(test_board.id)
-        assert isinstance(result, LastModifiedByInfo)
-        assert result.user_id == test_user.id
-
-    @pytest.mark.asyncio
-    async def test_get_last_opened(self, db_session, redis_client, test_user, test_board):
-        service = WhiteboardService(db_session, PresenceService(db_session, redis_client))
-        await service.mark_opened(test_board.id, test_user.id)
-        result = service.get_last_opened(test_board.id, test_user.id)
-        assert result.user_id == test_user.id
-        assert result.last_opened is not None
-
-    def test_get_last_opened_no_record_raises_not_found(self, db_session, test_user2, test_board):
-        service = WhiteboardService(db_session)
-        with pytest.raises(NotFoundError):
-            service.get_last_opened(test_board.id, test_user2.id)
 
 
 class TestSaveElements:
