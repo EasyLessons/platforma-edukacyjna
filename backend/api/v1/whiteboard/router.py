@@ -2,9 +2,6 @@
 Whiteboard router — /api/v1/whiteboard/{board_id}/*
 
 POST   /{id}/opened                 — zanotuj otwarcie tablicy (last_opened + presence)
-GET    /{id}/owner                  — info o właścicielu
-GET    /{id}/last-modified-by       — ostatni modyfikator
-GET    /{id}/last-opened            — ostatnie otwarcie (dla aktualnego usera)
 GET    /{id}/settings               — ustawienia tablicy
 PUT    /{id}/settings               — aktualizacja ustawień tablicy
 POST   /{id}/elements/batch         — batch save elementów
@@ -22,7 +19,6 @@ from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
-    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
     OnlineStatusResponse, BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
     BoardSettings, BoardSettingsPatch
@@ -32,7 +28,7 @@ from .service import WhiteboardService
 router = APIRouter(tags=["Whiteboard"])
 
 
-# ── Online presence ────────────────────────────────────────────────────────
+# Online presence --------------------------------------------------
 
 @router.post("/{board_id}/opened", response_model=ApiResponse[OnlineStatusResponse])
 async def mark_opened(
@@ -46,29 +42,7 @@ async def mark_opened(
         status="online", board_id=board_id, user_id=current_user.id
     ))
 
-# ── Board metadata ─────────────────────────────────────────────────────────
-
-@router.get("/{board_id}/owner", response_model=ApiResponse[BoardOwnerInfo])
-async def get_owner(board_id: int, db: Session = Depends(get_db)):
-    service = WhiteboardService(db)
-    return ApiResponse(success=True, data=service.get_owner_info(board_id))
-
-
-@router.get("/{board_id}/last-modified-by", response_model=ApiResponse[LastModifiedByInfo])
-async def get_last_modified_by(board_id: int, db: Session = Depends(get_db)):
-    service = WhiteboardService(db)
-    return ApiResponse(success=True, data=service.get_last_modifier(board_id))
-
-
-@router.get("/{board_id}/last-opened", response_model=ApiResponse[LastOpenedInfo])
-async def get_last_opened(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = WhiteboardService(db)
-    return ApiResponse(success=True, data=service.get_last_opened(board_id, current_user.id))
-
+# Settings --------------------------------------------------
 
 @router.get("/{board_id}/settings", response_model=ApiResponse[BoardSettings])
 async def get_settings(
@@ -91,7 +65,8 @@ async def update_settings(
     return ApiResponse(success=True, data=service.update_settings(board_id, patch, current_user.id))
 
 
-# ── Elements ───────────────────────────────────────────────────────────────
+
+# Elements --------------------------------------------------
 
 @router.post(
     "/{board_id}/elements/batch",
