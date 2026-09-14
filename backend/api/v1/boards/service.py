@@ -8,40 +8,35 @@ BoardService obsługuje:
   update_board()      — aktualizacja
   delete_board()      — usuwanie
   toggle_favourite()  — ulubione
-  get_members()       — lista członków (z workspace)
-  update_settings()   — ustawienia tablicy
-  join_board_workspace() — dołącza użytkownika przez link
+  get_online_users_by_workspace()  — kto jest online (deleguje do core.presence.PresenceService)
 """
 from datetime import datetime
+from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 
-from core.exceptions import NotFoundError, AppException
+from core.exceptions import NotFoundError
 from core.logging import get_logger
-from core.models import Board, BoardUsers, User, Workspace, WorkspaceMember
+from core.models import Board, BoardUsers
+from core.presence import PresenceService
+
+from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
+from api.v1.whiteboard.storage import delete_board_folder
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
-    BoardResponse, BoardListResponse, BoardSettings,
-    ToggleFavouriteResponse, BoardMember, BoardMembersResponse,
-    UpdateBoardSettings, JoinBoardResponse, OnlineUserInfo
+    BoardResponse, BoardListResponse,
+    ToggleFavouriteResponse, OnlineUsersResponse
 )
 
 logger = get_logger(__name__)
 
 
 def _build_board_response(
-    db: Session, board: Board, user_id: int, online_users: list[OnlineUserInfo] = None
+    board: Board, board_user: Optional[BoardUsers]
 ) -> BoardResponse:
     """Helper — buduje BoardResponse z ORM obiektu."""
-    owner = db.query(User).filter(User.id == board.created_by).first()
-    modifier = (
-        db.query(User).filter(User.id == board.last_modified_by).first()
-        if board.last_modified_by else owner
-    )
-    board_user = db.query(BoardUsers).filter(
-        BoardUsers.board_id == board.id,
-        BoardUsers.user_id == user_id,
-    ).first()
+    owner = board.creator
+    modifier = board.last_modifier or owner
 
     return BoardResponse(
         id=board.id,
@@ -52,14 +47,70 @@ def _build_board_response(
         owner_id=board.created_by,
         owner_username=owner.username if owner else "Unknown",
         is_favourite=board_user.is_favourite if board_user else False,
-        settings=BoardSettings(**(board.settings or {})),
         last_modified=board.last_modified,
         last_modified_by=modifier.username if modifier else None,
         last_opened=board_user.last_opened if board_user else None,
-        created_at=board.created_at,
-        created_by=owner.username if owner else "Unknown",
-        online_users=online_users or []
     )
+
+def _new_board_with_owner(
+    db: Session,
+    *,
+    name: str,
+    icon: str,
+    bg_color: str,
+    workspace_id: int,
+    user_id: int
+) -> Board:
+    """Tworzy Board + BoardUsers. Nie commituje - wołający zarządza transakcją."""
+    board = Board(
+        name=name,
+        icon=icon,
+        bg_color=bg_color,
+        workspace_id=workspace_id,
+        created_by=user_id,
+        created_at=datetime.utcnow(),
+        last_modified=datetime.utcnow(),
+        last_modified_by=user_id,
+    )
+    db.add(board)
+    db.flush()
+
+    board_user = BoardUsers(
+        board_id=board.id,
+        user_id=user_id,
+        is_favourite=False,
+        last_opened=datetime.utcnow(),
+    )
+    db.add(board_user)
+    return board
+
+def create_starter_board(db: Session, workspace_id: int, user_id: int) -> Board:
+    """Tworzy domyślną tablicę dla nowego workspace'a. Nie commituje - wołający zarządza transakcją."""
+    return _new_board_with_owner(
+        db,
+        name="Moja pierwsza tablica",
+        icon="PenTool",
+        bg_color="bg-gray-500",
+        workspace_id=workspace_id,
+        user_id=user_id
+    )
+
+def reassign_boards_on_member_removal(
+    db: Session, 
+    workspace_id: int, 
+    departing_user_id: int, 
+    new_owner_id: int
+) -> None:
+    """Przypisuje tablice użytkownika, który opuszcza workspace, do nowego właściciela."""
+    now = datetime.utcnow()
+    db.query(Board).filter(
+        Board.workspace_id == workspace_id,
+        Board.created_by == departing_user_id
+    ).update({
+        "created_by": new_owner_id,
+        "last_modified": now,
+        "last_modified_by": new_owner_id,
+    })
 
 
 class BoardService:
@@ -73,150 +124,74 @@ class BoardService:
             raise NotFoundError("Tablica nie znaleziona")
         return board
 
-    def _check_access(self, board: Board, user_id: int) -> None:
-        """Rzuca 403 jeśli user nie ma dostępu do tablicy."""
-        member = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == board.workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not member and board.created_by != user_id:
-            raise AppException("Brak dostępu do tej tablicy", status_code=403)
-
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
-        workspace = self.db.query(Workspace).filter(
-            Workspace.id == board_data.workspace_id
-        ).first()
-        if not workspace:
-            raise NotFoundError("Workspace nie znaleziony")
+        require_editor_or_owner(self.db, board_data.workspace_id, user_id)
 
-        board = Board(
+        board = _new_board_with_owner(
+            self.db,
             name=board_data.name,
             icon=board_data.icon or "PenTool",
             bg_color=board_data.bg_color or "bg-gray-500",
             workspace_id=board_data.workspace_id,
-            created_by=user_id,
-            created_at=datetime.utcnow(),
-            last_modified=datetime.utcnow(),
-            last_modified_by=user_id,
+            user_id=user_id
         )
-        self.db.add(board)
-        self.db.flush()
-
-        board_user = BoardUsers(
-            board_id=board.id,
-            user_id=user_id,
-            is_favourite=False,
-            is_online=True,
-            last_opened=datetime.utcnow(),
-        )
-        self.db.add(board_user)
         self.db.commit()
         self.db.refresh(board)
         
-        # Pusty albo z jednym tworzącym jako online. Dla pewności zwracamy twórce
-        owner = self.db.query(User).filter(User.id == user_id).first()
-        online_users = [OnlineUserInfo(user_id=user_id, username=owner.username, avatar_url=owner.avatar_url)] if owner else []
-
-        logger.info(f"✅ Tablica utworzona: {board.id} przez {user_id}")
-        return _build_board_response(self.db, board, user_id, online_users)
+        logger.info(f"Tablica utworzona: {board.id} przez {user_id}")
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def get_board(self, board_id: int, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
-        
-        from datetime import timedelta
-        active_threshold = datetime.utcnow() - timedelta(minutes=2)
-
-        online_records = (
-            self.db.query(User.id, User.username, User.avatar_url)
-            .join(BoardUsers, User.id == BoardUsers.user_id)
-            .filter(
-                BoardUsers.board_id == board.id, 
-                BoardUsers.is_online == True,
-                BoardUsers.last_opened >= active_threshold
-            )
-            .all()
-        )
-        online_users = [OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url) for uid, uname, av_url in online_records]
-
-        return _build_board_response(self.db, board, user_id, online_users)
+        require_membership(self.db, board.workspace_id, user_id)
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0
     ) -> BoardListResponse:
+        require_membership(self.db, workspace_id, user_id)
+
         base_query = self.db.query(Board).filter(Board.workspace_id == workspace_id)
         total = base_query.count()
 
         boards_data = (
-            self.db.query(Board, BoardUsers.is_favourite, BoardUsers.last_opened)
+            base_query.add_columns(BoardUsers)
             .outerjoin(BoardUsers, (Board.id == BoardUsers.board_id) & (BoardUsers.user_id == user_id))
             .options(
                 joinedload(Board.creator),
                 joinedload(Board.last_modifier)
             )
-            .filter(Board.workspace_id == workspace_id)
             .order_by(Board.last_modified.desc())
             .offset(offset)
             .limit(limit)
             .all()
         )
-
-        # Gather online users for all boards in one query
-        board_ids = [b[0].id for b in boards_data]
-        online_map = {}
-        if board_ids:
-            from datetime import timedelta
-            active_threshold = datetime.utcnow() - timedelta(minutes=2)
-            online_records = (
-                self.db.query(BoardUsers.board_id, User.id, User.username, User.avatar_url)
-                .join(User, User.id == BoardUsers.user_id)
-                .filter(
-                    BoardUsers.board_id.in_(board_ids), 
-                    BoardUsers.is_online == True,
-                    BoardUsers.last_opened >= active_threshold
-                )
-                .all()
-            )
-            for bid, uid, uname, av_url in online_records:
-                if bid not in online_map:
-                    online_map[bid] = []
-                online_map[bid].append(OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url))
-
+    
         responses = []
-        for board, is_favourite, last_opened in boards_data:
+        skipped = 0
+        for board, board_user in boards_data:
             try:
-                owner = board.creator
-                modifier = board.last_modifier or owner
-                
-                responses.append(BoardResponse(
-                    id=board.id,
-                    name=board.name,
-                    icon=board.icon,
-                    bg_color=board.bg_color,
-                    workspace_id=board.workspace_id,
-                    owner_id=board.created_by,
-                    owner_username=owner.username if owner else "Unknown",
-                    is_favourite=is_favourite or False,
-                    settings=BoardSettings(**(board.settings or {})),
-                    last_modified=board.last_modified,
-                    last_modified_by=modifier.username if modifier else None,
-                    last_opened=last_opened,
-                    created_at=board.created_at,
-                    created_by=owner.username if owner else "Unknown",
-                    online_users=online_map.get(board.id, [])
-                ))
+                responses.append(_build_board_response(board, board_user))
             except Exception as e:
-                logger.error(f"❌ Błąd budowania BoardResponse dla {board.id}: {e}")
-                continue
+                logger.error(f"Błąd budowania BoardResponse dla {board.id}: {e}")
+                skipped += 1
 
         return BoardListResponse(
-            boards=responses, total=total, limit=limit, offset=offset
+            boards=responses, total=total - skipped, limit=limit, offset=offset
         )
 
     async def update_board(self, board_id: int, data: UpdateBoard, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
-
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją edytować")
+        
         if data.name is not None:
             board.name = data.name
         if data.icon is not None:
@@ -228,52 +203,43 @@ class BoardService:
         board.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(board)
-        
-        online_records = (
-            self.db.query(User.id, User.username, User.avatar_url)
-            .join(BoardUsers, User.id == BoardUsers.user_id)
-            .filter(BoardUsers.board_id == board.id, BoardUsers.is_online == True)
-            .all()
-        )
-        online_users = [OnlineUserInfo(user_id=uid, username=uname, avatar_url=av_url) for uid, uname, av_url in online_records]
 
-
-        logger.info(f"✅ Tablica zaktualizowana: {board_id}")
-        return _build_board_response(self.db, board, user_id, online_users)
+        logger.info(f"Tablica zaktualizowana: {board_id}")
+        board_user = self.db.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == user_id,
+        ).first()
+        return _build_board_response(board, board_user)
 
     async def delete_board(self, board_id: int, user_id: int) -> dict:
         board = self._get_board_or_404(board_id)
-        if board.created_by != user_id:
-            raise AppException("Tylko właściciel może usunąć tablicę", status_code=403)
-
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją usunąć")
+        
         self.db.delete(board)
         self.db.commit()
 
-        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
-        # o "zapychanie się" Storage. Bez tego obrazy skasowanej tablicy
-        # zostałyby tam na zawsze (sieroty). Best-effort, PO commicie do bazy
-        # (usunięcie tablicy z bazy jest tym co naprawdę musi się udać;
-        # nieudane sprzątnięcie plików to dużo mniejszy problem).
-        from api.v1.whiteboard.storage import delete_board_folder
         await delete_board_folder(board_id)
 
-        logger.info(f"✅ Tablica usunięta: {board_id}")
+        logger.info(f"Tablica usunięta: {board_id}")
         return {"success": True, "message": "Tablica została pomyślnie usunięta."}
 
     async def toggle_favourite(
         self, board_id: int, toggle_data: ToggleFavourite, user_id: int
     ) -> ToggleFavouriteResponse:
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+
         board_user = self.db.query(BoardUsers).filter(
             BoardUsers.board_id == board_id,
             BoardUsers.user_id == user_id,
         ).first()
 
         if not board_user:
-            self._get_board_or_404(board_id)
             board_user = BoardUsers(
-                board_id=board_id, user_id=user_id,
+                board_id=board_id, 
+                user_id=user_id,
                 is_favourite=toggle_data.is_favourite,
-                is_online=False, last_opened=None,
+                last_opened=None,
             )
             self.db.add(board_user)
         else:
@@ -286,90 +252,15 @@ class BoardService:
             message="Ulubiona tablica zaktualizowana.",
         )
 
-    async def get_members(self, board_id: int, user_id: int) -> BoardMembersResponse:
-        board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+    async def get_online_users_by_workspace(self, workspace_id: int, user_id: int) -> OnlineUsersResponse:
+        """Kto jest online na podanych tablicach workspace'u."""
+        require_membership(self.db, workspace_id, user_id)
 
-        ws_members = (
-            self.db.query(WorkspaceMember, User)
-            .join(User, User.id == WorkspaceMember.user_id)
-            .filter(WorkspaceMember.workspace_id == board.workspace_id)
-            .all()
-        )
+        board_ids = [
+            b.id for b in self.db.query(Board.id)
+                .filter(Board.workspace_id == workspace_id).all()
+        ]
 
-        members = []
-        for wm, u in ws_members:
-            is_owner = u.id == board.created_by
-            members.append(BoardMember(
-                user_id=u.id,
-                username=u.username,
-                email=u.email,
-                role="owner" if is_owner else wm.role,
-                is_owner=is_owner,
-                joined_at=wm.joined_at,
-            ))
-
-        return BoardMembersResponse(members=members)
-
-    async def update_settings(
-        self, board_id: int, body: UpdateBoardSettings, user_id: int
-    ) -> dict:
-        board = self._get_board_or_404(board_id)
-        if board.created_by != user_id:
-            raise AppException("Tylko właściciel może zmieniać ustawienia", status_code=403)
-
-        board.settings = body.settings.model_dump()
-        self.db.commit()
-        self.db.refresh(board)
-        return {"success": True, "settings": board.settings}
-    
-    async def join_board_workspace(
-        self, 
-        board_id: int, 
-        user_id: int
-    ) -> JoinBoardResponse:
-        """
-        Dołącza użytkownika do workspace powiązanego z tablicą.
- 
-        Jeśli użytkownik jest już członkiem — zwraca current state.
-        Jeśli nie jest — dodaje jako 'editor'.
-        """
-        board = self._get_board_or_404(board_id)
-        is_owner = board.created_by == user_id
- 
-        existing_member = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == board.workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
- 
-        if existing_member:
-            return JoinBoardResponse(
-                success=True,
-                already_member=True,
-                workspace_id=board.workspace_id,
-                board_id=board_id,
-                owner_id=board.created_by,
-                is_owner=is_owner,
-                user_role="owner" if is_owner else existing_member.role,
-            )
- 
-        new_member = WorkspaceMember(
-            workspace_id=board.workspace_id,
-            user_id=user_id,
-            role="editor",
-            is_favourite=False,
-            joined_at=datetime.utcnow(),
-        )
-        self.db.add(new_member)
-        self.db.commit()
- 
-        return JoinBoardResponse(
-            success=True,
-            already_member=False,
-            workspace_id=board.workspace_id,
-            board_id=board_id,
-            owner_id=board.created_by,
-            is_owner=is_owner,
-            user_role="owner" if is_owner else "editor",
-            message="Dołączono do workspace",
-        )
+        presence = PresenceService(self.db)
+        result = await presence.get_online_users(board_ids)
+        return OnlineUsersResponse(online_users_by_board=result)

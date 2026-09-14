@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '@new/lib/api/client';
-import { loginUser, registerUser, getCurrentUser, logoutUser, checkUser } from './authApi';
+import { loginUser, registerUser, getCurrentUser, logoutUser } from './authApi';
 import { AppError } from '@new/lib/errors/AppError';
 import { mockUser } from '../../../../test/mocks/authFixtures';
 
@@ -98,6 +98,23 @@ describe('registerUser', () => {
       })
     ).rejects.toSatisfy((err: unknown) => err instanceof AppError && err.isConflict());
   });
+
+  it('przekazuje details (user_id) z body błędu 409 do AppError', async () => {
+    mock.onPost('/api/v1/auth/register').reply(409, {
+      success: false,
+      error: 'Email zajęty',
+      data: { user_id: 7, verified: false },
+    });
+
+    await expect(
+      registerUser({
+        username: 'a',
+        email: 'x@x.com',
+        password: 'P1pass',
+        password_confirm: 'P1pass',
+      })
+    ).rejects.toSatisfy((err: unknown) => err instanceof AppError && err.details?.user_id === 7);
+  });
 });
 
 describe('getCurrentUser', () => {
@@ -135,17 +152,5 @@ describe('logoutUser', () => {
     });
 
     await expect(logoutUser()).resolves.not.toThrow();
-  });
-});
-
-describe('checkUser', () => {
-  it('zwraca dane użytkownika przy sukcesie', async () => {
-    mock.onPost('/api/v1/auth/check-user').reply(200, {
-      success: true,
-      data: { exists: true, verified: false, user_id: 5 },
-    });
-
-    const result = await checkUser('test@test.com');
-    expect(result).toEqual({ exists: true, verified: false, user_id: 5 });
   });
 });

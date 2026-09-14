@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { LanguageSwitcher } from '@/_new/shared/ui/language-switcher';
+import { AppGoogleOAuthProvider } from '@/_new/features/auth/components/googleOAuthProvider';
 
 export default function AuthGroupLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -45,7 +46,9 @@ export default function AuthGroupLayout({ children }: { children: React.ReactNod
 
       {/* Wycentrowana zawartość strony */}
       <div className="relative z-10 flex-1 flex items-center justify-center py-8 sm:py-0">
-        <main className="w-full max-w-md px-6">{children}</main>
+        <main className="w-full max-w-md px-6">
+          <AppGoogleOAuthProvider>{children}</AppGoogleOAuthProvider>
+        </main>
       </div>
     </div>
   );

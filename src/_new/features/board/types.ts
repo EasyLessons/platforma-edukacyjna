@@ -10,28 +10,6 @@ import type { FormErrors } from '../auth/types';
 
 // CORE TYPES
 
-export interface BoardSettings {
-  ai_enabled: boolean;
-  grid_visible: boolean;
-  smartsearch_visible: boolean;
-  toolbar_visible: boolean;
-}
-
-export interface BoardMember {
-  user_id: number;
-  username: string;
-  email: string;
-  role: 'owner' | 'editor' | 'viewer';
-  is_owner: boolean;
-  joined_at: string | null;
-}
-
-export interface OnlineUserInfo {
-  user_id: number;
-  username: string;
-  avatar_url?: string | null;
-}
-
 export interface Board {
   id: number;
   name: string;
@@ -41,13 +19,9 @@ export interface Board {
   owner_id: number;
   owner_username: string;
   is_favourite: boolean;
-  settings: BoardSettings | null;
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
-  created_at: string;
-  created_by: string;
-  online_users?: OnlineUserInfo[];
 }
 
 // FORM DATA TYPES
@@ -80,10 +54,6 @@ export interface BoardToggleFavouriteRequest {
   is_favourite: boolean;
 }
 
-export interface UpdateBoardSettingsRequest {
-  settings: BoardSettings;
-}
-
 // API RESPONSE TYPES
 
 export interface BoardListResponse {
@@ -96,26 +66,6 @@ export interface BoardListResponse {
 export interface BoardToggleFavouriteResponse {
   is_favourite: boolean;
   message: string;
-}
-
-export interface BoardMembersResponse {
-  members: BoardMember[];
-}
-
-export interface UpdateSettingsResponse {
-  success: boolean;
-  settings: BoardSettings;
-}
-
-export interface JoinBoardResponse {
-  success: boolean;
-  already_member: boolean;
-  workspace_id: number;
-  board_id: number;
-  owner_id: number;
-  is_owner: boolean;
-  user_role: string;
-  message?: string;
 }
 
 // UI TYPES

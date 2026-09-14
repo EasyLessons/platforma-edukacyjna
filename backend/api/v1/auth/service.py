@@ -10,27 +10,27 @@ from core.exceptions import (
     ConflictError, ValidationError, AuthenticationError,
     NotFoundError, AppException
 )
-from typing import List
-import httpx
 import hashlib
 import redis.asyncio as redis
 from redis.exceptions import ConnectionError, TimeoutError
 from sqlalchemy.exc import OperationalError, IntegrityError
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 
-from core.models import User, Workspace, WorkspaceMember, RefreshToken
+from core.models import User, RefreshToken
 from .schemas import (
-    RegisterUser, LoginData, VerifyEmail, UserSearchResult,
+    RegisterUser, LoginData, VerifyEmail,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
-    RegisterResponse, AuthResponse, UserResponse,
-    ResendCodeResponse, CheckUserResponse, MessageResponse, VerifyResetCodeResponse,
-    MeResponse
+    RegisterResponse, AuthResponse, UserResponse, 
+    MessageResponse, VerifyResetCodeResponse, MeResponse
 )
 from .utils import (
-    hash_password, verify_password, create_access_token,
-    generate_verification_code, send_verification_email,
-    send_password_reset_email,
-    generate_refresh_token, hash_refresh_token
+    hash_password, verify_password, create_access_token, hash_refresh_token,
+    generate_verification_code, generate_refresh_token,
 )
+from api.v1.onboarding.service import OnboardingService
+from core.email import send_email
+from core.email.templates.auth import verification_email, password_reset_email
 
 logger = get_logger(__name__)
 
@@ -50,6 +50,16 @@ class AuthService:
     def _password_reset_key(self, user_id: int) -> str:
         """Generuje klucz Redis dla kodu resetowania hasła"""
         return f"auth:password_reset:{user_id}"
+
+    async def _send_code_email(self, email: str, subject: str, html: str) -> None:
+        """Wysyła mail, nie wywracając wywołującego flow przy błędzie."""
+        if not self.settings.resend_api_key or self.settings.resend_api_key == "SKIP":
+            logger.warning("Email nie został wysłany (brak konfiguracji Resend)")
+            return
+        try:
+            await send_email(email, subject, html, self.settings.resend_api_key, self.settings.from_email)
+        except Exception:
+            logger.warning(f"Wysyłka emaila nie powiodła się (to={email})")
 
     async def _store_verification_code(self, key: str, code: str) -> None:
         """Zapisuje kod w Redis z TTL; przy błędzie połączenia rzuca 503."""
@@ -109,6 +119,8 @@ class AuthService:
 
         if existing_user:
             if existing_user.email == user_data.email:
+                if not existing_user.is_active:
+                    raise ConflictError("Email zajęty", details={"user_id": existing_user.id, "verified": False})
                 raise ConflictError("Email zajęty")
             raise ConflictError("Nazwa użytkownika zajęta")
 
@@ -128,25 +140,7 @@ class AuthService:
             self.db.flush()
             logger.info(f"User utworzony (ID: {new_user.id})")
 
-            starter_workspace = Workspace(
-                name="Moja Przestrzeń",
-                icon="Home",
-                bg_color="bg-green-500",
-                created_by=new_user.id,
-                created_at=datetime.utcnow()
-            )
-            self.db.add(starter_workspace)
-            self.db.flush()
-
-            membership = WorkspaceMember(
-                workspace_id=starter_workspace.id,
-                user_id=new_user.id,
-                role="owner",
-                is_favourite=True,
-                joined_at=datetime.utcnow()
-            )
-            self.db.add(membership)
-            new_user.active_workspace_id = starter_workspace.id
+            OnboardingService(self.db).setup_new_user(new_user.id)
             
             self.db.commit()
             self.db.refresh(new_user)
@@ -163,19 +157,8 @@ class AuthService:
             raise AppException("Błąd serwera", status_code=500)
 
         await self._store_verification_code(self._email_verify_key(new_user.id), verification_code)
-
-        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
-            try:
-                await send_verification_email(
-                    new_user.email,
-                    new_user.username,
-                    verification_code,
-                    self.settings.resend_api_key,
-                    self.settings.from_email
-                )
-                logger.info(f"Email wysłany (user_id={new_user.id})")
-            except Exception:
-                logger.exception(f"Błąd wysyłania emaila (user_id={new_user.id})")
+        subject, html = verification_email(new_user.username, verification_code)
+        await self._send_code_email(new_user.email, subject, html)
 
         return RegisterResponse(
             user=UserResponse.model_validate(new_user),
@@ -225,13 +208,13 @@ class AuthService:
             raise AuthenticationError("Błędny login lub hasło")
 
         if not user.is_active:
-            raise AppException("Konto niezaktywne", code="AUTH_ERROR", status_code=403)
+            raise AppException("Konto nieaktywne", code="AUTH_ERROR", status_code=403, details={"user_id": user.id})
 
         logger.info(f"User zalogowany (user_id={user.id})")
 
         return self._create_session(user)
 
-    async def resend_code(self, user_id: int) -> ResendCodeResponse:
+    async def resend_code(self, user_id: int) -> MessageResponse:
         """Ponowne wysłanie kodu"""
         logger.info(f"Resend dla user_id={user_id}")
 
@@ -244,67 +227,13 @@ class AuthService:
 
         verification_code = generate_verification_code()
         await self._store_verification_code(self._email_verify_key(user.id), verification_code)
-
-        await send_verification_email(
-            user.email,
-            user.username,
-            verification_code,
-            self.settings.resend_api_key,
-            self.settings.from_email
-        )
+        
+        subject, html = verification_email(user.username, verification_code)
+        await self._send_code_email(user.email, subject, html)
 
         logger.info(f"Nowy kod wysłany (user_id={user.id})")
 
-        return ResendCodeResponse(message="Nowy kod wysłany")
-
-    async def check_user(self, email: str) -> CheckUserResponse:
-        """Sprawdza czy user istnieje"""
-
-        user = self.db.query(User).filter(User.email == email).first()
-
-        if not user:
-            return CheckUserResponse(exists=False, verified=False)
-        if user.is_active:
-            return CheckUserResponse(exists=True, verified=True)
-        
-        verification_code = generate_verification_code()
-        await self._store_verification_code(self._email_verify_key(user.id), verification_code)
-
-        await send_verification_email(
-            user.email,
-            user.username,
-            verification_code,
-            self.settings.resend_api_key,
-            self.settings.from_email
-        )
-
-        return CheckUserResponse(
-            exists=True,
-            verified=False,
-            user_id=user.id,
-            message="Nowy kod wysłany"
-        )
-
-    def search_users(self, query: str, current_user_id: int, limit: int = 10) -> List[UserSearchResult]:
-        """Wyszukuje użytkowników po username lub email"""
-        query = query.strip().lower()
-        if len(query) < 2:
-            return []
-
-        users = (
-            self.db.query(User)
-            .filter(
-                (User.username.ilike(f"%{query}%")) |
-                (User.email.ilike(f"%{query}%")) |
-                (User.full_name.ilike(f"%{query}%"))
-            )
-            .filter(User.id != current_user_id)
-            .filter(User.is_active == True)
-            .limit(limit)
-            .all()
-        )
-
-        return [UserSearchResult.model_validate(u) for u in users]
+        return MessageResponse(message="Nowy kod wysłany")
 
     # === PASSWORD RESET ===
 
@@ -321,20 +250,8 @@ class AuthService:
         reset_code = generate_verification_code()
         await self._store_verification_code(self._password_reset_key(user.id), reset_code)
 
-        if self.settings.resend_api_key and self.settings.resend_api_key != "SKIP":
-            try:
-                await send_password_reset_email(
-                    user.email,
-                    user.username,
-                    reset_code,
-                    self.settings.resend_api_key,
-                    self.settings.from_email
-                )
-                logger.info(f"Email z kodem resetu wysłany (user_id={user.id})")
-            except Exception:
-                logger.exception(f"Błąd wysyłania emaila (user_id={user.id})")
-        else:
-            logger.warning(f"Email NIE wysłany (RESEND_API_KEY=SKIP), user_id={user.id}")
+        subject, html = password_reset_email(user.username, reset_code)
+        await self._send_code_email(user.email, subject, html)
 
         return MessageResponse(message="Jeśli email istnieje, kod został wysłany")
 
@@ -434,66 +351,28 @@ class AuthService:
 
     # === GOOGLE OAUTH ===
 
-    async def get_google_auth_url(self) -> str:
-        """Generuje URL do autoryzacji Google OAuth"""
-        auth_url = (
-            f"https://accounts.google.com/o/oauth2/v2/auth?"
-            f"client_id={self.settings.google_client_id}&"
-            f"redirect_uri={self.settings.google_redirect_uri}&"
-            f"response_type=code&"
-            f"scope=openid%20email%20profile&"
-            f"access_type=offline"
-        )
-        logger.info("🔗 Wygenerowano URL autoryzacji Google")
-        return auth_url
+    def _verify_google_credential(self, credential: str) -> tuple[str, str, str, str | None]:
+        """Weryfikuje ID token z Google Identity Services (podpis, aud, exp). Zwraca (google_id, email, name, picture)."""
+        try:
+            idinfo = id_token.verify_oauth2_token(credential, google_requests.Request(), self.settings.google_client_id)
+        except ValueError:
+            logger.warning("Nieprawidłowy token Google ID")
+            raise AuthenticationError("Nieprawidłowy token logowania Google")
 
-    async def google_login(self, code: str) -> AuthResponse:
-        """Logowanie przez Google OAuth"""
-        logger.info("🔐 Rozpoczęto logowanie przez Google")
-
-        token_url = "https://oauth2.googleapis.com/token"
-        token_data = {
-            "code": code,
-            "client_id": self.settings.google_client_id,
-            "client_secret": self.settings.google_client_secret,
-            "redirect_uri": self.settings.google_redirect_uri,
-            "grant_type": "authorization_code"
-        }
-
-        async with httpx.AsyncClient() as client:
-            token_response = await client.post(token_url, data=token_data)
-
-            if token_response.status_code != 200:
-                logger.error(f"Błąd wymiany kodu Google (status={token_response.status_code})")
-                raise AuthenticationError("Błąd autoryzacji Google")
-
-            tokens = token_response.json()
-            access_token = tokens.get("access_token")
-
-            userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
-            headers = {"Authorization": f"Bearer {access_token}"}
-            userinfo_response = await client.get(userinfo_url, headers=headers)
-
-            if userinfo_response.status_code != 200:
-                logger.error(f"Błąd pobierania danych Google (status={userinfo_response.status_code})")
-                raise AuthenticationError("Błąd pobierania danych użytkownika")
-
-            user_info = userinfo_response.json()
-
-        google_id = user_info.get("id")
-        email = user_info.get("email")
-        name = user_info.get("name", "")
-        picture = user_info.get("picture")
+        google_id = idinfo.get("sub")
+        email = idinfo.get("email")
+        name = idinfo.get("name", "")
+        picture = idinfo.get("picture")
 
         if not google_id or not email:
-            logger.error(
-                "Brak wymaganych danych z Google userinfo (has_id=%s, has_email=%s)",
-                bool(google_id), bool(email),
-            )
             raise AuthenticationError("Google nie zwrócił wymaganych danych konta")
+        if not idinfo.get("email_verified", False):
+            raise AuthenticationError("Email Google niezweryfikowany")
 
-        logger.info(f"Dane Google (google_id={google_id})")
+        return google_id, email, name, picture
 
+    def _find_or_create_google_user(self, google_id: str, email: str, name: str, picture: str | None) -> User:
+        """Znajduje istniejącego usera po google_id/email albo tworzy nowego."""
         try:
             user = self.db.query(User).filter(
                 (User.google_id == google_id) | (User.email == email)
@@ -506,71 +385,47 @@ class AuthService:
                     user.profile_picture = picture
                     user.is_active = True
                     self.db.commit()
-                    logger.info(f"Zaktualizowano użytkownika (user_id={user.id})")
-                logger.info(f"Logowanie istniejącego użytkownika (user_id={user.id})")
-            else:
-                username = email.split("@")[0]
-                counter = 1
-                original_username = username
-                while self.db.query(User).filter(User.username == username).first():
-                    username = f"{original_username}{counter}"
-                    counter += 1
+                    logger.info(f"Logowanie istniejącego użytkownika (user_id={user.id})")
+                return user
 
-                user = User(
-                    username=username,
-                    email=email,
-                    full_name=name,
-                    google_id=google_id,
-                    auth_provider="google",
-                    profile_picture=picture,
-                    is_active=True,
-                    hashed_password=None
-                )
+            username = email.split("@")[0]
+            counter = 1
+            original_username = username
+            while self.db.query(User).filter(User.username == username).first():
+                username = f"{original_username}{counter}"
+                counter += 1
 
-                try:
-                    self.db.add(user)
-                    self.db.flush()
-                    logger.info(f"Nowy użytkownik Google (ID: {user.id})")
+            user = User(
+                username=username, 
+                email=email, 
+                full_name=name, 
+                google_id=google_id, 
+                auth_provider="google", 
+                profile_picture=picture, 
+                is_active=True, 
+                hashed_password=None)
+            self.db.add(user)
+            self.db.flush()
+            logger.info(f"Nowy użytkownik Google (ID: {user.id})")
 
-                    starter_workspace = Workspace(
-                        name="Moja Przestrzeń",
-                        icon="Home",
-                        bg_color="bg-green-500",
-                        created_by=user.id,
-                        created_at=datetime.utcnow()
-                    )
-                    self.db.add(starter_workspace)
-                    self.db.flush()
-
-                    membership = WorkspaceMember(
-                        workspace_id=starter_workspace.id,
-                        user_id=user.id,
-                        role="owner",
-                        is_favourite=True,
-                        joined_at=datetime.utcnow()
-                    )
-                    self.db.add(membership)
-
-                    user.active_workspace_id = starter_workspace.id
-
-                    self.db.commit()
-                    logger.info(f"Workspace utworzony (user_id={user.id})")
-
-                except Exception:
-                    self.db.rollback()
-                    logger.exception("Błąd tworzenia użytkownika Google")
-                    raise AppException("Błąd tworzenia konta", status_code=500)
-
+            OnboardingService(self.db).setup_new_user(user.id)
+            self.db.commit()
             self.db.refresh(user)
+            logger.info(f"Workspace utworzony (user_id={user.id})")
+            return user
+        
         except OperationalError:
             self.db.rollback()
-            logger.exception("❌ Błąd połączenia z bazą podczas Google OAuth")
-            raise AppException(
-                "Baza danych chwilowo niedostępna. Spróbuj ponownie za moment.",
-                code="DB_ERROR",
-                status_code=503,
-            )
+            logger.exception("Błąd połączenia z bazą podczas Google OAuth")
+            raise AppException("Baza danych chwilowo niedostępna", code="DB_ERROR", status_code=503)
+        except Exception:
+            self.db.rollback()
+            logger.exception("Błąd tworzenia użytkownika Google")
+            raise AppException("Błąd tworzenia konta", status_code=500)
 
+    async def google_login(self, credential: str) -> tuple[AuthResponse, str]:
+        """Logowanie przez Google (ID token z Google Identity Services)."""
+        google_id, email, name, picture = self._verify_google_credential(credential)
+        user = self._find_or_create_google_user(google_id, email, name, picture)
         logger.info(f"Token wygenerowany (user_id={user.id})")
-
         return self._create_session(user)

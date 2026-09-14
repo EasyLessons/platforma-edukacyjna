@@ -41,14 +41,8 @@ export const resendVerificationCode = (data: ResendCodeRequest): Promise<ResendC
 export const loginUser = (data: LoginRequest): Promise<LoginResponse> =>
   apiClient.post<LoginResponse>('/api/v1/auth/login', data).then((res) => res.data);
 
-export const checkUser = (
-  email: string
-): Promise<{
-  exists: boolean;
-  verified: boolean;
-  user_id?: number;
-  message?: string;
-}> => apiClient.post('/api/v1/auth/check-user', { email }).then((res) => res.data);
+export const loginWithGoogle = (credential: string): Promise<LoginResponse> =>
+  apiClient.post<LoginResponse>('/api/v1/auth/google', { credential }).then((res) => res.data);
 
 // RESET HASŁA
 
@@ -65,19 +59,6 @@ export const verifyResetCode = (data: VerifyResetCodeRequest): Promise<VerifyCod
 export const resetPassword = (data: ResetPasswordRequest): Promise<PasswordResetResponse> =>
   apiClient
     .post<PasswordResetResponse>('/api/v1/auth/reset-password', data)
-    .then((res) => res.data);
-
-// WYSZUKIWANIE UŻYTKOWNIKÓW
-
-export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & {
-  full_name?: string;
-};
-
-export const searchUsers = (query: string, limit = 10): Promise<UserSearchResult[]> =>
-  apiClient
-    .get<UserSearchResult[]>('/api/v1/auth/users/search', {
-      params: { query, limit },
-    })
     .then((res) => res.data);
 
 // SESJA

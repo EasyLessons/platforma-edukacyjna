@@ -3,6 +3,7 @@ Testy CRUD tablic
 api/v1/boards/service.py
 """
 import pytest
+from datetime import datetime
 
 from api.v1.boards.service import BoardService
 from api.v1.boards.schemas import (
@@ -10,7 +11,7 @@ from api.v1.boards.schemas import (
     BoardResponse, BoardListResponse, ToggleFavouriteResponse,
 )
 from core.exceptions import NotFoundError, AppException
-from core.models import Board, BoardUsers
+from core.models import Board, BoardUsers, WorkspaceMember
 
 
 def make_board_data(workspace_id, **kwargs):
@@ -65,6 +66,32 @@ class TestCreateBoard:
         assert result.icon == "Star"
         assert result.bg_color == "bg-red-500"
 
+    @pytest.mark.asyncio
+    async def test_non_member_raises(self, db_session, test_user2, test_workspace):
+        service = BoardService(db_session)
+        with pytest.raises(NotFoundError):
+            await service.create_board(make_board_data(test_workspace.id), test_user2.id)
+
+    @pytest.mark.asyncio
+    async def test_editor_can_create(self, db_session, test_user2, shared_workspace):
+        service = BoardService(db_session)
+        result = await service.create_board(make_board_data(shared_workspace.id), test_user2.id)
+        assert isinstance(result, BoardResponse)
+
+    @pytest.mark.asyncio
+    async def test_viewer_forbidden(self, db_session, test_user2, shared_workspace):
+        membership = db_session.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == shared_workspace.id,
+            WorkspaceMember.user_id == test_user2.id,
+        ).first()
+        membership.role = "viewer"
+        db_session.commit()
+
+        service = BoardService(db_session)
+        with pytest.raises(AppException) as exc:
+            await service.create_board(make_board_data(shared_workspace.id), test_user2.id)
+        assert exc.value.status_code == 403
+
 
 class TestGetBoard:
 
@@ -81,11 +108,10 @@ class TestGetBoard:
             await service.get_board(99999, test_user.id)
 
     @pytest.mark.asyncio
-    async def test_no_access_raises_403(self, db_session, test_board, test_user2):
+    async def test_no_access_raises_404(self, db_session, test_board, test_user2):
         service = BoardService(db_session)
-        with pytest.raises(AppException) as exc:
+        with pytest.raises(NotFoundError):
             await service.get_board(test_board.id, test_user2.id)
-        assert exc.value.status_code == 403
 
 
 class TestListBoards:
@@ -126,6 +152,12 @@ class TestListBoards:
         result = await service.list_boards(test_workspace.id, test_user.id, limit=3)
         assert len(result.boards) == 3
 
+    @pytest.mark.asyncio
+    async def test_non_member_raises(self, db_session, test_user2, test_workspace):
+        service = BoardService(db_session)
+        with pytest.raises(NotFoundError):
+            await service.list_boards(test_workspace.id, test_user2.id)
+
 
 class TestUpdateBoard:
 
@@ -143,10 +175,26 @@ class TestUpdateBoard:
         assert result.last_modified >= original
 
     @pytest.mark.asyncio
-    async def test_no_access_raises_403(self, db_session, test_board, test_user2):
+    async def test_no_access_raises_404(self, db_session, test_board, test_user2):
+        service = BoardService(db_session)
+        with pytest.raises(NotFoundError):
+            await service.update_board(test_board.id, UpdateBoard(name="X"), test_user2.id)
+
+    @pytest.mark.asyncio
+    async def test_member_non_owner_raises_403(self, db_session, test_user, test_user2, shared_workspace):
+        board = Board(
+            name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=shared_workspace.id, created_by=test_user.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
         service = BoardService(db_session)
         with pytest.raises(AppException) as exc:
-            await service.update_board(test_board.id, UpdateBoard(name="X"), test_user2.id)
+            await service.update_board(board.id, UpdateBoard(name="X"), test_user2.id)
         assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
@@ -172,10 +220,26 @@ class TestDeleteBoard:
         assert result["success"] is True
 
     @pytest.mark.asyncio
-    async def test_non_owner_raises_403(self, db_session, test_board, test_user2):
+    async def test_non_member_raises_404(self, db_session, test_board, test_user2):
+        service = BoardService(db_session)
+        with pytest.raises(NotFoundError):
+            await service.delete_board(test_board.id, test_user2.id)
+
+    @pytest.mark.asyncio
+    async def test_member_non_owner_raises_403(self, db_session, test_user, test_user2, shared_workspace):
+        board = Board(
+            name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
+            workspace_id=shared_workspace.id, created_by=test_user.id,
+            created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+            last_modified_by=test_user.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
         service = BoardService(db_session)
         with pytest.raises(AppException) as exc:
-            await service.delete_board(test_board.id, test_user2.id)
+            await service.delete_board(board.id, test_user2.id)
         assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
@@ -204,34 +268,40 @@ class TestToggleFavourite:
         assert result.is_favourite is False
 
     @pytest.mark.asyncio
-    async def test_creates_board_user_if_missing(self, db_session, test_user, test_board, test_user2):
-        """Jeśli BoardUsers nie istnieje, tworzy nowy rekord"""
+    async def test_non_member_raises_404(self, db_session, test_board, test_user2):
+        """Non-member nie może polubić cudzej tablicy."""
+        service = BoardService(db_session)
+        with pytest.raises(NotFoundError):
+            await service.toggle_favourite(
+                test_board.id, ToggleFavourite(is_favourite=True), test_user2.id
+            )
+
+    @pytest.mark.asyncio
+    async def test_creates_board_user_for_member_without_row(
+        self, db_session, test_user, test_user2, shared_workspace
+    ):
+        """Członek bez wiersza BoardUsers — toggle tworzy rekord."""
+        board = Board(
+            name="Shared Board",
+            icon="PenTool",
+            bg_color="bg-gray-500",
+            workspace_id=shared_workspace.id,
+            created_by=test_user.id,
+            created_at=datetime.utcnow(),
+            last_modified=datetime.utcnow(),
+            last_modified_by=test_user.id,
+        )
+        db_session.add(board)
+        db_session.commit()
+        db_session.refresh(board)
+
         service = BoardService(db_session)
         result = await service.toggle_favourite(
-            test_board.id, ToggleFavourite(is_favourite=True), test_user2.id
+            board.id, ToggleFavourite(is_favourite=True), test_user2.id
         )
         assert result.is_favourite is True
-
-
-class TestGetMembers:
-
-    @pytest.mark.asyncio
-    async def test_returns_members(self, db_session, test_user, test_board):
-        service = BoardService(db_session)
-        result = await service.get_members(test_board.id, test_user.id)
-        assert len(result.members) >= 1
-
-    @pytest.mark.asyncio
-    async def test_owner_marked_correctly(self, db_session, test_user, test_board):
-        service = BoardService(db_session)
-        result = await service.get_members(test_board.id, test_user.id)
-        owner = next(m for m in result.members if m.user_id == test_user.id)
-        assert owner.is_owner is True
-        assert owner.role == "owner"
-
-    @pytest.mark.asyncio
-    async def test_no_access_raises_403(self, db_session, test_board, test_user2):
-        service = BoardService(db_session)
-        with pytest.raises(AppException) as exc:
-            await service.get_members(test_board.id, test_user2.id)
-        assert exc.value.status_code == 403
+        row = db_session.query(BoardUsers).filter(
+            BoardUsers.board_id == board.id,
+            BoardUsers.user_id == test_user2.id,
+        ).first()
+        assert row is not None

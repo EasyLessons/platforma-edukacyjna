@@ -8,12 +8,6 @@
  */
 import { apiClient } from '@/_new/lib/api';
 
-export interface OnlineUser {
-  user_id: number;
-  username: string;
-  avatar_url?: string | null;
-}
-
 export interface BoardElement {
   element_id: string;
   type: string;
@@ -31,22 +25,15 @@ export interface SaveElementsResponse {
   saved: number;
 }
 
-export const markUserOnline = (id: number): Promise<void> =>
-  apiClient.post(`/api/v1/whiteboard/${id}/online`).then(() => undefined);
+export interface BoardSettings {
+  ai_enabled: boolean;
+  grid_visible: boolean;
+  smartsearch_visible: boolean;
+  toolbar_visible: boolean;
+}
 
-export const fetchOnlineUsers = (id: number, limit = 50, offset = 0): Promise<OnlineUser[]> =>
-  apiClient
-    .get<OnlineUser[]>(`/api/v1/whiteboard/${id}/online-users`, {
-      params: { limit, offset },
-    })
-    .then((res) => res.data);
-
-export const fetchOnlineUsersBatch = (board_ids: number[]): Promise<Record<number, OnlineUser[]>> =>
-  apiClient
-    .post<{
-      online_users_by_board: Record<number, OnlineUser[]>;
-    }>('/api/v1/whiteboard/online-users/batch', { board_ids })
-    .then((res) => res.data.online_users_by_board);
+export const markOpened = (id: number): Promise<void> =>
+  apiClient.post<void>(`/api/v1/whiteboard/${id}/opened`).then(() => undefined);
 
 export const saveBoardElementsBatch = (
   id: number,
@@ -72,21 +59,6 @@ export const deleteBoardElement = (
     }>(`/api/v1/whiteboard/${id}/elements/${element_id}`)
     .then((res) => res.data);
 
-/**
- * Upload obrazu (po kompresji, patrz elements/image-compress.ts) do Supabase
- * Storage przez backend — patrz docs/known-issues.md #2.
- *
- * NIE wysyłamy już base64 obrazka przez Realtime Broadcast (plan Free ma
- * twardy limit 256 KB na wiadomość, prawdziwe zdjęcia/PDF-y regularnie go
- * przekraczały). Zamiast tego: upload zwykłym HTTP POST tutaj, backend
- * zapisuje w Storage i zwraca publiczny URL — TEN URL (kilkadziesiąt bajtów)
- * jedzie potem przez broadcast jako element.src.
- *
- * `Content-Type: undefined` w headers jest celowe: axios domyślnie ustawia
- * 'application/json' (patrz client.ts), ale FormData z plikiem potrzebuje
- * 'multipart/form-data; boundary=...' — boundary umie dograć tylko
- * przeglądarka, więc usuwamy nasz nagłówek i pozwalamy jej to zrobić.
- */
 export const uploadBoardImage = (
   id: number,
   blob: Blob,
@@ -102,3 +74,12 @@ export const uploadBoardImage = (
     })
     .then((res) => res.data);
 };
+
+export const fetchBoardSettings = (id: number): Promise<BoardSettings> =>
+  apiClient.get<BoardSettings>(`/api/v1/whiteboard/${id}/settings`).then((res) => res.data);
+
+export const updateBoardSettings = (
+  id: number,
+  patch: Partial<BoardSettings>
+): Promise<BoardSettings> =>
+  apiClient.put<BoardSettings>(`/api/v1/whiteboard/${id}/settings`, patch).then((res) => res.data);

@@ -12,6 +12,7 @@ dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
 fastapi==0.104.1
+google-auth==2.35.0
 greenlet==3.2.4
 h11==0.16.0
 httptools==0.7.1

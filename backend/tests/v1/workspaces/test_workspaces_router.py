@@ -232,3 +232,13 @@ class TestAcceptInvite:
             headers=make_auth_headers(test_user2.id),
         )
         assert r.status_code in (400, 404, 410)
+
+
+# ─── GET /workspaces/{id}/invite/users ─────────────────────────────────────────
+
+class TestSearchInvitableUsersAuth:
+
+    def test_401_bez_tokenu(self, client, test_workspace):
+        """GET /{id}/invite/users bez Authorization → 401"""
+        r = client.get(f"/api/v1/workspaces/{test_workspace.id}/invite/users?query=test")
+        assert r.status_code == 401

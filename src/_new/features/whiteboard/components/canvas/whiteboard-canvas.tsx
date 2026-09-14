@@ -100,7 +100,7 @@ import type {
   ViewportTransform,
 } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
-import type { BoardSettings } from '@/_new/features/board/types';
+import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { compressAndUploadImage } from '../../elements/image-compress';
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';

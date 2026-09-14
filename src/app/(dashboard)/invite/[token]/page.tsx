@@ -9,12 +9,13 @@ import { Check, X, Loader2 } from 'lucide-react';
 export default function InvitePage() {
   const { token } = useParams();
   const router = useRouter();
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, loading: authLoading } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!token) return;
+    if (authLoading) return; // Poczekaj, aż stan logowania zostanie ustalony
 
     // Jeśli niezalogowany, przekieruj do logowania
     if (!isLoggedIn) {
@@ -40,7 +41,7 @@ export default function InvitePage() {
     };
 
     acceptInvitation();
-  }, [token, isLoggedIn, router]);
+  }, [token, isLoggedIn, authLoading, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50 px-4">

@@ -159,19 +159,3 @@ class TestToggleFavourite:
         )
         assert r.status_code == 200
         assert r.json()["data"]["is_favourite"] is True
-
-
-# ─── GET /boards/{id}/members ──────────────────────────────────────────────────
-
-class TestGetBoardMembers:
-
-    def test_zwraca_czlonkow(self, client, test_user, test_board):
-        """GET /boards/{id}/members → lista członków tablicy"""
-        r = client.get(
-            f"/api/v1/boards/{test_board.id}/members",
-            headers=make_auth_headers(test_user.id),
-        )
-        assert r.status_code == 200
-        data = r.json()
-        assert "members" in data["data"]
-        assert any(m["user_id"] == test_user.id for m in data["data"]["members"])

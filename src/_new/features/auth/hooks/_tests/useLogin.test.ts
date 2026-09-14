@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useLogin } from '../useLogin';
-import { loginUser, checkUser } from '../../api/authApi';
+import { loginUser } from '../../api/authApi';
 import { AppError } from '@/_new/lib/errors';
 import { mockLoginResponse } from '@/test/mocks/authFixtures';
 
 const mockPush = vi.fn();
 const mockAuthLogin = vi.fn();
+const mockSearchParamsGet = vi.fn();
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: mockPush }),
+  useSearchParams: () => ({ get: mockSearchParamsGet }),
 }));
 
 vi.mock('@/_new/lib/auth', () => ({
@@ -18,13 +20,12 @@ vi.mock('@/_new/lib/auth', () => ({
 
 vi.mock('../../api/authApi', () => ({
   loginUser: vi.fn(),
-  checkUser: vi.fn(),
 }));
 
 describe('useLogin', () => {
   beforeEach(() => {
     vi.mocked(loginUser).mockResolvedValue(mockLoginResponse);
-    vi.mocked(checkUser).mockResolvedValue({ exists: true, verified: false, user_id: 5 });
+    mockSearchParamsGet.mockReturnValue(null);
   });
 
   const setup = () => renderHook(() => useLogin());
@@ -115,6 +116,30 @@ describe('useLogin', () => {
       });
       expect(mockPush).toHaveBeenCalledWith('/dashboard');
     });
+
+    it('przekierowuje na ?redirect gdy jest bezpieczny (ścieżka względna)', async () => {
+      mockSearchParamsGet.mockImplementation((key: string) =>
+        key === 'redirect' ? '/join/abc123' : null
+      );
+      const { result } = setup();
+      fillForm(result);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/join/abc123');
+    });
+
+    it('ignoruje redirect spoza aplikacji (ochrona przed open-redirect)', async () => {
+      mockSearchParamsGet.mockImplementation((key: string) =>
+        key === 'redirect' ? 'https://zla-strona.pl' : null
+      );
+      const { result } = setup();
+      fillForm(result);
+      await act(async () => {
+        await result.current.handleSubmit(fakeEvent);
+      });
+      expect(mockPush).toHaveBeenCalledWith('/dashboard');
+    });
   });
 
   describe('handleSubmit — błędy API', () => {
@@ -130,7 +155,9 @@ describe('useLogin', () => {
     });
 
     it('przekierowuje na /verify przy 403 gdy konto niezweryfikowane', async () => {
-      vi.mocked(loginUser).mockRejectedValue(new AppError('Forbidden', 'AUTH_ERROR', 403));
+      vi.mocked(loginUser).mockRejectedValue(
+        new AppError('Forbidden', 'AUTH_ERROR', 403, { user_id: 5 })
+      );
       const { result } = setup();
       fillForm(result);
       await act(async () => {
@@ -139,9 +166,8 @@ describe('useLogin', () => {
       expect(mockPush).toHaveBeenCalledWith('/verify?userId=5&email=test%40example.com');
     });
 
-    it('ustawia generalError przy 403 gdy checkUser nie zwraca user_id', async () => {
+    it('ustawia generalError przy 403 gdy błąd nie ma user_id w details', async () => {
       vi.mocked(loginUser).mockRejectedValue(new AppError('Forbidden', 'AUTH_ERROR', 403));
-      vi.mocked(checkUser).mockResolvedValue({ exists: false, verified: false });
       const { result } = setup();
       fillForm(result);
       await act(async () => {

@@ -1,21 +1,9 @@
 import { vi, describe, it, expect, beforeEach, afterAll } from 'vitest';
 import MockAdapter from 'axios-mock-adapter';
 import { apiClient } from '@new/lib/api/client';
-import {
-  createInvite,
-  getPendingInvites,
-  acceptInvite,
-  rejectInvite,
-  checkUserInviteStatus,
-  checkUsersInviteStatusBatch,
-} from './inviteApi';
+import { createInvite, acceptInvite, rejectInvite, searchWorkspaceUsers } from './inviteApi';
 import { AppError } from '@new/lib/errors/AppError';
-import {
-  mockInviteResponse,
-  mockPendingInvite,
-  mockAcceptInviteResponse,
-  mockInviteStatus,
-} from '@/test/mocks/fixtures';
+import { mockInviteResponse, mockAcceptInviteResponse } from '@/test/mocks/fixtures';
 
 vi.mock('@new/lib/auth', () => ({
   getAccessToken: vi.fn(() => null),
@@ -58,29 +46,6 @@ describe('createInvite', () => {
   });
 });
 
-// ─── getPendingInvites ─────────────────────────────────────────────────────
-
-describe('getPendingInvites', () => {
-  it('zwraca listę oczekujących zaproszeń', async () => {
-    mock.onGet('/api/v1/workspaces/invites/pending').reply(200, {
-      success: true,
-      data: [mockPendingInvite],
-    });
-    const result = await getPendingInvites();
-    expect(result).toHaveLength(1);
-    expect(result[0].invite_token).toBe('abc-token-123');
-  });
-
-  it('zwraca pustą tablicę gdy brak zaproszeń', async () => {
-    mock.onGet('/api/v1/workspaces/invites/pending').reply(200, {
-      success: true,
-      data: [],
-    });
-    const result = await getPendingInvites();
-    expect(result).toHaveLength(0);
-  });
-});
-
 // ─── acceptInvite ──────────────────────────────────────────────────────────
 
 describe('acceptInvite', () => {
@@ -118,34 +83,20 @@ describe('rejectInvite', () => {
   });
 });
 
-// ─── checkUserInviteStatus ─────────────────────────────────────────────────
+// ─── searchWorkspaceUsers ──────────────────────────────────────────────────
 
-describe('checkUserInviteStatus', () => {
-  it('zwraca status zaproszenia użytkownika', async () => {
-    mock.onGet('/api/v1/workspaces/10/members/check/2').reply(200, {
+describe('searchWorkspaceUsers', () => {
+  it('zwraca listę userów pasujących do zapytania z flagą has_pending_invite', async () => {
+    const users = [
+      { id: 2, username: 'testuser2', email: 'test2@example.com', has_pending_invite: false },
+    ];
+    mock.onGet('/api/v1/workspaces/10/invite/users').reply(200, {
       success: true,
-      data: mockInviteStatus,
+      data: users,
     });
-    const result = await checkUserInviteStatus(10, 2);
-    expect(result.is_member).toBe(false);
-    expect(result.can_invite).toBe(true);
-  });
-});
-
-// ─── checkUsersInviteStatusBatch ───────────────────────────────────────────
-
-describe('checkUsersInviteStatusBatch', () => {
-  it('zwraca mapę statusów dla wielu użytkowników', async () => {
-    const statusMap = {
-      2: { is_member: false, has_pending_invite: false, can_invite: true },
-      3: { is_member: true, has_pending_invite: false, can_invite: false },
-    };
-    mock.onPost('/api/v1/workspaces/10/members/check-batch').reply(200, {
-      success: true,
-      data: { statuses: statusMap },
-    });
-    const result = await checkUsersInviteStatusBatch(10, [2, 3]);
-    expect(result[2].can_invite).toBe(true);
-    expect(result[3].is_member).toBe(true);
+    const result = await searchWorkspaceUsers(10, 'testuser', 10);
+    expect(result).toHaveLength(1);
+    expect(result[0].username).toBe('testuser2');
+    expect(result[0].has_pending_invite).toBe(false);
   });
 });

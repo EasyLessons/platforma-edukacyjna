@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, text
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -11,20 +11,17 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
-    hashed_password = Column(String, nullable=True)  # 🔥 Nullable dla Google OAuth
+    hashed_password = Column(String, nullable=True)
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    # 🔥 Google OAuth
+    # Google OAuth
     google_id = Column(String, unique=True, nullable=True, index=True)
     auth_provider = Column(String(20), default="email", nullable=False)  # "email" lub "google"
     profile_picture = Column(String, nullable=True)  # URL do zdjęcia profilowego
     avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
-    
-    # 🔥 NOWE - Aktywny workspace
-    active_workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="SET NULL"), nullable=True, index=True)
-
+  
     # Relationships
     created_workspaces = relationship("Workspace", back_populates="creator", foreign_keys="[Workspace.created_by]")
     workspace_memberships = relationship("WorkspaceMember", back_populates="user")
@@ -58,6 +55,7 @@ class Workspace(Base):
     members = relationship("WorkspaceMember", back_populates="workspace", cascade="all, delete-orphan")
     boards = relationship("Board", back_populates="workspace", cascade="all, delete-orphan")
     invites = relationship("WorkspaceInvite", back_populates="workspace", cascade="all, delete-orphan")
+    share_links = relationship("WorkspaceShareLink", back_populates="workspace", cascade="all, delete-orphan")
 
 class WorkspaceMember(Base):
     __tablename__ = "workspace_members"
@@ -99,7 +97,6 @@ class BoardUsers(Base):
     id = Column(Integer, primary_key=True, index=True)
     board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    is_online = Column(Boolean, default=False, index=True)
     is_favourite = Column(Boolean, default=False)
     last_opened = Column(DateTime, nullable=True)
     
@@ -123,6 +120,28 @@ class WorkspaceInvite(Base):
     workspace = relationship("Workspace", back_populates="invites")
     inviter = relationship("User", foreign_keys=[invited_by], backref="sent_invites")
     invited_user = relationship("User", foreign_keys=[invited_id], backref="received_invites")
+
+class WorkspaceShareLink(Base):
+    __tablename__ = "workspace_share_links"
+    __table_args__ = (
+        Index(
+            "ix_workspace_share_links_active_target",
+            "workspace_id", "board_id",
+            unique=True,
+            postgresql_where=text("revoked_at IS NULL"),
+            sqlite_where=text("revoked_at IS NULL"),
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False, index=True)
+    board_id = Column(Integer, ForeignKey("boards.id", ondelete="SET NULL"), nullable=True, index=True)
+    token = Column(String(100), unique=True, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    workspace = relationship("Workspace", back_populates="share_links")
 
 class BoardElement(Base):
     """

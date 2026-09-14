@@ -1,0 +1,133 @@
+"""
+Members service — zarządzanie członkami workspace'a.
+"""
+from sqlalchemy.orm import Session, joinedload
+
+from core.models import WorkspaceMember
+from core.exceptions import NotFoundError, AppException
+from ..authorization import require_membership, require_owner
+from api.v1.boards.service import reassign_boards_on_member_removal
+from .schemas import (
+    WorkspaceMemberResponse, WorkspaceMembersListResponse,
+    MyRoleResponse, RemoveMemberResponse, UpdateMemberRoleResponse
+)
+
+
+class MemberService:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_workspace_members(
+        self, workspace_id: int, user_id: int
+    ) -> WorkspaceMembersListResponse:
+        """Pobiera listę członków — dostępna dla każdego członka workspace'a."""
+        db = self.db
+        workspace, _ = require_membership(db, workspace_id, user_id)
+
+        memberships = (
+            db.query(WorkspaceMember)
+            .options(joinedload(WorkspaceMember.user))
+            .filter(WorkspaceMember.workspace_id == workspace_id)
+            .order_by(WorkspaceMember.joined_at.asc())
+            .all()
+        )
+
+        members = []
+        for m in memberships:
+            is_owner = workspace.created_by == m.user_id
+            members.append(WorkspaceMemberResponse(
+                id=m.id,
+                user_id=m.user.id,
+                username=m.user.username,
+                email=m.user.email,
+                full_name=m.user.full_name,
+                avatar_url=m.user.avatar_url,
+                role="owner" if is_owner else m.role,
+                joined_at=m.joined_at,
+                is_owner=is_owner,
+            ))
+
+        return WorkspaceMembersListResponse(members=members, total=len(members))
+
+    def remove_workspace_member(
+        self, workspace_id: int, member_user_id: int, current_user_id: int
+    ) -> RemoveMemberResponse:
+        """Usuwa członka — tylko owner, nie może usunąć siebie."""
+        db = self.db
+        workspace = require_owner(db, workspace_id, current_user_id, "Tylko właściciel może usuwać członków")
+
+        if member_user_id == current_user_id:
+            raise AppException(
+                "Nie możesz usunąć siebie. Użyj opcji 'Opuść workspace'.",
+                status_code=400,
+            )
+
+        membership = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == member_user_id,
+        ).first()
+        if not membership:
+            raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
+
+        try:
+            reassign_boards_on_member_removal(db, workspace_id, member_user_id, workspace.created_by)
+            db.delete(membership)
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise AppException(f"Błąd usuwania członka: {str(e)}", status_code=500)
+        
+        return RemoveMemberResponse(
+            message=f"Użytkownik id:{member_user_id} został usunięty z workspace'a"
+        )
+
+    def update_member_role(
+        self,
+        workspace_id: int,
+        member_user_id: int,
+        new_role: str,
+        current_user_id: int,
+    ) -> UpdateMemberRoleResponse:
+        """Zmienia rolę członka — tylko owner, nie może zmienić własnej roli."""
+        db = self.db
+        require_owner(db, workspace_id, current_user_id, "Tylko właściciel może zmieniać role członków")
+
+        if member_user_id == current_user_id:
+            raise AppException("Nie możesz zmienić własnej roli", status_code=400)
+
+        if new_role not in ("editor", "viewer"):
+            raise AppException("Nieprawidłowa rola", status_code=400)
+
+        membership = db.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == member_user_id,
+        ).first()
+        if not membership:
+            raise NotFoundError("Użytkownik nie jest członkiem tego workspace'a")
+
+        try:
+            membership.role = new_role
+            db.commit()
+        except Exception as e:
+            db.rollback()
+            raise AppException(f"Błąd zmiany roli: {str(e)}", status_code=500)
+
+        return UpdateMemberRoleResponse(
+            message=f"Zmieniono rolę użytkownika id:{member_user_id} na '{new_role}'",
+            new_role=new_role,
+            user_id=member_user_id,
+        )
+
+    def get_user_role(
+        self, workspace_id: int, user_id: int
+    ) -> MyRoleResponse:
+        """Pobiera rolę zalogowanego usera w danym workspace'ie."""
+        db = self.db
+        workspace, membership = require_membership(db, workspace_id, user_id)
+
+        is_owner = workspace.created_by == user_id
+        return MyRoleResponse(
+            role="owner" if is_owner else membership.role,
+            is_owner=is_owner,
+            workspace_id=workspace_id,
+        )

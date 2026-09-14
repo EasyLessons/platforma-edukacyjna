@@ -6,7 +6,7 @@
  * IDEA: typy zawarte w pliku są wspódzielone przez różne komponenty.
  */
 
-import type { UserBasic } from '@/_new/shared/types/user';
+import type { User } from '@/_new/shared/types/user';
 
 // CORE WORKSPACE TYPES
 export interface Workspace {
@@ -14,10 +14,6 @@ export interface Workspace {
   name: string;
   icon: string;
   bg_color: string;
-  created_by: number;
-  creator?: UserBasic;
-  member_count: number;
-  board_count: number;
   is_owner: boolean;
   role: string;
   is_favourite: boolean;
@@ -42,6 +38,10 @@ export interface WorkspaceFormData {
 }
 
 export type WorkspaceErrors = Partial<Record<keyof WorkspaceFormData, string>>;
+export type UserSearchResult = Pick<User, 'id' | 'username' | 'email'> & {
+  full_name?: string;
+  has_pending_invite: boolean;
+};
 
 // API REQUEST TYPES
 export interface WorkspaceCreateRequest {
@@ -77,21 +77,6 @@ export interface InviteResponse {
   created_at: string;
 }
 
-export interface PendingInviteResponse {
-  id: number;
-  workspace_id: number;
-  workspace_name: string;
-  workspace_icon: string;
-  workspace_bg_color: string;
-  invited_by: number;
-  inviter_name: string;
-  invited_id: number;
-  invited_user_name: string;
-  invite_token: string;
-  expires_at: string;
-  created_at: string;
-}
-
 export interface AcceptInviteResponse {
   message: string;
   workspace_id: number;
@@ -99,16 +84,34 @@ export interface AcceptInviteResponse {
   role: string;
 }
 
-export interface InviteStatusResponse {
-  is_member: boolean;
-  has_pending_invite: boolean;
-  can_invite: boolean;
-}
-
 export interface MyRoleResponse {
   role: string;
   is_owner: boolean;
   workspace_id: number;
+}
+
+export interface ShareLinkResponse {
+  token: string;
+  workspace_id: number;
+  board_id: number | null;
+}
+
+export interface ShareLinkPreview {
+  workspace_id: number;
+  workspace_name: string;
+  workspace_icon: string;
+  board_id: number | null;
+  board_name: string | null;
+  already_member: boolean;
+}
+
+export interface JoinShareLinkResponse {
+  message: string;
+  workspace_id: number;
+  workspace_name: string;
+  board_id: number | null;
+  role: string;
+  already_member: boolean;
 }
 
 // UI TYPES

@@ -19,19 +19,16 @@ import type {
   BoardUpdateRequest,
   BoardListResponse,
   BoardToggleFavouriteResponse,
-  BoardMembersResponse,
-  UpdateSettingsResponse,
-  JoinBoardResponse,
-  BoardSettings,
 } from '../types';
+import type { OnlineUser } from '@/_new/shared/types/user';
 
 export const fetchBoards = (
   workspace_id: number,
-  limit = 10,
+  limit = 50,
   offset = 0
 ): Promise<BoardListResponse> =>
   apiClient
-    .get<BoardListResponse>('/api/v1/boards', {
+    .get<BoardListResponse>(`/api/v1/boards`, {
       params: { workspace_id, limit, offset },
     })
     .then((res) => res.data);
@@ -56,28 +53,9 @@ export const toggleBoardFavourite = (
     .post<BoardToggleFavouriteResponse>(`/api/v1/boards/${id}/toggle-favourite`, { is_favourite })
     .then((res) => res.data);
 
-export const fetchBoardMembers = (id: number): Promise<BoardMembersResponse> =>
-  apiClient.get<BoardMembersResponse>(`/api/v1/boards/${id}/members`).then((res) => res.data);
-
-export const updateBoardMemberRole = (
-  id: number,
-  user_id: number,
-  role: 'editor' | 'viewer'
-): Promise<{ message: string; new_role: string }> =>
+export const fetchOnlineUsers = (workspace_id: number): Promise<Record<number, OnlineUser[]>> =>
   apiClient
-    .patch<{
-      message: string;
-      new_role: string;
-    }>(`/api/v1/boards/${id}/members/${user_id}/role`, { role })
-    .then((res) => res.data);
-
-export const updateBoardSettings = (
-  id: number,
-  settings: BoardSettings
-): Promise<UpdateSettingsResponse> =>
-  apiClient
-    .put<UpdateSettingsResponse>(`/api/v1/boards/${id}/settings`, { settings })
-    .then((res) => res.data);
-
-export const joinBoardWorkspace = (id: number): Promise<JoinBoardResponse> =>
-  apiClient.post<JoinBoardResponse>(`/api/v1/boards/${id}/join`).then((res) => res.data);
+    .get<{
+      online_users_by_board: Record<number, OnlineUser[]>;
+    }>('/api/v1/boards/online-users', { params: { workspace_id } })
+    .then((res) => res.data.online_users_by_board);

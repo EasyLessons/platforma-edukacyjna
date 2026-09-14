@@ -8,15 +8,16 @@
  */
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/_new/lib/auth';
-import { loginUser, checkUser } from '../api/authApi';
-import { validateEmail, validatePassword } from '../utils/validation';
+import { loginUser } from '../api/authApi';
+import { validateEmail } from '../utils/validation';
 import { useErrorHandler } from '@/_new/shared/hooks/useErrorHandler';
 import type { LoginFormData, FormErrors } from '../types';
 
 export function useLogin() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login: authLogin } = useAuth();
 
   // STATE
@@ -32,16 +33,15 @@ export function useLogin() {
   const { handleError } = useErrorHandler({
     onError: setGeneralError,
     onUnauthorized: () => setGeneralError('Błędny email lub hasło'),
-    onForbidden: async () => {
-      try {
-        const checkData = await checkUser(formData.login);
-        if (!checkData.verified && checkData.user_id) {
-          router.push(
-            `/verify?userId=${checkData.user_id}&email=${encodeURIComponent(formData.login)}`
-          );
-          return;
-        }
-      } catch {}
+    onForbidden: (err) => {
+      const details = err.details as { user_id?: number } | undefined;
+      if (details?.user_id) {
+        router.push(
+          `/verify?userId=${details.user_id}&email=${encodeURIComponent(formData.login)}`
+        );
+        return;
+      }
+
       setGeneralError('Konto niezweryfikowane. Sprawdź email.');
     },
   });
@@ -81,7 +81,8 @@ export function useLogin() {
         password: formData.password,
       });
       authLogin(response.access_token, response.user);
-      router.push('/dashboard');
+      const redirectTo = searchParams.get('redirect');
+      router.push(redirectTo && redirectTo?.startsWith('/') ? redirectTo : '/dashboard');
     } catch (err) {
       setIsLoading(false);
       await handleError(err);

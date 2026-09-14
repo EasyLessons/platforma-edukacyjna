@@ -16,6 +16,7 @@ interface BackendErrorBody {
   error?: string;
   code?: string;
   detail?: string; // fallback dla starych endpointów (main.py)
+  data?: Record<string, unknown>; // dodatkowe dane (np. walidacja)
 }
 
 /**
@@ -32,7 +33,6 @@ export function mapAxiosError(err: unknown): AppError {
 
   // Brak odpowiedzi (sieć, timeout)
   if (!axiosErr.response) {
-    console.log('No response error:', axiosErr.code, axiosErr.message, axiosErr.config?.url);
     return new AppError('Brak połączenia z serwerem', ErrorCode.NETWORK_ERROR, 0);
   }
 
@@ -44,7 +44,7 @@ export function mapAxiosError(err: unknown): AppError {
   // Wyciągnij kod błędu
   const code = data?.code || resolveCode(status);
 
-  return new AppError(message, code, status);
+  return new AppError(message, code, status, data?.data);
 }
 
 function resolveCode(status: number): string {

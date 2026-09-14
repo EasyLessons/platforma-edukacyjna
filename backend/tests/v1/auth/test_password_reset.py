@@ -21,7 +21,7 @@ from core.exceptions import ValidationError, AppException
 from core.models import User
 from pydantic import ValidationError as PydanticValidationError
 
-MOCK_RESET_EMAIL = "api.v1.auth.service.send_password_reset_email"
+MOCK_RESET_EMAIL = "api.v1.auth.service.send_email"
 VALID_CODE = "654321"
 
 

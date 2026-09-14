@@ -3,15 +3,13 @@ Boards router — /api/v1/boards/*
 
 POST   /                        — utwórz tablicę
 GET    /                        — lista tablic w workspace
+GET    /online-users            — kto jest online na tablicach workspace'u
 GET    /{id}                    — pobierz tablicę
 PUT    /{id}                    — zaktualizuj
 DELETE /{id}                    — usuń
 POST   /{id}/toggle-favourite   — ulubione
-GET    /{id}/members            — członkowie (z workspace)
-PUT    /{id}/settings           — ustawienia (tylko owner)
-POST   /{id}/join               — dołączenie przez link
 """
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -22,9 +20,8 @@ from core.responses import ApiResponse
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
     BoardResponse, BoardListResponse,
-    ToggleFavouriteResponse, BoardMembersResponse,
-    UpdateBoardSettings, DeleteBoardResponse,
-    JoinBoardResponse,
+    ToggleFavouriteResponse, DeleteBoardResponse, 
+    OnlineUsersResponse
 )
 from .service import BoardService
 
@@ -48,13 +45,23 @@ async def create_board(
 @router.get("", response_model=ApiResponse[BoardListResponse])
 async def list_boards(
     workspace_id: int,
-    limit: int = 10,
-    offset: int = 0,
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     service = BoardService(db)
     result = await service.list_boards(workspace_id, current_user.id, limit, offset)
+    return ApiResponse(success=True, data=result)
+
+@router.get("/online-users", response_model=ApiResponse[OnlineUsersResponse])
+async def get_online_users(
+    workspace_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = BoardService(db)
+    result = await service.get_online_users_by_workspace(workspace_id, current_user.id)
     return ApiResponse(success=True, data=result)
 
 
@@ -101,38 +108,4 @@ async def toggle_favourite(
 ):
     service = BoardService(db)
     result = await service.toggle_favourite(board_id, toggle_data, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
-@router.get("/{board_id}/members", response_model=ApiResponse[BoardMembersResponse])
-async def get_members(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = BoardService(db)
-    result = await service.get_members(board_id, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
-@router.put("/{board_id}/settings", response_model=ApiResponse[dict])
-async def update_settings(
-    board_id: int,
-    body: UpdateBoardSettings,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = BoardService(db)
-    result = await service.update_settings(board_id, body, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-@router.post("/{board_id}/join", response_model=ApiResponse[JoinBoardResponse])
-async def join_board(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """Dołącza użytkownika do workspace powiązanego z tablicą."""
-    service = BoardService(db)
-    result = await service.join_board_workspace(board_id, current_user.id)
     return ApiResponse(success=True, data=result)

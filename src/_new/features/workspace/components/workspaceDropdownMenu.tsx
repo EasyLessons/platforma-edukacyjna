@@ -13,7 +13,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { MoreVertical, Pencil, Settings, Users, Trash2, UserPlus } from 'lucide-react';
+import { MoreVertical, Pencil, Settings, Users, Trash2, UserPlus, Link2 } from 'lucide-react';
 import type { Workspace } from '../types';
 import { Button } from '@/_new/shared/ui/button';
 
@@ -23,7 +23,8 @@ interface WorkspaceDropdownMenuProps {
   onMembers: () => void;
   onDelete: () => void;
   onLeave: () => void;
-  onInvite?: () => void; // Nowy props na mobile zapraszanie
+  onInvite?: () => void;
+  onShareLink?: () => void;
   triggerClassName?: string;
   iconSize?: number;
 }
@@ -35,7 +36,8 @@ export function WorkspaceDropdownMenu({
   onDelete,
   onLeave,
   onInvite,
-  triggerClassName = 'w-8 h-8', // Domyślny rozmiar dla TopNav i innych miejsc
+  onShareLink,
+  triggerClassName = 'w-8 h-8',
   iconSize = 16,
 }: WorkspaceDropdownMenuProps) {
   // STATE
@@ -154,7 +156,7 @@ export function WorkspaceDropdownMenu({
                     role="menuitem"
                   >
                     <UserPlus size={14} />
-                    <span>Zaproś uczestników</span>
+                    <span>Zaproś</span>
                   </button>
                 )}
 
@@ -185,6 +187,17 @@ export function WorkspaceDropdownMenu({
                   <span>Członkowie</span>
                 </button>
 
+                {onShareLink && (
+                  <button
+                    onClick={handleAction(onShareLink)}
+                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Link2 size={14} />
+                    <span>Udostępnij</span>
+                  </button>
+                )}
+
                 <div className="h-px bg-gray-200 my-1" role="separator" />
 
                 <button
@@ -196,8 +209,31 @@ export function WorkspaceDropdownMenu({
                   <span>Usuń</span>
                 </button>
               </>
+            ) : workspace.role === 'editor' ? (
+              // Editor menu
+              <>
+                {onShareLink && (
+                  <button
+                    onClick={handleAction(onShareLink)}
+                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
+                    role="menuitem"
+                  >
+                    <Link2 size={14} />
+                    <span>Udostępnij link</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={handleAction(onLeave)}
+                  className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"
+                  role="menuitem"
+                >
+                  <Trash2 size={14} />
+                  <span>Opuść</span>
+                </button>
+              </>
             ) : (
-              // Member menu
+              // Viewer menu
               <button
                 onClick={handleAction(onLeave)}
                 className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"

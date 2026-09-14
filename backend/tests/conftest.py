@@ -279,8 +279,7 @@ def test_board(db_session: Session, test_user, test_workspace):
 
     db_session.add(BoardUsers(
         board_id=board.id, user_id=test_user.id,
-        is_favourite=False, is_online=True,
-        last_opened=datetime.utcnow(),
+        is_favourite=False, last_opened=datetime.utcnow(),
     ))
     db_session.commit()
     db_session.refresh(board)
@@ -305,7 +304,7 @@ def multiple_boards(db_session: Session, test_user, test_workspace):
         db_session.flush()
         db_session.add(BoardUsers(
             board_id=board.id, user_id=test_user.id,
-            is_favourite=(i % 3 == 0), is_online=(i % 2 == 0),
+            is_favourite=(i % 3 == 0),
             last_opened=datetime.utcnow(),
         ))
         boards.append(board)

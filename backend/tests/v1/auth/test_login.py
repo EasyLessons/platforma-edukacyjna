@@ -81,7 +81,7 @@ class TestLoginErrors:
                 LoginData(login=unverified_user.username, password="testpassword")
             )
         assert exc.value.status_code == 403
-        assert "niezaktywne" in exc.value.message.lower()
+        assert "nieaktywne" in exc.value.message.lower()
 
     @pytest.mark.asyncio
     async def test_wrong_password_same_error_as_missing_user(self, db_session, test_user):

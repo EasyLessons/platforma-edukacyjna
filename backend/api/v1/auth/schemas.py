@@ -49,24 +49,10 @@ class AuthResponse(BaseModel):
     token_type: str = "bearer"
     user: UserResponse
 
-class CheckUser(BaseModel):
-    """Schema do sprawdzania czy user istnieje"""
-    email: EmailStr
-
 class RegisterResponse(BaseModel):
     """Response po rejestracji"""
     user: UserResponse
     message: str
-
-class UserSearchResult(BaseModel):
-    """Wynik wyszukiwania użytkownika"""
-    id: int
-    username: str
-    email: str
-    full_name: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
 
 class RequestPasswordReset(BaseModel):
     """Schema dla żądania resetu hasła"""
@@ -92,19 +78,6 @@ class ResetPassword(BaseModel):
 
 # === RESPONSE SCHEMAS (API output) ===
 
-class ResendCodeResponse(BaseModel):
-    """Response po ponownym wysłaniu kodu"""
-    message: str
-
-
-class CheckUserResponse(BaseModel):
-    """Response sprawdzenia czy user istnieje"""
-    exists: bool
-    verified: bool
-    user_id: Optional[int] = None
-    message: Optional[str] = None
-
-
 class MessageResponse(BaseModel):
     """Generic response z wiadomością"""
     message: str
@@ -124,3 +97,11 @@ class RefreshResponse(BaseModel):
 class MeResponse(BaseModel):
     """Response z danymi aktualnie zalogowanego użytkownika"""
     user: UserResponse
+
+class GoogleLoginRequest(BaseModel):
+    """Schema dla logowania przez Google ID token"""
+    credential: str
+
+class AvatarUpdate(BaseModel):
+    """Schema dla aktualizacji avatara użytkownika"""
+    avatar_url: str

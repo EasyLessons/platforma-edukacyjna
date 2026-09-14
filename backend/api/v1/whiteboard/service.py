@@ -2,12 +2,7 @@
 Logika biznesowa sesji whiteboard.
 
 WhiteboardService obsługuje:
-  set_online()          — oznacz usera jako online
-  set_offline()         — oznacz usera jako offline
-  get_online_users()    — lista online
-  get_owner_info()      — info o właścicielu
-  get_last_modifier()   — info o ostatnim modyfikatorze
-  get_last_opened()     — kiedy user ostatnio otworzył
+  mark_opened()         — zanotuj otwarcie tablicy (last_opened + presence)
   save_elements()       — batch save elementów
   load_elements()       — ładowanie wszystkich elementów
   delete_element()      — usuń jeden element
@@ -20,22 +15,20 @@ from fastapi import BackgroundTasks
 from sqlalchemy.orm import Session
 
 from core.database import SessionLocal
-from core.exceptions import NotFoundError, AppException, ValidationError
+from core.exceptions import NotFoundError, ValidationError
 from core.logging import get_logger
-from core.models import Board, BoardElement, BoardUsers, User, WorkspaceMember
+from core.models import Board, BoardElement, BoardUsers, User
 
 from .schemas import (
-    BoardOwnerInfo, LastModifiedByInfo, LastOpenedInfo,
-    OnlineUserInfo, BoardElementWithAuthor, SaveElementsResponse,
+    BoardElementWithAuthor, SaveElementsResponse,
+    BoardSettings, BoardSettingsPatch
 )
 from .storage import upload_board_image, delete_board_image
+from core.presence import PresenceService
+from api.v1.workspaces.authorization import require_membership, require_board_owner
 
 logger = get_logger(__name__)
 
-# Ile sekund czekamy po usunięciu elementu-obrazu, zanim NAPRAWDĘ skasujemy
-# plik ze Storage — patrz docs/known-issues.md #2, Aktualizacja 9: usera
-# undo (Ctrl+Z) przywraca element z tym samym URL-em, więc jeśli plik
-# zniknąłby natychmiast, undo pokazywałoby szary/pusty blok zamiast obrazka.
 IMAGE_DELETE_GRACE_PERIOD_SECONDS = 90.0
 
 
@@ -67,8 +60,9 @@ async def _cleanup_image_after_delay(src: str, delay_seconds: float = IMAGE_DELE
 
 class WhiteboardService:
 
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, presence: PresenceService | None = None):
         self.db = db
+        self.presence = presence or PresenceService(db)
 
     def _get_board_or_404(self, board_id: int) -> Board:
         board = self.db.query(Board).filter(Board.id == board_id).first()
@@ -76,19 +70,12 @@ class WhiteboardService:
             raise NotFoundError("Tablica nie znaleziona")
         return board
 
-    def _check_access(self, board: Board, user_id: int) -> None:
-        member = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.workspace_id == board.workspace_id,
-            WorkspaceMember.user_id == user_id,
-        ).first()
-        if not member and board.created_by != user_id:
-            raise AppException("Brak dostępu do tej tablicy", status_code=403)
+    # Online presence --------------------------------------------------
 
-    # ── Online presence ────────────────────────────────────────────────────
-
-    def set_online(self, board_id: int, user_id: int) -> bool:
+    async def mark_opened(self, board_id: int, user_id: int) -> bool:
+        """Notuje otwarcie tablicy: last_opened w Postgresie + presence w Redisie."""
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         board_user = self.db.query(BoardUsers).filter(
             BoardUsers.board_id == board_id,
@@ -96,105 +83,37 @@ class WhiteboardService:
         ).first()
 
         if board_user:
-            board_user.is_online = True
             board_user.last_opened = datetime.utcnow()
         else:
             self.db.add(BoardUsers(
-                board_id=board_id, user_id=user_id,
-                is_online=True, is_favourite=False,
+                board_id=board_id,
+                user_id=user_id,
+                is_favourite=False,
                 last_opened=datetime.utcnow(),
             ))
 
         self.db.commit()
+        await self.presence.mark_online(board_id, user_id)
         return True
 
-    def set_offline(self, board_id: int, user_id: int) -> bool:
-        board_user = self.db.query(BoardUsers).filter(
-            BoardUsers.board_id == board_id,
-            BoardUsers.user_id == user_id,
-        ).first()
-        if not board_user:
-            return False
-        board_user.is_online = False
+    # Settings --------------------------------------------------
+
+    def get_settings(self, board_id: int, user_id: int) -> BoardSettings:
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+        return BoardSettings(**(board.settings or {}))
+
+    def update_settings(self, board_id: int, patch: BoardSettingsPatch, user_id: int) -> BoardSettings:
+        board = self._get_board_or_404(board_id)
+        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może zmienić jej ustawienia")
+
+        effective = BoardSettings(**(board.settings or {})).model_dump()
+        board.settings = {**effective, **patch.model_dump(exclude_unset=True)}
         self.db.commit()
-        return True
+        self.db.refresh(board)
+        return BoardSettings(**board.settings)
 
-    def get_online_users(
-        self, board_id: int, limit: int = 50, offset: int = 0
-    ) -> List[OnlineUserInfo]:
-        from datetime import timedelta, datetime
-        active_threshold = datetime.utcnow() - timedelta(minutes=2)
-
-        rows = (
-            self.db.query(BoardUsers, User)
-            .join(User, User.id == BoardUsers.user_id)
-            .filter(
-                BoardUsers.board_id == board_id, 
-                BoardUsers.is_online == True,
-                BoardUsers.last_opened >= active_threshold
-            )
-            .offset(offset).limit(limit)
-            .all()
-        )
-        return [OnlineUserInfo(user_id=u.id, username=u.username, avatar_url=u.avatar_url) for _, u in rows]
-
-    def get_online_users_batch(self, board_ids: List[int]) -> Dict[int, List[OnlineUserInfo]]:
-        unique_board_ids = sorted(set(board_ids))
-        if not unique_board_ids:
-            return {}
-
-        from datetime import timedelta, datetime
-        active_threshold = datetime.utcnow() - timedelta(minutes=2)
-
-        rows = (
-            self.db.query(BoardUsers.board_id, User)
-            .join(User, User.id == BoardUsers.user_id)
-            .filter(
-                BoardUsers.board_id.in_(unique_board_ids),
-                BoardUsers.is_online == True,
-                BoardUsers.last_opened >= active_threshold
-            )
-            .all()
-        )
-
-        by_board: Dict[int, List[OnlineUserInfo]] = {board_id: [] for board_id in unique_board_ids}
-        for board_id, user in rows:
-            by_board[board_id].append(OnlineUserInfo(user_id=user.id, username=user.username, avatar_url=user.avatar_url))
-
-        return by_board
-
-    # ── Board metadata ─────────────────────────────────────────────────────
-
-    def get_owner_info(self, board_id: int) -> BoardOwnerInfo:
-        board = self._get_board_or_404(board_id)
-        owner = self.db.query(User).filter(User.id == board.created_by).first()
-        if not owner:
-            raise NotFoundError("Właściciel tablicy nie znaleziony")
-        return BoardOwnerInfo(user_id=owner.id, username=owner.username)
-
-    def get_last_modifier(self, board_id: int) -> LastModifiedByInfo:
-        board = self._get_board_or_404(board_id)
-        uid = board.last_modified_by or board.created_by
-        user = self.db.query(User).filter(User.id == uid).first()
-        if not user:
-            raise NotFoundError("Ostatni modyfikator nie znaleziony")
-        return LastModifiedByInfo(user_id=user.id, username=user.username)
-
-    def get_last_opened(self, board_id: int, user_id: int) -> LastOpenedInfo:
-        board_user = self.db.query(BoardUsers).filter(
-            BoardUsers.board_id == board_id,
-            BoardUsers.user_id == user_id,
-        ).first()
-        if not board_user or not board_user.last_opened:
-            raise NotFoundError("Brak informacji o ostatnim otwarciu")
-        user = self.db.query(User).filter(User.id == user_id).first()
-        return LastOpenedInfo(
-            user_id=user_id,
-            username=user.username if user else "Unknown",
-            last_opened=board_user.last_opened,
-        )
-
-    # ── Elements ───────────────────────────────────────────────────────────
+    # Elements --------------------------------------------------
 
     def save_elements(
         self,
@@ -208,7 +127,7 @@ class WhiteboardService:
             raise ValidationError("Zbyt wiele elementów (maksymalnie 100)")
 
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         saved = 0
         for el in elements:
@@ -246,7 +165,7 @@ class WhiteboardService:
         self, board_id: int, user_id: int
     ) -> List[BoardElementWithAuthor]:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         elements = self.db.query(BoardElement).filter(
             BoardElement.board_id == board_id
@@ -286,7 +205,7 @@ class WhiteboardService:
         Realtime Broadcast, żeby nie łamać limitu 256 KB na wiadomość.
         """
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
         return await upload_board_image(board_id, file_bytes, content_type)
 
     def delete_element(
@@ -297,7 +216,7 @@ class WhiteboardService:
         background_tasks: Optional[BackgroundTasks] = None,
     ) -> dict:
         board = self._get_board_or_404(board_id)
-        self._check_access(board, user_id)
+        require_membership(self.db, board.workspace_id, user_id)
 
         element = self.db.query(BoardElement).filter(
             BoardElement.board_id == board_id,
@@ -307,16 +226,6 @@ class WhiteboardService:
         if not element:
             raise NotFoundError("Element nie znaleziony")
 
-        # 🛠️ Sprzątanie Storage — patrz docs/known-issues.md #2, pytanie usera
-        # o "zapychanie się" Storage. Obraz raz wgrany do Storage zostałby tam
-        # na zawsze, gdybyśmy kasowali tylko wiersz w bazie.
-        #
-        # NIE kasujemy pliku od razu — zaplanowane w tle z opóźnieniem
-        # (_cleanup_image_after_delay), bo natychmiastowe kasowanie psuło
-        # undo (patrz Aktualizacja 9): Ctrl+Z przywraca element z tym samym
-        # URL-em, a jeśli plik już zniknął, obrazek wraca jako szary/pusty
-        # blok. Background task sam sprawdzi tuż przed kasowaniem, czy URL
-        # nie wrócił na tablicę w międzyczasie.
         if element.type == "image" and background_tasks is not None:
             src = (element.data or {}).get("src")
             if isinstance(src, str) and src:

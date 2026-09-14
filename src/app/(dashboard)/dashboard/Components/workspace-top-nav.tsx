@@ -9,6 +9,7 @@ import { WorkspaceDropdownMenu } from '@/_new/features/workspace/components/work
 import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspaceEditModal';
 import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspaceMembersModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
+import { ShareLinkModal } from '@/_new/features/workspace/components/shareLinkModal';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { getColorClass, getIconComponent } from '@/_new/features/workspace/utils/helpers';
 import { useWorkspaceMembers } from '@/_new/features/workspace/hooks/useWorkspaceMember';
@@ -49,6 +50,7 @@ export default function WorkspaceTopNav({
   const [membersWorkspace, setMembersWorkspace] = useState<Workspace | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null);
   const [leavingWorkspace, setLeavingWorkspace] = useState<Workspace | null>(null);
+  const [sharingWorkspace, setSharingWorkspace] = useState<Workspace | null>(null);
 
   const WorkspaceIcon = activeWorkspace ? getIconComponent(activeWorkspace.icon) : null;
   const workspaceColorClass = activeWorkspace
@@ -203,6 +205,7 @@ export default function WorkspaceTopNav({
                   onMembers={() => setMembersWorkspace(activeWorkspace)}
                   onDelete={() => setDeletingWorkspace(activeWorkspace)}
                   onLeave={() => setLeavingWorkspace(activeWorkspace)}
+                  onShareLink={() => setSharingWorkspace(activeWorkspace)}
                   triggerClassName="h-8 w-8 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
                 />
               </div>
@@ -238,6 +241,15 @@ export default function WorkspaceTopNav({
         onClose={() => setMembersWorkspace(null)}
         workspace={membersWorkspace}
       />
+
+      {sharingWorkspace && (
+        <ShareLinkModal
+          isOpen={!!sharingWorkspace}
+          onClose={() => setSharingWorkspace(null)}
+          workspaceId={sharingWorkspace.id}
+          workspaceName={sharingWorkspace.name}
+        />
+      )}
 
       <ConfirmationModal
         isOpen={!!deletingWorkspace}

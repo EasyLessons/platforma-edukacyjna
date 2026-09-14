@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { registerUser, checkUser } from '../api/authApi';
+import { registerUser } from '../api/authApi';
 import {
   validateEmail,
   validatePassword,
@@ -94,19 +94,17 @@ export function useRegister() {
     setGeneralError('');
   };
 
-  const handleConflict = async () => {
-    try {
-      const checkData = await checkUser(formData.email);
-      if (checkData.verified) {
-        setGeneralError('To konto już istnieje. Przejdź do logowania.');
-      } else {
-        router.push(
-          `/verify?userId=${checkData.user_id}&email=${encodeURIComponent(formData.email)}`
-        );
-      }
-    } catch {
-      handleError(new AppError('Email już zajęty', 'CONFLICT', 409));
+  const handleConflict = (err: AppError) => {
+    const details = err.details as { user_id?: number; verified?: boolean } | undefined;
+    if (details?.verified) {
+      setGeneralError('To konto już istnieje. Przejdź do logowania.');
+      return;
     }
+    if (details?.user_id) {
+      router.push(`/verify?userId=${details.user_id}&email=${encodeURIComponent(formData.email)}`);
+      return;
+    }
+    setGeneralError('Email już zajęty');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,7 +120,7 @@ export function useRegister() {
     } catch (err) {
       setIsLoading(false);
       if (isError(err, 'CONFLICT')) {
-        await handleConflict();
+        handleConflict(err);
         return;
       }
       await handleError(err);
