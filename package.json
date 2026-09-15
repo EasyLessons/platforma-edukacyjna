@@ -33,6 +33,7 @@
     "axios": "^1.13.6",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fractional-indexing": "^4.0.0",
     "katex": "^0.16.28",
     "lucide-react": "^0.548.0",
     "mathjs": "^15.1.0",
@@ -48,6 +49,7 @@
     "remark-math": "^6.0.0",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "yjs": "^13.6.32",
     "zustand": "^5.0.14"
   },
   "devDependencies": {
