@@ -42,19 +42,6 @@ import {
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 
-// Helper do odczytania user_id z JWT (payload.sub)
-function getUserIdFromToken(): number | null {
-  if (typeof window === 'undefined') return null;
-  const token = localStorage.getItem('access_token');
-  if (!token) return null;
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub ? Number(payload.sub) : null;
-  } catch {
-    return null;
-  }
-}
-
 const DEFAULT_BOARD_SETTINGS: BoardSettings = {
   ai_enabled: true,
   grid_visible: true,
@@ -85,9 +72,7 @@ export function TablicaContent() {
     return Number.isFinite(parsedWorkspaceId) && parsedWorkspaceId > 0 ? parsedWorkspaceId : null;
   });
   const [boardSettings, setBoardSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
-  const [isOwner, setIsOwner] = useState(false);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
-  const [boardOwnerId, setBoardOwnerId] = useState<number | null>(null);
   const [showShareModal, setShowShareModal] = useState(false);
 
   // Sidebar tablicy
@@ -125,10 +110,6 @@ export function TablicaContent() {
           setBoardIcon(board.icon || 'PenTool');
           setBoardBgColor(board.bg_color || 'gray-500');
           setWorkspaceId(board.workspace_id);
-          setBoardOwnerId(board.owner_id);
-          // Sprawdz czy biezacy uzytkownik jest wlascicielem tablicy
-          const currentUserId = getUserIdFromToken();
-          setIsOwner(!!currentUserId && board.owner_id === currentUserId);
           // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
           try {
             const s = await fetchBoardSettings(numericId);
