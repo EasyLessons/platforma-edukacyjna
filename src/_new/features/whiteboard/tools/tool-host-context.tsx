@@ -94,6 +94,9 @@ export interface ToolHostContextValue {
   // ── pan ──
   onPanStart: () => void;
   onPanEnd: () => void;
+
+  // ── komunikaty dla uzytkownika (dolny toast canvasu) ──
+  onNotice: (message: string) => void;
 }
 
 const ToolHostContext = createContext<ToolHostContextValue | null>(null);

@@ -46,7 +46,10 @@ import {
   constrainViewport,
   inverseTransformPoint,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { compressAndUploadImage } from '@/_new/features/whiteboard/elements/image-compress';
+import {
+  compressAndUploadImage,
+  DemoUploadBlockedError,
+} from '@/_new/features/whiteboard/elements/image-compress';
 
 export interface ImageToolRef {
   handlePasteFromClipboard: () => void;
@@ -56,6 +59,8 @@ export interface ImageToolRef {
 interface ImageToolProps {
   /** ID tablicy — potrzebne do uploadu obrazu do Supabase Storage (docs/known-issues.md #2) */
   boardId: string;
+  /** Wolane, gdy uploadu nie da sie wykonac (np. tablica demo) — pokazuje komunikat. */
+  onUploadBlocked?: (message: string) => void;
   viewport: ViewportTransform;
   canvasWidth: number;
   canvasHeight: number;
@@ -64,7 +69,18 @@ interface ImageToolProps {
 }
 
 export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
-  ({ boardId, viewport, canvasWidth, canvasHeight, onImageCreate, onViewportChange }, ref) => {
+  (
+    {
+      boardId,
+      viewport,
+      canvasWidth,
+      canvasHeight,
+      onImageCreate,
+      onViewportChange,
+      onUploadBlocked,
+    },
+    ref
+  ) => {
     const overlayRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -267,7 +283,11 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           onImageCreate(newImage);
         }
       } catch (err) {
-        console.error('File upload error:', err);
+        if (err instanceof DemoUploadBlockedError) {
+          onUploadBlocked?.(err.message);
+        } else {
+          console.error('File upload error:', err);
+        }
       }
 
       // Reset input (żeby można było wgrać ten sam plik ponownie)
