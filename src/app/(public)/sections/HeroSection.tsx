@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Plus_Jakarta_Sans } from 'next/font/google';
+import DemoCtaButton from '@/_new/features/demo/demo-cta-button';
 
 const jakartaSans = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -124,6 +125,9 @@ export default function HeroSection() {
                   </span>
                 </button>
               </Link>
+              <DemoCtaButton className="mt-3 inline-flex w-full sm:w-auto items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-6 sm:px-7 py-3 text-[13px] sm:text-[15px] font-semibold text-white backdrop-blur-sm transition-colors duration-200 hover:bg-white/20 cursor-pointer">
+                Wypróbuj demo bez zakładania konta
+              </DemoCtaButton>
             </div>
           </div>
 
@@ -169,6 +173,9 @@ export default function HeroSection() {
                     </span>
                   </button>
                 </Link>
+                <DemoCtaButton className="mt-3 inline-flex items-center justify-center gap-2 rounded-xl border border-white/30 bg-white/10 px-7 py-3 text-[15px] font-semibold text-white backdrop-blur-sm transition-colors duration-200 hover:bg-white/20 cursor-pointer">
+                  Wypróbuj demo bez zakładania konta
+                </DemoCtaButton>
               </div>
             </div>
           </div>

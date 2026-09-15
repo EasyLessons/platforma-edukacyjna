@@ -29,7 +29,13 @@ services:
       # Bind mount z Windowsa do kontenera Linuksa NIE przekazuje zdarzen
       # systemu plikow, wiec Turbopack nie wie, ze plik sie zmienil i HMR
       # nie dziala - zmiany w kodzie nie docieraja do dzialajacego dev servera.
-      # Ponizsze wymusza odpytywanie plikow zamiast polegania na zdarzeniach.
+      #
+      # SPRAWDZONE 15.09: ponizsze dwie zmienne TEGO NIE NAPRAWIAJA. Sa z ery
+      # webpacka (watchpack / chokidar) i Turbopack ich nie czyta. Zostaja tylko
+      # dlatego, ze nie szkodza i dzialaja dla narzedzi pobocznych.
+      # Dzialajaca obejscie po zmianie kodu:
+      #   docker compose up -d --force-recreate frontend
+      # (samo `docker compose restart frontend` potrafi zawisnac na 0/1)
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
     depends_on:
