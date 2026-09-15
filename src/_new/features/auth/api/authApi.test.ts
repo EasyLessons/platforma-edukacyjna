@@ -16,6 +16,9 @@ vi.mock('@new/lib/auth', () => ({
   getStoredUser: vi.fn(() => null),
   setStoredUser: vi.fn(),
   removeStoredUser: vi.fn(),
+  // Interceptor 401 w client.ts pyta isPublicPath, czy odrzucić błąd (ścieżka
+  // publiczna) czy zwrócić wiszący promise (bo zaraz nastąpi redirect).
+  isPublicPath: vi.fn((pathname: string) => pathname === '/login'),
 }));
 
 const mock = new MockAdapter(apiClient, { onNoMatch: 'throwException' });
@@ -129,8 +132,9 @@ describe('getCurrentUser', () => {
   });
 
   it('rzuca AppError.isUnauthorized() dla 401', async () => {
-    // Interceptor po nieudanym refreshie sprawdza pathname === '/login' zanim odrzuci błąd.
-    // Mockujemy pathname żeby nie wisiał na never-resolving promise.
+    // Interceptor po nieudanym refreshie sprawdza isPublicPath(pathname) zanim odrzuci błąd.
+    // Ustawiamy /login (mock isPublicPath zwraca dla niego true), żeby nie wisiał na
+    // never-resolving promise.
     window.location.pathname = '/login';
 
     mock.onGet('/api/v1/auth/me').reply(401, {
