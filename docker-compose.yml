@@ -26,6 +26,12 @@ services:
       - ./.env.local
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      # Bind mount z Windowsa do kontenera Linuksa NIE przekazuje zdarzen
+      # systemu plikow, wiec Turbopack nie wie, ze plik sie zmienil i HMR
+      # nie dziala - zmiany w kodzie nie docieraja do dzialajacego dev servera.
+      # Ponizsze wymusza odpytywanie plikow zamiast polegania na zdarzeniach.
+      - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
     depends_on:
       - backend
   redis:
