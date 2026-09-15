@@ -16,6 +16,7 @@ export {
   isCurrentTokenValid,
   refreshAccessToken,
   logoutAndRedirect,
+  isPublicPath,
 } from './tokenService';
 
 export { AuthProvider, useAuth } from './AuthContext';
