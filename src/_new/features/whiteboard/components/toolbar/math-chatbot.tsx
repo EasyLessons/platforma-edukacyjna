@@ -451,7 +451,7 @@ function MathChatbotInner({
             </div>
             <button
               onClick={() => setIsCollapsed(true)}
-              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
               title="Zamknij"
               aria-label="Zamknij"
             >
@@ -466,7 +466,7 @@ function MathChatbotInner({
             </p>
             <button
               onClick={() => router.push('/login')}
-              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors shadow-sm"
+              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors shadow-sm cursor-pointer"
             >
               Zaloguj sie
             </button>

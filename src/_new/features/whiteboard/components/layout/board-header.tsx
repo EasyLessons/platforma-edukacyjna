@@ -13,7 +13,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { PanelLeftOpen, PanelLeftClose, MoreVertical, Link2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
@@ -24,6 +24,95 @@ import {
 import { Button } from '@/_new/shared/ui/button';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { Tooltip } from '@/_new/shared/ui/tooltip';
+
+/**
+ * Ramka nagłówka tablicy: pozycja w lewym górnym rogu + biały box.
+ *
+ * Wydzielona, żeby widok demo (`/demo/[sessionId]`) pokazywał logo w DOKŁADNIE
+ * tej samej oprawie co zwykła tablica, zamiast utrzymywać drugą kopię stylów.
+ * `compact` odpowiada wariantowi kompaktowemu (mniejszy cień) — jedyna różnica
+ * między dwoma wariantami ramki w BoardHeader.
+ */
+export function BoardHeaderFrame({
+  compact = false,
+  children,
+}: {
+  compact?: boolean;
+  children: ReactNode;
+}) {
+  const metrics = useWhiteboardUiMetrics();
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: `${metrics.spacing.top}px`,
+        left: `${metrics.spacing.side}px`,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0px',
+          padding: '0 12px',
+          height: '56px',
+          backgroundColor: 'white',
+          border: '2px solid #e0e0e0',
+          borderRadius: '16px',
+          boxShadow: compact ? '0 4px 4px rgba(0,0,0,0.1)' : '0 4px 12px rgba(0,0,0,0.1)',
+          pointerEvents: 'auto',
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Logo EasyLesson jako przycisk powrotu — wspólne dla tablicy i demo. */
+export function BoardLogoButton({ href, tooltip }: { href: string; tooltip: string }) {
+  const router = useRouter();
+
+  return (
+    <Tooltip content={tooltip} position="bottom">
+      <button
+        onClick={() => router.push(href)}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.backgroundColor = '#f3f4f6';
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+        style={{
+          padding: '4px',
+          backgroundColor: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          transition: 'background-color 0.15s',
+          display: 'flex',
+          alignItems: 'center',
+          position: 'relative',
+          borderRadius: '8px',
+        }}
+      >
+        <Image
+          src="/resources/LogoEasyLesson.webp"
+          alt="EasyLesson Logo"
+          width={160}
+          height={50}
+          className="h-9 w-auto"
+          priority
+        />
+      </button>
+    </Tooltip>
+  );
+}
 
 interface BoardHeaderProps {
   boardName: string;
@@ -64,388 +153,275 @@ export function BoardHeader({
     <>
       {/* Główny nagłówek — widoczny tylko przy szerokości >= 1640px */}
       {showFullHeader && (
-        <div
-          style={{
-            position: 'absolute',
-            top: `${metrics.spacing.top}px`,
-            left: `${metrics.spacing.side}px`,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            pointerEvents: 'none',
-          }}
-        >
-          {/* Biały box: [Logo] + [Sidebar toggle] + [Settings?] */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0px',
-              padding: '0 12px',
-              height: '56px',
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '16px',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              pointerEvents: 'auto',
-            }}
-          >
-            {/* Logo — link powrotu do dashboardu */}
-            <Tooltip content="Wróć do panelu" position="bottom">
+        <BoardHeaderFrame>
+          {/* Logo — link powrotu do dashboardu */}
+          <BoardLogoButton href={dashboardHref} tooltip="Wróć do panelu" />
+
+          {/* Sidebar toggle (po prawej stronie logo) */}
+          {onSidebarToggle && (
+            <Tooltip
+              content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+              position="bottom"
+              className="ml-2"
+            >
               <button
-                onClick={() => router.push(dashboardHref)}
+                onClick={onSidebarToggle}
+                style={{
+                  padding: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#374151',
+                  transition: 'background-color 0.15s',
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
-                style={{
-                  padding: '4px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  position: 'relative',
-                  borderRadius: '8px',
-                }}
               >
-                <Image
-                  src="/resources/LogoEasyLesson.webp"
-                  alt="EasyLesson Logo"
-                  width={160}
-                  height={50}
-                  className="h-9 w-auto"
-                  priority
-                />
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
               </button>
             </Tooltip>
+          )}
 
-            {/* Sidebar toggle (po prawej stronie logo) */}
-            {onSidebarToggle && (
-              <Tooltip
-                content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
-                position="bottom"
-                className="ml-2"
-              >
-                <button
-                  onClick={onSidebarToggle}
-                  style={{
-                    padding: '6px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#374151',
-                    transition: 'background-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Przycisk ustawień tablicy */}
-            {onSettingsClick && (
-              <Tooltip content="Ustawienia tablicy" position="bottom" className="ml-3 ">
-                <button
-                  onClick={onSettingsClick}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <MoreVertical size={18} color="#6b7280" />
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Przycisk udostępniania tablicy */}
-            {onShareClick && (
-              <Tooltip content="Udostępnij tablicę" position="bottom" className="ml-1">
-                <button
-                  onClick={onShareClick}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <Link2 size={18} color="#6b7280" />
-                </button>
-              </Tooltip>
-            )}
-
-            {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
-            <Tooltip content={boardName || 'Tablica'} position="bottom">
-              <div
+          {/* Przycisk ustawień tablicy */}
+          {onSettingsClick && (
+            <Tooltip content="Ustawienia tablicy" position="bottom" className="ml-3 ">
+              <button
+                onClick={onSettingsClick}
                 style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '10px',
-                  maxWidth: '160px',
-                  minWidth: 0,
-                  color: '#374151',
-                  cursor: 'default',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
                 }}
               >
-                <div
-                  className={`ml-3 w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
-                >
-                  <BoardIcon size={13} color="white" />
-                </div>
-                <span
-                  style={{
-                    display: 'block',
-                    minWidth: 0,
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                  }}
-                >
-                  {boardName || 'Tablica'}
-                </span>
-              </div>
+                <MoreVertical size={18} color="#6b7280" />
+              </button>
             </Tooltip>
+          )}
 
-            {showUpgradeButton && (
-              <>
-                <Tooltip content="Zmień wersję na premium" position="bottom">
-                  <Button
-                    onClick={() => router.push('/#pricing')}
-                    variant="secondary"
-                    size="sm"
-                    className="font-semibold ml-4 -mr-[5px] hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700  whitespace-nowrap transition-all duration-300 ease-in-out"
-                  >
-                    Zmień wersję
-                  </Button>
-                </Tooltip>
-              </>
-            )}
-          </div>
-        </div>
+          {/* Przycisk udostępniania tablicy */}
+          {onShareClick && (
+            <Tooltip content="Udostępnij tablicę" position="bottom" className="ml-1">
+              <button
+                onClick={onShareClick}
+                style={{
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Link2 size={18} color="#6b7280" />
+              </button>
+            </Tooltip>
+          )}
+
+          {/* Ikona + nazwa aktualnej tablicy (z danych tablicy) */}
+          <Tooltip content={boardName || 'Tablica'} position="bottom">
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                maxWidth: '160px',
+                minWidth: 0,
+                color: '#374151',
+                cursor: 'default',
+              }}
+            >
+              <div
+                className={`ml-3 w-6 h-6 rounded-md bg-gradient-to-br ${boardGradient} flex items-center justify-center flex-shrink-0`}
+              >
+                <BoardIcon size={13} color="white" />
+              </div>
+              <span
+                style={{
+                  display: 'block',
+                  minWidth: 0,
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  whiteSpace: 'nowrap',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {boardName || 'Tablica'}
+              </span>
+            </div>
+          </Tooltip>
+
+          {showUpgradeButton && (
+            <>
+              <Tooltip content="Zmień wersję na premium" position="bottom">
+                <Button
+                  onClick={() => router.push('/#pricing')}
+                  variant="secondary"
+                  size="sm"
+                  className="font-semibold ml-4 -mr-[5px] hover-shine h-10 rounded-lg  bg-gray-200 hover:bg-gray-200 text-gray-700  whitespace-nowrap transition-all duration-300 ease-in-out"
+                >
+                  Zmień wersję
+                </Button>
+              </Tooltip>
+            </>
+          )}
+        </BoardHeaderFrame>
       )}
 
       {showCompactHeader && !showFullHeader && (
-        <div
-          style={{
-            position: 'absolute',
-            top: `${metrics.spacing.top}px`,
-            left: `${metrics.spacing.side}px`,
-            zIndex: 100,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            pointerEvents: 'none',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0px',
-              padding: '0 12px',
-              height: '56px',
-              backgroundColor: 'white',
-              border: '2px solid #e0e0e0',
-              borderRadius: '16px',
-              boxShadow: '0 4px 4px rgba(0,0,0,0.1)',
-              pointerEvents: 'auto',
-            }}
-          >
-            <Tooltip content="Wróć do panelu" position="bottom">
+        <BoardHeaderFrame compact>
+          <BoardLogoButton href={dashboardHref} tooltip="Wróć do panelu" />
+
+          {onSidebarToggle && (
+            <div
+              style={{
+                marginLeft: '8px',
+                marginRight: '8px',
+                width: '1px',
+                height: '28px',
+                backgroundColor: '#e5e7eb',
+              }}
+            />
+          )}
+
+          {onSidebarToggle && (
+            <Tooltip
+              content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+              position="bottom"
+            >
               <button
-                onClick={() => router.push(dashboardHref)}
+                onClick={onSidebarToggle}
+                style={{
+                  padding: '6px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#374151',
+                  transition: 'background-color 0.15s',
+                }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#f3f4f6';
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = 'transparent';
                 }}
-                style={{
-                  padding: '4px',
-                  backgroundColor: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  transition: 'background-color 0.15s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  position: 'relative',
-                  borderRadius: '8px',
-                }}
               >
-                <Image
-                  src="/resources/LogoEasyLesson.webp"
-                  alt="EasyLesson Logo"
-                  width={160}
-                  height={50}
-                  className="h-9 w-auto"
-                  priority
-                />
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
               </button>
             </Tooltip>
+          )}
 
-            {onSidebarToggle && (
-              <div
+          {onSettingsClick && (
+            <div
+              style={{
+                marginLeft: '8px',
+                marginRight: '8px',
+                width: '1px',
+                height: '28px',
+                backgroundColor: '#e5e7eb',
+              }}
+            />
+          )}
+
+          {onSettingsClick && (
+            <Tooltip content="Ustawienia tablicy" position="bottom">
+              <button
+                onClick={onSettingsClick}
                 style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s',
                 }}
-              />
-            )}
-
-            {onSidebarToggle && (
-              <Tooltip
-                content={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
-                position="bottom"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
               >
-                <button
-                  onClick={onSidebarToggle}
-                  style={{
-                    padding: '6px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#374151',
-                    transition: 'background-color 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
-                </button>
-              </Tooltip>
-            )}
+                <MoreVertical size={18} color="#6b7280" />
+              </button>
+            </Tooltip>
+          )}
 
-            {onSettingsClick && (
-              <div
+          {onShareClick && (
+            <div
+              style={{
+                marginLeft: '8px',
+                marginRight: '8px',
+                width: '1px',
+                height: '28px',
+                backgroundColor: '#e5e7eb',
+              }}
+            />
+          )}
+
+          {onShareClick && (
+            <Tooltip content="Udostępnij tablicę" position="bottom">
+              <button
+                onClick={onShareClick}
                 style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
+                  padding: '8px',
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s',
                 }}
-              />
-            )}
-
-            {onSettingsClick && (
-              <Tooltip content="Ustawienia tablicy" position="bottom">
-                <button
-                  onClick={onSettingsClick}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <MoreVertical size={18} color="#6b7280" />
-                </button>
-              </Tooltip>
-            )}
-
-            {onShareClick && (
-              <div
-                style={{
-                  marginLeft: '8px',
-                  marginRight: '8px',
-                  width: '1px',
-                  height: '28px',
-                  backgroundColor: '#e5e7eb',
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#f0f0f2';
                 }}
-              />
-            )}
-
-            {onShareClick && (
-              <Tooltip content="Udostępnij tablicę" position="bottom">
-                <button
-                  onClick={onShareClick}
-                  style={{
-                    padding: '8px',
-                    backgroundColor: 'transparent',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor = '#f0f0f2';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor = 'transparent';
-                  }}
-                >
-                  <Link2 size={18} color="#6b7280" />
-                </button>
-              </Tooltip>
-            )}
-          </div>
-        </div>
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                }}
+              >
+                <Link2 size={18} color="#6b7280" />
+              </button>
+            </Tooltip>
+          )}
+        </BoardHeaderFrame>
       )}
 
       {/* Fallback — wąskie ekrany (< 1550px): sidebar toggle + ustawienia */}

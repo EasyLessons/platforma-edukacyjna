@@ -81,6 +81,16 @@ describe('MathChatbot — tryb demo', () => {
     expect(pushMock).toHaveBeenCalledWith('/login');
   });
 
+  it('przyciski w panelu demo maja kursor raczki', async () => {
+    const user = userEvent.setup();
+    renderChatbot({ isDemo: true });
+    await otworzTutora(user);
+
+    // Tailwind v4 nie daje przyciskom cursor: pointer z automatu — musi byc jawnie.
+    expect(screen.getByRole('button', { name: /^zaloguj sie$/i })).toHaveClass('cursor-pointer');
+    expect(screen.getByRole('button', { name: /zamknij/i })).toHaveClass('cursor-pointer');
+  });
+
   it('poza demo dziala normalnie — jest pole wpisywania, nie ma prosby o logowanie', async () => {
     const user = userEvent.setup();
     renderChatbot({ isDemo: false });

@@ -22,13 +22,15 @@
 
 'use client';
 
-import { GraduationCap } from 'lucide-react';
-
-import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { useDemoSession } from '@/_new/features/demo/use-demo-session';
+import {
+  BoardHeaderFrame,
+  BoardLogoButton,
+} from '@/_new/features/whiteboard/components/layout/board-header';
+import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { BoardRealtimeProvider } from '../../../context/BoardRealtimeContext';
 
 export default function DemoBoardPage() {
@@ -36,6 +38,7 @@ export default function DemoBoardPage() {
   const sessionId = typeof params?.sessionId === 'string' ? params.sessionId : '';
 
   const { boardId, guest, isLoading } = useDemoSession(sessionId);
+  const metrics = useWhiteboardUiMetrics();
 
   if (!sessionId) {
     return (
@@ -57,19 +60,17 @@ export default function DemoBoardPage() {
     <BoardRealtimeProvider boardId={boardId} identity={guest}>
       <div className="relative h-screen w-screen overflow-hidden">
         {/*
-          Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona,
-          a bez tego linku z tablicy nie da sie wyjsc inaczej niz przyciskiem
-          wstecz. `z-50` trzyma go nad plotnem, `pointer-events-auto` jest
-          jawne, bo rodzic bywa przykrywany warstwami canvasu.
+          Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona, a bez
+          tego przycisku z tablicy nie da sie wyjsc inaczej niz "wstecz".
+
+          Logo i ramka to TE SAME komponenty, ktorych uzywa BoardHeader na zwyklej
+          tablicy — zeby demo wygladalo identycznie. Jedyne roznice sa celowe:
+          prowadzi na "/" zamiast do panelu, i jest widoczne przy kazdej szerokosci
+          (BoardHeader ponizej 1300 px chowa logo, a w demo to jedyna droga powrotu).
         */}
-        <Link
-          href="/"
-          aria-label="EasyLesson - strona glowna"
-          className="pointer-events-auto absolute left-4 top-3 z-50 flex items-center gap-2 rounded-xl bg-white/90 px-3 py-2 text-sm font-semibold text-gray-800 shadow-md backdrop-blur-sm transition-colors hover:bg-white"
-        >
-          <GraduationCap className="h-5 w-5 text-blue-600" />
-          <span>EasyLesson</span>
-        </Link>
+        <BoardHeaderFrame compact={!metrics.showFullHeader}>
+          <BoardLogoButton href="/" tooltip="Wróć na stronę główną" />
+        </BoardHeaderFrame>
 
         <WhiteboardCanvas boardId={boardId} userRole="editor" />
       </div>
