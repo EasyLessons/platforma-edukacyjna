@@ -65,7 +65,14 @@ def get_user_notifications(
     notifications = (
         db.query(Notification)
         .filter(Notification.user_id == user_id)
-        .order_by(Notification.created_at.desc())
+        # Tiebreaker po `id` jest konieczny, nie kosmetyczny: `created_at` jest
+        # ustawiane przez `datetime.utcnow()`, ktore ma rozdzielczosc zegara
+        # systemowego (na Windowsie ~15 ms). Dwa powiadomienia utworzone w tym
+        # samym takcie dostaja IDENTYCZNY `created_at`, a wtedy samo
+        # ORDER BY created_at DESC nie definiuje ich wzajemnej kolejnosci —
+        # baza moze zwrocic je w dowolnej. `id` jest rosnace i unikalne, wiec
+        # domyka porzadek: przy rownym czasie nowsze (wyzsze id) idzie pierwsze.
+        .order_by(Notification.created_at.desc(), Notification.id.desc())
         .limit(limit)
         .all()
     )
