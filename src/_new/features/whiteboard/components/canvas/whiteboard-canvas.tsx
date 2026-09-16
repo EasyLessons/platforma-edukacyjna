@@ -38,6 +38,11 @@ import { useHistory } from '../../hooks/use-history';
 import { useClipboard, offsetElement } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
+import { useYjsBoard, type UseYjsBoardReturn } from '../../hooks/use-yjs-board';
+
+// Yjs - feature flag
+import { WHITEBOARD_YJS_ENABLED } from '../../config/feature-flags';
+import { useAuth } from '@/_new/lib/auth';
 
 // ─── Komponenty narzędzi (przez re-exportery _new/) ──────────────────────────
 import Toolbar from '../toolbar/toolbar';
@@ -135,6 +140,69 @@ export interface WhiteboardCanvasNewProps {
   /** Czy sidebar tablicy jest aktualnie otwarty */
   isSidebarOpen?: boolean;
   className?: string;
+}
+
+// Adaptery Yjs - przekazywane do hooków useElements i useRealtime, żeby mogły korzystać z Yjs
+
+interface BoardElementsBinding {
+  elements: DrawingElement[];
+  elementsRef: React.RefObject<DrawingElement[]>;
+  spatialIndex: import('../../navigation/spatial-index').ElementSpatialIndex;
+  loadedImages: Map<string, HTMLImageElement>;
+  elementsWithAuthor: import('../../api/whiteboardApi').BoardElementWithAuthor[];
+  isLoading: boolean;
+  loadingProgress: number;
+  isSaving: boolean;
+  unsavedElements: Set<string>;
+  addElements: (elements: DrawingElement[]) => void;
+  updateElement: (element: DrawingElement) => void;
+  updateElements: (elements: DrawingElement[]) => void;
+  removeElement: (id: string) => void;
+  markUnsaved: (ids: string[]) => void;
+  loadImage: (id: string, src: string) => void;
+  deleteElementDirectly: (boardId: number, id: string) => Promise<void>;
+}
+
+interface BoardHistoryBinding {
+  recordCommand: (command: import('../../commands').Command) => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
+}
+
+/** Pusta, stabilna referencja */
+const EMPTY_UNSAVED_SET = new Set<string>();
+
+function adaptYjsElements(board: UseYjsBoardReturn): BoardElementsBinding {
+  return {
+    elements: board.elements,
+    elementsRef: board.elementsRef,
+    spatialIndex: board.spatialIndex,
+    loadedImages: board.loadedImages,
+    elementsWithAuthor: board.elementsWithAuthor,
+    isLoading: false,
+    loadingProgress: 100,
+    isSaving: false,
+    unsavedElements: EMPTY_UNSAVED_SET,
+    addElements: (elements) => board.mutators.batch(elements),
+    updateElement: (element) => board.mutators.upsert(element),
+    updateElements: (elements) => board.mutators.batch(elements),
+    removeElement: (id) => board.mutators.delete(id),
+    markUnsaved: () => {},
+    loadImage: board.loadImage,
+    deleteElementDirectly: async () => {},
+  };
+}
+
+function adaptYjsHistory(board: UseYjsBoardReturn): BoardHistoryBinding {
+  return {
+    recordCommand: () => {},
+    undo: board.undo,
+    redo: board.redo,
+    canUndo: board.canUndo,
+    canRedo: board.canRedo,
+  };
 }
 
 // ─── Komponent ────────────────────────────────────────────────────────────────
@@ -317,27 +385,34 @@ export default function WhiteboardCanvasNew({
   const vp = useViewport();
 
   // ─── HOOK: elements ─────────────────────────────────────────────────────────
-  const el = useElements({ boardId });
+  const legacyEl = useElements({ boardId });
 
   // ─── HOOK: selection ────────────────────────────────────────────────────────
   const sel = useSelection();
 
   // ─── HOOK: history ──────────────────────────────────────────────────────────
-  const hist = useHistory({
-    onDeleteElement: (boardIdNum, elementId) => el.deleteElementDirectly(boardIdNum, elementId),
-    onSaveElement: (boardIdNum, element) => el.saveElementDirectly(boardIdNum, element),
+  const legacyHist = useHistory({
+    onDeleteElement: (boardIdNum, elementId) =>
+      legacyEl.deleteElementDirectly(boardIdNum, elementId),
+    onSaveElement: (boardIdNum, element) => legacyEl.saveElementDirectly(boardIdNum, element),
     // Używamy ref żeby nie tworzyć pętli zależności z rt
     onBroadcastCreated: (element) => broadcastCreatedRef.current(element),
     onBroadcastDeleted: (elementId) => broadcastDeletedRef.current(elementId),
     onBroadcastUpdated: (element) => broadcastUpdatedRef.current(element),
-    onRemoveElement: (elementId) => el.removeElement(elementId),
-    onAddElement: (element) => el.addElements([element]),
-    onUpdateElement: (element) => el.updateElement(element),
-    onLoadImage: el.loadImage,
+    onRemoveElement: (elementId) => legacyEl.removeElement(elementId),
+    onAddElement: (element) => legacyEl.addElements([element]),
+    onUpdateElement: (element) => legacyEl.updateElement(element),
+    onLoadImage: legacyEl.loadImage,
     onClearSelection: sel.clearSelection,
-    unsavedElementsRef: el.unsavedElementsRef,
+    unsavedElementsRef: legacyEl.unsavedElementsRef,
     boardIdRef,
   });
+
+  // ─── HOOK: yjs ─────────────────────────────────────────────────────────────
+  const { user } = useAuth();
+  const yjsBoard = useYjsBoard({ userId: user?.id ?? null, username: user?.username ?? null });
+  const el: BoardElementsBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsElements(yjsBoard) : legacyEl;
+  const hist: BoardHistoryBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsHistory(yjsBoard) : legacyHist;
 
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({
@@ -346,7 +421,7 @@ export default function WhiteboardCanvasNew({
       if (element.type === 'path' && !element.bbox) {
         (element as DrawingPath).bbox = computePathBbox(element);
       }
-      el.addElements([element]);
+      legacyEl.addElements([element]);
     },
     onRemoteElementUpdated: (partial) => {
       // 🛠️ FIX (known-issues.md #2, Opcja B): `partial` może być NIEPEŁNY —
@@ -354,7 +429,7 @@ export default function WhiteboardCanvasNew({
       // wysyła `src` (base64), bo my już je mamy. Dlatego SCALAMY przychodzące
       // dane z lokalną kopią zamiast nadpisywać cały element — inaczej
       // straciłbyś dane, których ten update w ogóle nie dotyczył.
-      const existing = el.elementsRef.current.find((e) => e.id === partial.id);
+      const existing = legacyEl.elementsRef.current.find((e) => e.id === partial.id);
       if (!existing) {
         // Rzadki wyścig sieciowy: update dla elementu, którego jeszcze nie
         // znamy lokalnie. Bez pełnych danych scalanie stworzyłoby zepsuty
@@ -367,12 +442,12 @@ export default function WhiteboardCanvasNew({
       if (merged.type === 'path') {
         (merged as DrawingPath).bbox = computePathBbox(merged as DrawingPath);
       }
-      el.updateElement(merged);
+      legacyEl.updateElement(merged);
     },
     onRemoteElementDeleted: (elementId) => {
-      el.removeElement(elementId);
+      legacyEl.removeElement(elementId);
     },
-    onLoadRemoteImage: el.loadImage,
+    onLoadRemoteImage: legacyEl.loadImage,
     onRemoteViewport: vp.applyRemoteViewport,
 
     onElementsUpdated: (elements, geometryOnly) => {
@@ -381,7 +456,7 @@ export default function WhiteboardCanvasNew({
       // lokalną kopią. Element, którego jeszcze nie znamy przy geometryOnly,
       // pomijamy (patrz komentarz w onRemoteElementUpdated wyżej). Przy
       // tworzeniu nowych elementów (geometryOnly=false) dane są zawsze pełne.
-      const currentMap = new Map(el.elementsRef.current.map((e) => [e.id, e]));
+      const currentMap = new Map(legacyEl.elementsRef.current.map((e) => [e.id, e]));
       const merged: DrawingElement[] = [];
       elements.forEach((incoming) => {
         const existing = currentMap.get(incoming.id);
@@ -392,26 +467,26 @@ export default function WhiteboardCanvasNew({
         }
       });
       if (merged.length === 0) return;
-      if (el.updateElements) {
-        el.updateElements(merged);
+      if (legacyEl.updateElements) {
+        legacyEl.updateElements(merged);
       } else {
-        merged.forEach((e) => el.updateElement(e));
+        merged.forEach((e) => legacyEl.updateElement(e));
       }
     },
 
     // 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
     onSyncRequest: (requestingUserId) => {
       // ⚠️ UŻYWAMY boardRt ZAMIAST rt!
-      if (el.elementsRef.current.length > 0 && boardRt.broadcastSyncResponse) {
+      if (legacyEl.elementsRef.current.length > 0 && boardRt.broadcastSyncResponse) {
         boardRt
-          .broadcastSyncResponse(el.elementsRef.current, requestingUserId)
+          .broadcastSyncResponse(legacyEl.elementsRef.current, requestingUserId)
           .catch(console.error);
       }
     },
 
     // 🔥 DODANE [SYNC] To my weszliśmy i ktoś nam przysłał najświeższe dane - łatajmy dziury!
     onSyncResponse: (incomingElements) => {
-      const currentMap = new Map(el.elementsRef.current.map((e) => [e.id, e]));
+      const currentMap = new Map(legacyEl.elementsRef.current.map((e) => [e.id, e]));
       const toAdd: DrawingElement[] = [];
       const toUpdate: DrawingElement[] = [];
 
@@ -427,8 +502,8 @@ export default function WhiteboardCanvasNew({
         }
       });
 
-      if (toAdd.length > 0) el.addElements(toAdd);
-      if (toUpdate.length > 0 && el.updateElements) el.updateElements(toUpdate);
+      if (toAdd.length > 0) legacyEl.addElements(toAdd);
+      if (toUpdate.length > 0 && legacyEl.updateElements) legacyEl.updateElements(toUpdate);
     },
   });
 
