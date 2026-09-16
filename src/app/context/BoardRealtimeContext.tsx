@@ -98,15 +98,29 @@ const BoardRealtimeContext = createContext<BoardRealtimeContextType | undefined>
 export function BoardRealtimeProvider({
   boardId,
   children,
+  identity,
 }: {
   boardId: string;
   children: ReactNode;
+  /**
+   * Tożsamość używana zamiast useAuth().user — podawana TYLKO przez tryb demo
+   * (/demo/[sessionId]), gdzie nie ma zalogowanego użytkownika. Gdy nie podana,
+   * wszystko działa jak dotąd.
+   *
+   * Świadomie NIE ruszamy AuthContext: ustawienie tam sztucznego usera
+   * rozjechałoby Header.tsx i layouty, które po `user` poznają, czy ktoś jest
+   * zalogowany.
+   */
+  identity?: { id: number; username: string; avatar_url?: string } | null;
 }) {
   // ───────────────────────────────────────────────────────────────────────
   // STANY
   // ───────────────────────────────────────────────────────────────────────
 
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+  // Gość demo ma pierwszeństwo przed zalogowanym userem. Jedna linijka zamiast
+  // przepisywania kontekstu — reszta pliku nie wie, skąd wzięta jest tożsamość.
+  const user = identity ?? authUser;
   // Wąski kształt usera, jakiego potrzebują hooki broadcastu (id + username) —
   // ten sam obiekt co dawniej `user` z `useAuth()`, tylko nazwany inaczej dla
   // jasności przy przekazywaniu do kilku hooków naraz.

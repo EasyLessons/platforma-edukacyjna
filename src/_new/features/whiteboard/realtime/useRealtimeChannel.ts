@@ -40,6 +40,7 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { markOpened } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { isDemoBoard } from '@/_new/features/demo/is-demo-board';
 import type { OnlineUser } from './types';
 import { PRESENCE_HEARTBEAT_MS, PRESENCE_SYNC_DEBOUNCE_MS } from './constants';
 import { log, logWarn, logDebug } from './logger';
@@ -241,12 +242,19 @@ export function useRealtimeChannel(
           trackPresence({ x, y, scale });
         };
 
-        markOpened(Number(boardId)).catch(() => {});
+        // Tablica demo nie istnieje w bazie — Number('demo-abc') to NaN, więc bez
+        // tego warunku leciałoby POST /api/v1/whiteboard/NaN/opened po subscribe
+        // i potem co PRESENCE_HEARTBEAT_MS. Backend odpowiadał na to 401.
+        if (!isDemoBoard(boardId)) {
+          markOpened(Number(boardId)).catch(() => {});
+        }
 
         if (presenceHeartbeatRef.current) clearInterval(presenceHeartbeatRef.current);
         presenceHeartbeatRef.current = setInterval(() => {
           trackPresence();
-          markOpened(Number(boardId)).catch(() => {});
+          if (!isDemoBoard(boardId)) {
+            markOpened(Number(boardId)).catch(() => {});
+          }
         }, PRESENCE_HEARTBEAT_MS);
       } else if (status === 'CHANNEL_ERROR') {
         if (reconnectAttemptRef.current === 0) {

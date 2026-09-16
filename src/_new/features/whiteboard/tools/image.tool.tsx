@@ -17,6 +17,7 @@ function ImageOverlay() {
       canvasHeight={h.canvasHeight}
       onImageCreate={h.onImageCreate}
       onViewportChange={h.onViewportChange}
+      onUploadBlocked={h.onNotice}
     />
   );
 }

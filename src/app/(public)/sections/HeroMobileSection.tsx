@@ -2,6 +2,7 @@
 
 import React, { useRef } from 'react';
 import Link from 'next/link';
+import DemoCtaButton from '@/_new/features/demo/demo-cta-button';
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 
 const jakartaSans = Plus_Jakarta_Sans({
@@ -118,6 +119,7 @@ export default function HeroSection() {
             <Link href="/poradnik">
               <button className="hero-btn-secondary">Obejrzyj poradnik</button>
             </Link>
+            <DemoCtaButton className="hero-btn-secondary">Wypróbuj demo</DemoCtaButton>
           </div>
         </div>
 

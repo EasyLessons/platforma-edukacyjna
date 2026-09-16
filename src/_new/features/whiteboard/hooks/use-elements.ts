@@ -27,6 +27,7 @@ import type { DrawingElement, ImageElement } from '../types';
 import { BoardElementWithAuthor } from '../api/whiteboardApi';
 import { ElementSpatialIndex } from '../navigation/spatial-index';
 import { getAccessToken } from '@/_new/lib/auth/tokenStore';
+import { isDemoBoard } from '@/_new/features/demo/is-demo-board';
 
 // ─── Typy ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +132,16 @@ export function useElements({ boardId }: UseElementsOptions): UseElementsReturn 
 
   // ─── Ładowanie elementów z bazy ─────────────────────────────────────────
   useEffect(() => {
+    // Tablica demo nie ma nic w bazie - nie ma czego ladowac. Ale MUSIMY zdjac
+    // blokade ladowania: isLoading startuje jako true, a LoadingOverlay zakrywa
+    // canvas dopoki jest true. Sam return zostawilby ekran ladowania na 0%
+    // na zawsze - dokladnie to sie dzialo przy pierwszym uruchomieniu demo.
+    if (isDemoBoard(boardId)) {
+      setLoadingProgress(100);
+      setIsLoading(false);
+      return;
+    }
+
     const boardIdNum = parseInt(boardId);
     if (isNaN(boardIdNum)) return;
 

@@ -101,7 +101,7 @@ import type {
 } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
-import { compressAndUploadImage } from '../../elements/image-compress';
+import { compressAndUploadImage, DemoUploadBlockedError } from '../../elements/image-compress';
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
@@ -210,6 +210,12 @@ export default function WhiteboardCanvasNew({
     null
   );
   const [isBottomToastExiting, setIsBottomToastExiting] = useState(false);
+
+  /** Jeden punkt pokazywania krotkiego komunikatu na dole tablicy. */
+  const showBottomToast = useCallback((message: string) => {
+    setIsBottomToastExiting(false);
+    setBottomToastState({ id: Date.now() + Math.floor(Math.random() * 1000), message });
+  }, []);
 
   // ─── Stan MathChatbot ───────────────────────────────────────────────────────
   const [chatMessages, setChatMessages] = useState<
@@ -1528,10 +1534,13 @@ export default function WhiteboardCanvasNew({
         return true;
       }
       return false;
-    } catch {
+    } catch (err) {
+      if (err instanceof DemoUploadBlockedError) {
+        showBottomToast(err.message);
+      }
       return false;
     }
-  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate, showBottomToast]);
 
   // Ref — umożliwia wywołanie w async then-chain wewnątrz useEffect (keydown handler)
   const handleOsClipboardPasteRef = useRef(handleOsClipboardPaste);
@@ -1954,7 +1963,11 @@ export default function WhiteboardCanvasNew({
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
           } catch (error) {
-            console.error('Błąd podczas ładowania PDF:', error);
+            if (error instanceof DemoUploadBlockedError) {
+              showBottomToast(error.message);
+            } else {
+              console.error('Błąd podczas ładowania PDF:', error);
+            }
           }
         }
         // 🖼️ OBSŁUGA ZWYKŁYCH OBRAZKÓW (Drag & Drop)
@@ -1963,11 +1976,23 @@ export default function WhiteboardCanvasNew({
           reader.onload = async (event) => {
             const rawDataUrl = event.target?.result as string;
             // 🛠️ Kompresja + upload PRZED wstawieniem — patrz docs/known-issues.md #2.
-            const {
-              url,
-              width: imgW,
-              height: imgH,
-            } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current), file.name);
+            let url: string;
+            let imgW: number;
+            let imgH: number;
+            try {
+              ({
+                url,
+                width: imgW,
+                height: imgH,
+              } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current), file.name));
+            } catch (error) {
+              if (error instanceof DemoUploadBlockedError) {
+                showBottomToast(error.message);
+              } else {
+                console.error('Blad uploadu obrazka:', error);
+              }
+              return;
+            }
             const aspectRatio = imgH / Math.max(imgW, 1);
             const worldWidth = 5.0;
             const worldHeight = worldWidth * aspectRatio;
@@ -1995,7 +2020,7 @@ export default function WhiteboardCanvasNew({
       window.removeEventListener('dragover', handleDragOver);
       window.removeEventListener('drop', handleDrop);
     };
-  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate]);
+  }, [userRole, canvasWidth, canvasHeight, vp.viewportRef, handleImageCreate, showBottomToast]);
 
   // ═══════════════════════════════════════════════════════════════════════════
   // HOST CONTEXT — gniazdko dla aktywnego narzędzia (wtyczki z rejestru)
@@ -2046,10 +2071,12 @@ export default function WhiteboardCanvasNew({
       onElementDelete: handleElementDelete,
       onPanStart: hideOverlaysForPan,
       onPanEnd: restoreOverlaysAfterPan,
+      onNotice: showBottomToast,
     }),
     [
       engine,
       boardId,
+      showBottomToast,
       vp.viewport,
       vp.viewportRef,
       canvasWidth,
