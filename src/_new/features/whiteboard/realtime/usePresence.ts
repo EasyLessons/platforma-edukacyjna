@@ -72,7 +72,10 @@ export function usePresence(): UsePresenceResult {
       });
 
       if (realLeftUsers.length > 0) {
-        log('🔴 Użytkownik wyszedł:', realLeftUsers.map((p: any) => p.username));
+        log(
+          '🔴 Użytkownik wyszedł:',
+          realLeftUsers.map((p: any) => p.username)
+        );
         const leftUserIds = realLeftUsers.map((p: any) => p.user_id);
         leaveCallbacksRef.current.forEach((callback) => callback(leftUserIds));
       }

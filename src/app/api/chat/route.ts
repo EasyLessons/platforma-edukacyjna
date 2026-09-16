@@ -17,6 +17,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { NextRequest, NextResponse } from 'next/server';
 
+import { authenticateChatRequest } from './auth';
+
 // ==========================================
 // 🎛️ KONFIGURACJA
 // ==========================================
@@ -232,6 +234,25 @@ export async function POST(req: NextRequest) {
           error: 'rate_limit',
         },
         { status: 429 }
+      );
+    }
+
+    // 🔐 Uwierzytelnienie — PRZED parsowaniem body i przed cache.
+    // Endpoint woła płatne Gemini; bez tego każdy w internecie mógł go używać.
+    // Cache też jest za bramką, bo odpowiedzi z cache to te same dane.
+    // Kolejność za rate limitem jest celowa: spam bez tokenu odbija się
+    // na limicie IP, zanim zacznie obciążać backend sprawdzaniem tokenów.
+    const auth = await authenticateChatRequest(req.headers.get('authorization'));
+    if (!auth.ok) {
+      return NextResponse.json(
+        {
+          response:
+            auth.error === 'unauthorized'
+              ? 'Zaloguj się, aby korzystać z asystenta AI. 🔐'
+              : 'Asystent AI jest chwilowo niedostępny. Spróbuj ponownie za chwilę.',
+          error: auth.error,
+        },
+        { status: auth.status }
       );
     }
 

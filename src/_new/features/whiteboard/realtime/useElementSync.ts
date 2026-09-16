@@ -118,7 +118,10 @@ export interface UseElementSyncResult {
   reset: () => void;
 }
 
-export function useElementSync({ user, safeBroadcast }: UseElementSyncOptions): UseElementSyncResult {
+export function useElementSync({
+  user,
+  safeBroadcast,
+}: UseElementSyncOptions): UseElementSyncResult {
   // 🛡️ TRAILING THROTTLE dla element-updated — przechowuj ostatnią wartość
   // do wysłania, jeśli throttle window jeszcze nie minął.
   const lastElementUpdateBroadcastRef = useRef(0);
@@ -136,7 +139,13 @@ export function useElementSync({ user, safeBroadcast }: UseElementSyncOptions): 
     ((elementId: string, userId: number, username: string) => void) | null
   >(null);
   const elementsBatchHandlerRef = useRef<
-    ((elements: ElementBroadcastPayload[], userId: number, username: string, geometryOnly: boolean) => void) | null
+    | ((
+        elements: ElementBroadcastPayload[],
+        userId: number,
+        username: string,
+        geometryOnly: boolean
+      ) => void)
+    | null
   >(null);
   const syncRequestHandlerRef = useRef<((userId: number, username: string) => void) | null>(null);
   const syncResponseHandlerRef = useRef<
@@ -435,14 +444,17 @@ export function useElementSync({ user, safeBroadcast }: UseElementSyncOptions): 
       buffer.chunks[chunkIndex] = elements;
 
       const received = buffer.chunks.filter(Boolean).length;
-      log(`📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`);
+      log(
+        `📥 [SYNC] Paczka ${chunkIndex + 1}/${totalChunks} od ${username} (${elements.length} el.)`
+      );
 
       if (received >= totalChunks) {
         // Wszystkie paczki dotarły — połącz i przekaż
         const allElements = buffer.chunks.flat();
         syncChunkBufferRef.current = null;
         log(`📥 [SYNC] Kompletny stan od ${username}: ${allElements.length} elementów`);
-        if (syncResponseHandlerRef.current) syncResponseHandlerRef.current(allElements, userId, username);
+        if (syncResponseHandlerRef.current)
+          syncResponseHandlerRef.current(allElements, userId, username);
       }
     },
     []

@@ -1,10 +1,17 @@
 // @vitest-environment node
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 
-vi.mock('@google/generative-ai', () => {
-  const mockGenerateContent = vi.fn().mockResolvedValue({
+const { mockGenerateContent, mockAuthenticate } = vi.hoisted(() => ({
+  mockGenerateContent: vi.fn().mockResolvedValue({
     response: { text: () => 'Odpowiedź AI: 2+2=4' },
-  });
+  }),
+  // Domyślnie token poprawny — testy walidacji/cache/rate limitu sprawdzają to,
+  // co dzieje się ZA bramką. Samą bramkę testuje sekcja "uwierzytelnianie"
+  // oraz auth.test.ts.
+  mockAuthenticate: vi.fn().mockResolvedValue({ ok: true, userId: 1 }),
+}));
+
+vi.mock('@google/generative-ai', () => {
   const mockGetGenerativeModel = vi.fn().mockReturnValue({ generateContent: mockGenerateContent });
   function MockGoogleGenerativeAI() {
     return { getGenerativeModel: mockGetGenerativeModel };
@@ -12,14 +19,17 @@ vi.mock('@google/generative-ai', () => {
   return { GoogleGenerativeAI: MockGoogleGenerativeAI };
 });
 
+vi.mock('./auth', () => ({ authenticateChatRequest: mockAuthenticate }));
+
 import { POST, GET } from './route';
 
-const makeRequest = (body: unknown, ip = '127.0.0.1') =>
+const makeRequest = (body: unknown, ip = '127.0.0.1', token: string | null = 'valid-token') =>
   new Request('http://localhost/api/chat', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'x-forwarded-for': ip,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: JSON.stringify(body),
   }) as Parameters<typeof POST>[0];
@@ -118,5 +128,67 @@ describe('POST /api/chat — rate limiting', () => {
 
     const res = await POST(makeRequest({ message: msg }, ip));
     expect(res.status).toBe(429);
+  });
+});
+
+// ─── POST /api/chat — uwierzytelnianie ────────────────────────────────────────
+
+describe('POST /api/chat — uwierzytelnianie', () => {
+  it('przekazuje nagłówek Authorization do weryfikacji', async () => {
+    await POST(makeRequest({ message: 'auth header test' }, '10.4.0.1', 'abc123'));
+    expect(mockAuthenticate).toHaveBeenCalledWith('Bearer abc123');
+  });
+
+  it('401 bez poprawnego tokenu — i Gemini NIE jest wołane', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ ok: false, status: 401, error: 'unauthorized' });
+
+    const res = await POST(makeRequest({ message: 'bez tokenu unikalne 4411' }, '10.4.0.2', null));
+
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe('unauthorized');
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+
+  it('503 gdy backend nie potwierdzi tokenu (fail closed) — i Gemini NIE jest wołane', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ ok: false, status: 503, error: 'auth_unavailable' });
+
+    const res = await POST(makeRequest({ message: 'backend lezy unikalne 4412' }, '10.4.0.3'));
+
+    expect(res.status).toBe(503);
+    expect((await res.json()).error).toBe('auth_unavailable');
+    expect(mockGenerateContent).not.toHaveBeenCalled();
+  });
+
+  it('odpowiedź z cache też jest za bramką', async () => {
+    const ip = '10.4.0.4';
+    const msg = 'pytanie w cache za bramka 4413';
+    await POST(makeRequest({ message: msg }, ip)); // zalogowany — wypełnia cache
+
+    mockAuthenticate.mockResolvedValueOnce({ ok: false, status: 401, error: 'unauthorized' });
+    const res = await POST(makeRequest({ message: msg }, ip, null));
+
+    expect(res.status).toBe(401);
+    expect((await res.json()).cached).toBeUndefined();
+  });
+
+  it('401 zanim body zostanie zwalidowane — niezalogowany nie dostaje nawet 400', async () => {
+    mockAuthenticate.mockResolvedValueOnce({ ok: false, status: 401, error: 'unauthorized' });
+
+    const res = await POST(makeRequest({}, '10.4.0.5', null));
+
+    expect(res.status).toBe(401);
+  });
+
+  it('rate limit po IP działa przed sprawdzeniem tokenu (spam nie obciąża backendu)', async () => {
+    const ip = '10.4.0.6';
+    for (let i = 0; i < 20; i++) {
+      await POST(makeRequest({ message: 'spam przed auth 4414' }, ip, null));
+    }
+    mockAuthenticate.mockClear();
+
+    const res = await POST(makeRequest({ message: 'spam przed auth 4414' }, ip, null));
+
+    expect(res.status).toBe(429);
+    expect(mockAuthenticate).not.toHaveBeenCalled();
   });
 });

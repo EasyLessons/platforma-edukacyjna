@@ -38,6 +38,8 @@ services:
       # (samo `docker compose restart frontend` potrafi zawisnac na 0/1)
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
+      # /api/chat sprawdza token w backendzie z wnetrza kontenera - tam localhost to sam frontend
+      - BACKEND_INTERNAL_URL=http://backend:8000
     depends_on:
       - backend
   redis:
