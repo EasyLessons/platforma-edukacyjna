@@ -45,6 +45,7 @@ import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import Link from 'next/link';
+import { getAccessToken, refreshAccessToken } from '@/_new/lib/auth';
 
 // ==========================================
 // 📝 TYPY
@@ -129,6 +130,38 @@ const QUICK_PROMPTS = [
 ];
 
 // LocalStorage key
+/**
+ * POST do /api/chat z access tokenem.
+ *
+ * /api/chat wymaga zalogowania (patrz src/app/api/chat/auth.ts). Przy 401
+ * odświeżamy token jeden raz i ponawiamy — tak samo jak interceptor apiClient
+ * robi to dla endpointów FastAPI.
+ *
+ * Nie używamy apiClient: ma baseURL backendu i zamienia błędy na AppError,
+ * a czat wyświetla pole `response` z odpowiedzi błędu (np. "Za dużo pytań" przy 429).
+ */
+async function postChatMessage(payload: { message: string; context?: string }): Promise<Response> {
+  const send = (token: string | null) =>
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+
+  const response = await send(getAccessToken());
+  if (response.status !== 401) return response;
+
+  try {
+    return await send(await refreshAccessToken());
+  } catch {
+    // Refresh się nie udał — oddaj oryginalne 401, czat pokaże "Zaloguj się".
+    return response;
+  }
+}
+
 const CHATBOT_WIDTH_KEY = 'mathChatbotWidth';
 
 // ==========================================
@@ -232,13 +265,9 @@ function MathChatbotInner({
       setIsLoading(true);
 
       try {
-        const response = await fetch('/api/chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: messageText,
-            context: boardContext,
-          }),
+        const response = await postChatMessage({
+          message: messageText,
+          context: boardContext,
         });
 
         const data = await response.json();
