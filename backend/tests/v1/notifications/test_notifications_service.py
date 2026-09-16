@@ -31,13 +31,14 @@ INVITE_PAYLOAD = {
 
 # ── Helpers ────────────────────────────────────────────────────────────────
 
-def add_notification(db, user_id, *, is_read=False, type="invite", payload=None):
+def add_notification(db, user_id, *, is_read=False, type="invite", payload=None,
+                     created_at=None):
     n = Notification(
         user_id=user_id,
         type=type,
         payload=payload or INVITE_PAYLOAD,
         is_read=is_read,
-        created_at=datetime.utcnow(),
+        created_at=created_at or datetime.utcnow(),
     )
     db.add(n)
     db.commit()
@@ -112,6 +113,44 @@ class TestGetUserNotifications:
         result = get_user_notifications(db_session, test_user.id)
         assert result.notifications[0].id == n2.id
         assert result.notifications[1].id == n1.id
+
+    def test_newest_first_gdy_created_at_identyczne(self, db_session, test_user):
+        """
+        Regresja: przy IDENTYCZNYM `created_at` o kolejnosci decyduje `id`.
+
+        `datetime.utcnow()` ma rozdzielczosc zegara systemowego (na Windowsie
+        ~15 ms), wiec dwa powiadomienia zapisane w tym samym takcie dostaja ten
+        sam `created_at`. Zanim serwis dostal tiebreaker po `id`, baza mogla
+        zwrocic je w dowolnej kolejnosci i `test_newest_first` migotal —
+        zmierzone: 133/200 przebiegow z kolizja czasu dawalo zla kolejnosc.
+
+        Ten test wymusza kolizje jawnie, wiec nie zalezy od zegara.
+        """
+        ts = datetime.utcnow()
+        n1 = add_notification(db_session, test_user.id, created_at=ts)
+        n2 = add_notification(db_session, test_user.id, created_at=ts)
+        assert n1.created_at == n2.created_at, "test bez sensu, jesli czasy sie roznia"
+
+        result = get_user_notifications(db_session, test_user.id)
+        assert result.notifications[0].id == n2.id
+        assert result.notifications[1].id == n1.id
+
+    def test_created_at_wazniejsze_niz_id(self, db_session, test_user):
+        """
+        `id` jest TYLKO tiebreakerem — nie moze przeslonic `created_at`.
+
+        Nowsze powiadomienie dostaje tu NIZSZY `id`, wiec gdyby sortowanie
+        poszlo po samym `id`, kolejnosc bylaby odwrotna.
+        """
+        now = datetime.utcnow()
+        nowsze = add_notification(db_session, test_user.id, created_at=now)
+        starsze = add_notification(db_session, test_user.id,
+                                   created_at=now - timedelta(hours=1))
+        assert starsze.id > nowsze.id, "zalozenie testu: starsze ma wyzszy id"
+
+        result = get_user_notifications(db_session, test_user.id)
+        assert result.notifications[0].id == nowsze.id
+        assert result.notifications[1].id == starsze.id
 
     def test_unread_count_correct(self, db_session, test_user):
         add_notification(db_session, test_user.id, is_read=False)
