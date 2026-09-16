@@ -98,8 +98,7 @@ export function useCursors({ user, safeBroadcast }: UseCursorsOptions): UseCurso
       // Math.abs, bo gość w trybie demo ma UJEMNE id (guest-identity.ts).
       // Bez tego -7 % 8 = -7, a CURSOR_COLORS[-7] to undefined — kursor bez koloru.
       // remote-cursors.tsx:140 ma już Math.abs, tu go brakowało.
-      const color =
-        existing?.color || CURSOR_COLORS[Math.abs(userId) % CURSOR_COLORS.length];
+      const color = existing?.color || CURSOR_COLORS[Math.abs(userId) % CURSOR_COLORS.length];
 
       if (existing) {
         remoteCursorsRef.current = prev.map((c) =>
