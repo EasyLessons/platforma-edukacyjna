@@ -155,7 +155,9 @@ export function useTypingIndicator({
         (t) => now - t.lastSeen < TYPING_TIMEOUT_MS
       );
       if (typingUsersRef.current.length !== before) {
-        log(`✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`);
+        log(
+          `✏️ [TYPING] Auto-cleanup: usunięto ${before - typingUsersRef.current.length} starych wpisów`
+        );
         notifyTypingSubscribers();
       }
     }, TYPING_CLEANUP_INTERVAL_MS);

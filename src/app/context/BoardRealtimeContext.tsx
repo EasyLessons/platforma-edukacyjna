@@ -198,7 +198,14 @@ export function BoardRealtimeProvider({
         elementSync.handleSyncRequest(channel, currentUser.id, userId, username);
       })
       .on('broadcast', { event: 'sync-response' }, ({ payload }) => {
-        const { elements, targetUserId, userId, username, chunkIndex = 0, totalChunks = 1 } = payload as any;
+        const {
+          elements,
+          targetUserId,
+          userId,
+          username,
+          chunkIndex = 0,
+          totalChunks = 1,
+        } = payload as any;
         elementSync.handleSyncResponse(
           currentUser.id,
           targetUserId,

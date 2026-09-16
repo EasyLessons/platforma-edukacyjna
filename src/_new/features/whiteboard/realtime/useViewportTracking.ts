@@ -28,7 +28,13 @@ export interface UseViewportTrackingResult {
   broadcastViewportChange: (x: number, y: number, scale: number) => Promise<void>;
   subscribeViewports: (callback: (viewports: RemoteViewport[]) => void) => () => void;
   /** Woła się z `channel.on('broadcast', { event: 'viewport-changed' }, ...)` w Providerze. */
-  handleViewportChanged: (x: number, y: number, scale: number, userId: number, username: string) => void;
+  handleViewportChanged: (
+    x: number,
+    y: number,
+    scale: number,
+    userId: number,
+    username: string
+  ) => void;
 }
 
 export function useViewportTracking({
