@@ -1,4 +1,5 @@
-import { useWebRTCConnections } from './voice-chat/useWebRTCConnections';
+'use client';
+
 /**
  * ═══════════════════════════════════════════════════════════════════════════
  *                        VOICE CHAT CONTEXT
@@ -22,8 +23,6 @@ import { useWebRTCConnections } from './voice-chat/useWebRTCConnections';
  * 5. Audio stream płynie bezpośrednio A ↔ B
  */
 
-('use client');
-
 import {
   createContext,
   useContext,
@@ -34,7 +33,6 @@ import {
   ReactNode,
 } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/_new/lib/auth';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -61,9 +59,10 @@ const VoiceChatContext = createContext<VoiceChatContextType | undefined>(undefin
 // 📦 PROVIDER
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { DEFAULT_SETTINGS, getIceServers } from './voice-chat/constants';
+import { DEFAULT_SETTINGS } from './voice-chat/constants';
 import { useVoiceDetection } from './voice-chat/useVoiceDetection';
 import { useVoiceSignaling } from './voice-chat/useVoiceSignaling';
+import { useWebRTCConnections } from './voice-chat/useWebRTCConnections';
 
 export function VoiceChatProvider({
   boardId,
