@@ -22,6 +22,9 @@
 
 'use client';
 
+import { GraduationCap } from 'lucide-react';
+
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
@@ -53,9 +56,20 @@ export default function DemoBoardPage() {
   return (
     <BoardRealtimeProvider boardId={boardId} identity={guest}>
       <div className="relative h-screen w-screen overflow-hidden">
-        <div className="pointer-events-none absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-sm text-white shadow">
-          Tryb demo - nic sie nie zapisuje. Jestes tu jako {guest.username}.
-        </div>
+        {/*
+          Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona,
+          a bez tego linku z tablicy nie da sie wyjsc inaczej niz przyciskiem
+          wstecz. `z-50` trzyma go nad plotnem, `pointer-events-auto` jest
+          jawne, bo rodzic bywa przykrywany warstwami canvasu.
+        */}
+        <Link
+          href="/"
+          aria-label="EasyLesson - strona glowna"
+          className="pointer-events-auto absolute left-4 top-3 z-50 flex items-center gap-2 rounded-xl bg-white/90 px-3 py-2 text-sm font-semibold text-gray-800 shadow-md backdrop-blur-sm transition-colors hover:bg-white"
+        >
+          <GraduationCap className="h-5 w-5 text-blue-600" />
+          <span>EasyLesson</span>
+        </Link>
 
         <WhiteboardCanvas boardId={boardId} userRole="editor" />
       </div>

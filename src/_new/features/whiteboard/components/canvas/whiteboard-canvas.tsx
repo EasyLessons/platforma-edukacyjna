@@ -70,6 +70,7 @@ import type {
 
 // ─── MathChatbot ─────────────────────────────────────────────────────────────
 import { MathChatbot } from '@/_new/features/whiteboard/components/toolbar/math-chatbot';
+import { isDemoBoard } from '@/_new/features/demo/is-demo-board';
 
 // ─── Renderowanie canvas ──────────────────────────────────────────────────────
 import { drawElement } from '../../elements/rendering';
@@ -2523,6 +2524,7 @@ export default function WhiteboardCanvasNew({
             setMessages={setChatMessages}
             onActiveChange={setIsCardViewerActive}
             userRole={userRole}
+            isDemo={isDemoBoard(boardId)}
           />
         )}
 
