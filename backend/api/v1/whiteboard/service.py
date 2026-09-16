@@ -143,6 +143,8 @@ class WhiteboardService:
             if existing:
                 existing.type = el.get("type", existing.type)
                 existing.data = el.get("data", existing.data)
+                # Undo po usunieciu: ten sam element_id wraca, wiec zdejmujemy flage.
+                existing.is_deleted = False
             else:
                 self.db.add(BoardElement(
                     board_id=board_id,
@@ -167,8 +169,11 @@ class WhiteboardService:
         board = self._get_board_or_404(board_id)
         require_membership(self.db, board.workspace_id, user_id)
 
+        # is_deleted.isnot(True), a nie == False: kolumna jest nullable,
+        # wiec starsze wiersze moga miec NULL zamiast False.
         elements = self.db.query(BoardElement).filter(
-            BoardElement.board_id == board_id
+            BoardElement.board_id == board_id,
+            BoardElement.is_deleted.isnot(True),
         ).all()
 
         # Pobierz wszystkich twórców jednym zapytaniem
@@ -226,11 +231,20 @@ class WhiteboardService:
         if not element:
             raise NotFoundError("Element nie znaleziony")
 
+        # Idempotencja: powtorne usuniecie juz usunietego elementu to no-op,
+        # nie blad. Bez tego klient, ktory wysyla DELETE optymistycznie i w tle
+        # (engine.deleteElements), dostawal 404 przy kazdej ponownej probie.
+        if element.is_deleted:
+            return {"success": True, "message": "Element byl juz usuniety"}
+
         if element.type == "image" and background_tasks is not None:
             src = (element.data or {}).get("src")
             if isinstance(src, str) and src:
                 background_tasks.add_task(_cleanup_image_after_delay, src)
 
-        self.db.delete(element)
+        # Soft delete zamiast db.delete(): wiersz zostaje, ale znika z load_elements.
+        # Dzieki temu klient dolaczajacy w trakcie nie dostanie przez REST elementu,
+        # ktory ktos wlasnie usunal, nawet jesli nie zlapal broadcastu.
+        element.is_deleted = True
         self.db.commit()
         return {"success": True, "message": "Element usunięty"}

@@ -136,6 +136,7 @@ class TestLoadElements:
 class TestDeleteElement:
 
     def test_deletes_element(self, db_session, test_user, test_board):
+        """Soft delete: wiersz zostaje w bazie, ale ma is_deleted=True."""
         service = WhiteboardService(db_session)
         service.save_elements(test_board.id, [ELEMENT], test_user.id)
         service.delete_element(test_board.id, "uuid-1", test_user.id)
@@ -144,7 +145,38 @@ class TestDeleteElement:
             BoardElement.board_id == test_board.id,
             BoardElement.element_id == "uuid-1",
         ).first()
-        assert el is None
+        assert el is not None
+        assert el.is_deleted is True
+
+    def test_deleted_element_not_returned_by_load(self, db_session, test_user, test_board):
+        """Sedno naprawy known-issue #1: klient dolaczajacy przez REST
+        nie moze dostac elementu, ktory ktos wlasnie usunal."""
+        service = WhiteboardService(db_session)
+        service.save_elements(test_board.id, [ELEMENT], test_user.id)
+        service.delete_element(test_board.id, "uuid-1", test_user.id)
+
+        assert service.load_elements(test_board.id, test_user.id) == []
+
+    def test_second_delete_is_noop_not_404(self, db_session, test_user, test_board):
+        """Powtorne DELETE tego samego elementu ma byc nieszkodliwym no-opem.
+        Wczesniej leciał 404 na kazdy element przy drugim usunieciu."""
+        service = WhiteboardService(db_session)
+        service.save_elements(test_board.id, [ELEMENT], test_user.id)
+        service.delete_element(test_board.id, "uuid-1", test_user.id)
+
+        result = service.delete_element(test_board.id, "uuid-1", test_user.id)
+        assert result["success"] is True
+
+    def test_resaving_deleted_element_revives_it(self, db_session, test_user, test_board):
+        """Undo po usunieciu: ten sam element_id wraca i ma byc znowu widoczny."""
+        service = WhiteboardService(db_session)
+        service.save_elements(test_board.id, [ELEMENT], test_user.id)
+        service.delete_element(test_board.id, "uuid-1", test_user.id)
+        service.save_elements(test_board.id, [ELEMENT], test_user.id)
+
+        result = service.load_elements(test_board.id, test_user.id)
+        assert len(result) == 1
+        assert result[0].element_id == "uuid-1"
 
     def test_nonexistent_element_raises_not_found(self, db_session, test_user, test_board):
         service = WhiteboardService(db_session)

@@ -57,13 +57,22 @@ Kanały są per-user (`notifications:{user_id}`) — jeden user nie widzi event�
 ## 4. AI Assistant (chat)
 
 ```
-UI chatu (whiteboard) → POST /api/chat (src/app/api/chat/route.ts, Next.js Route Handler — NIE FastAPI)
+UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Authorization: Bearer <access token>
+  (przy 401 czat raz odświeża token i ponawia — jak interceptor apiClient)
+  → Next.js Route Handler src/app/api/chat/route.ts — NIE FastAPI
   → sprawdzenie rate limitu (Map w pamięci, per IP: 20 req/min, blokada 2 min po przekroczeniu)
-  → sprawdzenie cache odpowiedzi (Map w pamięci, TTL 30 min)
+  → uwierzytelnienie (src/app/api/chat/auth.ts): token przekazany do GET /api/v1/auth/me
+    na backendzie — ta sama weryfikacja co get_current_user (podpis, wygaśnięcie, is_active)
+    · 401/403/404 z backendu → 401 "unauthorized"
+    · backend nieosiągalny / 5xx / timeout 5 s → 503 "auth_unavailable" (fail closed — NIE wpuszczamy)
+  → walidacja body
+  → sprawdzenie cache odpowiedzi (Map w pamięci, TTL 30 min) — cache jest ZA bramką
   → jeśli brak w cache: wywołanie Gemini (@google/generative-ai), model gemini-2.5-flash,
     fallback na gemini-2.5-flash-lite przy przekroczeniu limitu
   → zapis do cache, zwrot odpowiedzi do UI
 ```
+
+**Adres backendu z serwera Next:** `auth.ts` używa `BACKEND_INTERNAL_URL`, a gdy jest pusty — `NEXT_PUBLIC_API_URL`. Na Vercelu wystarcza ten drugi (publiczny adres backendu). W docker-compose nie: tam `NEXT_PUBLIC_API_URL=http://localhost:8000`, a z wnętrza kontenera frontendu `localhost` to sam frontend — dlatego compose ustawia `BACKEND_INTERNAL_URL=http://backend:8000`. Bez tego czat w Dockerze zwraca 503.
 
 **Ograniczenie architektoniczne do znajomości:** rate limiting i cache trzymane są w zwykłym `Map` w pamięci procesu Next.js. Działa poprawnie tylko dopóki appka działa na jednej, długo żyjącej instancji serwera. Jeśli kiedyś przejdziecie na wdrożenie serverless/edge (wiele instancji, cold starty) albo horizontal scaling — ten mechanizm przestanie działać poprawnie (każda instancja ma swoją osobną mapę) i trzeba będzie przenieść na współdzielony store (np. Redis). Nie problem dziś, ale ważne żeby wiedzieć zanim ktoś zmieni sposób hostingu.
 
