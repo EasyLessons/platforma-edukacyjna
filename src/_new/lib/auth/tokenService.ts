@@ -103,19 +103,36 @@ export async function refreshAccessToken(): Promise<string> {
 }
 
 /**
+ * Ścieżki, z których NIE wolno przekierowywać na /login po nieudanym
+ * odświeżeniu tokenu.
+ *
+ * Dwie różne przyczyny w jednej liście:
+ *  - /login, /rejestracja, /auth — jesteśmy już w obszarze logowania,
+ *    redirect zrobiłby pętlę,
+ *  - /demo — tryb demo jest PUBLICZNY z założenia. Gość nie ma i nie ma mieć
+ *    konta, więc 401 z /auth/me jest tam stanem normalnym, a nie błędem.
+ *
+ * UWAGA: tej listy używa też interceptor w lib/api/client.ts, żeby na tych
+ * ścieżkach ODRZUCIĆ błąd zamiast zwracać promise, który nigdy się nie
+ * rozwiązuje. Zmieniając ją, sprawdź oba miejsca.
+ */
+export function isPublicPath(pathname: string): boolean {
+  return (
+    pathname === '/login' ||
+    pathname.startsWith('/rejestracja') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/demo')
+  );
+}
+
+/**
  * Logout — czyści sesję i przekierowuje na /login.
  * Wywoływane gdy refresh się nie powiedzie lub token jest nieważny.
  */
 export function logoutAndRedirect(): void {
   clearSession();
   if (typeof window !== 'undefined') {
-    // Nie rób redirect jeśli już jesteśmy na /login lub /rejestracja — zapobiega pętli
-    const { pathname } = window.location;
-    if (
-      pathname === '/login' ||
-      pathname.startsWith('/rejestracja') ||
-      pathname.startsWith('/auth')
-    ) {
+    if (isPublicPath(window.location.pathname)) {
       return;
     }
     window.location.href = '/login';

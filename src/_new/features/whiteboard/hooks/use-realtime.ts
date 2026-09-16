@@ -117,6 +117,20 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
     optionsRef.current = options;
   }, [options]);
 
+  // Wspolny helper: wciagnij bitmapy wszystkich obrazkow z paczki do cache.
+  // Trzymany w ref-ach, wiec nie potrzebuje zaleznosci w useEffect ponizej.
+  const loadImagesFrom = (elements: Array<DrawingElement | ElementBroadcastPayload>) => {
+    elements.forEach((element) => {
+      if (element.type !== 'image') return;
+      // ElementBroadcastPayload to obrazek BEZ src (paczka geometryOnly),
+      // wiec src moze nie istniec - sprawdzamy, zamiast zakladac.
+      const src = (element as ImageElement).src;
+      if (src) {
+        optionsRef.current.onLoadRemoteImage(element.id, src);
+      }
+    });
+  };
+
   // ─── Subskrypcja: zdalne zmiany elementów ───────────────────────────────
   useEffect(() => {
     onRemoteElementCreated((element, userId, username) => {
@@ -139,6 +153,13 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
         if (optionsRef.current.onElementsUpdated) {
           optionsRef.current.onElementsUpdated(elements, geometryOnly);
         }
+        // Przy geometryOnly paczka jest NIEPELNA (bez src) i odbiorca ma juz
+        // te elementy - nie ma czego ladowac. Przy tworzeniu wielu naraz
+        // elementy sa pelne, wiec bitmapy trzeba wciagnac do cache tak samo
+        // jak przy element-created.
+        if (!geometryOnly) {
+          loadImagesFrom(elements);
+        }
       });
     }
 
@@ -155,6 +176,13 @@ export function useRealtime(options: UseRealtimeOptions): UseRealtimeReturn {
         if (optionsRef.current.onSyncResponse) {
           optionsRef.current.onSyncResponse(elements, userId, username);
         }
+        // BEZ TEGO dolaczajacy dostaje element obrazka, ale nigdy jego bitmapy -
+        // widzi pusta ramke. element-created robilo to od zawsze, sync-response
+        // nie. Na produkcji maskuje to dociaganie elementow z bazy (tamta sciezka
+        // laduje obrazki), wiec widac to tylko gdy ktos dolaczy zaraz po wstawieniu
+        // obrazka, zanim trafi on do bazy. W trybie demo bazy nie ma, wiec widac
+        // zawsze.
+        loadImagesFrom(elements);
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

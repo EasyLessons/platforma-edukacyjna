@@ -26,6 +26,7 @@ import {
   clearSession,
   refreshAccessToken,
   logoutAndRedirect,
+  isPublicPath,
 } from '../auth';
 import { mapAxiosError } from '../errors';
 import type { ApiSuccessResponse } from './types';
@@ -118,9 +119,16 @@ apiClient.interceptors.response.use(
         // Refresh nie powiódł się — wyloguj
         clearSession();
         logoutAndRedirect();
-        // Gdy logoutAndRedirect nie przekieruje (jesteśmy już na /login),
-        // przepuść oryginalny błąd żeby UI mogło go wyświetlić
-        if (typeof window !== 'undefined' && window.location.pathname === '/login') {
+        // Gdy logoutAndRedirect NIE przekieruje (ścieżka publiczna: /login,
+        // /rejestracja, /auth, /demo) — przepuść błąd, żeby wywołujący dostał
+        // odrzucenie i mógł się z nim obsłużyć.
+        //
+        // Zwrócenie tu new Promise(() => {}) byłoby błędem: wywołanie nigdy by
+        // się nie zakończyło. Na /demo AuthProvider.bootstrap() utknąłby przed
+        // swoim finally i `loading` zostałoby true na zawsze — wieczny spinner
+        // zamiast tablicy. Wiszący promise ma sens TYLKO wtedy, gdy strona i tak
+        // zaraz zniknie przez window.location.href.
+        if (typeof window !== 'undefined' && isPublicPath(window.location.pathname)) {
           return Promise.reject(mapAxiosError(error));
         }
         return new Promise(() => {});

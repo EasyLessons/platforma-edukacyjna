@@ -103,11 +103,31 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
  * Używana we WSZYSTKICH miejscach tworzenia obrazu: paste ze schowka,
  * drag&drop obrazka, drag&drop PDF (strona po stronie), upload z dysku.
  */
+export const DEMO_IMAGE_BLOCKED_MESSAGE =
+  'W trybie demo nie mozna wstawiac wlasnych zdjec — zaloz darmowe konto, zeby zapisywac obrazy.';
+
+/**
+ * Rzucany, gdy upload nie ma dokad trafic, bo tablica nie istnieje w bazie
+ * (tryb demo: boardId to string `demo-...`, wiec Number() daje NaN).
+ * Wolajacy ma pokazac `message` uzytkownikowi zamiast dusic blad w konsoli.
+ */
+export class DemoUploadBlockedError extends Error {
+  constructor(message: string = DEMO_IMAGE_BLOCKED_MESSAGE) {
+    super(message);
+    this.name = 'DemoUploadBlockedError';
+  }
+}
+
 export async function compressAndUploadImage(
   rawDataUrl: string,
   boardId: number,
   filename: string = 'image.jpg'
 ): Promise<UploadedImage> {
+  // Tablica demo nie ma rekordu w bazie — bez tego guardu leciałby PUT na
+  // /boards/NaN/images i uzytkownik widzialby tylko blad w konsoli.
+  if (!Number.isFinite(boardId)) {
+    throw new DemoUploadBlockedError();
+  }
   const { dataUrl, width, height } = await compressImageDataUrl(rawDataUrl);
   const blob = await dataUrlToBlob(dataUrl);
   const { url } = await uploadBoardImage(boardId, blob, filename);

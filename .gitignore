@@ -14,6 +14,8 @@ ENV/
 # Environment variables
 .env
 .env.local
+.env.*
+!.env.example
 
 # Database
 *.db
@@ -57,3 +59,9 @@ alembic/__pycache__/
 *.synctex.gz
 *.toc
 graph.svg
+
+# Kopie zapasowe plikow srodowiskowych (np. .env.backup-15.09, .env.local.bak).
+# Bez tego wpis '.env' ich NIE lapie i kopia z kluczami moze trafic do repo.
+.env.backup*
+.env.*.bak
+*.env.bak
