@@ -42,7 +42,7 @@ export default function DemoBoardPage() {
 
   if (!sessionId) {
     return (
-      <div className="flex h-screen items-center justify-center text-gray-600">
+      <div className="flex h-dvh items-center justify-center text-gray-600">
         Nieprawidlowy link do demo.
       </div>
     );
@@ -50,7 +50,7 @@ export default function DemoBoardPage() {
 
   if (isLoading || !guest) {
     return (
-      <div className="flex h-screen items-center justify-center text-gray-600">
+      <div className="flex h-dvh items-center justify-center text-gray-600">
         Przygotowuje tablice...
       </div>
     );
@@ -58,7 +58,7 @@ export default function DemoBoardPage() {
 
   return (
     <BoardRealtimeProvider boardId={boardId} identity={guest}>
-      <div className="relative h-screen w-screen overflow-hidden">
+      <div className="relative h-dvh w-screen overflow-hidden">
         {/*
           Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona, a bez
           tego przycisku z tablicy nie da sie wyjsc inaczej niz "wstecz".
@@ -69,7 +69,11 @@ export default function DemoBoardPage() {
           (BoardHeader ponizej 1300 px chowa logo, a w demo to jedyna droga powrotu).
         */}
         <BoardHeaderFrame compact={!metrics.showFullHeader}>
-          <BoardLogoButton href="/" tooltip="Wróć na stronę główną" />
+          <BoardLogoButton
+            href="/"
+            tooltip="Wróć na stronę główną"
+            compact={metrics.isPhoneLayout}
+          />
         </BoardHeaderFrame>
 
         <WhiteboardCanvas boardId={boardId} userRole="editor" />

@@ -33,6 +33,11 @@ import { flushSync } from 'react-dom';
 
 // ─── Nowe hooki ───────────────────────────────────────────────────────────────
 import { useViewport } from '../../hooks/use-viewport';
+import {
+  useWhiteboardUiMetrics,
+  safeInset,
+  shouldShowTooSmallOverlay,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { useElements } from '../../hooks/use-elements';
 import { useHistory } from '../../hooks/use-history';
 import { useClipboard, offsetElement } from '../../hooks/use-clipboard';
@@ -275,6 +280,7 @@ export default function WhiteboardCanvasNew({
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [windowWidth, setWindowWidth] = useState(0);
   const [windowHeight, setWindowHeight] = useState(0);
+  const uiMetrics = useWhiteboardUiMetrics();
   const [bottomToastState, setBottomToastState] = useState<{ id: number; message: string } | null>(
     null
   );
@@ -2248,45 +2254,55 @@ export default function WhiteboardCanvasNew({
           !(isSidebarOpen && windowWidth <= 1140) && (
             <div
               className="absolute z-50 pointer-events-auto"
-              style={{
-                top: '16px',
-                left:
-                  windowWidth <= 760
-                    ? '82px'
-                    : windowWidth <= 1299
-                      ? '90px'
-                      : windowWidth <= 1640
-                        ? '350px'
-                        : '50%',
-                transform:
-                  windowWidth <= 760
-                    ? 'none'
-                    : windowWidth <= 1299
-                      ? 'none'
-                      : windowWidth <= 1640
-                        ? 'none'
-                        : 'translateX(-50%)',
-                right:
-                  windowWidth <= 600
-                    ? '50px'
-                    : windowWidth <= 760
-                      ? '350px'
-                      : windowWidth <= 1299
-                        ? '380px'
-                        : windowWidth <= 1640
-                          ? '470px'
-                          : 'auto',
-                maxWidth:
-                  windowWidth <= 600
-                    ? 'calc(100vw - 82px - 50px)'
-                    : windowWidth <= 760
-                      ? 'calc(100vw - 82px - 350px)'
-                      : windowWidth <= 1300
-                        ? 'calc(100vw - 90px - 380px)'
-                        : windowWidth <= 1640
-                          ? 'calc(100vw - 300px - 420px)'
-                          : '900px',
-              }}
+              style={
+                uiMetrics.isPhoneLayout
+                  ? {
+                      // Telefon: w pionie pod przyciskiem panelu (wczesniej lupa
+                      // wjezdzala na awatary i historie), w poziomie obok niego.
+                      top: safeInset(uiMetrics.isPhonePortrait ? 82 : 16, 'top'),
+                      left: safeInset(uiMetrics.isPhonePortrait ? 16 : 82, 'left'),
+                      width: '52px',
+                    }
+                  : {
+                      top: '16px',
+                      left:
+                        windowWidth <= 760
+                          ? '82px'
+                          : windowWidth <= 1299
+                            ? '90px'
+                            : windowWidth <= 1640
+                              ? '350px'
+                              : '50%',
+                      transform:
+                        windowWidth <= 760
+                          ? 'none'
+                          : windowWidth <= 1299
+                            ? 'none'
+                            : windowWidth <= 1640
+                              ? 'none'
+                              : 'translateX(-50%)',
+                      right:
+                        windowWidth <= 600
+                          ? '50px'
+                          : windowWidth <= 760
+                            ? '350px'
+                            : windowWidth <= 1299
+                              ? '380px'
+                              : windowWidth <= 1640
+                                ? '470px'
+                                : 'auto',
+                      maxWidth:
+                        windowWidth <= 600
+                          ? 'calc(100vw - 82px - 50px)'
+                          : windowWidth <= 760
+                            ? 'calc(100vw - 82px - 350px)'
+                            : windowWidth <= 1300
+                              ? 'calc(100vw - 90px - 380px)'
+                              : windowWidth <= 1640
+                                ? 'calc(100vw - 300px - 420px)'
+                                : '900px',
+                    }
+              }
             >
               <SmartSearchBar
                 onFormulaSelect={handleFormulaSelect}
@@ -2613,7 +2629,7 @@ export default function WhiteboardCanvasNew({
           </div>
         )}
 
-        {windowWidth > 0 && (windowWidth <= 320 || windowHeight <= 600) && (
+        {shouldShowTooSmallOverlay(windowWidth, windowHeight, uiMetrics.isTouchDevice) && (
           <div className="absolute inset-0 z-[1300] flex items-center justify-center px-6 text-center bg-[#FEF2F2]/95 backdrop-blur-[1px]">
             <div className="max-w-sm rounded-2xl border border-gray-300 bg-white/95 shadow-[0_10px_30px_rgba(0,0,0,0.12)] px-5 py-6">
               <p className="text-sm font-semibold text-gray-900 mb-2">Zbyt mały obszar roboczy</p>

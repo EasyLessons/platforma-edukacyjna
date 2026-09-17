@@ -31,6 +31,12 @@ import { ToolModeButtons } from './registry-toolbar';
 import { getTool } from '@/_new/features/whiteboard/tools/registry';
 
 interface ToolbarUIProps {
+  /**
+   * Uklad telefonu: maksymalna wysokosc paska (przewija sie, gdy narzedzia
+   * sie nie mieszcza). Brak = uklad desktopowy bez zmian.
+   */
+  maxHeight?: string;
+
   // 🧮 Kalkulator state
   isCalculatorOpen?: boolean;
   onCalculatorToggle?: () => void;
@@ -108,6 +114,7 @@ const ToolButton = ({
 const Divider = () => <div className="h-px w-6 bg-gray-200 my-1" />;
 
 export function ToolbarUI({
+  maxHeight,
   isCalculatorOpen,
   onCalculatorToggle,
   onToggleAssetsLibrary,
@@ -141,14 +148,20 @@ export function ToolbarUI({
   // Full: >= 815px - wszystko widoczne
   // Medium: < 815px - ukryj markdown/table/import/export do menu "więcej"
   // Mobile: < 768px (md breakpoint) - pełny modal
-  const isMediumHeight = viewportHeight < 815 && viewportHeight >= 768;
-  const isMobile = viewportHeight < 768;
-  const isCompactHeight = viewportHeight <= 814;
+  // Telefon (maxHeight podany): zawsze wariant kompaktowy z menu "Wiecej" -
+  // wysoki telefon (np. Pixel 7, 839 px) dostawal pelny pasek na cala wysokosc.
+  const isPhone = !!maxHeight;
+  const isMediumHeight = !isPhone && viewportHeight < 815 && viewportHeight >= 768;
+  const isMobile = isPhone || viewportHeight < 768;
+  const isCompactHeight = isPhone || viewportHeight <= 814;
 
   return (
     <>
       {/* GŁÓWNY TOOLBAR - PIONOWY (desktop + mobile) */}
-      <div className="bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto">
+      <div
+        className={`bg-white rounded-xl shadow-lg border border-gray-200 pointer-events-auto ${maxHeight ? 'overflow-y-auto overscroll-contain' : ''}`}
+        style={maxHeight ? { maxHeight } : undefined}
+      >
         <div
           className={`flex flex-col items-center ${isCompactHeight ? 'gap-1 p-1.5' : 'gap-1.5 p-2'}`}
         >
@@ -177,7 +190,7 @@ export function ToolbarUI({
             </>
           )}
 
-          <Divider />
+          {!(maxHeight && isCompactHeight) && <Divider />}
 
           {/* History */}
           <ToolButton
@@ -234,7 +247,7 @@ export function ToolbarUI({
             </>
           )}
 
-          <Divider />
+          {(!maxHeight || hasSelection || !isCompactHeight) && <Divider />}
 
           {/* Delete Selected - widoczne gdy coś zaznaczone */}
           {hasSelection && onDeleteSelected && (
