@@ -8,6 +8,8 @@ WhiteboardService obsługuje:
   delete_element()      — usuń jeden element
 """
 import asyncio
+import base64
+import binascii
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -17,11 +19,12 @@ from sqlalchemy.orm import Session
 from core.database import SessionLocal
 from core.exceptions import NotFoundError, ValidationError
 from core.logging import get_logger
-from core.models import Board, BoardElement, BoardUsers, User
+from core.models import Board, BoardDocument, BoardElement, BoardUsers, User
 
 from .schemas import (
     BoardElementWithAuthor, SaveElementsResponse,
-    BoardSettings, BoardSettingsPatch
+    BoardSettings, BoardSettingsPatch,
+    DocumentResponse,
 )
 from .storage import upload_board_image, delete_board_image
 from core.presence import PresenceService
@@ -248,3 +251,46 @@ class WhiteboardService:
         element.is_deleted = True
         self.db.commit()
         return {"success": True, "message": "Element usunięty"}
+
+    # Document (Yjs snapshot) --------------------------------------------------
+
+    def save_document(self, board_id: int, snapshot_base64: str, user_id: int) -> None:
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+
+        try:
+            snapshot = base64.b64decode(snapshot_base64, validate=True)
+        except (binascii.Error, ValueError):
+            raise ValidationError("Niepoprawny base64 snapshot")
+        if not snapshot:
+            raise ValidationError("Pusty snapshot")
+
+        existing = self.db.query(BoardDocument).filter(
+            BoardDocument.board_id == board_id
+        ).first()
+
+        if existing:
+            existing.snapshot = snapshot
+            existing.updated_at = datetime.utcnow()
+        else:
+            self.db.add(BoardDocument(
+                board_id=board_id,
+                snapshot=snapshot,
+                updated_at=datetime.utcnow(),
+            ))
+        self.db.commit()
+
+    def load_document(self, board_id: int, user_id: int) -> DocumentResponse:
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+
+        doc = self.db.query(BoardDocument).filter(
+            BoardDocument.board_id == board_id
+        ).first()
+        if not doc:
+            return DocumentResponse(snapshot=None, updated_at=None)
+
+        return DocumentResponse(
+            snapshot=base64.b64encode(doc.snapshot).decode("ascii"),
+            updated_at=doc.updated_at,
+        )

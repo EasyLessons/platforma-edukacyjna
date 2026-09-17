@@ -7,6 +7,8 @@ PUT    /{id}/settings               — aktualizacja ustawień tablicy
 POST   /{id}/elements/batch         — batch save elementów
 GET    /{id}/elements               — załaduj wszystkie elementy
 DELETE /{id}/elements/{element_id}  — usuń element
+POST   /{id}/doc                    — zapisz snapshot Y.Doc
+GET    /{id}/doc                    — wczytaj snapshot Y.Doc
 """
 from typing import Any, Dict, List
 
@@ -21,7 +23,8 @@ from core.responses import ApiResponse
 from .schemas import (
     OnlineStatusResponse, BoardElementWithAuthor,
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
-    BoardSettings, BoardSettingsPatch
+    BoardSettings, BoardSettingsPatch,
+    SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
 )
 from .service import WhiteboardService
 
@@ -135,3 +138,32 @@ async def delete_element(
     service = WhiteboardService(db)
     result = service.delete_element(board_id, element_id, current_user.id, background_tasks)
     return ApiResponse(success=True, data=DeleteElementResponse(**result))
+
+# Document (Yjs snapshot) --------------------------------------------------
+
+@router.post(
+    "/{board_id}/doc",
+    response_model=ApiResponse[SaveDocumentResponse],
+)
+async def save_document(
+    board_id: int,
+    request: SaveDocumentRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = WhiteboardService(db)
+    service.save_document(board_id, request.snapshot, current_user.id)
+    return ApiResponse(success=True, data=SaveDocumentResponse(success=True))
+
+@router.get(
+    "/{board_id}/doc",
+    response_model=ApiResponse[DocumentResponse],
+)
+async def get_document(
+    board_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = WhiteboardService(db)
+    result = service.load_document(board_id, current_user.id)
+    return ApiResponse(success=True, data=result)

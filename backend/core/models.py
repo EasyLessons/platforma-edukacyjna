@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, text, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
@@ -175,6 +175,17 @@ class BoardElement(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     is_deleted = Column(Boolean, default=False, index=True)
+
+class BoardDocument(Base):
+    """
+    Snapshot dokumentu Yjs (Y.Doc) dla tablicy.
+    Jeden wiersz na tablicę - `snapshot` to Y.encodeStateAsUpdate(doc), zapisany binarnie (bytea).
+    """
+    __tablename__ = "board_documents"
+
+    board_id = Column(Integer, ForeignKey("boards.id", ondelete="CASCADE"), primary_key=True)
+    snapshot = Column(LargeBinary, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 class Notification(Base):
     """

@@ -4,14 +4,16 @@ api/v1/whiteboard/service.py
 """
 from datetime import datetime
 import pytest
+import base64
 
 from api.v1.whiteboard.service import WhiteboardService
 from api.v1.whiteboard.schemas import (
     SaveElementsResponse, BoardElementWithAuthor,
-    BoardSettings, BoardSettingsPatch
+    BoardSettings, BoardSettingsPatch,
+    DocumentResponse,
 )
 from core.exceptions import NotFoundError, AppException, ValidationError
-from core.models import Board, BoardUsers, BoardElement
+from core.models import Board, BoardUsers, BoardElement, BoardDocument
 from core.presence import PresenceService
 
 
@@ -234,4 +236,51 @@ class TestBoardSettings:
         service = WhiteboardService(db_session)
         with pytest.raises(AppException) as exc:
             service.update_settings(board.id, BoardSettingsPatch(ai_enabled=False), test_user2.id)
-        assert exc.value.status_code == 403 
+        assert exc.value.status_code == 403
+
+
+class TestDocument:
+
+    SNAPSHOT_B64 = base64.b64encode(b"\x01\x02\x03fake-yjs-update").decode("ascii")
+
+    def test_get_document_without_save_returns_none(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        result = service.load_document(test_board.id, test_user.id)
+        assert isinstance(result, DocumentResponse)
+        assert result.snapshot is None
+        assert result.updated_at is None
+
+    def test_save_then_load_roundtrips_snapshot(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        service.save_document(test_board.id, self.SNAPSHOT_B64, test_user.id)
+
+        result = service.load_document(test_board.id, test_user.id)
+        assert result.snapshot == self.SNAPSHOT_B64
+        assert result.updated_at is not None
+
+    def test_save_twice_overwrites_not_duplicates(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        service.save_document(test_board.id, self.SNAPSHOT_B64, test_user.id)
+        other_b64 = base64.b64encode(b"newer-snapshot").decode("ascii")
+        service.save_document(test_board.id, other_b64, test_user.id)
+
+        rows = db_session.query(BoardDocument).filter(
+            BoardDocument.board_id == test_board.id
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].snapshot == b"newer-snapshot"
+
+    def test_save_invalid_base64_raises_validation_error(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        with pytest.raises(ValidationError):
+            service.save_document(test_board.id, "not-valid-base64!!", test_user.id)
+
+    def test_save_no_access_raises_404(self, db_session, test_board, test_user2):
+        service = WhiteboardService(db_session)
+        with pytest.raises(NotFoundError):
+            service.save_document(test_board.id, self.SNAPSHOT_B64, test_user2.id)
+
+    def test_load_no_access_raises_404(self, db_session, test_board, test_user2):
+        service = WhiteboardService(db_session)
+        with pytest.raises(NotFoundError):
+            service.load_document(test_board.id, test_user2.id)
