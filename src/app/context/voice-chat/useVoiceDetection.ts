@@ -14,11 +14,36 @@ export function useVoiceDetection(
   const startVoiceDetection = useCallback(() => {
     if (!localStreamRef.current) return;
 
-    audioContextRef.current = new AudioContext();
-    analyserRef.current = audioContextRef.current.createAnalyser();
+    // Detekcja mowienia jest dodatkiem - jej brak nie moze przerwac dolaczenia.
+    // Starsze iOS maja tylko webkitAudioContext, a po `await` (poza gestem)
+    // kontekst startuje jako 'suspended', wiec probujemy go wznowic.
+    const AudioContextCtor: typeof AudioContext | undefined =
+      typeof window !== 'undefined'
+        ? window.AudioContext ||
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+        : undefined;
+    if (!AudioContextCtor) {
+      console.warn('🎤 [VOICE] Brak AudioContext - detekcja mówienia wyłączona');
+      return;
+    }
 
-    const source = audioContextRef.current.createMediaStreamSource(localStreamRef.current);
-    source.connect(analyserRef.current);
+    try {
+      audioContextRef.current = new AudioContextCtor();
+      analyserRef.current = audioContextRef.current.createAnalyser();
+
+      const source = audioContextRef.current.createMediaStreamSource(localStreamRef.current);
+      source.connect(analyserRef.current);
+
+      if (audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume?.().catch(() => {});
+      }
+    } catch (error) {
+      console.warn('🎤 [VOICE] Detekcja mówienia niedostępna:', error);
+      audioContextRef.current?.close?.().catch?.(() => {});
+      audioContextRef.current = null;
+      analyserRef.current = null;
+      return;
+    }
 
     analyserRef.current.fftSize = 256;
     const bufferLength = analyserRef.current.frequencyBinCount;
@@ -60,7 +85,7 @@ export function useVoiceDetection(
     }
 
     if (audioContextRef.current) {
-      audioContextRef.current.close();
+      audioContextRef.current.close().catch(() => {});
       audioContextRef.current = null;
     }
 

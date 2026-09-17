@@ -63,6 +63,12 @@ import { DEFAULT_SETTINGS } from './voice-chat/constants';
 import { useVoiceDetection } from './voice-chat/useVoiceDetection';
 import { useVoiceSignaling } from './voice-chat/useVoiceSignaling';
 import { useWebRTCConnections } from './voice-chat/useWebRTCConnections';
+import {
+  getVoiceSupportIssue,
+  mapGetUserMediaError,
+  voiceError as makeVoiceError,
+  type VoiceError,
+} from './voice-chat/mediaSupport';
 
 export function VoiceChatProvider({
   boardId,
@@ -91,6 +97,10 @@ export function VoiceChatProvider({
   });
   const [isMuted, setIsMuted] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<VoiceError | null>(null);
+  const [isAudioBlocked, setIsAudioBlocked] = useState(false);
+  // Blokada podwojnego tapniecia w trakcie dolaczania (czeste na telefonie).
+  const isJoiningRef = useRef(false);
 
   // Refs
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -114,6 +124,8 @@ export function VoiceChatProvider({
   >(null);
   const leaveVoiceChatRef = useRef<(() => void) | null>(null);
 
+  const onAudioBlocked = useCallback(() => setIsAudioBlocked(true), []);
+
   // Debounce i throttling
   const joinTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -126,13 +138,18 @@ export function VoiceChatProvider({
     cleanupUserConnections,
     createPeerConnection,
     handleOffer,
+    addRemoteIceCandidate,
+    applyRemoteAnswer,
+    clearPendingIce,
+    resumeRemoteAudio,
   } = useWebRTCConnections(
     user,
     settings,
     localStreamRef,
     channelRef,
     isInVoiceChatRef,
-    setParticipants
+    setParticipants,
+    onAudioBlocked
   );
 
   // Sync refs z state
@@ -163,7 +180,10 @@ export function VoiceChatProvider({
     lastSyncTimeRef,
     createPeerConnectionRef,
     handleOfferRef,
-    leaveVoiceChatRef
+    leaveVoiceChatRef,
+    applyRemoteAnswer,
+    addRemoteIceCandidate,
+    clearPendingIce
   );
 
   // 🔄 Sync refs z funkcjami (pozwala setupVoiceChannel używać aktualnych wersji)
@@ -191,21 +211,62 @@ export function VoiceChatProvider({
   // 🎮 AKCJE PUBLICZNE
   // ───────────────────────────────────────────────────────────────────────
 
-  const joinVoiceChat = useCallback(async () => {
-    if (!user || isInVoiceChat) return;
+  /**
+   * Sprzata wszystko po nieudanym dolaczeniu: mikrofon, detekcje glosu,
+   * polaczenia P2P i kanal. Wczesniej po odmowie mikrofonu kanal zostawal
+   * otwarty, a stan byl pol-dolaczony.
+   */
+  const abortJoin = useCallback(() => {
+    localStreamRef.current?.getTracks().forEach((track) => track.stop());
+    localStreamRef.current = null;
+    stopVoiceDetection();
 
+    peerConnectionsRef.current.forEach((_peerConn, userId) => cleanupUserConnections(userId));
+    pendingConnectionsRef.current.clear();
+    connectionTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
+    connectionTimeoutsRef.current.clear();
+    clearPendingIce();
+
+    if (joinTimeoutRef.current) {
+      clearInterval(joinTimeoutRef.current);
+      joinTimeoutRef.current = null;
+    }
+
+    const channel = channelRef.current;
+    channelRef.current = null;
+    channel?.unsubscribe();
+
+    isInVoiceChatRef.current = false;
+    setIsInVoiceChat(false);
+    setParticipants([]);
+    setIsSpeaking(false);
+  }, [
+    stopVoiceDetection,
+    cleanupUserConnections,
+    clearPendingIce,
+    peerConnectionsRef,
+    pendingConnectionsRef,
+    connectionTimeoutsRef,
+  ]);
+
+  const joinVoiceChat = useCallback(async (): Promise<boolean> => {
+    if (!user || isInVoiceChat || isJoiningRef.current) return false;
+
+    setVoiceError(null);
+
+    // 1) Czy w ogole warto probowac? Przegladarki wbudowane (Messenger itp.),
+    //    brak https albo brak API - komunikat od razu, bez otwierania kanalu.
+    const supportIssue = getVoiceSupportIssue();
+    if (supportIssue) {
+      console.warn(`🎤 [VOICE] Czat głosowy niedostępny: ${supportIssue.code}`);
+      setVoiceError(supportIssue);
+      return false;
+    }
+
+    isJoiningRef.current = true;
     setIsConnecting(true);
 
     try {
-      // 🛡️ LAZY INIT: Utwórz kanał voice dopiero teraz (czekamy na SUBSCRIBED)
-      const channel = await setupVoiceChannel();
-      if (!channel) {
-        console.error('🎤 [VOICE] Nie można utworzyć kanału voice');
-        setIsConnecting(false);
-        return;
-      }
-      console.log('🎤 [VOICE] ✅ Kanał voice gotowy, kontynuuję...');
-
       // 🧹 CLEAN START - wyczyść WSZYSTKO przed dołączeniem
       console.log('🎤 [VOICE] 🧹 Clean start - czyszczę wszystkie poprzednie połączenia...');
 
@@ -225,6 +286,7 @@ export function VoiceChatProvider({
       connectionRetriesRef.current.clear();
       connectionTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
       connectionTimeoutsRef.current.clear();
+      clearPendingIce();
       setParticipants([]);
 
       // Stop poprzedni stream jeśli istnieje
@@ -233,19 +295,39 @@ export function VoiceChatProvider({
         localStreamRef.current = null;
       }
 
-      // Pobierz stream audio z lepszymi ustawieniami anty-echo
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true, // ZAWSZE włącz echo cancellation
-          noiseSuppression: settings.noiseSupression,
-          autoGainControl: true,
-          sampleRate: 44100, // Wysoka jakość audio
-          sampleSize: 16,
-          channelCount: 1, // Mono dla lepszej wydajności
-        },
-      });
+      // 2) Mikrofon PRZED kanalem. Zgoda na mikrofon to pierwsza rzecz, ktora
+      //    moze sie nie udac - lepiej dowiedziec sie o tym, zanim cokolwiek
+      //    otworzymy, i jak najblizej klikniecia (iOS wiaze uprawnienia do
+      //    audio z gestem uzytkownika).
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true, // ZAWSZE włącz echo cancellation
+            noiseSuppression: settings.noiseSupression,
+            autoGainControl: true,
+            sampleRate: 44100, // Wysoka jakość audio
+            sampleSize: 16,
+            channelCount: 1, // Mono dla lepszej wydajności
+          },
+        });
+      } catch (error) {
+        console.error('🎤 [VOICE] Błąd dostępu do mikrofonu:', error);
+        setVoiceError(mapGetUserMediaError(error));
+        return false;
+      }
 
       localStreamRef.current = stream;
+
+      // 3) Kanal sygnalizacji (czekamy na SUBSCRIBED)
+      const channel = await setupVoiceChannel();
+      if (!channel) {
+        console.error('🎤 [VOICE] Nie można utworzyć kanału voice');
+        abortJoin();
+        setVoiceError(makeVoiceError('channel-failed'));
+        return false;
+      }
+      console.log('🎤 [VOICE] ✅ Kanał voice gotowy, kontynuuję...');
 
       // Ustaw głośność mikrofonu
       const audioTrack = stream.getAudioTracks()[0];
@@ -395,13 +477,26 @@ export function VoiceChatProvider({
       joinTimeoutRef.current = verifyInterval as unknown as NodeJS.Timeout;
 
       console.log('🎤 [VOICE] Dołączono do voice chat!');
+      return true;
     } catch (error) {
-      console.error('🎤 [VOICE] Błąd dostępu do mikrofonu:', error);
-      alert('Nie udało się uzyskać dostępu do mikrofonu. Sprawdź uprawnienia przeglądarki.');
+      console.error('🎤 [VOICE] Błąd dołączania do voice chat:', error);
+      abortJoin();
+      setVoiceError(makeVoiceError('unknown'));
+      return false;
     } finally {
+      isJoiningRef.current = false;
       setIsConnecting(false);
     }
-  }, [user, isInVoiceChat, settings, startVoiceDetection, createPeerConnection, setupVoiceChannel]);
+  }, [
+    user,
+    isInVoiceChat,
+    settings,
+    startVoiceDetection,
+    createPeerConnection,
+    setupVoiceChannel,
+    abortJoin,
+    clearPendingIce,
+  ]);
 
   const leaveVoiceChat = useCallback(() => {
     if (!user) return;
@@ -426,6 +521,7 @@ export function VoiceChatProvider({
 
     // Clear pending connections
     pendingConnectionsRef.current.clear();
+    clearPendingIce();
     lastSyncTimeRef.current.clear();
     connectionRetriesRef.current.clear();
     connectionTimeoutsRef.current.forEach((timeout) => clearTimeout(timeout));
@@ -463,7 +559,15 @@ export function VoiceChatProvider({
     setParticipants([]);
     setIsSpeaking(false);
     setIsMuted(false);
-  }, [user, stopVoiceDetection, cleanupUserConnections]);
+    setIsAudioBlocked(false);
+  }, [user, stopVoiceDetection, cleanupUserConnections, clearPendingIce]);
+
+  const clearVoiceError = useCallback(() => setVoiceError(null), []);
+
+  const resumeAudio = useCallback(async () => {
+    const ok = await resumeRemoteAudio();
+    if (ok) setIsAudioBlocked(false);
+  }, [resumeRemoteAudio]);
 
   const toggleMute = useCallback(() => {
     if (!localStreamRef.current || !user) return;
@@ -609,6 +713,10 @@ export function VoiceChatProvider({
     <VoiceChatContext.Provider
       value={{
         isInVoiceChat,
+        voiceError,
+        isAudioBlocked,
+        clearVoiceError,
+        resumeAudio,
         isConnecting,
         participants,
         settings,
