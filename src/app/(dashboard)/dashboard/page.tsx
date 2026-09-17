@@ -2,6 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { OpenWorkspacesButton } from './Components/open-workspaces-button';
 import WorkspaceSidebar from './Components/workspace-sidebar';
 import BoardsSection from './Components/BoardsSection';
 import TemplatesSection from './Components/TemplateSection';
@@ -72,6 +73,8 @@ function DashboardContent() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
   }, [searchParams]);
 
+  // Telefon: sidebar przestrzeni jako wysuwana szuflada (ponizej md).
+  const [isWorkspaceDrawerOpen, setIsWorkspaceDrawerOpen] = useState(false);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<number | null>(null);
   const [appliedUrlWorkspaceId, setAppliedUrlWorkspaceId] = useState<number | null>(null);
   const [currentView, setCurrentView] = useState<'workspace' | 'recent'>('workspace');
@@ -159,13 +162,21 @@ function DashboardContent() {
   }, [activeWorkspaceId, workspaces.length]);
 
   return (
-    <div className="dashboard-shell h-[calc(100vh-64px)] flex flex-col overflow-hidden bg-[var(--dash-panel)]">
+    <div className="dashboard-shell h-[calc(100vh-64px)] max-md:h-[calc(100dvh-65px)] flex flex-col overflow-hidden bg-[var(--dash-panel)]">
       <div className="flex flex-1 min-h-0 overflow-hidden ">
         <WorkspaceSidebar
           activeWorkspaceId={activeWorkspaceId}
           currentView={currentView}
-          onWorkspaceSelect={handleWorkspaceSelect}
-          onRecentSelect={() => setCurrentView('recent')}
+          onWorkspaceSelect={(workspaceId, workspaceName) => {
+            handleWorkspaceSelect(workspaceId, workspaceName);
+            setIsWorkspaceDrawerOpen(false);
+          }}
+          onRecentSelect={() => {
+            setCurrentView('recent');
+            setIsWorkspaceDrawerOpen(false);
+          }}
+          mobileOpen={isWorkspaceDrawerOpen}
+          onMobileClose={() => setIsWorkspaceDrawerOpen(false)}
           workspaces={workspaces}
           loading={loading}
           error={error}
@@ -178,7 +189,13 @@ function DashboardContent() {
 
         <main className="dashboard-main flex-1 min-h-0 overflow-y-auto relative bg-white">
           {currentView === 'recent' ? (
-            <RecentsView />
+            <>
+              {/* Telefon: sidebar jest wysuwany, wiec widok ostatnich tez musi go otwierac. */}
+              <div className="md:hidden sticky top-0 z-30 flex items-center gap-2 bg-gray-50 px-2 pt-2">
+                <OpenWorkspacesButton onClick={() => setIsWorkspaceDrawerOpen(true)} />
+              </div>
+              <RecentsView />
+            </>
           ) : (
             <div className="flex flex-col w-full min-h-full">
               <div ref={workspaceTopNavRef} className="sticky top-0 z-30 bg-white">
@@ -189,6 +206,7 @@ function DashboardContent() {
                   updateWorkspace={updateWorkspace}
                   deleteWorkspace={deleteWorkspace}
                   leaveWorkspace={leaveWorkspace}
+                  onOpenWorkspaces={() => setIsWorkspaceDrawerOpen(true)}
                 />
               </div>
 

@@ -37,14 +37,14 @@ export default function GiftPopup({ onClose }: GiftPopupProps) {
           <DashboardButton
             variant="secondary"
             onClick={onClose}
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>
         </div>
 
         {/* Content */}
-        <div className="p-6 space-y-5">
+        <div className="p-6 space-y-5 overflow-y-auto">
           {/* Opis */}
           <div className="text-center">
             <p className="text-gray-700 leading-relaxed">

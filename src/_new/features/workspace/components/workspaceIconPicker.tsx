@@ -27,7 +27,7 @@ export function WorkspaceIconPicker({
       <label className="block text-sm font-medium text-gray-700 mb-2">Ikona</label>
 
       {/* Icon Grid */}
-      <div className="grid grid-cols-8 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+      <div className="grid grid-cols-8 max-md:grid-cols-6 gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
         {WORKSPACE_ICON_NAMES.map((iconName) => {
           const Icon = WORKSPACE_ICONS[iconName];
           const isSelected = selected === iconName;

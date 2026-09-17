@@ -86,14 +86,16 @@ export default function RecentsView() {
 
   return (
     <div className="flex flex-col w-full min-h-full bg-gray-50">
-      <div className="p-8 md:p-10 pb-6 md:pb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">Ostatnio używane tablice</h1>
+      <div className="p-8 max-md:p-4 md:p-10 pb-6 md:pb-8">
+        <h1 className="text-2xl font-bold text-gray-900 mb-8 max-md:mb-4">
+          Ostatnio używane tablice
+        </h1>
 
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-wrap gap-3 justify-between items-center mb-6">
           <div className="flex gap-4">
             <button
               onClick={() => setViewMode('grid')}
-              className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${
+              className={`text-sm font-semibold pb-2 max-md:min-h-11 border-b-2 transition-colors ${
                 viewMode === 'grid'
                   ? 'text-black border-black'
                   : 'text-gray-400 border-transparent hover:text-gray-600'
@@ -103,7 +105,7 @@ export default function RecentsView() {
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`text-sm font-semibold pb-2 border-b-2 transition-colors ${
+              className={`text-sm font-semibold pb-2 max-md:min-h-11 border-b-2 transition-colors ${
                 viewMode === 'list'
                   ? 'text-black border-black'
                   : 'text-gray-400 border-transparent hover:text-gray-600'
