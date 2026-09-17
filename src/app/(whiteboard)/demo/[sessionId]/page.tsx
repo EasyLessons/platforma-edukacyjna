@@ -26,6 +26,11 @@ import { useParams } from 'next/navigation';
 
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { useDemoSession } from '@/_new/features/demo/use-demo-session';
+import {
+  BoardHeaderFrame,
+  BoardLogoButton,
+} from '@/_new/features/whiteboard/components/layout/board-header';
+import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { BoardRealtimeProvider } from '../../../context/BoardRealtimeContext';
 
 export default function DemoBoardPage() {
@@ -33,6 +38,7 @@ export default function DemoBoardPage() {
   const sessionId = typeof params?.sessionId === 'string' ? params.sessionId : '';
 
   const { boardId, guest, isLoading } = useDemoSession(sessionId);
+  const metrics = useWhiteboardUiMetrics();
 
   if (!sessionId) {
     return (
@@ -53,9 +59,18 @@ export default function DemoBoardPage() {
   return (
     <BoardRealtimeProvider boardId={boardId} identity={guest}>
       <div className="relative h-screen w-screen overflow-hidden">
-        <div className="pointer-events-none absolute left-1/2 top-3 z-50 -translate-x-1/2 rounded-full bg-black/70 px-4 py-1.5 text-sm text-white shadow">
-          Tryb demo - nic sie nie zapisuje. Jestes tu jako {guest.username}.
-        </div>
+        {/*
+          Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona, a bez
+          tego przycisku z tablicy nie da sie wyjsc inaczej niz "wstecz".
+
+          Logo i ramka to TE SAME komponenty, ktorych uzywa BoardHeader na zwyklej
+          tablicy — zeby demo wygladalo identycznie. Jedyne roznice sa celowe:
+          prowadzi na "/" zamiast do panelu, i jest widoczne przy kazdej szerokosci
+          (BoardHeader ponizej 1300 px chowa logo, a w demo to jedyna droga powrotu).
+        */}
+        <BoardHeaderFrame compact={!metrics.showFullHeader}>
+          <BoardLogoButton href="/" tooltip="Wróć na stronę główną" />
+        </BoardHeaderFrame>
 
         <WhiteboardCanvas boardId={boardId} userRole="editor" />
       </div>

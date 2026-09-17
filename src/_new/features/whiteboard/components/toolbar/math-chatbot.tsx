@@ -66,6 +66,14 @@ interface MathChatbotProps {
   setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
   onActiveChange?: (isActive: boolean) => void;
   userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
+  /**
+   * Tryb demo (tablica bez konta). Gość demo ma wyłącznie tożsamość kliencką
+   * (ujemne id w sessionStorage, patrz demo/guest-identity.ts) i NIE ma tokenu
+   * JWT, a `/api/chat` od PR #34 wymaga zalogowania — więc każde pytanie
+   * skończyłoby się 401. Zamiast wysyłać żądanie skazane na odrzucenie,
+   * pokazujemy prośbę o zalogowanie.
+   */
+  isDemo?: boolean;
 }
 
 // ==========================================
@@ -176,6 +184,7 @@ function MathChatbotInner({
   setMessages,
   onActiveChange,
   userRole,
+  isDemo = false,
 }: MathChatbotProps) {
   const router = useRouter();
   const [input, setInput] = useState('');
@@ -252,6 +261,10 @@ function MathChatbotInner({
     async (customMessage?: string) => {
       const messageText = customMessage || input.trim();
       if (!messageText || isLoading) return;
+      // W demo nie ma tokenu, więc /api/chat zwróciłby 401. Panel demo i tak nie
+      // renderuje pola wpisywania — ten guard jest drugą warstwą, żeby żadna
+      // przyszła ścieżka (skrót klawiszowy, quick prompt) nie wysłała żądania.
+      if (isDemo) return;
 
       const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
@@ -296,7 +309,7 @@ function MathChatbotInner({
 
       setIsLoading(false);
     },
-    [input, isLoading, boardContext, setMessages]
+    [input, isLoading, boardContext, setMessages, isDemo]
   );
 
   const handleKeyDown = useCallback(
@@ -406,6 +419,59 @@ function MathChatbotInner({
           </svg>
           <span className="text-[13px]">Tutor AI</span>
         </button>
+      </div>
+    );
+  }
+
+  // Tryb demo — zamiast czatu prosba o zalogowanie.
+  //
+  // Gosc demo nie ma tokenu JWT (demo/guest-identity.ts daje tylko tozsamosc
+  // kliencka), a /api/chat od PR #34 wymaga zalogowania. Wyslanie pytania
+  // skonczyloby sie 401 i komunikatem o bledzie — zamiast tego mowimy wprost,
+  // co zrobic. Zadne zadanie do /api/chat stad nie wychodzi: ten panel nie
+  // renderuje pola wpisywania ani szybkich promptow.
+  if (isDemo) {
+    return (
+      <div
+        className="fixed z-60 pointer-events-auto"
+        style={{
+          right: '20px',
+          bottom: '20px',
+          width: 'min(360px, calc(100vw - 40px))',
+        }}
+        data-testid="demo-tutor-locked"
+      >
+        <div className="flex flex-col bg-white/90 backdrop-blur-xl border border-gray-200/60 shadow-2xl rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200/50">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shadow-sm">
+                <GraduationCap className="w-5 h-5 text-blue-600" />
+              </div>
+              <span className="font-semibold text-gray-800">Tutor AI</span>
+            </div>
+            <button
+              onClick={() => setIsCollapsed(true)}
+              className="p-1.5 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors cursor-pointer"
+              title="Zamknij"
+              aria-label="Zamknij"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="px-5 py-6 flex flex-col items-center text-center gap-4">
+            <p className="text-gray-800 font-medium">Zaloguj sie, aby korzystac z Tutora AI</p>
+            <p className="text-sm text-gray-500">
+              Tablica demo dziala bez konta, ale Tutor AI jest dostepny tylko dla zalogowanych.
+            </p>
+            <button
+              onClick={() => router.push('/login')}
+              className="w-full h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition-colors shadow-sm cursor-pointer"
+            >
+              Zaloguj sie
+            </button>
+          </div>
+        </div>
       </div>
     );
   }
