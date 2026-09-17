@@ -358,9 +358,10 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
 
   const handleJoinOrToggleMicMenu = async () => {
     if (!isInVoiceChat) {
-      await joinVoiceChat();
-      setShowMicMenu(true);
-      setShowSpeakerMenu(false);
+      if (await joinVoiceChat()) {
+        setShowMicMenu(true);
+        setShowSpeakerMenu(false);
+      }
       return;
     }
 
@@ -370,9 +371,10 @@ export default function VoiceChat({ className = '', isVisible = false }: VoiceCh
 
   const handleToggleSpeakerMenu = async () => {
     if (!isInVoiceChat) {
-      await joinVoiceChat();
-      setShowSpeakerMenu(true);
-      setShowMicMenu(false);
+      if (await joinVoiceChat()) {
+        setShowSpeakerMenu(true);
+        setShowMicMenu(false);
+      }
       return;
     }
 

@@ -1,3 +1,5 @@
+import type { VoiceError } from './mediaSupport';
+
 export interface VoiceParticipant {
   odUserId: number;
   username: string;
@@ -47,6 +49,10 @@ export type VoiceEvent =
 export interface VoiceChatContextType {
   // Stan
   isInVoiceChat: boolean;
+  /** Ostatni blad dolaczenia do pokazania w UI (zamiast alert()). */
+  voiceError: VoiceError | null;
+  /** Przegladarka zablokowala odtwarzanie dzwieku od rozmowcow (iOS). */
+  isAudioBlocked: boolean;
   isConnecting: boolean;
   participants: VoiceParticipant[];
   settings: VoiceSettings;
@@ -54,7 +60,11 @@ export interface VoiceChatContextType {
   isSpeaking: boolean;
 
   // Akcje
-  joinVoiceChat: () => Promise<void>;
+  /** true = dolaczono; false = nie (powod w voiceError). */
+  joinVoiceChat: () => Promise<boolean>;
+  clearVoiceError: () => void;
+  /** Wolac z obslugi klikniecia - ponawia zablokowane odtwarzanie. */
+  resumeAudio: () => Promise<void>;
   leaveVoiceChat: () => void;
   toggleMute: () => void;
   setMuted: (muted: boolean) => void;

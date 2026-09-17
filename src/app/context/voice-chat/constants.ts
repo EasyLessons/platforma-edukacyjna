@@ -134,18 +134,9 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
   // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
   // ═══════════════════════════════════════════════════════════════════════════
   console.log('🎤 [VOICE] ⚠️ Używam fallback TURN serwerów');
+  // numb.viagenie.ca usuniety 17.09.2026: domena nie ma juz rekordu DNS, a martwy
+  // serwer TURN tylko wydluzal zbieranie kandydatow ICE.
   servers.push(
-    // NUMB (viagenie.ca) - darmowy publiczny TURN
-    {
-      urls: 'turn:numb.viagenie.ca:3478',
-      username: 'webrtc@live.com',
-      credential: 'muazkh',
-    },
-    {
-      urls: 'turn:numb.viagenie.ca:3478?transport=tcp',
-      username: 'webrtc@live.com',
-      credential: 'muazkh',
-    },
     // OpenRelay (metered.ca) - backup
     {
       urls: 'turn:openrelay.metered.ca:80',
@@ -169,9 +160,9 @@ export const getBasicIceServers = (): RTCIceServer[] => {
     { urls: 'stun:stun1.l.google.com:19302' },
     // Fallback TURN
     {
-      urls: 'turn:numb.viagenie.ca:3478',
-      username: 'webrtc@live.com',
-      credential: 'muazkh',
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
     },
   ];
 };
