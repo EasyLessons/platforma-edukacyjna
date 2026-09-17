@@ -32,6 +32,11 @@ export interface BoardSettings {
   toolbar_visible: boolean;
 }
 
+export interface BoardDocumentResponse {
+  snapshot: string | null;
+  updated_at: string | null;
+}
+
 export const markOpened = (id: number): Promise<void> =>
   apiClient.post<void>(`/api/v1/whiteboard/${id}/opened`).then(() => undefined);
 
@@ -83,3 +88,11 @@ export const updateBoardSettings = (
   patch: Partial<BoardSettings>
 ): Promise<BoardSettings> =>
   apiClient.put<BoardSettings>(`/api/v1/whiteboard/${id}/settings`, patch).then((res) => res.data);
+
+export const getBoardDocument = (id: number): Promise<BoardDocumentResponse> =>
+  apiClient.get<BoardDocumentResponse>(`/api/v1/whiteboard/${id}/doc`).then((res) => res.data);
+
+export const saveBoardDocument = (id: number, snapshot: string): Promise<{ success: boolean }> =>
+  apiClient
+    .post<{ success: boolean }>(`/api/v1/whiteboard/${id}/doc`, { snapshot })
+    .then((res) => res.data);

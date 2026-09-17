@@ -39,6 +39,7 @@ import { useClipboard, offsetElement } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 import { useYjsBoard, type UseYjsBoardReturn } from '../../hooks/use-yjs-board';
+import { useYjsSync } from '../../yjs/use-yjs-sync';
 
 // Yjs - feature flag
 import { WHITEBOARD_YJS_ENABLED } from '../../config/feature-flags';
@@ -414,6 +415,14 @@ export default function WhiteboardCanvasNew({
   const yjsBoard = useYjsBoard({ userId: user?.id ?? null, username: user?.username ?? null });
   const el: BoardElementsBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsElements(yjsBoard) : legacyEl;
   const hist: BoardHistoryBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsHistory(yjsBoard) : legacyHist;
+
+  // Snapshot + live transport Yjs
+  useYjsSync({
+    doc: yjsBoard.doc,
+    boardId,
+    userId: user?.id ?? null,
+    enabled: WHITEBOARD_YJS_ENABLED,
+  });
 
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({

@@ -61,3 +61,16 @@ class BoardSettingsPatch(BaseModel):
     grid_visible: Optional[bool] = None
     smartsearch_visible: Optional[bool] = None
     toolbar_visible: Optional[bool] = None
+
+
+class SaveDocumentRequest(BaseModel):
+    snapshot: str
+
+
+class SaveDocumentResponse(BaseModel):
+    success: bool
+
+
+class DocumentResponse(BaseModel):
+    snapshot: Optional[str] = None
+    updated_at: Optional[datetime] = None
