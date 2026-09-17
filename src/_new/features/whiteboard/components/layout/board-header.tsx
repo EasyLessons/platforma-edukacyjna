@@ -22,7 +22,10 @@ import {
   getGradientClass,
 } from '@/_new/features/board/utils/helpers';
 import { Button } from '@/_new/shared/ui/button';
-import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import {
+  useWhiteboardUiMetrics,
+  safeInset,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 /**
@@ -46,8 +49,12 @@ export function BoardHeaderFrame({
     <div
       style={{
         position: 'absolute',
-        top: `${metrics.spacing.top}px`,
-        left: `${metrics.spacing.side}px`,
+        top: metrics.isPhoneLayout
+          ? safeInset(metrics.spacing.top, 'top')
+          : `${metrics.spacing.top}px`,
+        left: metrics.isPhoneLayout
+          ? safeInset(metrics.spacing.side, 'left')
+          : `${metrics.spacing.side}px`,
         zIndex: 100,
         display: 'flex',
         alignItems: 'center',
@@ -75,8 +82,20 @@ export function BoardHeaderFrame({
   );
 }
 
-/** Logo EasyLesson jako przycisk powrotu — wspólne dla tablicy i demo. */
-export function BoardLogoButton({ href, tooltip }: { href: string; tooltip: string }) {
+/**
+ * Logo EasyLesson jako przycisk powrotu — wspólne dla tablicy i demo.
+ * `compact`: sama ikona z tego samego pliku logo (bez napisu) - na telefonie
+ * pelne logo zaslanialo pasek z uczestnikami i przyciskiem czatu glosowego.
+ */
+export function BoardLogoButton({
+  href,
+  tooltip,
+  compact = false,
+}: {
+  href: string;
+  tooltip: string;
+  compact?: boolean;
+}) {
   const router = useRouter();
 
   return (
@@ -101,14 +120,29 @@ export function BoardLogoButton({ href, tooltip }: { href: string; tooltip: stri
           borderRadius: '8px',
         }}
       >
-        <Image
-          src="/resources/LogoEasyLesson.webp"
-          alt="EasyLesson Logo"
-          width={160}
-          height={50}
-          className="h-9 w-auto"
-          priority
-        />
+        {compact ? (
+          // Ta sama grafika logo, przycieta do ikony po lewej (bez napisu).
+          // /resources/sygnet.webp jest bialy (pod ciemne tlo) - na bialej ramce niewidoczny.
+          <span className="block h-9 w-[30px] overflow-hidden">
+            <Image
+              src="/resources/LogoEasyLesson.webp"
+              alt="EasyLesson Logo"
+              width={160}
+              height={50}
+              className="h-9 w-auto max-w-none"
+              priority
+            />
+          </span>
+        ) : (
+          <Image
+            src="/resources/LogoEasyLesson.webp"
+            alt="EasyLesson Logo"
+            width={160}
+            height={50}
+            className="h-9 w-auto"
+            priority
+          />
+        )}
       </button>
     </Tooltip>
   );
@@ -429,8 +463,12 @@ export function BoardHeader({
         <div
           style={{
             position: 'absolute',
-            top: `${metrics.spacing.top}px`,
-            left: `${metrics.spacing.side}px`,
+            top: metrics.isPhoneLayout
+              ? safeInset(metrics.spacing.top, 'top')
+              : `${metrics.spacing.top}px`,
+            left: metrics.isPhoneLayout
+              ? safeInset(metrics.spacing.side, 'left')
+              : `${metrics.spacing.side}px`,
             zIndex: 100,
             display: 'flex',
             flexDirection: metrics.boardHeader.fallbackStackVertical ? 'column' : 'row',
