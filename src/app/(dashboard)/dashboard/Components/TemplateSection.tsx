@@ -193,7 +193,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
           <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 ml-3 mb-2">Szablony</h2>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="relative" ref={subjectDropdownRef}>
               <button
                 onClick={() => {
@@ -295,7 +295,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
       >
         <button
           onClick={() => createAndOpenBoard('Czysta tablica')}
-          className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
+          className="dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
         >
           <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white border border-dashed border-gray-300 flex items-center justify-center">
             <img
@@ -319,7 +319,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
             onClick={() =>
               createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
             }
-            className="dashboard-hover-surface group relative w-[280px] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
+            className="dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
           >
             <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
               <img

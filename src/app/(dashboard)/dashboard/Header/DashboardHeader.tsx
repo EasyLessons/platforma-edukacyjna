@@ -261,6 +261,8 @@ export default function DashboardHeader({
                 variant="secondary"
                 size="icon"
                 onClick={() => setShowMobileMenu(!showMobileMenu)}
+                aria-label={showMobileMenu ? 'Zamknij menu' : 'Otwórz menu'}
+                className="max-md:h-11 max-md:w-11"
               >
                 {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
               </Button>

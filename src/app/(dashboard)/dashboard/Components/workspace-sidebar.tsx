@@ -35,6 +35,9 @@ interface WorkspaceSidebarProps {
   deleteWorkspace: (id: number) => Promise<void>;
   leaveWorkspace: (id: number) => Promise<void>;
   toggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
+  /** Telefon (ponizej md): sidebar jako wysuwana szuflada nad trescia. */
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 export default function WorkspaceSidebar({
@@ -50,8 +53,22 @@ export default function WorkspaceSidebar({
   deleteWorkspace,
   leaveWorkspace,
   toggleFavourite,
+  mobileOpen = false,
+  onMobileClose,
 }: WorkspaceSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  // Ponizej md sidebar jest szuflada: zawsze pelna wersja, a przycisk zwijania ja zamyka.
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const collapsed = isMobileViewport ? false : isCollapsed;
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobileViewport(mq.matches);
+    update();
+    mq.addEventListener?.('change', update);
+    return () => mq.removeEventListener?.('change', update);
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -177,14 +194,23 @@ export default function WorkspaceSidebar({
 
   return (
     <>
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[65] bg-black/40"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
       <div
         className={`${
-          isCollapsed ? 'w-[72px]' : 'w-[344px]'
-        } h-full bg-[var(--dash-panel)] border-r border-[var(--dash-border)] flex flex-col transition-all duration-300 z-10`}
+          collapsed ? 'w-[72px]' : 'w-[344px]'
+        } h-full bg-[var(--dash-panel)] border-r border-[var(--dash-border)] flex flex-col transition-all duration-300 z-10 max-md:fixed max-md:inset-y-0 max-md:left-0 max-md:z-[70] max-md:w-[min(344px,85vw)] max-md:overflow-y-auto max-md:shadow-2xl ${
+          mobileOpen ? 'max-md:translate-x-0' : 'max-md:-translate-x-full'
+        }`}
       >
         <div className="px-4 pt-6 pb-2 bg-[var(--dash-panel)]">
           <div className="flex items-center justify-between mb-4 group">
-            {!isCollapsed && (
+            {!collapsed && (
               <div className="flex items-center gap-2.5">
                 <h2 className="mt-0.5 text-[14px] font-semibold text-black uppercase tracking-wide">
                   Przestrzenie
@@ -192,7 +218,7 @@ export default function WorkspaceSidebar({
                 <div className="flex items-center gap-1 transition-opacity">
                   <button
                     onClick={() => setShowCreateModal(true)}
-                    className="h-6 w-6 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
+                    className="h-6 w-6 max-md:h-11 max-md:w-11 text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer"
                     title="Dodaj przestrzeń"
                   >
                     <Plus size={18} strokeWidth={2.5} className="items-center" />
@@ -201,13 +227,19 @@ export default function WorkspaceSidebar({
               </div>
             )}
             <button
-              onClick={() => setIsCollapsed(!isCollapsed)}
+              onClick={() => (isMobileViewport ? onMobileClose?.() : setIsCollapsed(!isCollapsed))}
               className={`text-gray-400 hover:text-gray-600 hover:bg-gray-200 rounded p-0 bg-transparent flex justify-center items-center cursor-pointer ${
-                isCollapsed ? 'mx-auto w-12 h-12' : 'h-6 w-6'
+                collapsed ? 'mx-auto w-12 h-12' : 'h-6 w-6 max-md:h-11 max-md:w-11'
               }`}
-              title={isCollapsed ? 'Rozwiń sidebar' : 'Zwiń sidebar'}
+              title={
+                isMobileViewport
+                  ? 'Zamknij listę przestrzeni'
+                  : collapsed
+                    ? 'Rozwiń sidebar'
+                    : 'Zwiń sidebar'
+              }
             >
-              {isCollapsed ? (
+              {collapsed ? (
                 <PanelLeftOpen size={24} strokeWidth={2.5} />
               ) : (
                 <PanelLeftClose size={18} strokeWidth={2.5} />
@@ -215,7 +247,7 @@ export default function WorkspaceSidebar({
             </button>
           </div>
 
-          {!isCollapsed && (
+          {!collapsed && (
             <div className="pt-2">
               <Input
                 ref={searchInputRef}
@@ -224,11 +256,11 @@ export default function WorkspaceSidebar({
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Szukaj przestrzeni..."
                 leftIcon={<Search size={18} className="text-gray-400" strokeWidth={2.5} />}
-                className="bg-gray-100 border-transparent rounded-md focus:bg-gray-200/52 hover:bg-gray-100 focus:ring-0 transition-colors shadow-none h-[34px] text-[13px] placeholder:text-gray-500"
+                className="bg-gray-100 border-transparent rounded-md focus:bg-gray-200/52 hover:bg-gray-100 focus:ring-0 transition-colors shadow-none h-[34px] max-md:h-11 text-[13px] max-md:text-base placeholder:text-gray-500"
               />
             </div>
           )}
-          {isCollapsed && (
+          {collapsed && (
             <button
               onClick={() => {
                 setIsCollapsed(false);
@@ -252,7 +284,7 @@ export default function WorkspaceSidebar({
 
         {/* SYSTEM LINKS */}
         <div className="px-2 flex flex-col gap-[2px]">
-          {!isCollapsed ? (
+          {!collapsed ? (
             <button
               onClick={onRecentSelect}
               className={`relative w-full flex items-center gap-2 pr-2 py-2.5 rounded-md transition-colors duration-100 cursor-pointer group shadow-none ${
@@ -307,7 +339,7 @@ export default function WorkspaceSidebar({
           error={error}
           searchQuery={searchQuery}
           activeWorkspaceId={currentView === 'recent' ? null : activeWorkspaceId}
-          isCollapsed={isCollapsed}
+          isCollapsed={collapsed}
           customOrder={customOrder}
           onWorkspaceSelect={onWorkspaceSelect}
           onToggleFavourite={toggleFavourite}
