@@ -26,23 +26,24 @@ services:
       - ./.env.local
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
-      # Bind mount z Windowsa do kontenera Linuksa NIE przekazuje zdarzen
-      # systemu plikow, wiec Turbopack nie wie, ze plik sie zmienil i HMR
-      # nie dziala - zmiany w kodzie nie docieraja do dzialajacego dev servera.
-      #
-      # SPRAWDZONE 15.09: ponizsze dwie zmienne TEGO NIE NAPRAWIAJA. Sa z ery
-      # webpacka (watchpack / chokidar) i Turbopack ich nie czyta. Zostaja tylko
-      # dlatego, ze nie szkodza i dzialaja dla narzedzi pobocznych.
-      # Dzialajaca obejscie po zmianie kodu:
-      #   docker compose up -d --force-recreate frontend
-      # (samo `docker compose restart frontend` potrafi zawisnac na 0/1)
       - WATCHPACK_POLLING=true
       - CHOKIDAR_USEPOLLING=true
       # /api/chat sprawdza token w backendzie z wnetrza kontenera - tam localhost to sam frontend
       - BACKEND_INTERNAL_URL=http://backend:8000
     depends_on:
       - backend
+
   redis:
     image: redis:7-alpine
     ports:
       - '6379:6379'
+
+  whiteboard-sync:
+    build: ./whiteboard-sync
+    ports:
+      - '1234:1234'
+    volumes:
+      - ./whiteboard-sync:/app
+      - /app/node_modules
+    environment:
+      - PORT=1234
