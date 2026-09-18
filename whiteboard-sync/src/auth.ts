@@ -16,6 +16,7 @@ interface AccessCheckData {
 export interface AuthContext {
   userId: number;
   username: string;
+  token: string;
 }
 
 export async function onAuthenticate({
@@ -37,5 +38,5 @@ export async function onAuthenticate({
   if (!res.ok) throw new Error(`Brak dostępu do tablicy (status ${res.status})`);
 
   const body = (await res.json()) as { data: AccessCheckData };
-  return { userId: body.data.user_id, username: body.data.username };
+  return { userId: body.data.user_id, username: body.data.username, token };
 }
