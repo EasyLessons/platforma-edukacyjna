@@ -47,3 +47,6 @@ services:
       - /app/node_modules
     environment:
       - PORT=1234
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend

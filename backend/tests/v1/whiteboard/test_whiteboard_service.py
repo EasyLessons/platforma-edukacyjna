@@ -10,7 +10,7 @@ from api.v1.whiteboard.service import WhiteboardService
 from api.v1.whiteboard.schemas import (
     SaveElementsResponse, BoardElementWithAuthor,
     BoardSettings, BoardSettingsPatch,
-    DocumentResponse,
+    DocumentResponse, AccessCheckResponse,
 )
 from core.exceptions import NotFoundError, AppException, ValidationError
 from core.models import Board, BoardUsers, BoardElement, BoardDocument
@@ -284,3 +284,24 @@ class TestDocument:
         service = WhiteboardService(db_session)
         with pytest.raises(NotFoundError):
             service.load_document(test_board.id, test_user2.id)
+
+
+class TestAccessCheck:
+
+    def test_member_has_access(self, db_session, test_user, test_board):
+        service = WhiteboardService(db_session)
+        result = service.check_access(test_board.id, test_user.id)
+        assert isinstance(result, AccessCheckResponse)
+        assert result.has_access is True
+        assert result.user_id == test_user.id
+        assert result.username == test_user.username
+
+    def test_non_member_raises_404(self, db_session, test_board, test_user2):
+        service = WhiteboardService(db_session)
+        with pytest.raises(NotFoundError):
+            service.check_access(test_board.id, test_user2.id)
+
+    def test_nonexistent_board_raises_404(self, db_session, test_user):
+        service = WhiteboardService(db_session)
+        with pytest.raises(NotFoundError):
+            service.check_access(999999, test_user.id)
