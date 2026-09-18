@@ -50,6 +50,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "yjs": "^13.6.32",
+    "@hocuspocus/provider": "^2.15.0",
     "zustand": "^5.0.14"
   },
   "devDependencies": {

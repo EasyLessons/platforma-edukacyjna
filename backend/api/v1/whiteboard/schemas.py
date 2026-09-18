@@ -74,3 +74,9 @@ class SaveDocumentResponse(BaseModel):
 class DocumentResponse(BaseModel):
     snapshot: Optional[str] = None
     updated_at: Optional[datetime] = None
+
+
+class AccessCheckResponse(BaseModel):
+    has_access: bool
+    user_id: int
+    username: str

@@ -9,6 +9,7 @@ GET    /{id}/elements               — załaduj wszystkie elementy
 DELETE /{id}/elements/{element_id}  — usuń element
 POST   /{id}/doc                    — zapisz snapshot Y.Doc
 GET    /{id}/doc                    — wczytaj snapshot Y.Doc
+GET    /{id}/access                 — sprawdź dostęp do tablicy
 """
 from typing import Any, Dict, List
 
@@ -25,6 +26,7 @@ from .schemas import (
     SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
     BoardSettings, BoardSettingsPatch,
     SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
+    AccessCheckResponse,
 )
 from .service import WhiteboardService
 
@@ -166,4 +168,19 @@ async def get_document(
 ):
     service = WhiteboardService(db)
     result = service.load_document(board_id, current_user.id)
+    return ApiResponse(success=True, data=result)
+
+# Access check --------------------------------------------------
+
+@router.get(
+    "/{board_id}/access",
+    response_model=ApiResponse[AccessCheckResponse],
+)
+async def check_access(
+    board_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    service = WhiteboardService(db)
+    result = service.check_access(board_id, current_user.id)
     return ApiResponse(success=True, data=result)

@@ -24,7 +24,7 @@ from core.models import Board, BoardDocument, BoardElement, BoardUsers, User
 from .schemas import (
     BoardElementWithAuthor, SaveElementsResponse,
     BoardSettings, BoardSettingsPatch,
-    DocumentResponse,
+    DocumentResponse, AccessCheckResponse,
 )
 from .storage import upload_board_image, delete_board_image
 from core.presence import PresenceService
@@ -293,4 +293,19 @@ class WhiteboardService:
         return DocumentResponse(
             snapshot=base64.b64encode(doc.snapshot).decode("ascii"),
             updated_at=doc.updated_at,
+        )
+
+    # Access check --------------------------------------------------
+
+    def check_access(self, board_id: int, user_id: int) -> AccessCheckResponse:
+        """Sprawdza czy użytkownik ma dostęp do tablicy i zwraca info o nim."""
+        board = self._get_board_or_404(board_id)
+        require_membership(self.db, board.workspace_id, user_id)
+
+        user = self.db.query(User).filter(User.id == user_id).first()
+
+        return AccessCheckResponse(
+            has_access=True,
+            user_id=user.id,
+            username=user.username,
         )
