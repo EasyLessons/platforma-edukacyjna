@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Edit2, Trash2, MapPin, Phone, Mail, Star, StarOff } from 'lucide-react';
-import { Address } from '../../types';
+import { Address } from '../types';
 
 interface AddressCardProps {
   address: Address;

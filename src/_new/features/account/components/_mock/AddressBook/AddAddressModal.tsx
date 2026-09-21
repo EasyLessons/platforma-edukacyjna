@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
-import { Address } from '../../types';
+import { Address } from '../types';
 
 interface AddAddressModalProps {
   isOpen: boolean;
