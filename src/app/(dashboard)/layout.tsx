@@ -1,7 +1,7 @@
 'use client';
 
 import './dashboard/dashboard-theme.css';
-import DashboardHeader from './dashboard/Header/DashboardHeader';
+import { DashboardHeader } from '@/_new/features/dashboard';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
