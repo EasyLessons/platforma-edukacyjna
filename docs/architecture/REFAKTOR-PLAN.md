@@ -480,3 +480,27 @@ zero importów `features -> app` pilnowane przez CI, `whiteboard-canvas.tsx` ≈
 (z 2 712), `select-tool.tsx` ≈ 700 (z 1 906), brak `src/_new`, brak `src/app/context`,
 brak `src/lib`, ~1 500 linii legacy tablicy mniej (C0), 1 811 warningów backendu mniej,
 dokumentacja zgodna z kodem.
+
+---
+
+## 11. Decyzje Patryka (21.09.2026, po recenzji)
+
+Plan zatwierdzony. Odpowiedzi na pytania z §9:
+
+| Pyt. | Decyzja |
+| ---- | ------- |
+| P1 | TAK: `src/features` + `src/lib` + `src/shared` + `src/server`, aliasy `@/features/*` itd.; alias `@new/*` znika |
+| P2 | Makiety z `/account` -> `features/account/components/_mock/` + wpis w `known-issues.md` |
+| P3 | TAK: landing do `features/landing` |
+| P4 | NIE RUSZAĆ legacy tablicy - Patryk ustala z Bartkiem osobno |
+| P5 | później |
+| P6 | później (dzień na D1 do ustalenia) |
+| P7 | TAK, w A1: `NaukaNextjs/` poza repo, `komendy.txt` scalone z README |
+| P8 | odłożone (E2 nie wchodzi) |
+| P9 | odłożone (C7 nie wchodzi) |
+| P10 | kebab-case, wykonać w D1 |
+| P11 | zamknąć PR #1 i #2 z komentarzem |
+| P12 | TAK: próg 400 linii dopisany do `CLAUDE.md` |
+
+PR #39 zmergowany 21.09 - Faza B odblokowana. Każdy etap idzie jako osobny PR z `origin/main`;
+merguje wyłącznie Patryk.
