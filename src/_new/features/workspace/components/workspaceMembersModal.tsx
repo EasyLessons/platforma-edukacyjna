@@ -12,7 +12,7 @@ import { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Crown, Users as UsersIcon, Loader2, Trash2, Eye, Edit3 } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { useModal } from '@/_new/shared/hooks/use-modal';
 import { useWorkspaceMembers } from '../hooks/useWorkspaceMember';
 import { ROLE_LABELS, ROLE_COLORS } from '../utils/constants';
@@ -134,7 +134,7 @@ export function WorkspaceMembersModal({ isOpen, onClose, workspace }: WorkspaceM
             variant="secondary"
             onClick={handleClose}
             aria-label="Zamknij"
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>

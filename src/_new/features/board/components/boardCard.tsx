@@ -90,7 +90,7 @@ export function BoardCard({
           {canRename && (
             <button
               onClick={handleDropdownEdit}
-              className="p-1.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+              className="p-1.5 max-md:p-3.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
               title="Zmień nazwę"
             >
               <Pencil className="w-4 h-4" />
@@ -98,7 +98,7 @@ export function BoardCard({
           )}
           <button
             onClick={handleToggleFavourite}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-gray-100 transition-colors"
+            className="p-1.5 max-md:p-3.5 rounded-lg text-gray-400 hover:text-yellow-400 hover:bg-gray-100 transition-colors"
             title={board.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
           >
             <Star
@@ -228,7 +228,7 @@ function BoardDropdownMenu({ canRename, onEdit, onDelete }: BoardDropdownMenuPro
           e.stopPropagation();
           setOpen((p) => !p);
         }}
-        className="p-1.5 lg:p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
+        className="p-1.5 max-md:p-3.5 lg:p-2 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-all"
       >
         <MoreVertical size={16} />
       </button>

@@ -202,7 +202,7 @@ useEffect(() => {
 
 ## 8. Znany artefakt ESLint — nie naprawiać
 
-**Lokalizacja:** [whiteboard-canvas.tsx:743](../../../src/_new/features/whiteboard/components/canvas/whiteboard-canvas.tsx#L743)
+**Lokalizacja:** [whiteboard-canvas.tsx:889](../../../src/_new/features/whiteboard/components/canvas/whiteboard-canvas.tsx#L889) (numer linii z 21.09.2026 — szukaj po komentarzu `Stabilna — wszystkie wartości runtime przez renderStateRef`)
 
 ```ts
 // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -221,7 +221,7 @@ stabilność `redrawCanvas` i wprowadzi re-mount event handlerów przy każdym r
 
 ## 9. Znana luka w `eraser-tool` — nieobsługiwane typy elementów
 
-**Lokalizacja:** [eraser-tool.tsx:116](../../../src/_new/features/whiteboard/components/toolbar/eraser-tool.tsx#L116) — funkcja `isPointInElement`
+**Lokalizacja:** [eraser-tool.tsx:85](../../../src/_new/features/whiteboard/components/toolbar/eraser-tool.tsx#L85) — funkcja `isPointInElement`
 
 Gumka obsługuje hit-testing tylko dla: `shape`, `text`, `image`, `path`, `function`.
 

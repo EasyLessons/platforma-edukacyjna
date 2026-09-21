@@ -14,6 +14,10 @@
 
 import { memo } from 'react';
 import { ToolbarUI } from './toolbar-ui';
+import {
+  useWhiteboardUiMetrics,
+  safeInset,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 
 // Re-eksport dla starych importów typu z './toolbar/Toolbar'
 export type { Tool, ShapeType } from '@/_new/features/whiteboard/types';
@@ -56,13 +60,35 @@ function Toolbar({
   leftOffset = 0,
   onToggleAssetsLibrary,
 }: ToolbarProps) {
+  const metrics = useWhiteboardUiMetrics();
+
+  // Telefon: pasek nie jest centrowany w pionie (w poziomie wychodzil poza ekran,
+  // w pionie zajmowal ~70% wysokosci). Startuje pod gornymi kontrolkami, konczy
+  // nad kontrolka zoomu i przewija sie, gdy narzedzia sie nie mieszcza.
+  // W pionie gorny rzad to przycisk panelu + wyszukiwarka pod nim.
+  const phoneTop = metrics.isPhonePortrait ? 142 : 82;
+  const PHONE_BOTTOM_RESERVED = 66; // zoom (40) + odstepy
+  const phoneMaxHeight = `calc(100dvh - ${phoneTop + PHONE_BOTTOM_RESERVED}px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px))`;
+
   return (
     <div
-      className="absolute top-1/2 -translate-y-1/2 z-50 pointer-events-none flex flex-row items-start gap-2"
-      style={{
-        left: `${leftOffset + 16}px`,
-        transition: 'left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-      }}
+      className={
+        metrics.isPhoneLayout
+          ? 'absolute z-50 pointer-events-none flex flex-row items-start gap-2'
+          : 'absolute top-1/2 -translate-y-1/2 z-50 pointer-events-none flex flex-row items-start gap-2'
+      }
+      style={
+        metrics.isPhoneLayout
+          ? {
+              top: safeInset(phoneTop, 'top'),
+              left: safeInset(leftOffset + 16, 'left'),
+              transition: 'left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            }
+          : {
+              left: `${leftOffset + 16}px`,
+              transition: 'left 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+            }
+      }
     >
       <ToolbarUI
         canUndo={canUndo}
@@ -78,6 +104,7 @@ function Toolbar({
         onCalculatorToggle={onCalculatorToggle}
         isReadOnly={isReadOnly}
         onToggleAssetsLibrary={onToggleAssetsLibrary}
+        maxHeight={metrics.isPhoneLayout ? phoneMaxHeight : undefined}
       />
     </div>
   );

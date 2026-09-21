@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
 import { User, Settings, Crown, LogOut } from 'lucide-react';
 import { useAuth } from '@/_new/lib/auth';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 
 interface UserMenuPopupProps {
   onClose: () => void;

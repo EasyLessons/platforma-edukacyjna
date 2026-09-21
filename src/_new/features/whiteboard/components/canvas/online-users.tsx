@@ -24,10 +24,14 @@ import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeCon
 import { useAuth } from '@/_new/lib/auth';
 import { Check, Eye, EyeOff, Phone, Plus, Users, History } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
+import { VoiceChatNotice } from '@/_new/features/whiteboard/components/canvas/voice-chat-notice';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { useVoiceChat } from '@/app/context/VoiceChatContext';
 import { Button } from '@/_new/shared/ui/button';
-import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import {
+  useWhiteboardUiMetrics,
+  safeInset,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { Tooltip } from '@/_new/shared/ui/tooltip';
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -143,8 +147,9 @@ export function OnlineUsers({
     if (!voiceChat) return;
 
     if (!voiceChat.isInVoiceChat) {
-      await voiceChat.joinVoiceChat();
-      setIsVoicePanelOpen(true);
+      // Panel tylko po udanym dolaczeniu - powod porazki pokazuje VoiceChatNotice.
+      const joined = await voiceChat.joinVoiceChat();
+      if (joined) setIsVoicePanelOpen(true);
       return;
     }
 
@@ -177,8 +182,12 @@ export function OnlineUsers({
     <div
       className="absolute z-50 flex flex-col items-end gap-3 w-fit"
       style={{
-        top: `${metrics.onlineUsers.topOffset}px`,
-        right: `${metrics.spacing.side}px`,
+        top: metrics.isPhoneLayout
+          ? safeInset(metrics.onlineUsers.topOffset, 'top')
+          : `${metrics.onlineUsers.topOffset}px`,
+        right: metrics.isPhoneLayout
+          ? safeInset(metrics.spacing.side, 'right')
+          : `${metrics.spacing.side}px`,
         maxWidth: metrics.isMobile ? 'calc(100vw - 10px)' : 'calc(100vw - 32px)',
       }}
     >
@@ -317,16 +326,20 @@ export function OnlineUsers({
               variant="dark"
               size="sm"
               onClick={handleCopyLink}
-              className={`font-semibold h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.onlineUsers.compactButtons ? 'px-3  justify-center' : 'px-4'}`}
+              aria-label={linkCopied ? 'Skopiowano link' : 'Udostępnij tablicę'}
+              className={`font-semibold h-10 rounded-lg font-medium whitespace-nowrap transition-all duration-300 ease-in-out shrink-0 ${metrics.isPhonePortrait ? 'w-10 min-w-10 px-0 justify-center' : metrics.onlineUsers.compactButtons ? 'px-3  justify-center' : 'px-4'}`}
               leftIcon={shareIcon}
             >
-              {linkCopied ? 'Skopiowano link' : 'Udostępnij'}
+              {/* Na telefonie w pionie sama ikona - napis spychal pasek pod lewe kontrolki. */}
+              {!metrics.isPhonePortrait && (linkCopied ? 'Skopiowano link' : 'Udostępnij')}
             </Button>
           </Tooltip>
         </div>
       </div>
 
       <VoiceChat isVisible={shouldShowVoicePanel} className="ml-auto" />
+
+      <VoiceChatNotice />
 
       {toastState && (
         <div className="fixed inset-x-0 bottom-8 z-[1200] pointer-events-none flex justify-center px-4">

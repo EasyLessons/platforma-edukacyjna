@@ -18,7 +18,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Filter, ChevronDown } from 'lucide-react';
-import { DashboardButton } from './DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { BoardList } from '@/_new/features/board/components/boardList';
 import { BoardCreateModal } from '@/_new/features/board/components/boardCreateModal';
 import { BoardEditModal } from '@/_new/features/board/components/boardEditModal';
@@ -93,20 +93,20 @@ export default function BoardsSection({
   return (
     <>
       <div
-        className="sticky z-20 bg-white backdrop-blur supports-[backdrop-filter]:bg-white"
+        className="sticky max-md:static z-20 bg-white backdrop-blur supports-[backdrop-filter]:bg-white"
         style={{ top: stickyOffset }}
       >
         <div className="pt-4">
           {/* Header */}
-          <div className="flex items-center justify-between mb-6 md:mb-8">
-            <h2 className="text-2xl md:text-[28px] font-bold text-gray-900">
+          <div className="flex items-center justify-between gap-3 mb-6 md:mb-8">
+            <h2 className="min-w-0 text-2xl max-md:text-xl max-md:truncate md:text-[28px] font-bold text-gray-900">
               {workspace_name ? `Tablice — ${workspace_name}` : 'Tablice'}
             </h2>
             <DashboardButton
               variant="primary"
               leftIcon={<Plus size={16} />}
               onClick={() => setShowCreateModal(true)}
-              className="h-8"
+              className="h-8 max-md:h-11 shrink-0"
             >
               <span className="hidden sm:inline">Nowa tablica</span>
               <span className="sm:hidden">Nowa</span>
@@ -123,12 +123,12 @@ export default function BoardsSection({
                 </span>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 flex-1 sm:justify-end">
+              <div className="flex flex-col sm:flex-row max-sm:flex-row max-sm:flex-wrap max-sm:w-full gap-2 sm:gap-4 flex-1 sm:justify-end">
                 <div className="relative">
                   <select
                     value={filterOwner}
                     onChange={(e) => setFilterOwner(e.target.value as FilterOwner)}
-                    className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs md:text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-black focus:border-black cursor-pointer transition-all min-w-[120px]"
+                    className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 max-md:py-3 text-xs max-md:text-sm md:text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-black focus:border-black cursor-pointer transition-all min-w-[120px]"
                   >
                     <option value="all">Dowolna osoba</option>
                     <option value="mine">Tylko moje</option>
@@ -143,7 +143,7 @@ export default function BoardsSection({
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortBy)}
-                    className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs md:text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-black focus:border-black cursor-pointer transition-all min-w-[120px]"
+                    className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 max-md:py-3 text-xs max-md:text-sm md:text-sm font-medium text-gray-800 focus:outline-none focus:ring-1 focus:ring-black focus:border-black cursor-pointer transition-all min-w-[120px]"
                   >
                     <option value="recent">Ostatnio zmieniona</option>
                     <option value="favourite">Ulubione</option>

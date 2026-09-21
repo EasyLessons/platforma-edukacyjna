@@ -3,7 +3,8 @@
 import { useMemo, useState } from 'react';
 import { Loader2, Pencil, Star, UserPlus, Lock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from './DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
+import { OpenWorkspacesButton } from './open-workspaces-button';
 import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
 import { WorkspaceDropdownMenu } from '@/_new/features/workspace/components/workspaceDropdownMenu';
 import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspaceEditModal';
@@ -23,6 +24,8 @@ interface WorkspaceTopNavProps {
   updateWorkspace: (id: number, data: WorkspaceUpdateRequest) => Promise<Workspace>;
   deleteWorkspace: (id: number) => Promise<void>;
   leaveWorkspace: (id: number) => Promise<void>;
+  /** Telefon: otwiera wysuwana liste przestrzeni. */
+  onOpenWorkspaces?: () => void;
 }
 
 export default function WorkspaceTopNav({
@@ -32,6 +35,7 @@ export default function WorkspaceTopNav({
   updateWorkspace,
   deleteWorkspace,
   leaveWorkspace,
+  onOpenWorkspaces,
 }: WorkspaceTopNavProps) {
   const { getAvatarColorClass, getInitials } = useUserAvatar();
 
@@ -85,8 +89,9 @@ export default function WorkspaceTopNav({
     <>
       <div className="w-full shrink-0 bg-white">
         {/* Biały pasek Navu */}
-        <div className="flex items-center justify-between gap-4 bg-white px-4 py-3 sm:px-8 border-b border-gray-100">
-          <div className="min-w-0 flex items-center gap-3">
+        <div className="flex items-center justify-between gap-4 max-md:gap-1 bg-white px-4 max-md:px-2 max-md:py-1.5 py-3 sm:px-8 border-b border-gray-100">
+          <div className="min-w-0 flex items-center gap-3 max-md:gap-2">
+            {onOpenWorkspaces && <OpenWorkspacesButton onClick={onOpenWorkspaces} />}
             {activeWorkspace && WorkspaceIcon && (
               <div
                 className={`flex h-6 w-6 items-center justify-center rounded-lg text-white shadow-sm ${workspaceColorClass}`}
@@ -188,7 +193,7 @@ export default function WorkspaceTopNav({
               <button
                 onClick={() => toggleFavourite(activeWorkspace.id, !activeWorkspace.is_favourite)}
                 title={activeWorkspace.is_favourite ? 'Usuń z ulubionych' : 'Dodaj do ulubionych'}
-                className={`cursor-pointer flex items-center justify-center h-8 w-8 transition ${
+                className={`cursor-pointer flex items-center justify-center h-8 w-8 max-md:h-11 max-md:w-11 transition ${
                   activeWorkspace.is_favourite
                     ? 'text-yellow-500 hover:text-yellow-600'
                     : 'text-gray-500 hover:text-gray-800'
@@ -197,7 +202,7 @@ export default function WorkspaceTopNav({
                 <Star size={16} className={activeWorkspace.is_favourite ? 'fill-yellow-500' : ''} />
               </button>
 
-              <div className="cursor-pointer flex items-center justify-center h-8 w-8">
+              <div className="cursor-pointer flex items-center justify-center h-8 w-8 max-md:h-11 max-md:w-11">
                 <WorkspaceDropdownMenu
                   workspace={activeWorkspace}
                   onInvite={() => setInvitingWorkspace(activeWorkspace)}
@@ -206,12 +211,14 @@ export default function WorkspaceTopNav({
                   onDelete={() => setDeletingWorkspace(activeWorkspace)}
                   onLeave={() => setLeavingWorkspace(activeWorkspace)}
                   onShareLink={() => setSharingWorkspace(activeWorkspace)}
-                  triggerClassName="h-8 w-8 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
+                  triggerClassName="h-8 w-8 max-md:h-11 max-md:w-11 text-gray-500 hover:text-gray-800 cursor-pointer hover:bg-transparent bg-transparent"
                 />
               </div>
             </div>
           ) : (
-            <span className="text-xs text-gray-500">Wybierz workspace z menu po lewej</span>
+            <span className="text-xs text-gray-500 truncate">
+              Wybierz workspace z menu po lewej
+            </span>
           )}
         </div>
       </div>

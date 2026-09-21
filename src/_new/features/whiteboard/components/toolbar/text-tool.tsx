@@ -224,7 +224,6 @@ export function TextTool({
     textarea.style.height = '100%';
     const newWorldH = Math.max(MIN_WORLD_H, scrollH / (100 * viewport.scale));
     setLocalHeight((prev) => (Math.abs(newWorldH - prev) < 0.005 ? prev : newWorldH));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     editText,
     phase,

@@ -12,7 +12,7 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { WorkspaceIconPicker } from './workspaceIconPicker';
 import { WorkspaceColorPicker } from './workspaceColorPicker';
 import { useCreateWorkspaceForm } from '../hooks/useCreateWorkspaceForm';
@@ -68,7 +68,7 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label="Zamknij"
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>

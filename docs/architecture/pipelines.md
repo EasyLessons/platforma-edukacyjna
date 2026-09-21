@@ -10,7 +10,7 @@ UI (LoginForm, src/_new/features/auth/components/loginForm.tsx)
   → authApi.ts (POST /login)
   → backend/api/v1/auth/router.py → service.py
   → sprawdzenie hasła (passlib/bcrypt) → wystawienie access token (JWT) + refresh token (cookie HttpOnly)
-  → AuthContext.login() (src/app/context/AuthContext.tsx) zapisuje access token in-memory
+  → AuthContext.login() (src/_new/lib/auth/AuthContext.tsx) zapisuje access token in-memory
   → redirect na /dashboard
 ```
 
@@ -32,7 +32,23 @@ User A rysuje na Canvas
 
 Presence (kto jest online na tablicy, kursory innych userów) — ten sam kanał Supabase, mechanizm Presence zamiast Broadcast.
 
-**Do zapamiętania:** to jest jeden z trzech dużych legacy plików (`BoardRealtimeContext`, 1245 linii) — patrz `docs/migration-status.md`.
+Powyższe to ścieżka **legacy** (aktywna, gdy `NEXT_PUBLIC_WHITEBOARD_YJS` nie jest `true`). Logika broadcastu elementów siedzi w `src/_new/features/whiteboard/realtime/useElementSync.ts`, stan w `hooks/use-elements.ts`, REST w `api/elements-api.ts`; `BoardRealtimeContext` (390 linii, `src/app/context`) tylko spina hooki z kanałem.
+
+### 2b. Synchronizacja tablicy — ścieżka Yjs (za flagą `NEXT_PUBLIC_WHITEBOARD_YJS=true`)
+
+```
+User A rysuje na Canvas
+  → WhiteboardEngine wykonuje Command → mutacja Y.Doc (hooks/use-yjs-board.ts → yjs/board-doc.ts)
+  → HocuspocusProvider (yjs/use-yjs-sync.ts) wysyła update CRDT po WebSocket
+    do serwisu whiteboard-sync (whiteboard-sync/src/index.ts, port 1234)
+  → whiteboard-sync przy pierwszym połączeniu z dokumentem:
+      · onAuthenticate: GET /api/v1/whiteboard/{id}/access z tokenem usera (auth.ts)
+      · Database.fetch: GET /api/v1/whiteboard/{id}/doc → snapshot z tabeli board_documents (database.ts)
+  → serwis rozsyła update do pozostałych klientów tego dokumentu (User B/C)
+  → Database.store (debounce Hocuspocusa): POST /api/v1/whiteboard/{id}/doc → snapshot do Postgresa
+```
+
+Presence/kursory/typing/follow nadal idą przez Supabase (pkt 2) — Yjs zastępuje tylko synchronizację i persystencję elementów. Undo/redo w tej ścieżce to `Y.UndoManager`. Migracja danych `board_elements → board_documents` i wyłączenie ścieżki legacy: gałąź `feature/whiteboard-yjs`.
 
 ## 3. Powiadomienia (np. zaproszenie do workspace'u)
 
@@ -79,7 +95,9 @@ UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Author
 ## 5. Voice chat (WebRTC)
 
 ```
-User dołącza do tablicy → VoiceChatContext (src/app/context/VoiceChatContext.tsx, 1484 linie)
+User dołącza do tablicy → VoiceChatContext (src/app/context/VoiceChatContext.tsx + hooki w src/app/context/voice-chat/:
+  useVoiceSignaling — kanał i zdarzenia voice-*, useWebRTCConnections — RTCPeerConnection per user,
+  useVoiceDetection — wskaźnik "mówi", mediaSupport — wykrywanie braku wsparcia/HTTPS)
   → sygnalizacja (wymiana SDP/ICE candidates) przez Supabase Broadcast (ten sam mechanizm co pkt 2)
   → połączenie peer-to-peer między przeglądarkami po ustaleniu ścieżki przez Xirsys (TURN/STUN)
   → audio leci bezpośrednio między klientami, nie przez backend

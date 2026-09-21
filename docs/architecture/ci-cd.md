@@ -36,6 +36,7 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 | `frontend-test` | `npm run test` (vitest) | to samo |
 | `frontend-lint` | `npm run lint` + `npm run format:check` | to samo |
 | `frontend-typecheck` | `npm run typecheck` (`tsc --noEmit`) | to samo |
+| `frontend-arch` | `npm run depcruise` (dependency-cruiser: granice importów `app -> _new/features -> _new/{shared,lib}`, brak cykli/sierot) | to samo |
 | `frontend-build` | `npm run build` (sanity-check kompilacji) | to samo |
 
 **Przed pushem warto odpalić to lokalnie**, żeby nie czekać na czerwone CI:
@@ -49,6 +50,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run format:check
+npm run depcruise
 ```
 
 Jeśli `npm run lint`/`format:check` znajdzie coś do poprawy automatycznie:
@@ -75,3 +77,8 @@ GitHub Push Protection i GitGuardian skanują każdy push/PR pod kątem hardkodo
 
 - Mypy/pyright dla backendu, pełny `eslint-config-next` — nieaktywne, bo kodebase nigdy nie było pod nie pisane; włączenie teraz zalałoby CI szumem. Osobna, przyszła decyzja.
 - Realna baza Postgres/Redis w CI (`services:` w Actions) — testy celowo używają SQLite in-memory + fakeredis, wystarczające dziś.
+
+## Luki (nie decyzje)
+
+- `whiteboard-sync/` nie ma w CI żadnego kroku (typecheck/lint/testy) — do dodania, patrz `REFAKTOR-PLAN.md` (PR-A10).
+- `dependency-cruiser` jest w devDependencies i ma konfigurację (`.dependency-cruiser.cjs`), ale nie jest uruchamiany w CI — reguły granic importów wchodzą w PR-A2 planu.

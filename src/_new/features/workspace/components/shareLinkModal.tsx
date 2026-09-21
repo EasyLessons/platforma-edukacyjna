@@ -12,7 +12,7 @@ import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link2, Copy, Check, X, RefreshCw, Ban, AlertCircle } from 'lucide-react';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { createShareLink, refreshShareLink, revokeShareLink } from '../api/shareLinkApi';
 
 interface ShareLinkModalProps {
@@ -132,7 +132,7 @@ export function ShareLinkModal({
           <DashboardButton
             variant="secondary"
             onClick={onClose}
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>

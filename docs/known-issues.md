@@ -4,6 +4,8 @@ Miejsce na realne buble znalezione w czasie pracy/testów (nie mylić z `docs/mi
 
 Format wpisu: co się dzieje, jak to odtworzyć, co naprawdę się dzieje pod spodem (root cause), jak groźne, opcje naprawy. Priorytet ustawiany ręcznie — wysoki/średni/niski.
 
+**Uwaga (21.09.2026):** wpisy #1–#3 dotyczą ścieżki **legacy** synchronizacji tablicy (Supabase Broadcast + `board_elements`). W ścieżce Yjs (`NEXT_PUBLIC_WHITEBOARD_YJS=true`, patrz `architecture/pipelines.md` §2b) te problemy nie występują z założenia (CRDT rozwiązuje konflikty, brak limitu 256 KB/wiadomość). Po wyłączeniu ścieżki legacy wpisy #1–#3 do usunięcia, nie do naprawy.
+
 ---
 
 ## 1. Wyścig: usunięcie elementów w momencie dołączania drugiej osoby → element "wraca", drugie usunięcie rzuca 404 (średni priorytet)

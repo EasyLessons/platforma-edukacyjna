@@ -13,7 +13,7 @@ import { Mail, X, UserPlus, Search, Check, AlertCircle, Clock } from 'lucide-rea
 import { Button } from '@/_new/shared/ui/button';
 import { Input } from '@/_new/shared/ui/input';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { useWorkspaceInvite } from '../hooks/useWorkspaceInvite';
 import { Workspace } from '../types';
 import type { UserSearchResult } from '../types';
@@ -91,7 +91,7 @@ export function WorkspaceInviteModal({ isOpen, onClose, workspace }: WorkspaceIn
           <DashboardButton
             variant="secondary"
             onClick={onClose}
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>
