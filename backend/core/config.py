@@ -8,7 +8,7 @@ Cel:
     lub z systemu (production - Heroku/Vercel).
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 class Settings(BaseSettings):
@@ -49,12 +49,9 @@ class Settings(BaseSettings):
     port: int = 8000
     
     # === KONFIGURACJA PYDANTIC ===
-    class Config:
-        env_file = ".env"  # Czytaj zmienne z pliku .env (development)
-        # W produkcji (Heroku/Vercel) .env nie istnieje, czyta z systemu
-        
-        case_sensitive = False  # database_url == DATABASE_URL (nie ma różnicy)
-        # Dzięki temu możesz pisać DATABASE_URL w .env ale database_url w kodzie
+    # .env czytany w developmencie; w produkcji (Render) zmienne ida z systemu.
+    # case_sensitive=False: DATABASE_URL w .env == database_url w kodzie.
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
 @lru_cache()
 def get_settings():

@@ -3,6 +3,7 @@ MAIN.PY - Entry point aplikacji
 """
 import os
 import re
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,8 +22,16 @@ log_level = "DEBUG" if os.getenv("ENV", "production") == "development" else "INF
 setup_logging(log_level=log_level)
 logger = logging.getLogger(__name__)
 
+# Lifespan zamiast deprecowanych @app.on_event("startup"/"shutdown")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    logger.info("Education Platform API started ...")
+    yield
+    logger.info("... Education Platform API stopped")
+
 # App
 app = FastAPI(
+    lifespan=lifespan,
     title="Education Platform API",
     version="1.0.0",
     description="Collaborative education platform",
@@ -52,14 +61,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Events
-@app.on_event("startup")
-async def startup_event():
-    logger.info("Education Platform API started ...")
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    logger.info("... Education Platform API stopped")
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)

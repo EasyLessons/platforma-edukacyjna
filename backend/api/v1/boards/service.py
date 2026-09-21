@@ -10,7 +10,7 @@ BoardService obsługuje:
   toggle_favourite()  — ulubione
   get_online_users_by_workspace()  — kto jest online (deleguje do core.presence.PresenceService)
 """
-from datetime import datetime
+from core.time import utcnow
 from typing import Optional
 from sqlalchemy.orm import Session, joinedload
 
@@ -68,8 +68,8 @@ def _new_board_with_owner(
         bg_color=bg_color,
         workspace_id=workspace_id,
         created_by=user_id,
-        created_at=datetime.utcnow(),
-        last_modified=datetime.utcnow(),
+        created_at=utcnow(),
+        last_modified=utcnow(),
         last_modified_by=user_id,
     )
     db.add(board)
@@ -79,7 +79,7 @@ def _new_board_with_owner(
         board_id=board.id,
         user_id=user_id,
         is_favourite=False,
-        last_opened=datetime.utcnow(),
+        last_opened=utcnow(),
     )
     db.add(board_user)
     return board
@@ -102,7 +102,7 @@ def reassign_boards_on_member_removal(
     new_owner_id: int
 ) -> None:
     """Przypisuje tablice użytkownika, który opuszcza workspace, do nowego właściciela."""
-    now = datetime.utcnow()
+    now = utcnow()
     db.query(Board).filter(
         Board.workspace_id == workspace_id,
         Board.created_by == departing_user_id
@@ -199,7 +199,7 @@ class BoardService:
         if data.bg_color is not None:
             board.bg_color = data.bg_color
 
-        board.last_modified = datetime.utcnow()
+        board.last_modified = utcnow()
         board.last_modified_by = user_id
         self.db.commit()
         self.db.refresh(board)

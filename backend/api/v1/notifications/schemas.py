@@ -7,7 +7,7 @@ ReadAllResponse           — wynik operacji mark-all-as-read
 """
 from datetime import datetime
 from typing import Any, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class NotificationResponse(BaseModel):
@@ -29,8 +29,7 @@ class NotificationResponse(BaseModel):
     created_at: datetime
     read_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class NotificationListResponse(BaseModel):
