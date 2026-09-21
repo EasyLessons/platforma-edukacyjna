@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Loader2, Pencil, Star, UserPlus, Lock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from './DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { OpenWorkspacesButton } from './open-workspaces-button';
 import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
 import { WorkspaceDropdownMenu } from '@/_new/features/workspace/components/workspaceDropdownMenu';

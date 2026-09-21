@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Gift, Copy, Check, X, Info, UserPlus, Crown } from 'lucide-react';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 
 interface GiftPopupProps {
   onClose: () => void;

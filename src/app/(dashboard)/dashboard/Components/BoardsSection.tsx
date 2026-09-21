@@ -18,7 +18,7 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Filter, ChevronDown } from 'lucide-react';
-import { DashboardButton } from './DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { BoardList } from '@/_new/features/board/components/boardList';
 import { BoardCreateModal } from '@/_new/features/board/components/boardCreateModal';
 import { BoardEditModal } from '@/_new/features/board/components/boardEditModal';

@@ -12,7 +12,7 @@ import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link2, Copy, Check, X, RefreshCw, Ban, AlertCircle } from 'lucide-react';
 import { useModal } from '@/_new/shared/hooks/use-modal';
-import { DashboardButton } from '@/app/(dashboard)/dashboard/Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { createShareLink, refreshShareLink, revokeShareLink } from '../api/shareLinkApi';
 
 interface ShareLinkModalProps {
