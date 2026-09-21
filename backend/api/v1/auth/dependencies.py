@@ -11,6 +11,7 @@ from core.database import get_db
 from core.models import User
 from core.config import get_settings
 from core.exceptions import AuthenticationError, NotFoundError, AppException
+from core.request_context import set_user_id
 
 security = HTTPBearer(auto_error=False)
 settings = get_settings()
@@ -52,5 +53,7 @@ def get_current_user(
     
     if not user.is_active:
         raise AppException("Konto niezweryfikowane", code="AUTH_ERROR", status_code=403)
-    
+
+    # user_id do logow tego zadania (core/logging.py RequestContextFilter)
+    set_user_id(user.id)
     return user
