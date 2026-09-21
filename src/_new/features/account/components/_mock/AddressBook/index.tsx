@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import AddressCard from './AddressCard';
 import AddAddressModal from './AddAddressModal';
-import { Address } from '../../types';
+import { Address } from '../types';
 
 // Przykładowe dane
 const mockAddresses: Address[] = [

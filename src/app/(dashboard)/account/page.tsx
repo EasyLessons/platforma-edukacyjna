@@ -3,12 +3,14 @@
 import { useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import Sidebar from './components/Sidebar';
-import ProfileSection from './components/ProfileSection';
-import AddressBook from './components/AddressBook';
-import PaymentMethods from './components/PaymentMethods';
-import SecurityCenter from './components/SecurityCenter';
-import { ActiveSection } from './types';
+import {
+  Sidebar,
+  ProfileSection,
+  AddressBook,
+  PaymentMethods,
+  SecurityCenter,
+  type ActiveSection,
+} from '@/_new/features/account';
 
 export default function ClientPanel() {
   const [activeSection, setActiveSection] = useState<ActiveSection>('profile');

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Edit2, Trash2, CreditCard, Star, StarOff } from 'lucide-react';
-import { PaymentMethod } from '../../types';
+import { PaymentMethod } from '../types';
 
 interface PaymentCardProps {
   paymentMethod: PaymentMethod;

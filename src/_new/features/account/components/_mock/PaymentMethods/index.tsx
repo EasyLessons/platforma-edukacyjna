@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Plus, CreditCard, Zap, MapPin } from 'lucide-react';
 import PaymentCard from './PaymentCard';
 import AddPaymentModal from './AddPaymentModal';
-import { PaymentMethod } from '../../types';
+import { PaymentMethod } from '../types';
 
 // TODO: Integracja ze Stripe dla subskrypcji
 // - Stripe Customer Portal dla zarządzania kartami
