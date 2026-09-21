@@ -134,6 +134,14 @@ export function useYjsBoard({ userId, username }: UseYjsBoardOptions): UseYjsBoa
         added.delete(id);
         updated.delete(id);
         spatialIndex.remove(id);
+
+        loadedIdsRef.current.delete(id);
+        setLoadedImages((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
       }
 
       const byId = new Map(getElements(doc).map((el) => [el.id, el]));
