@@ -46,3 +46,50 @@ export function isRenegotiationOfSameSession(
   const incoming = getDtlsFingerprint(incomingOfferSdp);
   return current !== null && incoming !== null && current === incoming;
 }
+
+export interface IceRestartRequest {
+  user: { id: number; username: string };
+  remoteUserId: number;
+  remoteUsername: string;
+  pc: RTCPeerConnection;
+  /** Wysyla oferte (voice-offer) do peera przez kanal sygnalizacji. */
+  sendOffer: (offer: RTCSessionDescriptionInit | null) => void;
+}
+
+/**
+ * Restart ICE na ISTNIEJACYM polaczeniu (po zaniku sieci: LTE <-> Wi-Fi, zmiana IP).
+ * Nowa oferta z `iceRestart: true` leci tym samym kanalem co pierwsza; druga strona
+ * odpowiada answerem na tym samym pc (handleOffer rozpoznaje restart po fingerprincie).
+ * Zwraca true, jesli oferta poszla. Inicjuje tylko strona z nizszym id (glare = 0);
+ * pomija, gdy pc nie jest `stable` (trwa inna negocjacja).
+ */
+export async function restartIceOnConnection({
+  user,
+  remoteUserId,
+  remoteUsername,
+  pc,
+  sendOffer,
+}: IceRestartRequest): Promise<boolean> {
+  if (!shouldInitiateIceRestart(user.id, remoteUserId)) {
+    console.log(
+      `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername}: czekam na ofertę od drugiej strony`
+    );
+    return false;
+  }
+  if (pc.signalingState !== 'stable') {
+    console.log(
+      `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} pominięty (signalingState=${pc.signalingState})`
+    );
+    return false;
+  }
+  try {
+    console.log(`🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} - wysyłam nową ofertę`);
+    const offer = await pc.createOffer({ iceRestart: true });
+    await pc.setLocalDescription(offer);
+    sendOffer(pc.localDescription);
+    return true;
+  } catch (error) {
+    console.error(`🎤 [VOICE] ❌ Restart ICE z ${remoteUsername} nieudany:`, error);
+    return false;
+  }
+}
