@@ -35,9 +35,14 @@ export type ChatAuthResult =
   | { ok: true; userId: number | null }
   | { ok: false; status: 401 | 503; error: 'unauthorized' | 'auth_unavailable' };
 
+/**
+ * @param requestId X-Request-ID z żądania do /api/chat — przekazany dalej, żeby
+ *   sprawdzenie tokenu w backendzie było w logach pod tym samym id co czat.
+ */
 export async function authenticateChatRequest(
   authorizationHeader: string | null,
-  fetchImpl: typeof fetch = fetch
+  fetchImpl: typeof fetch = fetch,
+  requestId?: string | null
 ): Promise<ChatAuthResult> {
   const match = authorizationHeader?.match(/^Bearer\s+(\S+)$/i);
   if (!match) {
@@ -48,7 +53,10 @@ export async function authenticateChatRequest(
   try {
     response = await fetchImpl(`${getBackendUrl()}/api/v1/auth/me`, {
       method: 'GET',
-      headers: { Authorization: `Bearer ${match[1]}` },
+      headers: {
+        Authorization: `Bearer ${match[1]}`,
+        ...(requestId ? { 'X-Request-ID': requestId } : {}),
+      },
       cache: 'no-store',
       signal: AbortSignal.timeout(AUTH_CHECK_TIMEOUT_MS),
     });

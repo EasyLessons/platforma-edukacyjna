@@ -19,13 +19,22 @@ export class AppError extends Error {
   public readonly code: string;
   public readonly status: number;
   public readonly details?: Record<string, unknown>;
+  /** X-Request-ID żądania — do podania w zgłoszeniu i odnalezienia w logach backendu. */
+  public readonly requestId?: string;
 
-  constructor(message: string, code: string, status: number, details?: Record<string, unknown>) {
+  constructor(
+    message: string,
+    code: string,
+    status: number,
+    details?: Record<string, unknown>,
+    requestId?: string
+  ) {
     super(message);
     this.name = 'AppError';
     this.code = code;
     this.status = status;
     this.details = details;
+    this.requestId = requestId;
 
     Object.setPrototypeOf(this, AppError.prototype);
   }

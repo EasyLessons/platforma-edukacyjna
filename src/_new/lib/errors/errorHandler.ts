@@ -5,6 +5,7 @@
  * Axios interceptor woła mapAxiosError() — reszta kodu widzi tylko AppError.
  */
 import axios, { AxiosError } from 'axios';
+import { readRequestIdHeader } from '../api/request-id';
 import { AppError, ErrorCode } from './AppError';
 
 /**
@@ -17,6 +18,7 @@ interface BackendErrorBody {
   code?: string;
   detail?: string; // fallback dla starych endpointów (main.py)
   data?: Record<string, unknown>; // dodatkowe dane (np. walidacja)
+  request_id?: string; // ApiResponse.request_id (core/responses.py)
 }
 
 /**
@@ -31,9 +33,18 @@ export function mapAxiosError(err: unknown): AppError {
 
   const axiosErr = err as AxiosError<BackendErrorBody>;
 
+  // Id nadane przez klienta — jest nawet wtedy, gdy odpowiedź nie dotarła.
+  const sentRequestId = readRequestIdHeader(axiosErr.config?.headers);
+
   // Brak odpowiedzi (sieć, timeout)
   if (!axiosErr.response) {
-    return new AppError('Brak połączenia z serwerem', ErrorCode.NETWORK_ERROR, 0);
+    return new AppError(
+      'Brak połączenia z serwerem',
+      ErrorCode.NETWORK_ERROR,
+      0,
+      undefined,
+      sentRequestId
+    );
   }
 
   const { status, data } = axiosErr.response;
@@ -44,7 +55,12 @@ export function mapAxiosError(err: unknown): AppError {
   // Wyciągnij kod błędu
   const code = data?.code || resolveCode(status);
 
-  return new AppError(message, code, status, data?.data);
+  // Id z odpowiedzi (nagłówek lub ciało) ma pierwszeństwo — backend mógł odrzucić
+  // niepoprawny nagłówek klienta i nadać własny.
+  const requestId =
+    readRequestIdHeader(axiosErr.response.headers) || data?.request_id || sentRequestId;
+
+  return new AppError(message, code, status, data?.data, requestId);
 }
 
 function resolveCode(status: number): string {

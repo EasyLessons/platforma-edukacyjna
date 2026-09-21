@@ -101,3 +101,26 @@ describe('mapAxiosError', () => {
     expect(result.message).toBe('Główny komunikat');
   });
 });
+
+describe('mapAxiosError - requestId', () => {
+  it('bierze id z naglowka odpowiedzi przed cialem', () => {
+    const error = makeAxiosError(500, { success: false, request_id: 'cialo' });
+    error.response!.headers = { 'x-request-id': 'naglowek' };
+    expect(mapAxiosError(error).requestId).toBe('naglowek');
+  });
+
+  it('bierze id z ciala, gdy brak naglowka', () => {
+    const error = makeAxiosError(500, { success: false, request_id: 'cialo' });
+    expect(mapAxiosError(error).requestId).toBe('cialo');
+  });
+
+  it('bez odpowiedzi bierze id wyslane w zadaniu', () => {
+    const error = new AxiosError('Network Error');
+    error.config = { headers: { 'X-Request-ID': 'wyslane' } } as never;
+    expect(mapAxiosError(error).requestId).toBe('wyslane');
+  });
+
+  it('brak id nigdzie -> undefined', () => {
+    expect(mapAxiosError(makeAxiosError(500)).requestId).toBeUndefined();
+  });
+});

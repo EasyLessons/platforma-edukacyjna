@@ -2,7 +2,7 @@
  * apiClient — skonfigurowana instancja Axios dla całego projektu.
  *
  * Request interceptor:
- *   Dodaje Authorization: Bearer <token> do każdego requestu.
+ *   Dodaje Authorization: Bearer <token> oraz X-Request-ID do każdego requestu.
  *
  * Response interceptor:
  *   - Rozpakowuje { success: true, data: T } → zwraca T bezpośrednio
@@ -25,6 +25,7 @@ import axios, {
 import { getAccessToken, setAccessToken, clearSession } from '../auth/tokenStore';
 import { refreshAccessToken, logoutAndRedirect, isPublicPath } from '../auth/tokenService';
 import { mapAxiosError } from '../errors';
+import { REQUEST_ID_HEADER, newRequestId } from './request-id';
 import type { ApiSuccessResponse } from './types';
 
 // KONFIGURACJA BAZOWA
@@ -48,6 +49,11 @@ apiClient.interceptors.request.use(
     const token = getAccessToken();
     if (token && config.headers) {
       config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Ponowienie po refreshu tokenu zachowuje id z pierwszej próby — to ta sama
+    // akcja użytkownika, w logach backendu obie próby będą pod jednym request_id.
+    if (config.headers && !config.headers[REQUEST_ID_HEADER]) {
+      config.headers[REQUEST_ID_HEADER] = newRequestId();
     }
     return config;
   },
