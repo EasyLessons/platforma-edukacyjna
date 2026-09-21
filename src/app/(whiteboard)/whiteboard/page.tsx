@@ -31,6 +31,7 @@ import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '@/_new/features/voice-chat';
 import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
+import { ReadOnlyBanner, UpgradeModal, usePlan } from '@/_new/features/plans';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { ShareLinkModal } from '@/_new/features/workspace/components/shareLinkModal';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
@@ -75,6 +76,12 @@ export function TablicaContent() {
   const [showBoardSettings, setShowBoardSettings] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
+  // Plan free/premium: tablica ponad limitem elementów = tylko do odczytu
+  // (flaga z GET /api/v1/boards/{id}; canvas dostaje wtedy rolę 'viewer').
+  const [planReadOnly, setPlanReadOnly] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const { limits: planLimits } = usePlan();
+
   // Sidebar tablicy
   const sidebar = useWhiteboardSidebar();
 
@@ -110,6 +117,7 @@ export function TablicaContent() {
           setBoardIcon(board.icon || 'PenTool');
           setBoardBgColor(board.bg_color || 'gray-500');
           setWorkspaceId(board.workspace_id);
+          setPlanReadOnly(board.read_only === true);
           // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
           try {
             const s = await fetchBoardSettings(numericId);
@@ -318,6 +326,19 @@ export function TablicaContent() {
           />
         )}
 
+        {/* Plan Free: tablica ponad limitem elementów — baner + modal upgrade */}
+        {planReadOnly && (
+          <ReadOnlyBanner
+            limit={planLimits?.max_elements_per_board}
+            onUpgradeClick={() => setShowUpgradeModal(true)}
+          />
+        )}
+        <UpgradeModal
+          isOpen={showUpgradeModal}
+          reason="PLAN_LIMIT_ELEMENTS"
+          onClose={() => setShowUpgradeModal(false)}
+        />
+
         {/* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
         <BoardRealtimeProvider boardId={boardId ?? ''}>
           {/* VOICE CHAT PROVIDER - P2P audio */}
@@ -325,7 +346,7 @@ export function TablicaContent() {
             <WhiteboardCanvas
               boardId={boardId ?? ''}
               arkuszPath={arkuszPath}
-              userRole={userRole || 'editor'}
+              userRole={planReadOnly ? 'viewer' : userRole || 'editor'}
               boardSettings={boardSettings}
               toolbarLeftOffset={0}
               isSidebarOpen={sidebar.isOpen}

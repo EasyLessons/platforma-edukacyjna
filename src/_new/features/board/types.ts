@@ -22,6 +22,9 @@ export interface Board {
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
+  /** Plan free/premium: tablica ponad limitem elementów. Tylko w GET /boards/{id}. */
+  read_only?: boolean;
+  read_only_reason?: 'PLAN_LIMIT_ELEMENTS' | null;
 }
 
 // FORM DATA TYPES

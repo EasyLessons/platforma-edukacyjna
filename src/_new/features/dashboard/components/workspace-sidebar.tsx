@@ -11,6 +11,7 @@ import { WorkspaceEditModal } from '@/_new/features/workspace/components/workspa
 import { WorkspaceMembersModal } from '@/_new/features/workspace/components/workspaceMembersModal';
 import { WorkspaceInviteModal } from '@/_new/features/workspace/components/workspaceInviteModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
+import { UpgradeModal, getPlanLimitCode, type PlanLimitCode } from '@/_new/features/plans';
 import {
   Workspace,
   WorkspaceCreateRequest,
@@ -84,6 +85,7 @@ export default function WorkspaceSidebar({
   const dragState: WorkspaceDragState = { draggedId, dragOverId };
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<PlanLimitCode | null>(null);
   const [editingWorkspace, setEditingWorkspace] = useState<Workspace | null>(null);
   const [membersWorkspace, setMembersWorkspace] = useState<Workspace | null>(null);
   const [deletingWorkspace, setDeletingWorkspace] = useState<Workspace | null>(null);
@@ -354,9 +356,26 @@ export default function WorkspaceSidebar({
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         onSubmit={async (data) => {
-          await createWorkspace(data);
+          try {
+            await createWorkspace(data);
+          } catch (err) {
+            const code = getPlanLimitCode(err);
+            if (code) {
+              // 403 PLAN_LIMIT_WORKSPACES -> zamknij formularz, otwórz „Przejdź na Premium"
+              setShowCreateModal(false);
+              setUpgradeReason(code);
+              return;
+            }
+            throw err;
+          }
           setShowCreateModal(false);
         }}
+      />
+
+      <UpgradeModal
+        isOpen={upgradeReason !== null}
+        reason={upgradeReason}
+        onClose={() => setUpgradeReason(null)}
       />
 
       {editingWorkspace && (
