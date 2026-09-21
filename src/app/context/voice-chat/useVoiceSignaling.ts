@@ -1,6 +1,6 @@
 import { useCallback, MutableRefObject, useRef, useEffect } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/_new/lib/supabase/client';
 import { VoiceParticipant, VoiceEvent, PeerConnection } from './types';
 
 export function useVoiceSignaling(
