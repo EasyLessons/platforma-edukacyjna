@@ -35,7 +35,7 @@ const channelMock: any = {
   unsubscribe: vi.fn(),
 };
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/_new/lib/supabase/client', () => ({
   supabase: { channel: vi.fn(() => channelMock) },
 }));
 

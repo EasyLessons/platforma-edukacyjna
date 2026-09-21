@@ -19,7 +19,7 @@ vi.mock('@google/generative-ai', () => {
   return { GoogleGenerativeAI: MockGoogleGenerativeAI };
 });
 
-vi.mock('./auth', () => ({ authenticateChatRequest: mockAuthenticate }));
+vi.mock('@/_new/server/chat/auth', () => ({ authenticateChatRequest: mockAuthenticate }));
 
 import { POST, GET } from './route';
 
