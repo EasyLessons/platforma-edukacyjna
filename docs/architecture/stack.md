@@ -31,7 +31,11 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 ### Realtime i komunikacja
 
-**Supabase (tylko Realtime, nie Auth!)** — Broadcast + Presence. Broadcast = wysyłanie eventów (np. "ktoś narysował element") do wszystkich subskrybentów kanału. Presence = śledzenie kto jest aktualnie podłączony do kanału (kto online na tablicy). Client: `src/lib/supabase.ts`.
+**Supabase (Realtime + Storage, NIE Auth!)** — Broadcast + Presence po stronie frontendu (client: `src/lib/supabase.ts`): powiadomienia, kursory/presence/typing na tablicy, sygnalizacja voice chatu i — w ścieżce legacy — synchronizacja elementów tablicy. Storage po stronie backendu (bucket `board-images`, `backend/api/v1/whiteboard/storage.py`) na obrazy wklejane na tablicę. Auth jest własne (patrz wyżej).
+
+**Yjs + Hocuspocus (`whiteboard-sync/`)** — nowy model tablicy, wdrażany za flagą `NEXT_PUBLIC_WHITEBOARD_YJS=true`. Stan tablicy to dokument CRDT `Y.Doc` (`src/_new/features/whiteboard/yjs/board-doc.ts`, kolejność elementów przez `fractional-indexing`, undo/redo przez `Y.UndoManager`), synchronizowany przez `HocuspocusProvider` (`yjs/use-yjs-sync.ts`, env `NEXT_PUBLIC_WHITEBOARD_SYNC_URL`, domyślnie `ws://localhost:1234`) z serwisem `whiteboard-sync` (Node, `@hocuspocus/server`), który deleguje autoryzację i persystencję do FastAPI (`GET /whiteboard/{id}/access`, `GET/POST /whiteboard/{id}/doc`, tabela `board_documents`). Dlaczego CRDT: konflikty przy równoczesnej edycji rozwiązuje model danych, nie ręczna logika broadcastów (patrz `known-issues.md` #1–#3 — problemy ścieżki legacy, które w Yjs nie istnieją). Migracja `board_elements → board_documents` w toku (gałąź `feature/whiteboard-yjs`).
+
+**Redis** — presence na tablicy (`backend/core/presence.py`, sorted set z TTL) i rate limit auth. W testach `fakeredis`.
 
 **WebRTC (Xirsys jako TURN/STUN provider)** — połączenia głosowe peer-to-peer między użytkownikami na tej samej tablicy, sygnalizacja przez Supabase Broadcast.
 
@@ -51,7 +55,7 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **PostgreSQL (Neon, serverless)** — baza produkcyjna. Bez lokalnego Postgresa w development — łączysz się przez `DATABASE_URL` do instancji Neon.
 
-**Autoryzacja: JWT cookie-first z rotacją refresh tokenów** — pełny opis w `docs/architecture/auth.md`. **Uwaga:** w `requirements.txt` są jednocześnie `python-jose` i `PyJWT` — dwie biblioteki do tego samego (kodowanie/dekodowanie JWT). Do ujednolicenia, patrz `docs/migration-status.md`.
+**Autoryzacja: JWT cookie-first z rotacją refresh tokenów** — pełny opis w `docs/architecture/auth.md`. JWT przez `python-jose` (jedyna biblioteka JWT w projekcie). Limit prób logowania/rejestracji w Redisie (`core/rate_limit.py`).
 
 **passlib + bcrypt** — hashowanie haseł użytkowników.
 
@@ -63,6 +67,6 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 ## Infrastruktura
 
-**Docker + docker-compose** — uruchomienie całości (frontend + backend) lokalnie jednym poleceniem, patrz `docker-compose.yml` i `README.md`.
+**Docker + docker-compose** — uruchomienie całości (frontend + backend + redis + whiteboard-sync) lokalnie jednym poleceniem, patrz `docker-compose.yml` i `README.md`.
 
-**Neon (Postgres serverless)**, **Supabase (Realtime)**, **Resend (email)**, **Xirsys (WebRTC TURN/STUN)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`).
+**Neon (Postgres serverless)**, **Supabase (Realtime + Storage)**, **Redis**, **Resend (email)**, **Xirsys (WebRTC TURN/STUN)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`). Backend deployowany na Render, frontend na Vercel (patrz `ci-cd.md`); `whiteboard-sync` ma `Procfile`/`Dockerfile`, hosting do ustalenia.
