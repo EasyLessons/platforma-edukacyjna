@@ -2,12 +2,14 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { OpenWorkspacesButton } from './Components/open-workspaces-button';
-import WorkspaceSidebar from './Components/workspace-sidebar';
-import BoardsSection from './Components/BoardsSection';
-import TemplatesSection from './Components/TemplateSection';
-import WorkspaceTopNav from './Components/workspace-top-nav';
-import RecentsView from './Components/RecentsView';
+import {
+  OpenWorkspacesButton,
+  WorkspaceSidebar,
+  BoardsSection,
+  TemplatesSection,
+  WorkspaceTopNav,
+  RecentsView,
+} from '@/_new/features/dashboard';
 import { useWorkspaces } from '@/_new/features/workspace/hooks/useWorkspaces';
 
 const ACTIVE_WORKSPACE_STORAGE_KEY = 'dashboard:activeWorkspaceId';
