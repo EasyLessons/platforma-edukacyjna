@@ -16,6 +16,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
 13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
 14. **`docs/architecture/REFAKTOR-PLAN.md`** — zatwierdzony plan refaktoru struktury (docelowe drzewo, etapy jako małe PR-y, kolejność względem pracy równoległej, decyzje). Czytaj przed każdym PR-em przenoszącym pliki.
+15. **`docs/plan-subskrypcje.md`** — plany Free/Premium (bez płatności): tabela `user_plans`, limity w jednym miejscu, gdzie egzekwowane, tryb tylko do odczytu tablicy, TODO dla `whiteboard-sync`, migracja i SQL do ręcznego nadania Premium.
 
 ## Zasada utrzymania
 
