@@ -1,7 +1,7 @@
 """Schemas dla modułu boards (CRUD tablicy)."""
 from datetime import datetime
 from typing import Dict, Optional, List
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 from api.v1.whiteboard.schemas import OnlineUserInfo
 
@@ -40,8 +40,7 @@ class BoardResponse(BaseModel):
     last_modified_by: Optional[str]
     last_opened: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class BoardListResponse(BaseModel):

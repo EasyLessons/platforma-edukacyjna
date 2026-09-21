@@ -4,7 +4,8 @@ Narzędzia dla autentykacji:
 - Generowanie tokenów JWT
 - Generowanie kodów weryfikacyjnych i refresh tokenów
 """
-from datetime import datetime, timedelta
+from datetime import timedelta
+from core.time import utcnow
 from typing import Optional
 from jose import jwt
 from passlib.context import CryptContext
@@ -25,7 +26,7 @@ def hash_password(password: str) -> str:
 def create_access_token(data: dict, secret_key: str, algorithm: str,
                        expires_delta: Optional[timedelta] = None) -> str:
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=15))
+    expire = utcnow() + (expires_delta or timedelta(minutes=15))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, secret_key, algorithm=algorithm)
 
