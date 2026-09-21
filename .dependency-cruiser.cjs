@@ -1,6 +1,51 @@
 /** @type {import('dependency-cruiser').IConfiguration} */
 module.exports = {
   forbidden: [
+    // ------------------------------------------------------------------
+    // Reguly architektury EasyLesson (docs/architecture/frontend-structure.md,
+    // sekcja "Granice importow"; plan: docs/architecture/REFAKTOR-PLAN.md).
+    // Kierunek importow: app -> _new/features -> _new/{shared,lib}.
+    // ------------------------------------------------------------------
+    {
+      name: 'no-features-to-app',
+      severity: 'error',
+      comment:
+        "Kod w src/_new (logika, feature'y, shared, lib) nie moze importowac z src/app " +
+        '(routing). Wyjatki ponizej sa TYMCZASOWE i znikaja w kolejnych PR-ach planu: ' +
+        'DashboardButton -> PR-A3 (do shared/ui), VoiceChatContext -> PR-B1 ' +
+        '(features/voice-chat), BoardRealtimeContext -> PR-C1 (features/whiteboard/realtime).',
+      from: { path: '^src/_new/', pathNot: '[.](?:spec|test)[.](?:ts|tsx)$' },
+      to: {
+        path: '^src/app/',
+        pathNot: [
+          '^src/app/\\(dashboard\\)/dashboard/Components/DashboardButton\\.tsx$', // PR-A3
+          '^src/app/context/VoiceChatContext\\.tsx$', // PR-B1
+          '^src/app/context/BoardRealtimeContext\\.tsx$', // PR-C1
+        ],
+      },
+    },
+    {
+      name: 'no-app-cross-group',
+      severity: 'error',
+      comment:
+        'Route group w src/app nie importuje z innej route group. Wspolne komponenty ' +
+        'ida do src/_new/shared, logika do src/_new/features.',
+      from: { path: '^src/app/\\(([a-z]+)\\)/' },
+      to: { path: '^src/app/\\(', pathNot: '^src/app/\\($1\\)/' },
+    },
+    {
+      name: 'no-shared-lib-to-features',
+      severity: 'error',
+      comment: "src/_new/shared i src/_new/lib sa warstwa nizsza - nie moga zalezec od feature'ow.",
+      from: { path: '^src/_new/(shared|lib)/' },
+      to: {
+        path: '^src/_new/features/',
+        // TYMCZASOWO: AuthContext (lib/auth) wola features/auth/api/authApi.ts
+        // (getCurrentUser/logoutUser). Do rozwiazania osobnym PR-em: przeniesc te
+        // dwa wywolania do lib/auth albo AuthContext do features/auth.
+        pathNot: ['^src/_new/features/auth/api/authApi[.]ts$'],
+      },
+    },
     {
       name: 'no-circular',
       severity: 'warn',
@@ -28,6 +73,12 @@ module.exports = {
           '[.]d[.]ts$', // TypeScript declaration files
           '(^|/)tsconfig[.]json$', // TypeScript config
           '(^|/)(?:babel|webpack)[.]config[.](?:js|cjs|mjs|ts|cts|mts|json)$', // other configs
+          // Pliki specjalne Next.js App Router - importuje je framework, nie kod:
+          '^src/app/.*/(?:page|layout|loading|error|not-found|template|default|route)[.](?:ts|tsx)$',
+          '^src/app/(?:page|layout|loading|error|not-found|global-error)[.](?:ts|tsx)$',
+          '^src/mdx-components[.]tsx$',
+          // Setup i mocki testow - wciagane przez vitest.config.ts / vi.mock:
+          '^src/test/',
         ],
       },
       to: {},
@@ -87,6 +138,9 @@ module.exports = {
       from: {},
       to: {
         dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
+        // @types/mdx przychodzi transytywnie z @mdx-js/* i jest uzywany tylko jako typ
+        // w src/mdx-components.tsx - nie jest zaleznoscia runtime.
+        pathNot: ['node_modules/@types/mdx/'],
       },
     },
     {
@@ -154,7 +208,7 @@ module.exports = {
         'from.pathNot re of the not-to-dev-dep rule in the dependency-cruiser configuration',
       from: {
         path: '^(src)',
-        pathNot: '[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$',
+        pathNot: ['[.](?:spec|test)[.](?:js|mjs|cjs|jsx|ts|mts|cts|tsx)$', '^src/test/'],
       },
       to: {
         dependencyTypes: ['npm-dev'],

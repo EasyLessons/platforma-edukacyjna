@@ -36,6 +36,7 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 | `frontend-test` | `npm run test` (vitest) | to samo |
 | `frontend-lint` | `npm run lint` + `npm run format:check` | to samo |
 | `frontend-typecheck` | `npm run typecheck` (`tsc --noEmit`) | to samo |
+| `frontend-arch` | `npm run depcruise` (dependency-cruiser: granice importów `app -> _new/features -> _new/{shared,lib}`, brak cykli/sierot) | to samo |
 | `frontend-build` | `npm run build` (sanity-check kompilacji) | to samo |
 
 **Przed pushem warto odpalić to lokalnie**, żeby nie czekać na czerwone CI:
@@ -49,6 +50,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run format:check
+npm run depcruise
 ```
 
 Jeśli `npm run lint`/`format:check` znajdzie coś do poprawy automatycznie:
