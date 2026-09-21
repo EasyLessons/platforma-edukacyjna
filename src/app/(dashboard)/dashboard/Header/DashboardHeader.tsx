@@ -16,7 +16,7 @@ import { NotificationBell } from '@/_new/features/notifications/components/notif
 import { NotificationPanel } from '@/_new/features/notifications/components/notification-panel';
 
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from '../Components/DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 
 import type { User } from '@/_new/shared/types/user';

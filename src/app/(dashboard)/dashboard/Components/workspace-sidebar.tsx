@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanelLeftClose, PanelLeftOpen, Plus, Search, FolderPlus, Home, Clock } from 'lucide-react';
 import { Button } from '@/_new/shared/ui/button';
-import { DashboardButton } from './DashboardButton';
+import { DashboardButton } from '@/_new/shared/ui/dashboard-button';
 import { Input } from '@/_new/shared/ui/input';
 import { WorkspaceList } from '@/_new/features/workspace/components/workspaceList';
 import { WorkspaceCreateModal } from '@/_new/features/workspace/components/workspaceCreateModal';
