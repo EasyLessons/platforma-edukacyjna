@@ -2,6 +2,7 @@ import { useCallback, useRef, MutableRefObject } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { PeerConnection, VoiceParticipant, VoiceSettings } from './types';
 import { getIceServers } from './constants';
+import { isRenegotiationOfSameSession, shouldInitiateIceRestart } from './iceRestart';
 
 export function useWebRTCConnections(
   user: { id: number; username: string } | null,
@@ -62,6 +63,61 @@ export function useWebRTCConnections(
       lastSyncTimeRef.current.delete(userId);
     },
     [setParticipants]
+  );
+
+  /**
+   * Restart ICE na ISTNIEJACYM polaczeniu (po zaniku sieci: LTE <-> Wi-Fi,
+   * zmiana IP). Nowa oferta z `iceRestart: true` leci tym samym kanalem co
+   * pierwsza; druga strona odpowiada answerem na tym samym pc (handleOffer
+   * rozpoznaje restart po fingerprincie DTLS). Zwraca true, jesli oferta poszla.
+   *
+   * Inicjuje tylko strona z nizszym id (shouldInitiateIceRestart) - druga czeka
+   * na oferte. Jesli restart sie nie uda, polaczenie przejdzie w `failed` i
+   * zadziala istniejaca sciezka: cleanup + createPeerConnection od zera.
+   */
+  const restartIceConnection = useCallback(
+    async (remoteUserId: number, remoteUsername: string): Promise<boolean> => {
+      if (!user || !isInVoiceChatRef.current) return false;
+
+      const peerConn = peerConnectionsRef.current.get(remoteUserId);
+      if (!peerConn) return false;
+      const pc = peerConn.pc;
+
+      if (!shouldInitiateIceRestart(user.id, remoteUserId)) {
+        console.log(
+          `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername}: czekam na ofertę od drugiej strony`
+        );
+        return false;
+      }
+      if (pc.signalingState !== 'stable') {
+        console.log(
+          `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} pominięty (signalingState=${pc.signalingState})`
+        );
+        return false;
+      }
+
+      try {
+        console.log(`🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} - wysyłam nową ofertę`);
+        const offer = await pc.createOffer({ iceRestart: true });
+        await pc.setLocalDescription(offer);
+        channelRef.current?.send({
+          type: 'broadcast',
+          event: 'voice-offer',
+          payload: {
+            type: 'voice-offer',
+            fromUserId: user.id,
+            fromUsername: user.username,
+            toUserId: remoteUserId,
+            offer: pc.localDescription,
+          },
+        });
+        return true;
+      } catch (error) {
+        console.error(`🎤 [VOICE] ❌ Restart ICE z ${remoteUsername} nieudany:`, error);
+        return false;
+      }
+    },
+    [user, channelRef, isInVoiceChatRef]
   );
 
   const createPeerConnection = useCallback(
@@ -181,6 +237,12 @@ export function useWebRTCConnections(
 
           const existing = peerConnectionsRef.current.get(remoteUserId);
           if (existing) {
+            // Nie zostawiaj poprzedniego elementu grajacego "w tle" (wyciek przy
+            // ponownym ontrack na tym samym polaczeniu).
+            if (existing.audioElement && existing.audioElement !== audio) {
+              existing.audioElement.pause();
+              existing.audioElement.srcObject = null;
+            }
             existing.audioElement = audio;
           }
         };
@@ -222,37 +284,22 @@ export function useWebRTCConnections(
           if (pc.iceConnectionState === 'connected') {
             console.log(`🎤 [VOICE] ✅ Połączenie P2P nawiązane z ${remoteUsername}!`);
           } else if (pc.iceConnectionState === 'failed') {
-            console.log(`🎤 [VOICE] ❌ ICE failed - próbuję restart`);
-
-            // Próbuj ICE restart
-            try {
-              pc.restartIce();
-            } catch (error) {
-              console.error(`🎤 [VOICE] Błąd ICE restart:`, error);
-
-              // Jeśli restart nie działa, wyczyść i retry całe połączenie
-              const retries = connectionRetriesRef.current.get(remoteUserId) || 0;
-              if (retries < MAX_CONNECTION_RETRIES) {
-                cleanupUserConnections(remoteUserId);
-                setTimeout(() => {
-                  createPeerConnection(remoteUserId, remoteUsername, isInitiator);
-                }, 2000);
-              }
-            }
+            // Restart ICE = nowa oferta z iceRestart:true na tym samym pc.
+            // Samo pc.restartIce() (jak bylo wczesniej) tylko ustawialo flage i
+            // nigdy nie wysylalo oferty - polaczenie zostawalo martwe do czasu
+            // az interwal weryfikacji (10 s) odtworzyl je od zera.
+            console.log(`🎤 [VOICE] ❌ ICE failed z ${remoteUsername} - restart ICE`);
+            void restartIceConnection(remoteUserId, remoteUsername);
           } else if (pc.iceConnectionState === 'disconnected') {
             console.log(
               `🎤 [VOICE] ⚠️ ICE disconnected z ${remoteUsername} - czekam na reconnect...`
             );
 
-            // Czekaj chwilę na automatyczny reconnect
+            // Chwila na samoistny powrot (consent freshness), potem restart ICE.
             setTimeout(() => {
               if (pc.iceConnectionState === 'disconnected') {
-                console.log(`🎤 [VOICE] ICE nadal disconnected - wymuszam restart`);
-                try {
-                  pc.restartIce();
-                } catch (error) {
-                  console.error(`🎤 [VOICE] Błąd ICE restart:`, error);
-                }
+                console.log(`🎤 [VOICE] ICE nadal disconnected - restart ICE`);
+                void restartIceConnection(remoteUserId, remoteUsername);
               }
             }, 5000);
           }
@@ -296,14 +343,18 @@ export function useWebRTCConnections(
           } else if (pc.connectionState === 'disconnected') {
             console.log(`🎤 [VOICE] ⚠️ Połączenie z ${remoteUsername} rozłączone`);
 
-            // Wait a bit and retry if still in voice chat
+            // Wczesniej ta galaz sprawdzala `!peerConnectionsRef.current.has(id)`,
+            // a polaczenie wciaz bylo w mapie - warunek nigdy nie byl prawdziwy,
+            // wiec z tej sciezki nic nigdy nie ruszalo. Teraz: 2 s na samoistny
+            // powrot, potem restart ICE na tym samym pc.
             setTimeout(() => {
-              if (isInVoiceChatRef.current && !peerConnectionsRef.current.has(remoteUserId)) {
-                const retries = connectionRetriesRef.current.get(remoteUserId) || 0;
-                if (retries < MAX_CONNECTION_RETRIES) {
-                  console.log(`🎤 [VOICE] 🔁 Reconnecting po ${remoteUsername}`);
-                  createPeerConnection(remoteUserId, remoteUsername, isInitiator);
-                }
+              if (
+                isInVoiceChatRef.current &&
+                peerConnectionsRef.current.get(remoteUserId)?.pc === pc &&
+                pc.connectionState === 'disconnected'
+              ) {
+                console.log(`🎤 [VOICE] 🔁 Nadal rozłączone z ${remoteUsername} - restart ICE`);
+                void restartIceConnection(remoteUserId, remoteUsername);
               }
             }, 2000);
           }
@@ -342,6 +393,7 @@ export function useWebRTCConnections(
       user,
       settings.speakerVolume,
       cleanupUserConnections,
+      restartIceConnection,
       channelRef,
       localStreamRef,
       isInVoiceChatRef,
@@ -425,6 +477,41 @@ export function useWebRTCConnections(
           existingPc.signalingState === 'stable' &&
           !existingPc.remoteDescription &&
           !existingPc.localDescription;
+
+        // Restart ICE od peera: ta sama sesja (ten sam fingerprint DTLS), nowa
+        // oferta. Negocjujemy NA ISTNIEJACYM pc - bez zamykania, bez nowego
+        // elementu <audio>, bez ponownego ontrack. Nowy fingerprint oznacza, ze
+        // peer odtworzyl polaczenie od zera - wtedy dalej: cleanup + nowe pc.
+        const isIceRestart =
+          existingPc.signalingState === 'stable' &&
+          !!existingPc.remoteDescription &&
+          isRenegotiationOfSameSession(existingPc.remoteDescription.sdp, offer.sdp);
+
+        if (isIceRestart) {
+          console.log(
+            `🎤 [VOICE] 🔁 Oferta restartu ICE od ${fromUsername} - renegocjuję w miejscu`
+          );
+          try {
+            await existingPc.setRemoteDescription(offer);
+            await flushPendingIce(fromUserId, existingPc);
+            const answer = await existingPc.createAnswer();
+            await existingPc.setLocalDescription(answer);
+            channelRef.current?.send({
+              type: 'broadcast',
+              event: 'voice-answer',
+              payload: {
+                type: 'voice-answer',
+                fromUserId: user.id,
+                toUserId: fromUserId,
+                answer: existingPc.localDescription,
+              },
+            });
+          } catch (error) {
+            console.error(`🎤 [VOICE] ❌ Renegocjacja z ${fromUsername} nieudana:`, error);
+            cleanupUserConnections(fromUserId);
+          }
+          return;
+        }
 
         if (existingPc.signalingState === 'have-local-offer') {
           // Kolizja ofert (glare): obie strony wyslaly offer jednoczesnie.
@@ -517,6 +604,7 @@ export function useWebRTCConnections(
     lastSyncTimeRef,
     cleanupUserConnections,
     createPeerConnection,
+    restartIceConnection,
     handleOffer,
     addRemoteIceCandidate,
     applyRemoteAnswer,

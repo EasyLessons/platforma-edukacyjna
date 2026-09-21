@@ -137,6 +137,7 @@ export function VoiceChatProvider({
     lastSyncTimeRef,
     cleanupUserConnections,
     createPeerConnection,
+    restartIceConnection,
     handleOffer,
     addRemoteIceCandidate,
     applyRemoteAnswer,
@@ -303,7 +304,9 @@ export function VoiceChatProvider({
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           audio: {
-            echoCancellation: true, // ZAWSZE włącz echo cancellation
+            // Z ustawien (domyslnie true). Wczesniej hardcode `true`, a przelacznik
+            // "Echo cancellation" w panelu ustawien nie robil nic.
+            echoCancellation: settings.echoCancellation,
             noiseSuppression: settings.noiseSupression,
             autoGainControl: true,
             sampleRate: 44100, // Wysoka jakość audio
@@ -335,9 +338,11 @@ export function VoiceChatProvider({
         // Jeśli push-to-talk, wycisz na start
         audioTrack.enabled = !settings.pushToTalk;
 
-        // Dodatkowe ustawienia anty-echo na poziomie track
+        // Diagnostyka echa: co ZAZADALISMY vs co przegladarka FAKTYCZNIE ustawila
+        // (echoCancellation, sampleRate itd. - patrz raport 21.09 o echu, test B).
         const constraints = audioTrack.getConstraints();
         console.log(`🎤 [VOICE] Audio track constraints:`, constraints);
+        console.log(`🎤 [VOICE] Audio track settings:`, audioTrack.getSettings?.());
       }
 
       setIsInVoiceChat(true);
@@ -443,9 +448,16 @@ export function VoiceChatProvider({
         } else {
           // Sprawdź stan każdego połączenia
           peerConnectionsRef.current.forEach((peerConn, odUserId) => {
-            if (
+            if (peerConn.pc.connectionState === 'disconnected') {
+              // Chwilowy zanik sieci: najpierw restart ICE na tym samym pc
+              // (tania sciezka, bez nowego <audio>). Odtworzenie od zera dopiero
+              // gdy przejdzie w `failed`/`closed` (galaz nizej).
+              console.log(
+                `🎤 [VOICE] 🔍 Połączenie z ${peerConn.username} rozłączone - restart ICE`
+              );
+              void restartIceConnection(odUserId, peerConn.username);
+            } else if (
               peerConn.pc.connectionState === 'failed' ||
-              peerConn.pc.connectionState === 'disconnected' ||
               peerConn.pc.connectionState === 'closed'
             ) {
               console.log(
@@ -493,6 +505,7 @@ export function VoiceChatProvider({
     settings,
     startVoiceDetection,
     createPeerConnection,
+    restartIceConnection,
     setupVoiceChannel,
     abortJoin,
     clearPendingIce,
@@ -655,6 +668,28 @@ export function VoiceChatProvider({
           // Jeśli przełączono na push-to-talk, wycisz
           audioTrack.enabled = !newSettings.pushToTalk;
         }
+      }
+
+      // Echo cancellation / noise suppression w TRAKCIE rozmowy: applyConstraints
+      // na zywym torze (best effort - jesli przegladarka nie wspiera zmiany w locie,
+      // nowa wartosc i tak trafi do getUserMedia przy nastepnym dolaczeniu).
+      if (
+        (newSettings.echoCancellation !== undefined || newSettings.noiseSupression !== undefined) &&
+        localStreamRef.current
+      ) {
+        const audioTrack = localStreamRef.current.getAudioTracks()[0];
+        audioTrack
+          ?.applyConstraints?.({
+            echoCancellation: updated.echoCancellation,
+            noiseSuppression: updated.noiseSupression,
+            autoGainControl: true,
+          })
+          ?.catch((error: unknown) => {
+            console.warn(
+              '🎤 [VOICE] applyConstraints nieudane (zadziała od następnego dołączenia):',
+              error
+            );
+          });
       }
 
       return updated;
