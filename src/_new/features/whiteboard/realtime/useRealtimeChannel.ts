@@ -38,7 +38,7 @@
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/_new/lib/supabase/client';
 import { markOpened } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { isDemoBoard } from '@/_new/features/demo/is-demo-board';
 import type { OnlineUser } from './types';

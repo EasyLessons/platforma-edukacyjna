@@ -4,7 +4,7 @@ import React from 'react';
 import { VoiceChatProvider, useVoiceChat, useVoiceChatRequired } from './VoiceChatContext';
 
 // Mock dependencies
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/_new/lib/supabase/client', () => ({
   supabase: {
     channel: vi.fn(() => ({
       on: vi.fn().mockReturnThis(),

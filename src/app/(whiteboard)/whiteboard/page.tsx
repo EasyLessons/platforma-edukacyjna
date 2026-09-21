@@ -170,7 +170,7 @@ export function TablicaContent() {
   useEffect(() => {
     if (!workspaceId || workspaceId <= 0) return;
 
-    const { supabase } = require('@/lib/supabase');
+    const { supabase } = require('@/_new/lib/supabase/client');
 
     const channel = supabase
       .channel(`workspace_members_${workspaceId}`)

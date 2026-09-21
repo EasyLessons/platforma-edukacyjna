@@ -32,7 +32,7 @@ const channelMock: any = {
 };
 
 const channelFactory = vi.fn((_name: string) => channelMock);
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/_new/lib/supabase/client', () => ({
   supabase: { channel: (name: string) => channelFactory(name) },
 }));
 
