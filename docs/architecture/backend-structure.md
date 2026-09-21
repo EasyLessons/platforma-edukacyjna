@@ -10,6 +10,7 @@ FastAPI, moduł per domenę pod `backend/api/v1/`. Każdy moduł ma ten sam kszt
 - **notifications/** — lista powiadomień, oznaczanie jako przeczytane (pojedynczo/wszystkie), usuwanie, `realtime.py` (wysyłanie eventów Broadcast do frontendu — patrz `pipelines.md`).
 - **whiteboard/** — wszystko, co dotyczy jednej tablicy: `POST /{id}/opened` (presence), `GET/PUT /{id}/settings`, elementy w modelu legacy (`POST /{id}/elements/batch`, `GET /{id}/elements`, `DELETE /{id}/elements/{element_id}`), `POST /{id}/upload-image` (Supabase Storage, `storage.py`), oraz endpointy dla serwisu Yjs: `GET/POST /{id}/doc` (snapshot `Y.Doc` w `board_documents`) i `GET /{id}/access` (weryfikacja tokenu + dostępu do tablicy dla `whiteboard-sync`).
 - **assets/** — zapisane szablony/assety użytkownika (`saved_assets`).
+- **plans/** — plany Free/Premium: własny model `user_plans` (`models.py`), limity w jednym miejscu (`limits.py`), `PlanService` wołany z `workspaces`/`boards` przy tworzeniu zasobów (403 `PLAN_LIMIT_*`) i przy `GET /boards/{id}` (`read_only`), `GET /plans/me`. Szczegóły: `docs/plan-subskrypcje.md`.
 - **onboarding/** — `OnboardingService.setup_new_user()`: startowy workspace + domyślna tablica dla nowo zarejestrowanego usera (bez własnego routera, wołany z `auth`).
 
 Poza `api/v1/`: **backend/core/** — `config.py` (Settings z `.env`), `database.py` (połączenie z Postgresem), `models.py` (wszystkie modele SQLAlchemy w jednym pliku), `exceptions.py`, `logging.py`, `responses.py` (wspólny format `ApiResponse[T]`), `presence.py` (kto jest na tablicy — sorted set w Redisie z TTL), `redis_client.py`, `rate_limit.py` (limit prób logowania/rejestracji), `email/` (klient Resend + szablony `auth`/`workspace`).
@@ -38,10 +39,11 @@ Nie istnieją (mimo starszych wzmianek w docs): `backend/auth/`, `backend/dashbo
 - **Notification** — generyczna: `type` + `payload` (JSONB) zamiast osobnej tabeli per typ zdarzenia.
 - **RefreshToken** — `token_hash` (nigdy plaintext), `revoked` do unieważniania przy rotacji.
 - **SavedAsset** — zapisane grupy elementów tablicy (`elements_data` JSONB) + `thumbnail`.
+- **UserPlan** (`api/v1/plans/models.py`, tabela `user_plans`, poza `core/models.py`) — `user_id` PK/FK, `plan` (`free`/`premium`, CHECK), `updated_at`. Brak wiersza = `free`. Osobny moduł, żeby nie ruszać `core/models.py` w czasie równoległej pracy nad Yjs; rejestrowany w metadata przez import w `alembic/env.py` i `tests/conftest.py`.
 
 ## Testy
 
-`backend/tests/v1/` odzwierciedla strukturę API (folder per moduł), `backend/tests/core/` testuje `presence` i `email`. `conftest.py` trzyma współdzielone fixtures (baza SQLite in-memory, fakeredis, przykładowi userzy/workspace'y/boardy). Rozdział na `test_*_router.py` (HTTP, przez `TestClient`) i `test_*_service.py` (logika bez HTTP) tam gdzie moduł jest wystarczająco złożony. Stan: 334 testy (21.09.2026). Bez testów: `assets/`, `onboarding/`, `whiteboard/router.py` i `storage.py`, `share_links/router.py` (service ma testy).
+`backend/tests/v1/` odzwierciedla strukturę API (folder per moduł), `backend/tests/core/` testuje `presence` i `email`. `conftest.py` trzyma współdzielone fixtures (baza SQLite in-memory, fakeredis, przykładowi userzy/workspace'y/boardy). Rozdział na `test_*_router.py` (HTTP, przez `TestClient`) i `test_*_service.py` (logika bez HTTP) tam gdzie moduł jest wystarczająco złożony. Stan: 363 testy (22.09.2026; w tym 29 dla `plans/`). Bez testów: `assets/`, `onboarding/`, `whiteboard/router.py` i `storage.py`, `share_links/router.py` (service ma testy).
 
 ## Znane niespójności
 

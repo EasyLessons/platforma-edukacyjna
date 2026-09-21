@@ -30,3 +30,14 @@ class ConflictError(AppException):
     """Resource conflict"""
     def __init__(self, message: str, details: dict | None = None):
         super().__init__(message, code="CONFLICT", status_code=409, details=details)
+
+class PlanLimitError(AppException):
+    """
+    Przekroczony limit planu (free/premium).
+
+    `code` trafia do pola `code` w ApiResponse i jest rozpoznawany przez frontend
+    (otwiera modal "Przejdź na Premium"). Dozwolone kody:
+      PLAN_LIMIT_WORKSPACES, PLAN_LIMIT_BOARDS, PLAN_LIMIT_ELEMENTS
+    """
+    def __init__(self, message: str, code: str, details: dict | None = None):
+        super().__init__(message, code=code, status_code=403, details=details)

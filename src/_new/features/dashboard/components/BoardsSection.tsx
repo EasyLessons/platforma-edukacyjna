@@ -24,6 +24,13 @@ import { BoardCreateModal } from '@/_new/features/board/components/boardCreateMo
 import { BoardEditModal } from '@/_new/features/board/components/boardEditModal';
 import { ConfirmationModal } from '@/_new/shared/ui/confirmation-modal';
 import { useBoards } from '@/_new/features/board/hooks/useBoard';
+import {
+  PlanUsageBadge,
+  UpgradeModal,
+  usePlan,
+  getPlanLimitCode,
+  type PlanLimitCode,
+} from '@/_new/features/plans';
 import { useAuth } from '@/_new/lib/auth';
 import type { Board, BoardCardActions } from '@/_new/features/board/types';
 import type { SortBy, FilterOwner } from '@/_new/features/board/utils/helpers';
@@ -55,6 +62,10 @@ export default function BoardsSection({
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [deletingBoard, setDeletingBoard] = useState<Board | null>(null);
 
+  // Plan free/premium: licznik „2/3 tablice" + modal upgrade po 403 PLAN_LIMIT_*
+  const { refresh: refreshPlan } = usePlan();
+  const [upgradeReason, setUpgradeReason] = useState<PlanLimitCode | null>(null);
+
   // Obiekt akcji przekazywany do kart przez BoardList
   const cardActions: BoardCardActions = useMemo(
     () => ({
@@ -82,6 +93,7 @@ export default function BoardsSection({
     try {
       await deleteBoard(deletingBoard.id);
       setDeletingBoard(null);
+      refreshPlan();
     } catch (err) {
       console.error('Error deleting board:', err);
       alert('Nie udało się usunąć tablicy. Spróbuj ponownie.');
@@ -102,15 +114,18 @@ export default function BoardsSection({
             <h2 className="min-w-0 text-2xl max-md:text-xl max-md:truncate md:text-[28px] font-bold text-gray-900">
               {workspace_name ? `Tablice — ${workspace_name}` : 'Tablice'}
             </h2>
-            <DashboardButton
-              variant="primary"
-              leftIcon={<Plus size={16} />}
-              onClick={() => setShowCreateModal(true)}
-              className="h-8 max-md:h-11 shrink-0"
-            >
-              <span className="hidden sm:inline">Nowa tablica</span>
-              <span className="sm:hidden">Nowa</span>
-            </DashboardButton>
+            <div className="flex shrink-0 items-center gap-2 md:gap-3">
+              <PlanUsageBadge kind="boards" className="max-sm:hidden" />
+              <DashboardButton
+                variant="primary"
+                leftIcon={<Plus size={16} />}
+                onClick={() => setShowCreateModal(true)}
+                className="h-8 max-md:h-11 shrink-0"
+              >
+                <span className="hidden sm:inline">Nowa tablica</span>
+                <span className="sm:hidden">Nowa</span>
+              </DashboardButton>
+            </div>
           </div>
 
           {/* Filters */}
@@ -191,8 +206,20 @@ export default function BoardsSection({
         onClose={() => setShowCreateModal(false)}
         workspace_id={workspace_id}
         onSubmit={async (data) => {
-          await createBoard(data);
+          try {
+            await createBoard(data);
+          } catch (err) {
+            const code = getPlanLimitCode(err);
+            if (code) {
+              // 403 PLAN_LIMIT_BOARDS -> zamknij formularz, otwórz „Przejdź na Premium"
+              setShowCreateModal(false);
+              setUpgradeReason(code);
+              return;
+            }
+            throw err;
+          }
           setShowCreateModal(false);
+          refreshPlan();
         }}
       />
 
@@ -222,6 +249,12 @@ export default function BoardsSection({
         }
         confirmText="Usuń tablicę"
         confirmVariant="destructive"
+      />
+
+      <UpgradeModal
+        isOpen={upgradeReason !== null}
+        reason={upgradeReason}
+        onClose={() => setUpgradeReason(null)}
       />
     </>
   );

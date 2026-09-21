@@ -21,6 +21,7 @@ from core.presence import PresenceService
 
 from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
 from api.v1.whiteboard.storage import delete_board_folder
+from api.v1.plans.service import PlanService
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -32,13 +33,19 @@ logger = get_logger(__name__)
 
 
 def _build_board_response(
-    board: Board, board_user: Optional[BoardUsers]
+    board: Board,
+    board_user: Optional[BoardUsers],
+    *,
+    read_only: bool = False,
+    read_only_reason: Optional[str] = None,
 ) -> BoardResponse:
     """Helper — buduje BoardResponse z ORM obiektu."""
     owner = board.creator
     modifier = board.last_modifier or owner
 
     return BoardResponse(
+        read_only=read_only,
+        read_only_reason=read_only_reason,
         id=board.id,
         name=board.name,
         icon=board.icon,
@@ -125,7 +132,9 @@ class BoardService:
         return board
 
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
-        require_editor_or_owner(self.db, board_data.workspace_id, user_id)
+        workspace, _ = require_editor_or_owner(self.db, board_data.workspace_id, user_id)
+        # Limit planu (free: 3 tablice we własnych workspace'ach) -> 403 PLAN_LIMIT_BOARDS
+        PlanService(self.db).ensure_can_create_board(user_id, workspace)
 
         board = _new_board_with_owner(
             self.db,
@@ -152,7 +161,11 @@ class BoardService:
             BoardUsers.board_id == board.id,
             BoardUsers.user_id == user_id,
         ).first()
-        return _build_board_response(board, board_user)
+        # Tablica ponad limitem elementów planu (free: 300) -> tryb tylko do odczytu
+        read_only, reason = PlanService(self.db).board_read_only_state(board)
+        return _build_board_response(
+            board, board_user, read_only=read_only, read_only_reason=reason
+        )
 
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0

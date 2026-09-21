@@ -4,7 +4,7 @@ Rzeczy, które wiadomo że nadejdą, zanim jeszcze jest kod. Cel: żeby architek
 
 ## Poziom subskrybenta (płatny plan)
 
-Trzeci stan usera obok zalogowany/niezalogowany. Szczegóły architektoniczne (model danych, warstwa autoryzacji, co zmienić na froncie) opisane w `docs/architecture/auth.md`, sekcja "Planowane: poziom subskrybenta". Status: **niezaczęte**, tylko zaplanowane.
+Trzeci stan usera obok zalogowany/niezalogowany. Szczegóły architektoniczne (model danych, warstwa autoryzacji, co zmienić na froncie) opisane w `docs/architecture/auth.md`, sekcja "Planowane: poziom subskrybenta". Status: **podstawa zrobiona bez płatności** (22.09.2026, PR `feat/plans-entitlements`) — plany `free`/`premium`, limity i egzekwowanie opisane w `docs/plan-subskrypcje.md`. Do zrobienia: płatności (Stripe), serwerowe domknięcie limitu elementów w `whiteboard-sync`.
 
 Otwarte pytania do rozstrzygnięcia przed startem prac (uzupełnić gdy będzie decyzja):
 
