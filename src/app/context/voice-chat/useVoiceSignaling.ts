@@ -28,7 +28,10 @@ export function useVoiceSignaling(
       ) => Promise<void>)
     | null
   >,
-  leaveVoiceChatRef: MutableRefObject<(() => void) | null>
+  leaveVoiceChatRef: MutableRefObject<(() => void) | null>,
+  applyRemoteAnswer: (fromUserId: number, answer: RTCSessionDescriptionInit) => Promise<void>,
+  addRemoteIceCandidate: (fromUserId: number, candidate: RTCIceCandidateInit) => Promise<void>,
+  clearPendingIce: (userId?: number) => void
 ) {
   const setupVoiceChannel = useCallback((): Promise<RealtimeChannel | null> => {
     return new Promise((resolve) => {
@@ -79,6 +82,7 @@ export function useVoiceSignaling(
             connectionTimeoutsRef.current.delete(userId);
           }
           lastSyncTimeRef.current.delete(userId);
+          clearPendingIce(userId);
 
           // Dodaj do listy uczestników (fresh)
           setParticipants((prev) => {
@@ -194,6 +198,7 @@ export function useVoiceSignaling(
 
           console.log(`🎤 [VOICE] User ${userId} opuścił voice chat`);
           cleanupUserConnections(userId);
+          clearPendingIce(userId);
         })
         .on('broadcast', { event: 'voice-offer' }, async ({ payload }) => {
           const { fromUserId, fromUsername, toUserId, offer } = payload as VoiceEvent & {
@@ -207,19 +212,14 @@ export function useVoiceSignaling(
           const { fromUserId, toUserId, answer } = payload as VoiceEvent & { type: 'voice-answer' };
           if (toUserId !== user.id) return;
 
-          const pc = peerConnectionsRef.current.get(fromUserId)?.pc;
-          if (pc) {
-            await pc.setRemoteDescription(answer);
-          }
+          await applyRemoteAnswer(fromUserId, answer);
         })
         .on('broadcast', { event: 'voice-ice' }, async ({ payload }) => {
           const { fromUserId, toUserId, candidate } = payload as VoiceEvent & { type: 'voice-ice' };
           if (toUserId !== user.id) return;
 
-          const pc = peerConnectionsRef.current.get(fromUserId)?.pc;
-          if (pc) {
-            await pc.addIceCandidate(candidate);
-          }
+          // Kolejkuje kandydata, jesli polaczenie jeszcze nie jest gotowe.
+          await addRemoteIceCandidate(fromUserId, candidate);
         })
         .on('broadcast', { event: 'voice-mute' }, ({ payload }) => {
           const { userId, isMuted } = payload as VoiceEvent & { type: 'voice-mute' };
@@ -244,12 +244,22 @@ export function useVoiceSignaling(
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             console.error(`🎤 [VOICE] ❌ Kanał voice błąd: ${status}`);
+            // Nie zostawiaj subskrypcji po nieudanym dolaczeniu.
+            channel.unsubscribe();
             resolve(null);
           }
         });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [boardId, user?.id, user?.username, cleanupUserConnections]);
+  }, [
+    boardId,
+    user?.id,
+    user?.username,
+    cleanupUserConnections,
+    applyRemoteAnswer,
+    addRemoteIceCandidate,
+    clearPendingIce,
+  ]);
 
   // 🛡️ Cleanup kanału przy zmianie boardId - wywołaj pełny leaveVoiceChat
   const prevBoardIdRef = useRef(boardId);

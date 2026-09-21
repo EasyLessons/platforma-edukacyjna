@@ -24,6 +24,7 @@ import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeCon
 import { useAuth } from '@/_new/lib/auth';
 import { Check, Eye, EyeOff, Phone, Plus, Users, History } from 'lucide-react';
 import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
+import { VoiceChatNotice } from '@/_new/features/whiteboard/components/canvas/voice-chat-notice';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { useVoiceChat } from '@/app/context/VoiceChatContext';
 import { Button } from '@/_new/shared/ui/button';
@@ -146,8 +147,9 @@ export function OnlineUsers({
     if (!voiceChat) return;
 
     if (!voiceChat.isInVoiceChat) {
-      await voiceChat.joinVoiceChat();
-      setIsVoicePanelOpen(true);
+      // Panel tylko po udanym dolaczeniu - powod porazki pokazuje VoiceChatNotice.
+      const joined = await voiceChat.joinVoiceChat();
+      if (joined) setIsVoicePanelOpen(true);
       return;
     }
 
@@ -336,6 +338,8 @@ export function OnlineUsers({
       </div>
 
       <VoiceChat isVisible={shouldShowVoicePanel} className="ml-auto" />
+
+      <VoiceChatNotice />
 
       {toastState && (
         <div className="fixed inset-x-0 bottom-8 z-[1200] pointer-events-none flex justify-center px-4">
