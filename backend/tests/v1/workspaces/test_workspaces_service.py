@@ -58,6 +58,11 @@ class TestGetWorkspaces:
         assert result == []
 
     def test_returns_own_workspaces(self, db_session, test_user):
+        # Plan free pozwala na 1 własny workspace — test potrzebuje dwóch, więc premium
+        from api.v1.plans.models import UserPlan
+        db_session.add(UserPlan(user_id=test_user.id, plan="premium"))
+        db_session.commit()
+
         service = WorkspaceService(db_session)
         service.create_workspace(WorkspaceCreate(name="WS1"), test_user.id)
         service.create_workspace(WorkspaceCreate(name="WS2"), test_user.id)
