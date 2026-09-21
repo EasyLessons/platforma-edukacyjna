@@ -6,14 +6,11 @@ Stan obecny (nie historia zmian — historia scalona tu i usunięta jako osobne 
 
 `src/app` ma odpowiadać wyłącznie za routing Next.js (które URL-e istnieją, jaki layout mają) i **składać** strony z komponentów zaimportowanych z `src/_new`. Cała logika biznesowa, hooki, komunikacja z API i większość komponentów UI żyje w `src/_new/features/*` (patrz `docs/architecture/stack.md`, sekcja "Struktura feature-based").
 
-Wyjątki, czyli kod, który wciąż żyje w `src/app` zamiast w `src/_new` (do przeniesienia — kolejność i PR-y w `REFAKTOR-PLAN.md`, Faza A i B):
+Jedyny wyjątek, czyli kod, który wciąż żyje w `src/app` zamiast w `src/_new` (PR-C1 w `REFAKTOR-PLAN.md`, po migracji tablicy na Yjs):
 
 - `src/app/context/BoardRealtimeContext.tsx` — Provider synchronizacji tablicy przez Supabase Realtime (390 linii). Sama logika jest już rozbita na hooki w `src/_new/features/whiteboard/realtime/` (presence, kursory, typing, viewport, sync elementów); w `app/context` został tylko Provider spinający hooki z kanałem.
-- `src/app/context/VoiceChatContext.tsx` (646 linii) + `src/app/context/voice-chat/` (hooki: `useWebRTCConnections`, `useVoiceSignaling`, `useVoiceDetection`, `mediaSupport`, `constants`, `types`) — WebRTC voice chat. Rozbity na hooki w PR #38, ale nadal poza `_new`.
-- `src/lib/supabase.ts` — klient Supabase, jedyny plik w `src/lib`.
-- Komponenty w `src/app/(dashboard)/dashboard/{Components,Header}`, `src/app/(dashboard)/account/components`, `src/app/(public)/{sections,_components}` — ok. 10 000 linii UI, które z punktu widzenia reguły "app = routing" powinny być feature'ami (`dashboard`, `account`, `landing`).
 
-`AuthContext` **nie** jest już wyjątkiem — Provider sesji żyje w `src/_new/lib/auth/AuthContext.tsx` (eksport `AuthProvider`, `useAuth` przez barrel `src/_new/lib/auth`).
+Zrobione we wrześniu 2026 (PR #47–#56): `AuthContext` → `src/_new/lib/auth`, klient Supabase → `src/_new/lib/supabase/client.ts` (folder `src/lib` nie istnieje), voice chat → `features/voice-chat`, komponenty panelu/konta/landingu → `features/{dashboard,account,landing}`, logika `/api/chat` → `src/_new/server/chat`. Strony w `src/app` importują wyłącznie przez barrele `index.ts` tych feature'ów.
 
 ## Route Groups w `src/app`
 
@@ -24,19 +21,17 @@ src/app/
 ├── layout.tsx                  ← root: fonty, QueryProvider, AuthProvider (z src/_new/lib)
 ├── mdx-components.tsx          ← mapowanie komponentów dla stron MDX w (info)
 │
-├── (public)/                   ← marketing / landing page — Header+Footer
+├── (public)/                   ← marketing / landing page — Header+Footer z features/landing
 │   ├── layout.tsx
-│   ├── _components/             (Header, Footer, mega-menus/)
 │   ├── page.tsx                 (strona główna, "/")
-│   ├── sections/                (sekcje landing page)
-│   ├── product/ (+ sections/), news/, contact/
+│   ├── product/, news/, contact/
 │
 ├── (auth)/                     ← logowanie/rejestracja — gradient blobs + top bar
 │   ├── login/, register/, reset-password/, verify/, auth/callback/
 │
-├── (dashboard)/                ← panel użytkownika — DashboardHeader
-│   ├── dashboard/                (główny widok: boardy, workspace'y; Components/, Header/)
-│   ├── account/                  (profil użytkownika; components/)
+├── (dashboard)/                ← panel użytkownika — DashboardHeader z features/dashboard
+│   ├── dashboard/                (page.tsx + dashboard-theme.css; komponenty w features/dashboard)
+│   ├── account/                  (page.tsx; komponenty w features/account)
 │   ├── invite/[token]/           (akceptacja zaproszenia do workspace'u)
 │   ├── join/[token]/             (dołączenie przez link udostępniania workspace'u)
 │
@@ -48,10 +43,10 @@ src/app/
 │   └── docs/, privacy-policy/, terms/, terms-of-use/, gdpr/, cookies-policy/
 │
 ├── api/                         ← Next.js Route Handlers (nie FastAPI!)
-│   ├── chat/                     (proxy do Gemini + auth przez backend, patrz pipelines.md)
+│   ├── chat/                     (cienki handler; logika w src/_new/server/chat, patrz pipelines.md)
 │   └── contact/                  (formularz kontaktowy)
 │
-└── context/                     ← BoardRealtimeContext, VoiceChatContext + voice-chat/ — do migracji, patrz wyżej
+└── context/                     ← tylko BoardRealtimeContext — do migracji (PR-C1), patrz wyżej
 ```
 
 Każda grupa ma dokładnie jeden powód do zmiany layoutu (Single Responsibility na poziomie layoutu). Header dla zalogowanych i niezalogowanych to **jeden** komponent (`Header.tsx`) — sam decyduje przez `useAuth()` co wyrenderować.
@@ -61,10 +56,14 @@ Każda grupa ma dokładnie jeden powód do zmiany layoutu (Single Responsibility
 ```
 src/_new/
 ├── features/
+│   ├── account/        (panel konta: Sidebar, ProfileSection; components/_mock/ = makiety bez backendu, known-issues #5)
 │   ├── auth/           (formularze logowania/rejestracji, hooki useLogin/useRegister, Google OAuth button)
 │   ├── board/          (lista boardów, tworzenie/edycja, karty boardów)
+│   ├── dashboard/      (układ panelu: sidebar workspace'ów, sekcje boardów, nagłówek z popupami)
 │   ├── demo/           (tablica demo bez konta: tożsamość gościa, sesja demo, CTA na landingu)
+│   ├── landing/        (strona marketingowa: sections/, navigation/ (Header, Footer, mega-menus), product/)
 │   ├── notifications/  (dzwoneczek powiadomień, hook useNotifications)
+│   ├── voice-chat/     (VoiceChatProvider, hooki WebRTC/sygnalizacji, iceRestart, components/ panelu rozmowy)
 │   ├── whiteboard/     (silnik tablicy)
 │   │   ├── api/         (whiteboardApi, assets-api, elements-api — REST do backendu)
 │   │   ├── commands/    (Command pattern: create/update/delete, composite)
@@ -86,8 +85,11 @@ src/_new/
 │   ├── api/            (klient axios + typy odpowiedzi API)
 │   ├── auth/           (AuthContext/AuthProvider, tokenStore, tokenService)
 │   ├── errors/         (AppError, errorHandler — jednolita obsługa błędów API)
+│   ├── supabase/       (client.ts — klient Supabase Realtime)
 │   ├── query-provider.tsx (TanStack Query provider)
 │   └── utils.ts        (cn)
+├── server/             # logika Route Handlerów Next (server-only, bez React)
+│   └── chat/           (rate-limit, response-cache, prompt, gemini, auth dla /api/chat)
 └── shared/
     ├── hooks/, types/, ui/ (komponenty reużywalne: przyciski, modale, tooltip, avatar)
 ```
@@ -99,12 +101,13 @@ Aliasy importu (`tsconfig.json`): `@/*` → `src/*`, `@new/*` → `src/_new/*`. 
 Chcesz zmienić **jak wygląda/routuje się strona** → szukaj w `src/app`.
 Chcesz zmienić **jak coś działa** (logika, dane, stan) → szukaj w `src/_new/features/<nazwa-funkcji>`.
 Chcesz zmienić **coś współdzielonego między funkcjami** (przycisk, modal, hook) → `src/_new/shared`.
-Trafiłeś na `src/app/context/*` albo `src/lib/supabase.ts` → to legacy do migracji, patrz `docs/migration-status.md` i `REFAKTOR-PLAN.md` zanim zaczniesz tam grzebać.
+Trafiłeś na `src/app/context/BoardRealtimeContext.tsx` → to ostatni plik legacy, patrz `REFAKTOR-PLAN.md` (PR-C1) zanim zaczniesz tam grzebać.
+Zmieniasz logikę Route Handlera (`/api/chat`) → `src/_new/server/chat`, nie `src/app/api`.
 Pracujesz nad synchronizacją tablicy → sprawdź najpierw flagę `NEXT_PUBLIC_WHITEBOARD_YJS` (`features/whiteboard/config/feature-flags.ts`): są dwie ścieżki (legacy Supabase Broadcast i Yjs/Hocuspocus), opis w `pipelines.md` §2.
 
 ## Granice importów
 
-Zasada: `app → _new/features → _new/{shared,lib}`. Kod w `_new` nie powinien importować z `src/app`. Dziś ta reguła jest łamana w 17 miejscach (`DashboardButton` z `app/(dashboard)`, oba konteksty z `app/context`) — usuwane w PR-ach A3, B1, C1 planu; pilnowanie przez `dependency-cruiser` w CI wchodzi w PR-A2.
+Zasada: `app → _new/features → _new/{shared,lib,server}`. Kod w `_new` nie importuje z `src/app`; route group nie importuje z innej route group; `shared`/`lib` nie zależą od `features`. Pilnuje `npm run depcruise` (dependency-cruiser, job `frontend-arch` w CI, konfiguracja `.dependency-cruiser.cjs`). Pozostałe, jawnie wpisane wyjątki: `BoardRealtimeContext` (do PR-C1) i `lib/auth/AuthContext → features/auth/api/authApi` (do osobnego małego PR-a).
 
 ## Limit rozmiaru pliku
 
