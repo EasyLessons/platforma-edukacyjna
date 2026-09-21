@@ -1,6 +1,6 @@
 """Schemas dla modułu boards (CRUD tablicy)."""
 from datetime import datetime
-from typing import Dict, Optional, List
+from typing import Dict, Literal, Optional, List
 from pydantic import BaseModel, Field, ConfigDict
 
 from api.v1.whiteboard.schemas import OnlineUserInfo
@@ -39,6 +39,10 @@ class BoardResponse(BaseModel):
     last_modified: datetime
     last_modified_by: Optional[str]
     last_opened: Optional[datetime]
+    # Plan (free/premium): tablica ponad limitem elementów = tylko do odczytu.
+    # Wypełniane tylko w GET /boards/{id}; na liście zawsze False/None.
+    read_only: bool = False
+    read_only_reason: Optional[Literal["PLAN_LIMIT_ELEMENTS"]] = None
 
     model_config = ConfigDict(from_attributes=True)
 
