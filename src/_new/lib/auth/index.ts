@@ -19,4 +19,5 @@ export {
   isPublicPath,
 } from './tokenService';
 
+export { getCurrentUser, logoutUser } from './session-api';
 export { AuthProvider, useAuth } from './AuthContext';

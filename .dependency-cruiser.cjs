@@ -36,13 +36,7 @@ module.exports = {
       severity: 'error',
       comment: "src/_new/shared i src/_new/lib sa warstwa nizsza - nie moga zalezec od feature'ow.",
       from: { path: '^src/_new/(shared|lib)/' },
-      to: {
-        path: '^src/_new/features/',
-        // TYMCZASOWO: AuthContext (lib/auth) wola features/auth/api/authApi.ts
-        // (getCurrentUser/logoutUser). Do rozwiazania osobnym PR-em: przeniesc te
-        // dwa wywolania do lib/auth albo AuthContext do features/auth.
-        pathNot: ['^src/_new/features/auth/api/authApi[.]ts$'],
-      },
+      to: { path: '^src/_new/features/' },
     },
     {
       name: 'no-circular',

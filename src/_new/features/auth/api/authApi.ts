@@ -63,8 +63,6 @@ export const resetPassword = (data: ResetPasswordRequest): Promise<PasswordReset
 
 // SESJA
 
-export const getCurrentUser = (): Promise<User> =>
-  apiClient.get<{ user: User }>('/api/v1/auth/me').then((res) => res.data.user);
-
-export const logoutUser = (): Promise<void> =>
-  apiClient.post('/api/v1/auth/logout').then((res) => res.data);
+// Bootstrap/wylogowanie sesji zyja w lib/auth/session-api.ts (AuthProvider jest
+// warstwa lib i nie moze importowac z features). Re-eksport zachowuje publiczne API.
+export { getCurrentUser, logoutUser } from '@/_new/lib/auth/session-api';
