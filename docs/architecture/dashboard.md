@@ -12,34 +12,39 @@ Panel użytkownika po zalogowaniu: `src/app/(dashboard)/`. Odpowiada za zarządz
 
 ## Struktura komponentów
 
+Strony w `src/app/(dashboard)` to cienki routing; komponenty żyją w feature'ach i wchodzą przez barrele `index.ts`:
+
 ```
 src/app/(dashboard)/
-├── layout.tsx
-├── dashboard/
-│   ├── page.tsx
-│   ├── Header/
-│   │   ├── DashboardHeader.tsx        ← nagłówek (powiadomienia, menu usera, mobile hamburger)
-│   │   └── popups/                    (GiftPopup, UserMenuPopup)
-│   └── Components/
-│       ├── BoardsSection.tsx          ← import z src/_new/features/board (lista, tworzenie, edycja, usuwanie)
-│       ├── RecentsView.tsx            ← ostatnio otwierane boardy
-│       ├── TemplateSection.tsx        ← szablony boardów
-│       ├── WelcomeSection.tsx
-│       ├── workspace-sidebar.tsx      ← lista workspace'ów usera (na telefonie wysuwana)
-│       ├── workspace-top-nav.tsx      ← przełącznik aktywnego workspace'u
-│       ├── open-workspaces-button.tsx ← przycisk otwierający sidebar na telefonie
-│       ├── DashboardButton.tsx        ← przycisk używany też przez modale w src/_new (do przeniesienia do shared/ui)
-│       └── _tests/
-├── account/
-│   ├── page.tsx
-│   ├── types.ts
-│   └── components/ (Sidebar, ProfileSection/BasicInfo — realne dane;
-│                    AddressBook, PaymentMethods, SecurityCenter — makiety bez backendu)
-├── invite/[token]/page.tsx            ← akceptacja zaproszenia imiennego
-└── join/[token]/page.tsx              ← dołączenie przez link udostępniania
+├── layout.tsx                        ← DashboardHeader z @/_new/features/dashboard + dashboard-theme.css
+├── dashboard/page.tsx                ← składa WorkspaceSidebar, WorkspaceTopNav, BoardsSection, TemplatesSection, RecentsView
+├── dashboard/dashboard-theme.css     ← klasy dashboard-* (także dla shared/ui/dashboard-button)
+├── account/page.tsx                  ← składa Sidebar, ProfileSection, AddressBook, PaymentMethods, SecurityCenter
+├── invite/[token]/page.tsx           ← akceptacja zaproszenia imiennego
+└── join/[token]/page.tsx             ← dołączenie przez link udostępniania
+
+src/_new/features/dashboard/
+├── index.ts
+└── components/
+    ├── BoardsSection.tsx             ← lista/tworzenie/edycja/usuwanie boardów (features/board)
+    ├── RecentsView.tsx               ← ostatnio otwierane boardy
+    ├── TemplateSection.tsx           ← szablony boardów
+    ├── workspace-sidebar.tsx         ← lista workspace'ów (na telefonie wysuwana)
+    ├── workspace-top-nav.tsx         ← przełącznik aktywnego workspace'u
+    ├── open-workspaces-button.tsx
+    ├── header/DashboardHeader.tsx    ← powiadomienia, menu usera, mobile hamburger; popups/
+    └── _tests/
+
+src/_new/features/account/
+├── index.ts, types.ts (ActiveSection)
+└── components/
+    ├── Sidebar.tsx, ProfileSection/  ← realne dane (/api/v1/auth/me)
+    └── _mock/                        ← AddressBook, PaymentMethods, SecurityCenter: makiety bez backendu (known-issues #5)
 ```
 
-Logika (hooki, typy, wywołania API) żyje w `src/_new/features/board`, `src/_new/features/workspace`, `src/_new/features/notifications` — komponenty w `src/app/(dashboard)` je tylko konsumują. Jeśli zmieniasz **co dashboard robi** (np. nowy filtr boardów, nowa reguła uprawnień), zmiana wchodzi w `src/_new/features/*`, nie w `src/app/(dashboard)`.
+Współdzielony przycisk panelu: `src/_new/shared/ui/dashboard-button.tsx`.
+
+Logika (hooki, typy, wywołania API) żyje w `src/_new/features/board`, `src/_new/features/workspace`, `src/_new/features/notifications` — `features/dashboard` i `features/account` to układ i kompozycja. Jeśli zmieniasz **co dashboard robi** (np. nowy filtr boardów, nowa reguła uprawnień), zmiana wchodzi w `features/board`/`workspace`, nie w komponenty panelu ani w `src/app/(dashboard)`.
 
 ## Backend
 

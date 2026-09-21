@@ -12,13 +12,12 @@ module.exports = {
       comment:
         "Kod w src/_new (logika, feature'y, shared, lib) nie moze importowac z src/app " +
         '(routing). Wyjatki ponizej sa TYMCZASOWE i znikaja w kolejnych PR-ach planu: ' +
-        'DashboardButton -> PR-A3 (zrobione, #47), VoiceChatContext -> PR-B1 (zrobione), ' +
+        'DashboardButton -> PR-A3 (zrobione, #47), VoiceChatContext -> PR-B1 (zrobione, #54), ' +
         'BoardRealtimeContext -> PR-C1 (features/whiteboard/realtime).',
       from: { path: '^src/_new/', pathNot: '[.](?:spec|test)[.](?:ts|tsx)$' },
       to: {
         path: '^src/app/',
         pathNot: [
-          '^src/app/\\(dashboard\\)/dashboard/Components/DashboardButton\\.tsx$', // PR-A3
           '^src/app/context/BoardRealtimeContext\\.tsx$', // PR-C1
         ],
       },
