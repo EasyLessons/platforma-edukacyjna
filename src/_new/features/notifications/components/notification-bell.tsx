@@ -26,7 +26,7 @@ export function NotificationBell({ unreadCount, onClick }: NotificationBellProps
         size="iconSm"
         onClick={onClick}
         title="Powiadomienia"
-        className="dashboard-btn-secondary rounded-full"
+        className="dashboard-btn-secondary rounded-full max-md:h-11 max-md:w-11"
       >
         <Bell size={16} />
       </Button>

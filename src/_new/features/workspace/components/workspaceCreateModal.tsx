@@ -68,7 +68,7 @@ export function WorkspaceCreateModal({ isOpen, onClose, onSubmit }: WorkspaceCre
             onClick={handleClose}
             disabled={isSubmitting}
             aria-label="Zamknij"
-            className="h-9 w-9 rounded-full p-0"
+            className="h-9 w-9 max-md:h-11 max-md:w-11 rounded-full p-0"
           >
             <X size={20} />
           </DashboardButton>
