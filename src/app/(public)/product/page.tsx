@@ -1,6 +1,4 @@
-import ProductHero from './sections/ProductHero';
-import DashboardSection from './sections/DashboardSection';
-import TutoringBoardSection from './sections/TutoringBoardSection';
+import { ProductHero, DashboardSection, TutoringBoardSection } from '@/_new/features/landing';
 import { Plus_Jakarta_Sans } from 'next/font/google';
 
 const jakartaSans = Plus_Jakarta_Sans({

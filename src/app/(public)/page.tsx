@@ -1,7 +1,9 @@
-import HeroSection from './sections/HeroSection';
-import WhyTutorsSection from './sections/WhyTutorsSection';
-import BenefitsTimelineSection from './sections/BenefitsTimelineSection';
-import PricingSection from './sections/PricingSection';
+import {
+  HeroSection,
+  WhyTutorsSection,
+  BenefitsTimelineSection,
+  PricingSection,
+} from '@/_new/features/landing';
 
 export default function Home() {
   return (
