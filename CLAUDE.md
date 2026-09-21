@@ -41,6 +41,11 @@ Testy leza obok kodu (`*.test.ts[x]`), setup w `src/test/setup.ts`.
 Chcesz zmienic JAK WYGLADA / ROUTUJE sie strona -> `src/app`.
 Chcesz zmienic JAK COS DZIALA -> `src/_new/features/<nazwa>`.
 
+Przenosiny plikow/katalogow TYLKO wg `docs/architecture/REFAKTOR-PLAN.md` (etapy, kolejnosc,
+strefa zakazu wokol migracji Yjs). Prog rozmiaru pliku: **400 linii** - plik powyzej nie jest
+bledem, ale w PR napisz jednym zdaniem, czemu nie da sie go podzielic (albo ze podzial jest
+w planie). Nie dziel plikow "dla statystyki" poza zakresem PR-a.
+
 ## Git - jak commitowac
 
 1. **Commituj po jawnych sciezkach**: `git add src/a.ts src/b.ts`, potem commit.

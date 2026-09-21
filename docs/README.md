@@ -15,6 +15,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 11. **`docs/migration-status.md`** — co z migracji na architekturę feature-based zostało zrobione, co zostaje do zrobienia. Sprawdź to **zanim** zaczniesz zmieniać coś w `src/app/context/*` albo w folderze `src/_new`.
 12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
 13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
+14. **`docs/architecture/REFAKTOR-PLAN.md`** — zatwierdzony plan refaktoru struktury (docelowe drzewo, etapy jako małe PR-y, kolejność względem pracy równoległej, decyzje). Czytaj przed każdym PR-em przenoszącym pliki.
 
 ## Zasada utrzymania
 
