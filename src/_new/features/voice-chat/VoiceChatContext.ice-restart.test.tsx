@@ -13,7 +13,7 @@ import {
   getDtlsFingerprint,
   isRenegotiationOfSameSession,
   shouldInitiateIceRestart,
-} from './voice-chat/iceRestart';
+} from './iceRestart';
 
 // ── Kanal Supabase z przechwytywaniem handlerow broadcastu ──────────────────
 type Handler = (msg: { payload: unknown }) => void | Promise<void>;

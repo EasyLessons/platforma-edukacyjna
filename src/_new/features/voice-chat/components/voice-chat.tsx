@@ -18,7 +18,7 @@ import {
   Check,
   PhoneOff,
 } from 'lucide-react';
-import { useVoiceChat } from '@/app/context/VoiceChatContext';
+import { useVoiceChat } from '../VoiceChatContext';
 import VoiceChatSettings from './voice-chat-settings';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { Button } from '@/_new/shared/ui/button';

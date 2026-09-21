@@ -42,8 +42,8 @@ vi.mock('@/_new/lib/auth', () => ({
 
 // getIceServers sterowany z testu: domyslnie od razu, na zyczenie "wisi".
 let iceGate: { promise: Promise<void>; release: () => void } | null = null;
-vi.mock('./voice-chat/constants', async (importOriginal) => {
-  const orig = await importOriginal<typeof import('./voice-chat/constants')>();
+vi.mock('./constants', async (importOriginal) => {
+  const orig = await importOriginal<typeof import('./constants')>();
   return {
     ...orig,
     getIceServers: vi.fn(async () => {
