@@ -189,6 +189,5 @@ export function useWhiteboardEngine(deps: WhiteboardEngineDeps): WhiteboardEngin
       },
     };
     // Pusta lista zależności — obiekt stabilny; runtime czytany przez depsRef.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }
