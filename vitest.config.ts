@@ -18,11 +18,15 @@ export default defineConfig({
     exclude: ['node_modules', '.next'],
     coverage: {
       provider: 'v8',
-      reporter: ['text'],
-      include: [
-        'src/_new/features/auth/**/*.{ts,tsx}',
-        'src/_new/lib/auth/**/*.ts',
-        'src/_new/lib/errors/**/*.ts',
+      // text-summary: czytelne w CI; json-summary: coverage/coverage-summary.json
+      // dla progu pokrycia (bez dodatkowych zaleznosci).
+      reporter: ['text', 'text-summary', 'json-summary'],
+      include: ['src/_new/features/**/*.{ts,tsx}', 'src/_new/lib/**/*.{ts,tsx}'],
+      exclude: [
+        '**/*.test.{ts,tsx}',
+        '**/*.d.ts',
+        '**/_mock/**', // dane atrapy (decyzja P2 z REFAKTOR-PLAN)
+        '**/index.ts', // barrele bez logiki
       ],
     },
   },
