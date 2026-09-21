@@ -10,7 +10,7 @@
 
 import { useState } from 'react';
 import { AlertCircle, Volume2 } from 'lucide-react';
-import { useVoiceChat } from '@/app/context/VoiceChatContext';
+import { useVoiceChat } from '../VoiceChatContext';
 
 const buttonBase =
   'min-h-11 min-w-11 px-3 rounded-lg text-sm font-semibold cursor-pointer transition-colors';

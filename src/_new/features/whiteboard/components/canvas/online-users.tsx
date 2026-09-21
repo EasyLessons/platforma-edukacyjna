@@ -23,10 +23,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useBoardRealtime, RemoteViewport } from '@/app/context/BoardRealtimeContext';
 import { useAuth } from '@/_new/lib/auth';
 import { Check, Eye, EyeOff, Phone, Plus, Users, History } from 'lucide-react';
-import VoiceChat from '@/_new/features/whiteboard/components/canvas/voice-chat';
-import { VoiceChatNotice } from '@/_new/features/whiteboard/components/canvas/voice-chat-notice';
+import VoiceChat from '@/_new/features/voice-chat';
+import { VoiceChatNotice } from '@/_new/features/voice-chat';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
-import { useVoiceChat } from '@/app/context/VoiceChatContext';
+import { useVoiceChat } from '@/_new/features/voice-chat';
 import { Button } from '@/_new/shared/ui/button';
 import {
   useWhiteboardUiMetrics,

@@ -28,7 +28,7 @@ import { Suspense, useState, useEffect } from 'react';
 
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
-import { VoiceChatProvider } from '../../context/VoiceChatContext';
+import { VoiceChatProvider } from '@/_new/features/voice-chat';
 import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';

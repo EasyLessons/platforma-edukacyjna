@@ -9,7 +9,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Volume2, Keyboard, Shield, Check } from 'lucide-react';
-import { useVoiceChat, VoiceSettings } from '@/app/context/VoiceChatContext';
+import { useVoiceChat, VoiceSettings } from '../VoiceChatContext';
 
 interface VoiceChatSettingsProps {
   onClose: () => void;

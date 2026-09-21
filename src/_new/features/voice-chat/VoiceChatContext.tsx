@@ -45,7 +45,7 @@ import {
   VoiceChatContextType,
   PeerConnection,
   VoiceEvent,
-} from './voice-chat/types';
+} from './types';
 
 export type { VoiceParticipant, VoiceSettings, VoiceChatContextType, PeerConnection, VoiceEvent };
 
@@ -59,16 +59,16 @@ const VoiceChatContext = createContext<VoiceChatContextType | undefined>(undefin
 // 📦 PROVIDER
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { DEFAULT_SETTINGS } from './voice-chat/constants';
-import { useVoiceDetection } from './voice-chat/useVoiceDetection';
-import { useVoiceSignaling } from './voice-chat/useVoiceSignaling';
-import { useWebRTCConnections } from './voice-chat/useWebRTCConnections';
+import { DEFAULT_SETTINGS } from './constants';
+import { useVoiceDetection } from './useVoiceDetection';
+import { useVoiceSignaling } from './useVoiceSignaling';
+import { useWebRTCConnections } from './useWebRTCConnections';
 import {
   getVoiceSupportIssue,
   mapGetUserMediaError,
   voiceError as makeVoiceError,
   type VoiceError,
-} from './voice-chat/mediaSupport';
+} from './mediaSupport';
 
 export function VoiceChatProvider({
   boardId,
