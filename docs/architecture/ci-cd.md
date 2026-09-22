@@ -33,11 +33,15 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 |---|---|---|
 | `backend-test` | `pytest tests/ -v` w `backend/` | to samo, z aktywnym venv |
 | `backend-lint` | `ruff check .` w `backend/` | to samo |
-| `frontend-test` | `npm run test` (vitest) | to samo |
+| `frontend-test` | `npm run test:coverage` (vitest z pokryciem; failuje, gdy pokrycie spadnie poniżej `coverage.thresholds` w `vitest.config.ts` — progi podnosimy, nie obniżamy) | to samo |
 | `frontend-lint` | `npm run lint` + `npm run format:check` | to samo |
 | `frontend-typecheck` | `npm run typecheck` (`tsc --noEmit`) | to samo |
 | `frontend-arch` | `npm run depcruise` (dependency-cruiser: granice importów `app -> _new/features -> _new/{shared,lib}`, brak cykli/sierot) | to samo |
 | `frontend-build` | `npm run build` (sanity-check kompilacji) | to samo |
+| `sync-typecheck` | `npx tsc --noEmit` w `whiteboard-sync/` | to samo |
+| `frontend-audit` | `npm audit --omit=dev` na zależnościach produkcyjnych (dziś `--audit-level=critical` do czasu podbicia `pdfjs-dist` do 6.x, potem `high`); pełny audyt z dev tylko informacyjnie; `whiteboard-sync` osobno na `high` | `npm audit --audit-level=critical --omit=dev` |
+| `backend-audit` | `pip-audit -r requirements.txt --strict` w `backend/`; podatności bez poprawki w obrębie naszego majora są wpisane z powodem w `backend/pip-audit-ignore.txt` (każdy wpis ma warunek usunięcia). Każda nowa podatność spoza listy = czerwony job | `pip install pip-audit`, potem komenda z joba |
+| `gitleaks` | binarka `gitleaks` (bez licencji, w przeciwieństwie do `gitleaks-action` dla organizacji): commity z PR skanowane z twardym failem; cała historia tylko informacyjnie (`continue-on-error`) do czasu rotacji 4 starych wpisów i allowlisty w `.gitleaks.toml` | `gitleaks git --redact .` |
 
 **Przed pushem warto odpalić to lokalnie**, żeby nie czekać na czerwone CI:
 ```
@@ -48,7 +52,7 @@ pytest tests/ -v
 # frontend (z roota)
 npm run lint
 npm run typecheck
-npm run test
+npm run test:coverage
 npm run format:check
 npm run depcruise
 ```

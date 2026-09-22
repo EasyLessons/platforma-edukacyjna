@@ -53,7 +53,9 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
-      - run: npm run test
+      # --coverage: vitest sam failuje, gdy pokrycie spadnie ponizej
+      # coverage.thresholds z vitest.config.ts (lokalnie +~2 s wzgledem `npm run test`).
+      - run: npm run test:coverage
 
   frontend-lint:
     runs-on: ubuntu-latest
@@ -121,3 +123,82 @@ jobs:
           node-version: '20'
       - run: npm ci
       - run: npx tsc --noEmit
+
+  # --- Bezpieczenstwo ---------------------------------------------------------
+  # Trzy joby ponizej nie buduja ani nie testuja kodu - pilnuja zaleznosci i sekretow.
+  # Polityka i lista wyjatkow: docs/architecture/ci-cd.md, sekcja "Co sprawdza CI".
+
+  frontend-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      # Zaleznosci produkcyjne - twardy fail.
+      # TODO(2026-09-22): docelowo `--audit-level=high`. Tymczasowo `critical`, bo
+      # pdfjs-dist 5.7.284 ma 1 high (GHSA-hq66-cqwq-w95j) z poprawka dopiero w 6.x
+      # (major, osobny PR). Po podbiciu pdfjs-dist do 6.x zmienic na `high`.
+      - name: npm audit (prod)
+        run: npm audit --audit-level=critical --omit=dev
+      # Wszystkie zaleznosci (w tym dev) - tylko informacyjnie: devDependencies nie
+      # trafiaja do bundla ani na serwer, wiec nie blokuja mergu.
+      - name: npm audit (prod + dev, informacyjnie)
+        run: npm audit --audit-level=high
+        continue-on-error: true
+      # whiteboard-sync ma wlasny package-lock.json (serwer Yjs) - audyt osobno, twardy fail.
+      - name: npm audit (whiteboard-sync)
+        working-directory: whiteboard-sync
+        run: |
+          npm ci
+          npm audit --audit-level=high
+
+  backend-audit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install pip-audit
+      # pip-audit nie filtruje po wadze ani nie ma pliku ignore, wiec kazda podatnosc
+      # BEZ poprawki w obrebie naszego majora jest wpisana (z powodem i warunkiem
+      # usuniecia) w backend/pip-audit-ignore.txt i przekazana jako `--ignore-vuln`.
+      # Kazda NOWA podatnosc spoza listy = czerwony job.
+      - name: pip-audit (requirements.txt)
+        run: |
+          IGNORE_ARGS=$(sed 's/#.*//' pip-audit-ignore.txt | awk 'NF { print "--ignore-vuln", $1 }')
+          echo "Ignorowane wpisy: $(echo "$IGNORE_ARGS" | grep -c ignore-vuln)"
+          # shellcheck disable=SC2086
+          pip-audit -r requirements.txt --strict --desc --progress-spinner off $IGNORE_ARGS
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    env:
+      # Binarka z release zamiast gitleaks/gitleaks-action, bo akcja wymaga
+      # GITLEAKS_LICENSE dla repozytoriow organizacji, a binarka nie.
+      GITLEAKS_VERSION: 8.30.1
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # cala historia - gitleaks skanuje commity, nie tylko drzewo
+      - name: Pobierz gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+          ./gitleaks version
+      # Commity wnoszone przez PR - twardy fail (nowy sekret nie wejdzie do main).
+      - name: gitleaks (commity z PR)
+        if: github.event_name == 'pull_request'
+        run: ./gitleaks git --redact --no-banner --exit-code 1 --log-opts="origin/${{ github.base_ref }}..HEAD" .
+      # Cala historia - informacyjnie, do czasu decyzji Patryka. Skan z 2026-09-22
+      # znalazl 4 stare wpisy (reguly gcp-api-key, generic-api-key, 2x jwt) w commitach
+      # z 2025-11 .. 2026-02; w biezacym drzewie ich nie ma. Po rotacji tych sekretow
+      # dodac .gitleaks.toml z allowlista po fingerprintach i usunac continue-on-error.
+      - name: gitleaks (cala historia, informacyjnie)
+        run: ./gitleaks git --redact --no-banner --exit-code 1 .
+        continue-on-error: true

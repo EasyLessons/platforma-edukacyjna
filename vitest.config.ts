@@ -28,6 +28,16 @@ export default defineConfig({
         '**/_mock/**', // dane atrapy (decyzja P2 z REFAKTOR-PLAN)
         '**/index.ts', // barrele bez logiki
       ],
+      // Prog pokrycia = stan z 2026-09-22 (543 testy) zaokraglony w dol do 0,5 pkt.
+      // Podnosic, nie obnizac. Vitest failuje sam, gdy ktorys wynik spadnie ponizej.
+      // autoUpdate: false - progi zmieniamy swiadomie w PR, nie automatem.
+      thresholds: {
+        lines: 22.5,
+        statements: 22,
+        branches: 17,
+        functions: 20,
+        autoUpdate: false,
+      },
     },
   },
 });

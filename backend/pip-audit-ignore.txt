@@ -1,0 +1,42 @@
+# Lista podatnosci ignorowanych przez job `backend-audit` w .github/workflows/ci.yml.
+# Format: <ID> # <pakiet>, <powod>, <kiedy usunac>
+# Kazda linia to jeden `--ignore-vuln <ID>`. Komentarze (#) i puste linie sa pomijane.
+# Zasada: wpis tylko dla podatnosci BEZ poprawki w obrebie naszego majora (czyli takiej,
+# ktorej nie da sie zalatwic zwyklym podbiciem wersji w requirements.txt). Kazda NOWA
+# podatnosc spoza tej listy = czerwone CI. Stan listy: 2026-09-22, po PR #67 (requirements).
+
+# anyio 3.7.1 - poprawka w 4.14.2 (major); fastapi 0.104 / starlette 0.27 pinuja anyio<4.
+# Usunac przy podbiciu fastapi/starlette (osobny PR).
+CVE-2026-63374 # anyio, fix 4.14.2 (major), usunac po podbiciu fastapi/starlette
+CVE-2026-64847 # anyio, fix 4.14.2 (major), usunac po podbiciu fastapi/starlette
+
+# cryptography 46.0.7 - poprawki dopiero w 48.0.1 / 49.0.0 / 50.0.0 (major).
+# Usunac po podbiciu cryptography (sprawdzic zgodnosc z python-jose i authlib).
+GHSA-537c-gmf6-5ccf # cryptography, fix 48.0.1 (major), usunac po podbiciu cryptography
+PYSEC-2026-3552 # cryptography, CVE-2026-69247, fix 50.0.0 (major), usunac po podbiciu cryptography
+PYSEC-2026-3553 # cryptography, CVE-2026-69249, fix 49.0.0 (major), usunac po podbiciu cryptography
+PYSEC-2026-3554 # cryptography, CVE-2026-69248, fix 49.0.0 (major), usunac po podbiciu cryptography
+
+# ecdsa 0.19.2 - Minerva (CVE-2024-23342), side-channel bez poprawki upstream;
+# zaleznosc python-jose. Usunac po zastapieniu python-jose (np. PyJWT) - kandydat do refaktoru.
+PYSEC-2026-1325 # ecdsa, CVE-2024-23342 Minerva, brak fixa upstream, usunac po zastapieniu python-jose
+
+# fastapi 0.104.1 / starlette 0.27.0 - poprawki w fastapi 0.109+ i starlette 0.40-1.3
+# (przed 1.0 kazdy minor = breaking). Podbicie fastapi+starlette to osobny PR; usunac po nim.
+PYSEC-2024-38 # fastapi, CVE-2024-24762 (ReDoS python-multipart - sam python-multipart juz podbity), fix 0.109.1, usunac po podbiciu fastapi
+PYSEC-2026-1943 # starlette, CVE-2024-47874, fix 0.40.0, usunac po podbiciu fastapi/starlette
+PYSEC-2026-1941 # starlette, CVE-2025-54121, fix 0.47.2, usunac po podbiciu fastapi/starlette
+PYSEC-2026-161 # starlette, CVE-2026-48710, fix 1.0.1, usunac po podbiciu fastapi/starlette
+PYSEC-2026-2280 # starlette, CVE-2026-48817, fix 1.1.0, usunac po podbiciu fastapi/starlette
+PYSEC-2026-2281 # starlette, CVE-2026-48818, fix 1.1.0, usunac po podbiciu fastapi/starlette
+PYSEC-2026-248 # starlette, CVE-2026-54282, fix 1.3.0, usunac po podbiciu fastapi/starlette
+PYSEC-2026-249 # starlette, CVE-2026-54283, fix 1.3.1, usunac po podbiciu fastapi/starlette
+
+# requests 2.31.0 - poprawki w 2.32.0+ / 2.33.0, ale resend 0.8.0 pinuje requests==2.31.0.
+# Usunac po podbiciu resend (osobny PR).
+PYSEC-2026-1873 # requests, CVE-2024-35195, fix 2.32.0, usunac po podbiciu resend
+PYSEC-2026-1872 # requests, CVE-2024-47081, fix 2.32.4, usunac po podbiciu resend
+PYSEC-2026-2275 # requests, CVE-2026-25645, fix 2.33.0, usunac po podbiciu resend
+
+# pytest 8.4.2 - tylko dev; poprawka w 9.0.3 (major). Usunac po podbiciu pytest.
+PYSEC-2026-1845 # pytest, CVE-2025-71176, fix 9.0.3 (major, tylko dev), usunac po podbiciu pytest
