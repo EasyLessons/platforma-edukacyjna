@@ -153,8 +153,8 @@ describe('apiClient - interceptor sukcesu', () => {
     await expect(apiClient.get('/api/v1/me')).rejects.toBeDefined();
   });
 
-   // Naprawione w #76: odrzucenie z onFulfilled trafia teraz do mapAxiosError.
-   it('{ success: false } przy HTTP 200 → AppError', async () => {
+  // Naprawione w #76: odrzucenie z onFulfilled trafia teraz do mapAxiosError.
+  it('{ success: false } przy HTTP 200 → AppError', async () => {
     apiMock.onGet('/api/v1/me').reply(200, { success: false, error: 'Nie', timestamp: 'x' });
 
     await expect(apiClient.get('/api/v1/me')).rejects.toBeInstanceOf(AppError);
