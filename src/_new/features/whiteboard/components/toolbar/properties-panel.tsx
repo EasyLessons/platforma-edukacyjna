@@ -31,6 +31,9 @@ import {
   resizeTableCells,
   calculateTableFontSize,
 } from '@/_new/features/whiteboard/elements/table-helpers';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('whiteboard/properties-panel');
 
 interface SelectionPropertiesPanelProps {
   elements: DrawingElement[];
@@ -270,7 +273,7 @@ export function SelectionPropertiesPanel({
           {/* Rozwiąż z AI - UPROSZCZONE bez animacji */}
           <div className="relative group">
             <button
-              onClick={() => console.log('🤖 AI - funkcja w przygotowaniu')}
+              onClick={() => log.info('AI - funkcja w przygotowaniu')}
               className="relative rounded-lg cursor-pointer px-4 py-2 bg-gradient-to-br from-slate-900 via-slate-950 to-black text-white"
               style={{
                 border: '1px solid rgba(139, 92, 246, 0.4)',

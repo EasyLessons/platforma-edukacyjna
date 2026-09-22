@@ -10,6 +10,9 @@
  * dowie. Jawna oferta jest deterministyczna i testowalna, a `onnegotiationneeded`
  * odpala sie tez przy innych zmianach (addTrack), co utrudnia kontrole glare.
  */
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/iceRestart');
 
 /**
  * Restart ICE inicjuje TYLKO strona z nizszym id usera. Dzieki temu obie strony
@@ -71,25 +74,21 @@ export async function restartIceOnConnection({
   sendOffer,
 }: IceRestartRequest): Promise<boolean> {
   if (!shouldInitiateIceRestart(user.id, remoteUserId)) {
-    console.log(
-      `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername}: czekam na ofertę od drugiej strony`
-    );
+    log.info(`🔁 Restart ICE z ${remoteUsername}: czekam na ofertę od drugiej strony`);
     return false;
   }
   if (pc.signalingState !== 'stable') {
-    console.log(
-      `🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} pominięty (signalingState=${pc.signalingState})`
-    );
+    log.info(`🔁 Restart ICE z ${remoteUsername} pominięty (signalingState=${pc.signalingState})`);
     return false;
   }
   try {
-    console.log(`🎤 [VOICE] 🔁 Restart ICE z ${remoteUsername} - wysyłam nową ofertę`);
+    log.info(`🔁 Restart ICE z ${remoteUsername} - wysyłam nową ofertę`);
     const offer = await pc.createOffer({ iceRestart: true });
     await pc.setLocalDescription(offer);
     sendOffer(pc.localDescription);
     return true;
   } catch (error) {
-    console.error(`🎤 [VOICE] ❌ Restart ICE z ${remoteUsername} nieudany:`, error);
+    log.error(`❌ Restart ICE z ${remoteUsername} nieudany:`, error);
     return false;
   }
 }

@@ -9,6 +9,9 @@ import type { MutableRefObject } from 'react';
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import type { PeerConnection } from './types';
 import { closePeerConnection } from './remote-audio';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/connection-watchdog');
 
 export const WATCHDOG_INTERVAL_MS = 10000;
 
@@ -44,10 +47,10 @@ export function startConnectionWatchdog(deps: Deps): ReturnType<typeof setInterv
       return;
     }
 
-    console.log('🎤 [VOICE] 🔍 Weryfikacja połączeń P2P...');
+    log.debug('🔍 Weryfikacja połączeń P2P...');
 
     if (peerConnectionsRef.current.size === 0) {
-      console.log('🎤 [VOICE] ⚠️ Brak aktywnych połączeń - próbuję sync');
+      log.info('⚠️ Brak aktywnych połączeń - próbuję sync');
       channelRef.current?.send({
         type: 'broadcast',
         event: 'voice-request-sync',
@@ -59,12 +62,10 @@ export function startConnectionWatchdog(deps: Deps): ReturnType<typeof setInterv
     peerConnectionsRef.current.forEach((peerConn, odUserId) => {
       const state = peerConn.pc.connectionState;
       if (state === 'disconnected') {
-        console.log(`🎤 [VOICE] 🔍 Połączenie z ${peerConn.username} rozłączone - restart ICE`);
+        log.info(`🔍 Połączenie z ${peerConn.username} rozłączone - restart ICE`);
         void restartIceConnection(odUserId, peerConn.username);
       } else if (state === 'failed' || state === 'closed') {
-        console.log(
-          `🎤 [VOICE] 🔍 Połączenie z ${peerConn.username} w złym stanie (${state}) - restartuję`
-        );
+        log.info(`🔍 Połączenie z ${peerConn.username} w złym stanie (${state}) - restartuję`);
         closePeerConnection(peerConn);
         peerConnectionsRef.current.delete(odUserId);
         connectionRetriesRef.current.delete(odUserId);
@@ -72,7 +73,7 @@ export function startConnectionWatchdog(deps: Deps): ReturnType<typeof setInterv
           createPeerConnection(odUserId, peerConn.username, true);
         }, 500);
       } else {
-        console.log(`🎤 [VOICE] ✅ Połączenie z ${peerConn.username} OK (${state})`);
+        log.debug(`✅ Połączenie z ${peerConn.username} OK (${state})`);
       }
     });
   }, WATCHDOG_INTERVAL_MS);

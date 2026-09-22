@@ -42,7 +42,6 @@ export default function PasswordSection() {
     if (!validateForm()) return;
 
     // TODO: Wywołaj API do zmiany hasła
-    console.log('Changing password...');
 
     // Reset form
     setFormData({

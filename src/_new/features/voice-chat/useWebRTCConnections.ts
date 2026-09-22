@@ -16,6 +16,9 @@ import {
   attachPeerConnectionEvents,
   buildRtcConfiguration,
 } from './peer-connection-events';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/useWebRTCConnections');
 
 export function useWebRTCConnections(
   user: { id: number; username: string } | null,
@@ -39,7 +42,7 @@ export function useWebRTCConnections(
 
   const cleanupUserConnections = useCallback(
     (userId: number) => {
-      console.log(`🎤 [VOICE] 🧹 Czyszczę wszystkie połączenia dla user ${userId}`);
+      log.info(`🧹 Czyszczę wszystkie połączenia dla user ${userId}`);
 
       pendingConnectionsRef.current.delete(userId);
       connectionRetriesRef.current.delete(userId);
@@ -97,16 +100,16 @@ export function useWebRTCConnections(
       if (!user || !localStreamRef.current) return;
 
       if (peerConnectionsRef.current.has(remoteUserId)) {
-        console.log(`🎤 [VOICE] ⚠️ Połączenie z ${remoteUsername} już istnieje`);
+        log.info(`⚠️ Połączenie z ${remoteUsername} już istnieje`);
         return;
       }
       if (pendingConnectionsRef.current.has(remoteUserId)) {
-        console.log(`🎤 [VOICE] ⚠️ Połączenie z ${remoteUsername} jest w trakcie`);
+        log.info(`⚠️ Połączenie z ${remoteUsername} jest w trakcie`);
         return;
       }
       const retries = connectionRetriesRef.current.get(remoteUserId) || 0;
       if (retries >= MAX_CONNECTION_RETRIES) {
-        console.log(`🎤 [VOICE] ❌ Zbyt dużo prób połączenia z ${remoteUsername} (${retries})`);
+        log.info(`❌ Zbyt dużo prób połączenia z ${remoteUsername} (${retries})`);
         return;
       }
 
@@ -120,17 +123,17 @@ export function useWebRTCConnections(
       );
 
       try {
-        console.log(
-          `🎤 [VOICE] Tworzę połączenie z ${remoteUsername} (initiator: ${isInitiator}, próba: ${retries + 1})`
+        log.info(
+          `Tworzę połączenie z ${remoteUsername} (initiator: ${isInitiator}, próba: ${retries + 1})`
         );
 
         // Timeout proby polaczenia -> cleanup + ponowna proba (do limitu)
         const connectionTimeout = setTimeout(() => {
-          console.log(`🎤 [VOICE] ⏰ Timeout połączenia z ${remoteUsername}`);
+          log.info(`⏰ Timeout połączenia z ${remoteUsername}`);
           cleanupUserConnections(remoteUserId);
           if (retries + 1 < MAX_CONNECTION_RETRIES) {
             setTimeout(() => {
-              console.log(`🎤 [VOICE] 🔁 Ponawiam połączenie z ${remoteUsername}`);
+              log.info(`🔁 Ponawiam połączenie z ${remoteUsername}`);
               createPeerConnection(remoteUserId, remoteUsername, isInitiator);
             }, 2000);
           }
@@ -175,9 +178,7 @@ export function useWebRTCConnections(
             const failedRetries = connectionRetriesRef.current.get(remoteUserId) || 0;
             cleanupUserConnections(remoteUserId);
             if (failedRetries < MAX_CONNECTION_RETRIES) {
-              console.log(
-                `🎤 [VOICE] 🔁 Auto-retry połączenia z ${remoteUsername} (próba ${failedRetries + 1})`
-              );
+              log.info(`🔁 Auto-retry połączenia z ${remoteUsername} (próba ${failedRetries + 1})`);
               setTimeout(
                 () => {
                   createPeerConnection(remoteUserId, remoteUsername, isInitiator);
@@ -243,7 +244,7 @@ export function useWebRTCConnections(
         await pc.setRemoteDescription(answer);
         await iceQueueRef.current.flush(fromUserId, pc);
       } catch (error) {
-        console.error('🎤 [VOICE] ❌ Błąd ustawiania answer:', error);
+        log.error('❌ Błąd ustawiania answer:', error);
       }
     },
     []
@@ -274,7 +275,7 @@ export function useWebRTCConnections(
     async (fromUserId: number, fromUsername: string, offer: RTCSessionDescriptionInit) => {
       if (!user || !localStreamRef.current) return;
 
-      console.log(`🎤 [VOICE] 📬 Obsługuję offer od ${fromUsername}`);
+      log.info(`📬 Obsługuję offer od ${fromUsername}`);
 
       // Jesli polaczenie z ta osoba jest wlasnie budowane (np. po voice-sync),
       // poczekaj na nie - inaczej offer bylby porzucany bez odpowiedzi.
@@ -297,13 +298,11 @@ export function useWebRTCConnections(
           isRenegotiationOfSameSession(existingPc.remoteDescription.sdp, offer.sdp);
 
         if (isIceRestart) {
-          console.log(
-            `🎤 [VOICE] 🔁 Oferta restartu ICE od ${fromUsername} - renegocjuję w miejscu`
-          );
+          log.info(`🔁 Oferta restartu ICE od ${fromUsername} - renegocjuję w miejscu`);
           try {
             await answerOffer(existingPc, fromUserId, offer);
           } catch (error) {
-            console.error(`🎤 [VOICE] ❌ Renegocjacja z ${fromUsername} nieudana:`, error);
+            log.error(`❌ Renegocjacja z ${fromUsername} nieudana:`, error);
             cleanupUserConnections(fromUserId);
           }
           return;
@@ -314,16 +313,14 @@ export function useWebRTCConnections(
           // Rozstrzygniecie deterministyczne - ustepuje strona z nizszym id.
           const weYield = user.id < fromUserId;
           if (!weYield) {
-            console.warn(`🎤 [VOICE] ↔️ Kolizja ofert z ${fromUsername} - zostaję przy swojej`);
+            log.warn(`↔️ Kolizja ofert z ${fromUsername} - zostaję przy swojej`);
             return;
           }
-          console.warn(`🎤 [VOICE] ↔️ Kolizja ofert z ${fromUsername} - ustępuję`);
+          log.warn(`↔️ Kolizja ofert z ${fromUsername} - ustępuję`);
           cleanupUserConnections(fromUserId);
           await new Promise((resolve) => setTimeout(resolve, 100));
         } else if (!isFreshResponder) {
-          console.log(
-            `🎤 [VOICE] ⚠️ Czyszczę istniejące połączenie z ${fromUsername} przed nowym offer`
-          );
+          log.info(`⚠️ Czyszczę istniejące połączenie z ${fromUsername} przed nowym offer`);
           cleanupUserConnections(fromUserId);
           await new Promise((resolve) => setTimeout(resolve, 100));
         }
@@ -338,15 +335,15 @@ export function useWebRTCConnections(
 
       const peerConn = peerConnectionsRef.current.get(fromUserId);
       if (!peerConn) {
-        console.error(`🎤 [VOICE] ❌ Nie udało się utworzyć połączenia dla ${fromUsername}`);
+        log.error(`❌ Nie udało się utworzyć połączenia dla ${fromUsername}`);
         return;
       }
 
       try {
         await answerOffer(peerConn.pc, fromUserId, offer);
-        console.log(`🎤 [VOICE] ✅ Wysłano answer do ${fromUsername}`);
+        log.info(`✅ Wysłano answer do ${fromUsername}`);
       } catch (error) {
-        console.error(`🎤 [VOICE] ❌ Błąd podczas obsługi offer od ${fromUsername}:`, error);
+        log.error(`❌ Błąd podczas obsługi offer od ${fromUsername}:`, error);
         cleanupUserConnections(fromUserId);
       }
     },

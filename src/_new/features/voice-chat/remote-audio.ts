@@ -3,6 +3,9 @@
  * zwalnianie. Wydzielone z useWebRTCConnections (ontrack), semantyka 1:1.
  */
 import type { PeerConnection } from './types';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/remote-audio');
 
 interface AttachOptions {
   stream: MediaStream;
@@ -25,7 +28,7 @@ export function attachRemoteAudio({
   remoteUsername,
   onAudioBlocked,
 }: AttachOptions): HTMLAudioElement | null {
-  console.log(`🎤 [VOICE] ✅ Otrzymano audio stream od ${remoteUsername}`);
+  log.info(`✅ Otrzymano audio stream od ${remoteUsername}`);
 
   const audio = new Audio();
   audio.srcObject = stream;
@@ -33,14 +36,14 @@ export function attachRemoteAudio({
   audio.muted = false; // to jest remote stream, wiec nie mute
 
   if (localStreamId && stream.id === localStreamId) {
-    console.log(`🎤 [VOICE] ⚠️ Ignoruję własny stream (zapobieganie echo)`);
+    log.info(`⚠️ Ignoruję własny stream (zapobieganie echo)`);
     return null;
   }
 
   audio.autoplay = true;
   audio.setAttribute('playsinline', '');
   audio.play().catch((err) => {
-    console.error('🎤 [VOICE] ❌ Błąd odtwarzania audio:', err);
+    log.error('❌ Błąd odtwarzania audio:', err);
     if ((err as { name?: string } | null)?.name === 'NotAllowedError') {
       onAudioBlocked?.();
     }

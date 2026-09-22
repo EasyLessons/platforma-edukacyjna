@@ -307,6 +307,23 @@ Myli usera (może sądzić, że zapisał kartę/adres). Nie psuje niczego innego
 
 Zostają w folderze `_mock/` jako zalążek przyszłych sekcji konta (opis w `README.md` obok). Realna funkcja = endpointy + `api/` + hooki w `features/account` i usunięcie `_mock/`. Do tego czasu: nie rozbudowywać makiet.
 
+## 6. Warningi ESLint: zostało 52 (49 × `react-hooks/exhaustive-deps`, 2 × `no-console`, 1 nieużyty `eslint-disable`) (niski priorytet)
+
+**Zgłoszone:** 22.09.2026, PR `chore/logger-no-console`.
+
+### Co się dzieje
+
+`npm run lint` miał 134 warningi (84 × `no-console`, 49 × `exhaustive-deps`, 1 nieużyta dyrektywa). W tym PR `console.log` poza strefą Yjs poszły przez `createLogger` (`src/_new/lib/logger.ts`, opis w `architecture/frontend-structure.md` → „Logowanie”), martwe logi diagnostyczne usunięte, a trzy miejsca wypisywały dane wrażliwe (odpowiedź Xirsys z loginem/hasłem TURN w `voice-chat/constants.ts`, `formData` z e-mailem w `account/.../BasicInfo.tsx`, cały wiersz `workspace_members` w `app/(whiteboard)/whiteboard/page.tsx`) — zredukowane do statusów/liczników. Efekt uboczny: `debug`/`info` są w `NODE_ENV=test` cicho, więc flake vitesta `EnvironmentTeardownError: Closing rpc while "onUserConsoleLog" was pending` z testów voice-chat nie ma już źródła (pełny `npm run test` po zmianie: 549 passed, bez błędu).
+
+### Co zostaje i dlaczego
+
+- **Strefa `feature/whiteboard-yjs` (Bartek), 33 warningi:** `whiteboard-canvas.tsx` (29 × `exhaustive-deps` + 1 nieużyty `eslint-disable`), `realtime/logger.ts` (2 × `no-console` — mini-logger legacy, do zastąpienia `createLogger` w PR-C1), `realtime/useSafeBroadcast.ts` (1). Nie ruszać do czasu merge'u gałęzi Yjs.
+- **Poza strefą, 19 × `exhaustive-deps`:** `useNotifications.tsx` (3), `board/hooks/useBoard.ts` (2), `toolbar/eraser-tool.tsx` (2), `toolbar/pan-tool.tsx` (2), `workspace/hooks/useWorkspaces.ts` (2), po 1: `useEditBoardForm.ts`, `voice-chat/useVoiceSignaling.ts`, `smart-search-bar.tsx`, `calculator-tool.tsx`, `function-tool.tsx`, `useEditWorkspaceForm.ts`, `useWorkspaceInvite.ts`, `useWorkspaceMember.ts`. Każdy wymaga osobnej decyzji (dodanie zależności do `useEffect`/`useCallback` zmienia, kiedy efekt się odpala — to zmiana logiki, nie kosmetyka), więc świadomie poza PR-em „logger”.
+
+### Opcje
+
+Osobny PR per feature, każdy warning z uzasadnieniem: albo brakująca zależność naprawdę powinna tam być, albo `useRef`/`useEffectEvent` zamiast `eslint-disable`. Nie wyciszać hurtowo dyrektywą.
+
 ## Zasada
 
 Nowy błąd znaleziony w czasie pracy/testów → nowy wpis tutaj, w tym samym formacie (odtworzenie, root cause, opcje naprawy), z priorytetem. Jak coś zostanie naprawione, wpis przenosimy na dół pod `## Naprawione` (do stworzenia gdy pierwszy taki przypadek się pojawi) zamiast kasować — żeby było widać historię.
