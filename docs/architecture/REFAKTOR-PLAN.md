@@ -427,6 +427,7 @@ Nie przerabiamy przy okazji - do decyzji jako osobne pozycje:
 | `src/app/api/chat/route.ts`: własny rate limit i cache w `Map` | `@upstash/ratelimit` lub Vercel KV / Redis (już w compose) | tylko przy zmianie hostingu; dziś zostaje |
 | `core/rate_limit.py` (45 linii) | `slowapi` | mały zysk, zostaje |
 | `commands/*` + `use-history.ts` (własne undo/redo) | `Y.UndoManager` (już używany w `use-yjs-board`) | po C0 legacy history znika; `commands` zostają jako intencje silnika - do oceny z Bartkiem |
+| cały silnik canvasu `features/whiteboard/` (~25 000 linii bez testów) | Excalidraw (MIT) — decyzja i warunki w `ADR-silnik-tablicy.md` | -~16 000 linii; jeśli wejdzie, Faza C (C1, C7) dla starego silnika odpada |
 
 ---
 
