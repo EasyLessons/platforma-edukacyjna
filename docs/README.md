@@ -19,6 +19,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 15. **`docs/architecture/WARSTWY-PROJEKT.md`** — projekt warstw tablicy (na wierzch / na spód / wyżej / niżej): gdzie siedzi kolejność elementów (`_index` w Yjs), model, API, UI, lista zmian w plikach Yjs do uzgodnienia z Bartkiem, szacunek.
 16. **`docs/architecture/ZALEZNOSCI-2026-09.md`** — audyt zależności (`npm audit` front + whiteboard-sync, `pip-audit` backend), co zostało załatane, co wymaga skoku major (FastAPI/Starlette, Next/React/Vitest/ESLint/TS, pdfjs-dist) z listą zmian łamiących, szacunkiem i kolejnością. Czytaj przed podnoszeniem wersji czegokolwiek.
 17. **`docs/architecture/ADR-silnik-tablicy.md`** — decyzja o silniku tablicy (własny vs Excalidraw vs tldraw): stan zmierzony, licencje, koszt migracji w dniach, warunki dla prototypu `proto/excalidraw-yjs`, pytania do Patryka i Bartka; na końcu plan płatności (Stripe + polskie faktury — co bierzemy gotowe, co piszemy sami).
+18. **`docs/security/AUDYT-2026-09.md`** — audyt bezpieczeństwa (znaleziska SEC-xx z dowodami `plik:linia`, plan PR-ów naprawczych, akcje dla Patryka). Obok: `rls-board-images.sql` i `rls-realtime.sql` — gotowe polityki do uruchomienia w Supabase SQL Editor.
 
 ## Zasada utrzymania
 
