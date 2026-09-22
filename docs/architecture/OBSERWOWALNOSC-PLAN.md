@@ -128,6 +128,12 @@ Zasady:
 | **O7** `feat/sync-observability` | `whiteboard-sync`: `pino` (JSON) zamiast `console.log`, `@sentry/node` (ten sam projekt co backend, tag `service`), `GET /health` (Hocuspocus: `server.hocuspocus.getConnectionsCount()` + `getDocumentsCount()` w odpowiedzi), `SENTRY_DSN` z env | `whiteboard-sync/src/*.ts`, `package.json` serwisu, `docker-compose.yml` (env) | O4 (projekt Sentry istnieje) | `npx tsc --noEmit` w serwisie (job `sync-typecheck` z #55); `curl :1234/health` | 2 h |
 | **O8** `docs/uptime-alerts` | konfiguracja poza kodem: UptimeRobot (50 monitorów free, co 5 min) albo Better Stack (10 monitorów, co 3 min, ładniejsze status page) na `https://api…/api/v1/health`, `https://easylesson.app/`, `wss://…sync…/health` (HTTP); alert e-mail + (opcjonalnie) Telegram; w Sentry: alert "nowy typ błędu w production" + "więcej niż 20 zdarzeń/h" → e-mail; runbook w `docs/architecture/observability.md` (co robić, gdy `/health` = 503: `redis` → sprawdzić Upstash/Render Redis, `db` → Neon status) | `docs/architecture/observability.md` (nowy, docelowy opis stanu — ten plan wtedy znika, zgodnie z zasadą "docs opisują stan, nie historię") | O1, O5 | ręczny test: zatrzymać lokalnie Redis → `/health` 503 → alert w ciągu ≤ 10 min | 1 h + konta |
 
+**O1 — zrobione w PR `feat/health-endpoints`:** `GET /api/v1/health` (`api/v1/health/router.py`, `core/database.py::ping_db`)
+sprawdza DB (`SELECT 1`) i Redis (`PING`) równolegle, każde z `asyncio.wait_for` 2 s; odpowiedź `{status, checks: {db, redis:
+{status, latency_ms[, error: <typ wyjątku>]}}, version}` (`APP_VERSION` → `RENDER_GIT_COMMIT[:7]` → `dev`), bez treści wyjątków.
+Różnice wobec tabeli: Redis padł → **200 `degraded`** (API działa bez Redisa; monitor z O8 ma patrzeć na `status`, nie tylko na kod
+HTTP), DB padła → 503 `down`; `supabase_storage` pominięty. `GET /api/v1/health/live` zawsze 200. Testy: `tests/v1/health/test_health.py` (16).
+
 Suma: **~18 h** pracy + założenie kont (Sentry, UptimeRobot) i decyzje z §6.
 Kolejność bez blokad: O1 i O2 od razu (backend, niezależne od Bartka — nie dotykają `whiteboard/*`,
 `models.py`); O3 równolegle; O4/O5 po decyzji P-O1; O6 po O5; O7 po O4; O8 na końcu.
