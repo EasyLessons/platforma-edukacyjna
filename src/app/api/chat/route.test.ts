@@ -136,7 +136,7 @@ describe('POST /api/chat — rate limiting', () => {
 describe('POST /api/chat — uwierzytelnianie', () => {
   it('przekazuje nagłówek Authorization do weryfikacji', async () => {
     await POST(makeRequest({ message: 'auth header test' }, '10.4.0.1', 'abc123'));
-        expect(mockAuthenticate).toHaveBeenCalledWith('Bearer abc123', expect.any(Function), null);
+    expect(mockAuthenticate).toHaveBeenCalledWith('Bearer abc123', expect.any(Function), null);
   });
 
   it('401 bez poprawnego tokenu — i Gemini NIE jest wołane', async () => {
