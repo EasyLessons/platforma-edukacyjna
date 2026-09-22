@@ -350,7 +350,9 @@ module.exports = {
 
       // List of conditions to check for in the exports field.
       // Only works when the 'exportsFields' array is non-empty.
-      conditionNames: ['import', 'require', 'node', 'default', 'types'],
+      // 'production': @excalidraw/excalidraw eksportuje './index.css' TYLKO pod warunkami
+      // development/production (bez 'default'); bez tego depcruise zglasza not-to-unresolvable.
+      conditionNames: ['import', 'require', 'node', 'default', 'types', 'production'],
 
       // The extensions, by default are the same as the ones dependency-cruiser
       // can access (run `npx depcruise --info` to see which ones that are in
