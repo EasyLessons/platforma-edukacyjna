@@ -16,6 +16,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
 13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
 14. **`docs/architecture/REFAKTOR-PLAN.md`** — zatwierdzony plan refaktoru struktury (docelowe drzewo, etapy jako małe PR-y, kolejność względem pracy równoległej, decyzje). Czytaj przed każdym PR-em przenoszącym pliki.
+15. **`docs/architecture/WARSTWY-PROJEKT.md`** — projekt warstw tablicy (na wierzch / na spód / wyżej / niżej): gdzie siedzi kolejność elementów (`_index` w Yjs), model, API, UI, lista zmian w plikach Yjs do uzgodnienia z Bartkiem, szacunek.
 
 ## Zasada utrzymania
 
