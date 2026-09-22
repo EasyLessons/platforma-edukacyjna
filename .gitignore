@@ -65,3 +65,6 @@ graph.svg
 .env.backup*
 .env.*.bak
 *.env.bak
+
+# vitest --coverage
+coverage/
