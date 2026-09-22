@@ -4,8 +4,9 @@
  * Wyciete z components/toolbar/select-tool.tsx (PR-C6 z REFAKTOR-PLAN.md), zeby
  * geometria zaznaczania byla testowalna bez Reacta. Zero zaleznosci od DOM.
  */
-import type { Point, DrawingElement } from '../types';
+import type { Point, DrawingElement, DrawingPath, Shape } from '../types';
 import { ElementRegistry } from '../handlers/element-registry';
+import { getScaledWorldSize } from '../navigation/viewport-math';
 
 export interface BoundingBox {
   x: number;
@@ -127,30 +128,137 @@ export function isPointInBoundingBox(worldPoint: Point, bbox: BoundingBox): bool
   );
 }
 
-/** Strategy: hit-test deleguje do handlera typu elementu (brak handlera = false). */
-export function isPointInElement(worldPoint: Point, element: DrawingElement): boolean {
+// ── trafienie w kreske (path / line / arrow) ─────────────────────────────────
+
+/**
+ * Minimalny promien trafienia w kreske w px EKRANU. Cienka linia (1-2 px) bylaby
+ * nie do klikniecia, gdyby liczyla sie tylko polowa jej grubosci.
+ */
+export const MIN_LINE_HIT_PX = 4;
+
+/** Dlugosc grotu strzalki w px ekranu - 1:1 z ShapeHandler.render (headLen = 15). */
+const ARROW_HEAD_PX = 15;
+
+/** Odleglosc punktu p od odcinka a-b (ten sam uklad wspolrzednych dla wszystkich trzech). */
+export function distancePointToSegment(p: Point, a: Point, b: Point): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSq = dx * dx + dy * dy;
+  if (lengthSq === 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / lengthSq));
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+}
+
+/** Najmniejsza odleglosc punktu od polilinii; jeden punkt = odleglosc do niego (kropka). */
+export function distancePointToPolyline(p: Point, points: Point[]): number {
+  if (points.length === 0) return Infinity;
+  if (points.length === 1) return Math.hypot(p.x - points[0].x, p.y - points[0].y);
+  let best = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    const d = distancePointToSegment(p, points[i], points[i + 1]);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/**
+ * Tolerancja trafienia w kreske w JEDNOSTKACH SWIATA.
+ *
+ * Grubosc kreski (`width` / `strokeWidth`) jest w px ekranu przy zoom 1 - render robi
+ * `clampLineWidth(width, viewport.scale)` = width * scale px. Polowa tego to promien
+ * kreski; dla cienkich kresek bierzemy minimum MIN_LINE_HIT_PX. Wynik przeliczamy na
+ * jednostki swiata tak samo jak reszta tablicy (100 px = 1 jednostka przy zoom 1).
+ *
+ * @param zoom viewport.scale (1 = 100 %)
+ */
+export function lineHitTolerance(strokeWidth: number, zoom: number): number {
+  const safeZoom = zoom > 0 ? zoom : 1;
+  const halfStrokePx = (strokeWidth * safeZoom) / 2;
+  return getScaledWorldSize(Math.max(halfStrokePx, MIN_LINE_HIT_PX), safeZoom);
+}
+
+/** Najgrubsze miejsce sciezki (pressure-sensitive `widths` moga byc grubsze niz `width`). */
+function pathStrokeWidth(el: DrawingPath): number {
+  let width = el.width;
+  if (el.widths) {
+    for (const w of el.widths) if (w > width) width = w;
+  }
+  return width;
+}
+
+/**
+ * Sciezka z dlugopisu: trafienie, gdy punkt lezy blisko ktoregos odcinka polilinii.
+ * Punkty sciezki sa w ukladzie swiata (bez offsetu x/y elementu), bbox bez paddingu.
+ */
+export function isPointNearPath(worldPoint: Point, el: DrawingPath, zoom: number): boolean {
+  if (el.points.length === 0) return false;
+  return (
+    distancePointToPolyline(worldPoint, el.points) <= lineHitTolerance(pathStrokeWidth(el), zoom)
+  );
+}
+
+/**
+ * Linia / strzalka (shape): odleglosc od odcinka start-end; strzalka dodatkowo od dwoch
+ * ramion grotu (ARROW_HEAD_PX na ekranie, kat 30 stopni - jak w ShapeHandler.render).
+ */
+export function isPointNearLineShape(worldPoint: Point, el: Shape, zoom: number): boolean {
+  const start = { x: el.startX, y: el.startY };
+  const end = { x: el.endX, y: el.endY };
+  const tolerance = lineHitTolerance(el.strokeWidth, zoom);
+  if (distancePointToSegment(worldPoint, start, end) <= tolerance) return true;
+  if (el.shapeType !== 'arrow') return false;
+
+  const headLength = getScaledWorldSize(ARROW_HEAD_PX, zoom > 0 ? zoom : 1);
+  const angle = Math.atan2(end.y - start.y, end.x - start.x);
+  for (const side of [-1, 1]) {
+    const tip = {
+      x: end.x - headLength * Math.cos(angle + (side * Math.PI) / 6),
+      y: end.y - headLength * Math.sin(angle + (side * Math.PI) / 6),
+    };
+    if (distancePointToSegment(worldPoint, end, tip) <= tolerance) return true;
+  }
+  return false;
+}
+
+/** Czy shape jest "kreska" (bez wnetrza): linia albo strzalka. */
+function isLineShape(element: DrawingElement): element is Shape {
+  return (
+    element.type === 'shape' && (element.shapeType === 'line' || element.shapeType === 'arrow')
+  );
+}
+
+// ── co jest pod kursorem ─────────────────────────────────────────────────────
+
+/**
+ * Hit-test punktu (uklad swiata):
+ * - path oraz shape line/arrow: po odleglosci od kreski (tolerancja zalezna od zoomu),
+ *   bo ich bbox to w wiekszosci puste pole - klik w srodek kolka nie ma trafiac w kolko;
+ * - reszta (Strategy): deleguje do handlera typu elementu (wnetrze; brak handlera = false).
+ *
+ * @param zoom viewport.scale; domyslnie 1 (np. testy, podwojne klikniecie w tekst)
+ */
+export function isPointInElement(worldPoint: Point, element: DrawingElement, zoom = 1): boolean {
+  if (element.type === 'path') return isPointNearPath(worldPoint, element, zoom);
+  if (isLineShape(element)) return isPointNearLineShape(worldPoint, element, zoom);
   const handler = ElementRegistry[element.type as keyof typeof ElementRegistry];
   if (!handler) return false;
   return handler.isPointInElement(worldPoint, element);
 }
 
-/** Ostatni (najwyzej narysowany) element pod punktem - jak przy podwojnym kliknieciu. */
+/**
+ * Element pod punktem: przy kilku trafieniach wygrywa NAJWYZEJ narysowany, czyli ostatni
+ * w tablicy (kolejnosc tablicy = kolejnosc rysowania / z-order). Uzywane przy klikniecu
+ * i podwojnym klikniecu w select-tool.
+ */
 export function findTopmostElementAt(
   worldPoint: Point,
-  elements: DrawingElement[]
+  elements: DrawingElement[],
+  zoom = 1
 ): DrawingElement | null {
   for (let i = elements.length - 1; i >= 0; i--) {
-    if (isPointInElement(worldPoint, elements[i])) return elements[i];
+    if (isPointInElement(worldPoint, elements[i], zoom)) return elements[i];
   }
   return null;
-}
-
-/** Pierwszy element (w kolejnosci tablicy) pod punktem - jak przy klikniecu w select-tool. */
-export function findFirstElementAt(
-  worldPoint: Point,
-  elements: DrawingElement[]
-): DrawingElement | undefined {
-  return elements.find((el) => isPointInElement(worldPoint, el));
 }
 
 /** Ramka zaznaczenia z dwoch punktow swiata (dowolna kolejnosc rogow). */
