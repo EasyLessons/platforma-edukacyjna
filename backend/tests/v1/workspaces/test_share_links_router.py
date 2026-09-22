@@ -21,7 +21,8 @@ from api.v1.auth.utils import create_access_token
 
 settings = get_settings()
 
-API_RESPONSE_KEYS = {"success", "data", "error", "code", "timestamp"}
+# request_id: pole ApiResponse (core/responses.py) od #64 - w sukcesie serializowane jako null
+API_RESPONSE_KEYS = {"success", "data", "error", "code", "timestamp", "request_id"}
 
 
 def make_auth_headers(user_id: int) -> dict:
