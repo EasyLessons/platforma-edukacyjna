@@ -85,6 +85,7 @@ src/_new/
 │   ├── api/            (klient axios + typy odpowiedzi API)
 │   ├── auth/           (AuthContext/AuthProvider, tokenStore, tokenService)
 │   ├── errors/         (AppError, errorHandler — jednolita obsługa błędów API)
+│   ├── logger.ts       (createLogger(scope) — jedyny wrapper nad console, patrz "Logowanie")
 │   ├── supabase/       (client.ts — klient Supabase Realtime)
 │   ├── query-provider.tsx (TanStack Query provider)
 │   └── utils.ts        (cn)
@@ -95,6 +96,10 @@ src/_new/
 ```
 
 Aliasy importu (`tsconfig.json`): `@/*` → `src/*`, `@new/*` → `src/_new/*`. W kodzie funkcjonują równolegle trzy style (`@/_new/...`, `@new/...`, ścieżki relatywne) — ujednolicenie jest zaplanowane razem ze zmianą nazwy `_new` (`REFAKTOR-PLAN.md`, PR-D1).
+
+## Logowanie
+
+Zamiast `console.log` (eslint `no-console` = warning) każdy plik robi `const log = createLogger('<feature>/<plik>')` z `src/_new/lib/logger.ts` i loguje przez `log.debug/info/warn/error`. `debug`/`info` wychodzą tylko w developmencie (w `production` i `test` są wyciszone, chyba że `NEXT_PUBLIC_DEBUG_LOGS=1`), `warn`/`error` zawsze — z prefiksem `[scope]`. Ten sam moduł działa w przeglądarce i w Node (`src/_new/server`, Route Handlery). Do logów nie trafiają tokeny, e-maile ani treść tablicy — tylko id, stany i liczniki. Wyjątek: `features/whiteboard/realtime/logger.ts` (mini-logger ścieżki legacy) zostaje do PR-C1, potem do zastąpienia `createLogger`.
 
 ## Reguła nawigacji dla zmian
 

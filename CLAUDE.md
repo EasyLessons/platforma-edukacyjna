@@ -37,6 +37,8 @@ Dwie warstwy (pelny opis: `docs/architecture/frontend-structure.md`):
 
 Aliasy z `tsconfig.json`: `@/*` -> `src/*`, `@new/*` -> `src/_new/*`.
 Testy leza obok kodu (`*.test.ts[x]`), setup w `src/test/setup.ts`.
+Logi przez `createLogger('<feature>/<plik>')` z `src/_new/lib/logger.ts`, nie
+`console.log` (warning `no-console`); bez tokenow, e-maili i tresci tablicy.
 
 Chcesz zmienic JAK WYGLADA / ROUTUJE sie strona -> `src/app`.
 Chcesz zmienic JAK COS DZIALA -> `src/_new/features/<nazwa>`.
