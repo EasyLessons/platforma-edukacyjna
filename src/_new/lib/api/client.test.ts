@@ -153,11 +153,7 @@ describe('apiClient - interceptor sukcesu', () => {
     await expect(apiClient.get('/api/v1/me')).rejects.toBeDefined();
   });
 
-  // ZNANY BŁĄD (client.ts:73): onFulfilled robi `Promise.reject({ response })`, ale
-  // onRejected TEJ SAMEJ pary interceptorów nie łapie odrzucenia z jej onFulfilled
-  // (Axios podpina je jako `.then(onFulfilled, onRejected)`). Wywołujący dostaje
-  // goły obiekt { response } zamiast AppError. Test przejdzie, gdy błąd zostanie naprawiony.
-  it.fails('{ success: false } przy HTTP 200 → AppError (obecnie: goły { response })', async () => {
+  it('{ success: false } przy HTTP 200 → AppError', async () => {
     apiMock.onGet('/api/v1/me').reply(200, { success: false, error: 'Nie', timestamp: 'x' });
 
     await expect(apiClient.get('/api/v1/me')).rejects.toBeInstanceOf(AppError);

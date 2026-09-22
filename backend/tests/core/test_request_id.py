@@ -23,7 +23,8 @@ from main import app as real_app
 
 @pytest.fixture
 def client():
-    # Bez prawdziwej bazy: endpointy uzyte w testach albo jej nie tykaja (/health),
+    # Bez prawdziwej bazy: endpointy uzyte w testach albo jej nie tykaja (/health/live -
+    # liveness, zawsze 200; /health to readiness i pinguje DB, na CI daje 503),
     # albo padaja na braku tokenu zanim siegna po sesje (/auth/me).
     from core.database import get_db
 
@@ -50,19 +51,19 @@ class TestSanitize:
 
 class TestMiddleware:
     def test_echo_naglowka_od_klienta(self, client):
-        res = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: "abc-123"})
+        res = client.get("/api/v1/health/live", headers={REQUEST_ID_HEADER: "abc-123"})
         assert res.status_code == 200
         assert res.headers[REQUEST_ID_HEADER] == "abc-123"
 
     def test_generuje_id_gdy_brak_naglowka(self, client):
-        res = client.get("/api/v1/health")
+        res = client.get("/api/v1/health/live")
         rid = res.headers[REQUEST_ID_HEADER]
         assert len(rid) == 32
         # kazde zadanie dostaje swoje
-        assert client.get("/api/v1/health").headers[REQUEST_ID_HEADER] != rid
+        assert client.get("/api/v1/health/live").headers[REQUEST_ID_HEADER] != rid
 
     def test_niepoprawny_naglowek_zastapiony(self, client):
-        res = client.get("/api/v1/health", headers={REQUEST_ID_HEADER: "zle id ze spacja"})
+        res = client.get("/api/v1/health/live", headers={REQUEST_ID_HEADER: "zle id ze spacja"})
         assert res.headers[REQUEST_ID_HEADER] != "zle id ze spacja"
 
     def test_blad_ma_request_id_w_ciele_i_naglowku(self, client):
@@ -97,11 +98,11 @@ class TestMiddleware:
 
     def test_loguje_http_request_bez_query_stringa(self, client, caplog):
         with caplog.at_level(logging.INFO, logger="http"):
-            client.get("/api/v1/health?token=SEKRET", headers={REQUEST_ID_HEADER: "log-1"})
+            client.get("/api/v1/health/live?token=SEKRET", headers={REQUEST_ID_HEADER: "log-1"})
         records = [r for r in caplog.records if r.getMessage() == "http.request"]
         assert records, "brak logu http.request"
         rec = records[-1]
-        assert rec.path == "/api/v1/health"
+        assert rec.path == "/api/v1/health/live"
         assert "SEKRET" not in rec.path
         assert rec.status == 200
         assert rec.method == "GET"
