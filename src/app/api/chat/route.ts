@@ -39,7 +39,11 @@ export async function POST(req: NextRequest) {
     }
 
     // 2) Uwierzytelnienie - przed body i przed cache (endpoint wola platne Gemini).
-    const auth = await authenticateChatRequest(req.headers.get('authorization'));
+    const auth = await authenticateChatRequest(
+      req.headers.get('authorization'),
+      fetch,
+      req.headers.get('x-request-id')
+    );
     if (!auth.ok) {
       return reply(
         auth.error === 'unauthorized'

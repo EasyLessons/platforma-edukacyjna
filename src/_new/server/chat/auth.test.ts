@@ -105,3 +105,23 @@ describe('getBackendUrl', () => {
     expect(getBackendUrl()).toBe('https://api.example.com');
   });
 });
+
+describe('authenticateChatRequest - X-Request-ID', () => {
+  it('przekazuje X-Request-ID do backendu, gdy jest', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { data: { user: { id: 1 } } }));
+
+    await authenticateChatRequest('Bearer tok', fetchImpl, 'req-77');
+
+    const [, init] = fetchImpl.mock.calls[0];
+    expect(init.headers['X-Request-ID']).toBe('req-77');
+  });
+
+  it('nie wysyla pustego naglowka X-Request-ID, gdy brak id', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, {}));
+
+    await authenticateChatRequest('Bearer tok', fetchImpl, null);
+
+    const [, init] = fetchImpl.mock.calls[0];
+    expect('X-Request-ID' in init.headers).toBe(false);
+  });
+});
