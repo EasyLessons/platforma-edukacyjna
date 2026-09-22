@@ -3,7 +3,8 @@ Invites service — zaproszenia do workspace'ów.
 """
 import asyncio
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
+from core.time import utcnow
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -59,12 +60,12 @@ class InviteService:
             WorkspaceInvite.workspace_id == workspace_id,
             WorkspaceInvite.invited_id == invited_user_id,
             WorkspaceInvite.is_used == False,
-            WorkspaceInvite.expires_at > datetime.utcnow(),
+            WorkspaceInvite.expires_at > utcnow(),
         ).first():
             raise ConflictError("Zaproszenie już zostało wysłane")
 
         invite_token = secrets.token_urlsafe(32)
-        expires_at = datetime.utcnow() + timedelta(days=expires_in_days)
+        expires_at = utcnow() + timedelta(days=expires_in_days)
         inviter = db.query(User).filter(User.id == user_id).first()
         inviter_name = inviter.username if inviter else "Nieznany"
 
@@ -76,7 +77,7 @@ class InviteService:
                 invite_token=invite_token,
                 expires_at=expires_at,
                 is_used=False,
-                created_at=datetime.utcnow(),
+                created_at=utcnow(),
             )
             db.add(new_invite)
             db.commit()
@@ -183,7 +184,7 @@ class InviteService:
             .filter(
                 WorkspaceInvite.workspace_id == workspace_id,
                 WorkspaceInvite.invited_id.in_(user_ids),
-                WorkspaceInvite.expires_at > datetime.utcnow(),
+                WorkspaceInvite.expires_at > utcnow(),
                 WorkspaceInvite.is_used == False
             )
             .all()
@@ -210,7 +211,7 @@ class InviteService:
             raise NotFoundError("Zaproszenie nie istnieje")
         if invite.invited_id != user_id:
             raise AppException("To zaproszenie nie jest dla Ciebie", status_code=403)
-        if invite.expires_at < datetime.utcnow():
+        if invite.expires_at < utcnow():
             raise AppException("Zaproszenie wygasło", status_code=410)
         if invite.is_used:
             raise ConflictError("Zaproszenie już użyte")
@@ -229,7 +230,7 @@ class InviteService:
                 user_id=user_id,
                 role="editor",
                 is_favourite=False,
-                joined_at=datetime.utcnow(),
+                joined_at=utcnow(),
             ))
             db.delete(invite)
             db.commit()

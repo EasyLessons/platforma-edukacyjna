@@ -20,14 +20,10 @@ import axios, {
   InternalAxiosRequestConfig,
 } from 'axios';
 
-import {
-  getAccessToken,
-  setAccessToken,
-  clearSession,
-  refreshAccessToken,
-  logoutAndRedirect,
-  isPublicPath,
-} from '../auth';
+// Import z konkretnych modulow, nie z barrela '../auth' - barrel eksportuje AuthContext
+// i session-api (ktore importuja apiClient), co dawaloby cykl lib/api <-> lib/auth.
+import { getAccessToken, setAccessToken, clearSession } from '../auth/tokenStore';
+import { refreshAccessToken, logoutAndRedirect, isPublicPath } from '../auth/tokenService';
 import { mapAxiosError } from '../errors';
 import type { ApiSuccessResponse } from './types';
 

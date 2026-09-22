@@ -1,7 +1,7 @@
 """
 Workspace service — CRUD workspace'ów.
 """
-from datetime import datetime
+from core.time import utcnow
 from typing import List
 
 from sqlalchemy.orm import Session
@@ -24,7 +24,7 @@ def _build_workspace_with_owner(
         icon=icon,
         bg_color=bg_color,
         created_by=user_id,
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
     )
     db.add(workspace)
     db.flush()
@@ -34,7 +34,7 @@ def _build_workspace_with_owner(
         user_id=user_id,
         role="owner",
         is_favourite=is_favourite,
-        joined_at=datetime.utcnow(),
+        joined_at=utcnow(),
     )
     db.add(membership)
     return workspace, membership

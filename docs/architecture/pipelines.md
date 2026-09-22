@@ -75,9 +75,9 @@ Kanały są per-user (`notifications:{user_id}`) — jeden user nie widzi event�
 ```
 UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Authorization: Bearer <access token>
   (przy 401 czat raz odświeża token i ponawia — jak interceptor apiClient)
-  → Next.js Route Handler src/app/api/chat/route.ts — NIE FastAPI
+  → Next.js Route Handler src/app/api/chat/route.ts — NIE FastAPI (cienki handler; logika w src/_new/server/chat)
   → sprawdzenie rate limitu (Map w pamięci, per IP: 20 req/min, blokada 2 min po przekroczeniu)
-  → uwierzytelnienie (src/app/api/chat/auth.ts): token przekazany do GET /api/v1/auth/me
+  → uwierzytelnienie (src/_new/server/chat/auth.ts): token przekazany do GET /api/v1/auth/me
     na backendzie — ta sama weryfikacja co get_current_user (podpis, wygaśnięcie, is_active)
     · 401/403/404 z backendu → 401 "unauthorized"
     · backend nieosiągalny / 5xx / timeout 5 s → 503 "auth_unavailable" (fail closed — NIE wpuszczamy)
@@ -95,7 +95,7 @@ UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Author
 ## 5. Voice chat (WebRTC)
 
 ```
-User dołącza do tablicy → VoiceChatContext (src/app/context/VoiceChatContext.tsx + hooki w src/app/context/voice-chat/:
+User dołącza do tablicy → VoiceChatProvider (src/_new/features/voice-chat/VoiceChatContext.tsx + hooki obok:
   useVoiceSignaling — kanał i zdarzenia voice-*, useWebRTCConnections — RTCPeerConnection per user,
   useVoiceDetection — wskaźnik "mówi", mediaSupport — wykrywanie braku wsparcia/HTTPS)
   → sygnalizacja (wymiana SDP/ICE candidates) przez Supabase Broadcast (ten sam mechanizm co pkt 2)

@@ -291,6 +291,22 @@ Zweryfikowane: `npx tsc --noEmit` scoped na oba zmienione pliki — zero błęd�
 
 ---
 
+## 5. Makiety w panelu konta: adresy, płatności, bezpieczeństwo — bez backendu (niski priorytet, świadome)
+
+**Zgłoszone:** 21.09.2026, przy inwentaryzacji do `architecture/REFAKTOR-PLAN.md` (decyzja P2).
+
+### Co się dzieje
+
+W `/account` sekcje „Adresy”, „Płatności” i „Bezpieczeństwo” (`AddressBook`, `PaymentMethods`, `SecurityCenter` w `src/_new/features/account/components/_mock/`, ~1 700 linii) wyglądają jak działające, ale to makiety: dane pochodzą z tablic `mock*` w komponentach, żaden endpoint FastAPI ich nie obsługuje, nic nie jest zapisywane, a po odświeżeniu strony wszystko wraca do stanu początkowego.
+
+### Jak groźne
+
+Myli usera (może sądzić, że zapisał kartę/adres). Nie psuje niczego innego.
+
+### Decyzja
+
+Zostają w folderze `_mock/` jako zalążek przyszłych sekcji konta (opis w `README.md` obok). Realna funkcja = endpointy + `api/` + hooki w `features/account` i usunięcie `_mock/`. Do tego czasu: nie rozbudowywać makiet.
+
 ## Zasada
 
 Nowy błąd znaleziony w czasie pracy/testów → nowy wpis tutaj, w tym samym formacie (odtworzenie, root cause, opcje naprawy), z priorytetem. Jak coś zostanie naprawione, wpis przenosimy na dół pod `## Naprawione` (do stworzenia gdy pierwszy taki przypadek się pojawi) zamiast kasować — żeby było widać historię.

@@ -2,7 +2,8 @@
 AUTH SERVICE - Cała logika autentykacji
 """
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import timedelta
+from core.time import utcnow
 from core.logging import get_logger
 from core.config import get_settings
 from core.redis_client import get_redis_client
@@ -94,7 +95,7 @@ class AuthService:
 
         refresh_token_plain = generate_refresh_token()
         refresh_token_hash = hash_refresh_token(refresh_token_plain)
-        expires_at = datetime.utcnow() + timedelta(days=self.settings.refresh_token_expire_days)
+        expires_at = utcnow() + timedelta(days=self.settings.refresh_token_expire_days)
 
         db_refresh = RefreshToken(
             user_id=user.id,
@@ -319,7 +320,7 @@ class AuthService:
         if not db_token:
             raise AuthenticationError("Nieprawidłowy refresh token")
         
-        if datetime.utcnow() > db_token.expires_at:
+        if utcnow() > db_token.expires_at:
             raise AuthenticationError("Refresh token wygasł")
         
         # Unieważnij stary token

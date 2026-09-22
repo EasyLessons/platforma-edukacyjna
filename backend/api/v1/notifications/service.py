@@ -27,7 +27,7 @@ Użycie create_notification() w innych modułach:
         },
     )
 """
-from datetime import datetime
+from core.time import utcnow
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -48,7 +48,7 @@ def create_notification(
         type=type,
         payload=payload,
         is_read=False,
-        created_at=datetime.utcnow(),
+        created_at=utcnow(),
     )
     db.add(notification)
     db.commit()
@@ -66,7 +66,7 @@ def get_user_notifications(
         db.query(Notification)
         .filter(Notification.user_id == user_id)
         # Tiebreaker po `id` jest konieczny, nie kosmetyczny: `created_at` jest
-        # ustawiane przez `datetime.utcnow()`, ktore ma rozdzielczosc zegara
+        # ustawiane przez `utcnow()`, ktore ma rozdzielczosc zegara
         # systemowego (na Windowsie ~15 ms). Dwa powiadomienia utworzone w tym
         # samym takcie dostaja IDENTYCZNY `created_at`, a wtedy samo
         # ORDER BY created_at DESC nie definiuje ich wzajemnej kolejnosci —
@@ -110,7 +110,7 @@ def mark_as_read(
 
     if not notification.is_read:
         notification.is_read = True
-        notification.read_at = datetime.utcnow()
+        notification.read_at = utcnow()
         db.commit()
         db.refresh(notification)
 
@@ -134,7 +134,7 @@ def mark_all_as_read(
         .update(
             {
                 Notification.is_read: True,
-                Notification.read_at: datetime.utcnow(),
+                Notification.read_at: utcnow(),
             },
             synchronize_session=False,
         )

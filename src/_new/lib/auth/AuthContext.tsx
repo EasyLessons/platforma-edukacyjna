@@ -12,7 +12,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 
 import { setAccessToken, removeAccessToken, setStoredUser, removeStoredUser } from './tokenStore';
 import { refreshAccessToken } from './tokenService';
-import { getCurrentUser, logoutUser } from '@/_new/features/auth/api/authApi';
+import { getCurrentUser, logoutUser } from './session-api';
 import type { User } from '@/_new/shared/types/user';
 
 interface AuthContextType {

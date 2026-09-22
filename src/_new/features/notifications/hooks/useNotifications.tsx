@@ -12,7 +12,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/_new/lib/supabase/client';
 import { useAuth } from '@/_new/lib/auth';
 import { acceptInvite, rejectInvite } from '../../workspace/api/inviteApi';
 import {

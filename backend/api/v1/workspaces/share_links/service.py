@@ -9,7 +9,8 @@ ShareLinkService obsługuje:
     join_via_link() - faktyczne dołączenie do workspace'a
 """
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
+from core.time import utcnow
 
 from sqlalchemy.orm import Session
 
@@ -34,7 +35,7 @@ class ShareLinkService:
         query = self.db.query(WorkspaceShareLink).filter(
             WorkspaceShareLink.workspace_id == workspace_id,
             WorkspaceShareLink.revoked_at.is_(None),
-            WorkspaceShareLink.expires_at > datetime.utcnow(),
+            WorkspaceShareLink.expires_at > utcnow(),
         )
         if board_id is None:
             query = query.filter(WorkspaceShareLink.board_id.is_(None))
@@ -62,7 +63,7 @@ class ShareLinkService:
             workspace_id=workspace_id,
             board_id=board_id,
             token=secrets.token_urlsafe(32),
-            expires_at=datetime.utcnow() + timedelta(days=SHARE_LINK_BACKSTOP_TTL_DAYS),
+            expires_at=utcnow() + timedelta(days=SHARE_LINK_BACKSTOP_TTL_DAYS),
         )
         self.db.add(link)
         self.db.commit()
@@ -80,7 +81,7 @@ class ShareLinkService:
         if not link:
             raise NotFoundError("Link nie znaleziony")
 
-        link.revoked_at = datetime.utcnow()
+        link.revoked_at = utcnow()
         self.db.commit()
         logger.info(f"Share link unieważniony dla workspace {workspace_id}")
         return {"message": "Link został unieważniony"}
@@ -92,13 +93,13 @@ class ShareLinkService:
 
         existing = self._find_active_link(workspace_id, board_id)
         if existing:
-            existing.revoked_at = datetime.utcnow()
+            existing.revoked_at = utcnow()
 
         new_link = WorkspaceShareLink(
             workspace_id=workspace_id,
             board_id=board_id,
             token=secrets.token_urlsafe(32),
-            expires_at=datetime.utcnow() + timedelta(days=SHARE_LINK_BACKSTOP_TTL_DAYS),
+            expires_at=utcnow() + timedelta(days=SHARE_LINK_BACKSTOP_TTL_DAYS),
         )
         self.db.add(new_link)
         self.db.commit()
@@ -112,7 +113,7 @@ class ShareLinkService:
             raise NotFoundError("Link nie istnieje")
         if link.revoked_at is not None:
             raise AppException("Link został unieważniony", status_code=410)
-        if link.expires_at < datetime.utcnow():
+        if link.expires_at < utcnow():
             raise AppException("Link wygasł", status_code=410)
 
         workspace = self.db.query(Workspace).filter(Workspace.id == link.workspace_id).first()
@@ -144,7 +145,7 @@ class ShareLinkService:
             raise NotFoundError("Link nie istnieje")
         if link.revoked_at is not None:
             raise AppException("Link został unieważniony", status_code=410)
-        if link.expires_at < datetime.utcnow():
+        if link.expires_at < utcnow():
             raise AppException("Link wygasł", status_code=410)
 
         workspace = self.db.query(Workspace).filter(Workspace.id == link.workspace_id).first()
@@ -171,7 +172,7 @@ class ShareLinkService:
             user_id=user_id,
             role="editor",
             is_favourite=False,
-            joined_at=datetime.utcnow()
+            joined_at=utcnow()
         )
         self.db.add(new_member)
         self.db.commit()

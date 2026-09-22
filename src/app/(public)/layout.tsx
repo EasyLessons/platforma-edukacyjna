@@ -1,5 +1,4 @@
-import Header from './_components/Header';
-import Footer from './_components/Footer';
+import { Header, Footer } from '@/_new/features/landing';
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (

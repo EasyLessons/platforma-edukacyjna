@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class InviteCreate(BaseModel):
@@ -16,8 +16,7 @@ class InviteResponse(BaseModel):
     expires_at: datetime
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserSearchResult(BaseModel):
@@ -27,8 +26,7 @@ class UserSearchResult(BaseModel):
     full_name: Optional[str] = None
     has_pending_invite: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AcceptInviteResponse(BaseModel):

@@ -1,5 +1,5 @@
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class WorkspaceCreate(BaseModel):
@@ -23,8 +23,7 @@ class WorkspaceResponse(BaseModel):
     role: str = "viewer"
     is_favourite: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class WorkspaceListResponse(BaseModel):
