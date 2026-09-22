@@ -16,6 +16,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
 13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
 14. **`docs/architecture/REFAKTOR-PLAN.md`** — zatwierdzony plan refaktoru struktury (docelowe drzewo, etapy jako małe PR-y, kolejność względem pracy równoległej, decyzje). Czytaj przed każdym PR-em przenoszącym pliki.
+15. **`docs/architecture/ADR-silnik-tablicy.md`** — decyzja o silniku tablicy (własny vs Excalidraw vs tldraw): stan zmierzony, licencje, koszt migracji w dniach, warunki dla prototypu `proto/excalidraw-yjs`, pytania do Patryka i Bartka; na końcu plan płatności (Stripe + polskie faktury — co bierzemy gotowe, co piszemy sami).
 
 ## Zasada utrzymania
 
