@@ -14,6 +14,8 @@ from core.logging import setup_logging
 from core.config import get_settings
 from core.exceptions import AppException, ValidationError, AuthenticationError, NotFoundError
 from core.responses import ApiResponse
+from core.request_context import REQUEST_ID_HEADER, get_request_id
+from core.request_id import RequestIdMiddleware
 
 from api.v1.router import get_v1_router
 
@@ -61,6 +63,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# X-Request-ID: czyta/generuje id zadania, oddaje w naglowku, loguje http.request
+app.add_middleware(RequestIdMiddleware)
+
 
 # Exception handlers
 @app.exception_handler(RequestValidationError)
@@ -70,6 +75,7 @@ async def request_validation_handler(request, exc: RequestValidationError):
         status_code=422,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error=first_error.get("msg", "Nieprawidłowe dane"),
             code="VALIDATION_ERROR"
         ).model_dump(mode="json")
@@ -83,6 +89,7 @@ async def validation_error_handler(request, exc: ValidationError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error=exc.message,
             code=exc.code
         ).model_dump(mode='json')
@@ -96,6 +103,7 @@ async def auth_error_handler(request, exc: AuthenticationError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error=exc.message,
             code=exc.code
         ).model_dump(mode='json')
@@ -109,6 +117,7 @@ async def not_found_handler(request, exc: NotFoundError):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error=exc.message,
             code=exc.code
         ).model_dump(mode='json')
@@ -122,6 +131,7 @@ async def app_exception_handler(request, exc: AppException):
         status_code=exc.status_code,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error=exc.message,
             code=exc.code,
             data=exc.details
@@ -143,10 +153,13 @@ async def global_exception_handler(request, exc: Exception):
         status_code=500,
         content=ApiResponse(
             success=False,
+            request_id=get_request_id(),
             error="Internal server error",
             code="APP_ERROR"
         ).model_dump(mode='json')
     )
+    if get_request_id():
+        response.headers[REQUEST_ID_HEADER] = get_request_id()
     origin = request.headers.get("origin")
     if origin and (origin in ALLOWED_ORIGINS or re.match(ALLOWED_ORIGIN_REGEX, origin)):
         response.headers["Access-Control-Allow-Origin"] = origin

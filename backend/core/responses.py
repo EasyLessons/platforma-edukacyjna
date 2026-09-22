@@ -15,6 +15,8 @@ class ApiResponse(BaseModel, Generic[T]):
     error: Optional[str] = None
     code: Optional[str] = None
     timestamp: datetime = Field(default_factory=utcnow)
+    # Identyfikator zadania (X-Request-ID) - w odpowiedziach bledow, do korelacji z logami
+    request_id: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

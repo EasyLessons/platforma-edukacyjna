@@ -4,16 +4,11 @@ Whiteboard router — /api/v1/whiteboard/{board_id}/*
 POST   /{id}/opened                 — zanotuj otwarcie tablicy (last_opened + presence)
 GET    /{id}/settings               — ustawienia tablicy
 PUT    /{id}/settings               — aktualizacja ustawień tablicy
-POST   /{id}/elements/batch         — batch save elementów
-GET    /{id}/elements               — załaduj wszystkie elementy
-DELETE /{id}/elements/{element_id}  — usuń element
 POST   /{id}/doc                    — zapisz snapshot Y.Doc
 GET    /{id}/doc                    — wczytaj snapshot Y.Doc
 GET    /{id}/access                 — sprawdź dostęp do tablicy
 """
-from typing import Any, Dict, List
-
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -22,8 +17,7 @@ from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
-    OnlineStatusResponse, BoardElementWithAuthor,
-    SaveElementsResponse, DeleteElementResponse, UploadImageResponse,
+    OnlineStatusResponse, UploadImageResponse,
     BoardSettings, BoardSettingsPatch,
     SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
     AccessCheckResponse,
@@ -69,40 +63,6 @@ async def update_settings(
     service = WhiteboardService(db)
     return ApiResponse(success=True, data=service.update_settings(board_id, patch, current_user.id))
 
-
-
-# Elements --------------------------------------------------
-
-@router.post(
-    "/{board_id}/elements/batch",
-    response_model=ApiResponse[SaveElementsResponse],
-    status_code=status.HTTP_200_OK,
-)
-async def save_elements_batch(
-    board_id: int,
-    elements: List[Dict[str, Any]],
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = WhiteboardService(db)
-    result = service.save_elements(board_id, elements, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
-@router.get(
-    "/{board_id}/elements",
-    response_model=ApiResponse[List[BoardElementWithAuthor]],
-)
-async def load_elements(
-    board_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = WhiteboardService(db)
-    result = service.load_elements(board_id, current_user.id)
-    return ApiResponse(success=True, data=result)
-
-
 @router.post(
     "/{board_id}/upload-image",
     response_model=ApiResponse[UploadImageResponse],
@@ -124,22 +84,6 @@ async def upload_image(
         board_id, current_user.id, file_bytes, file.content_type or "application/octet-stream"
     )
     return ApiResponse(success=True, data=UploadImageResponse(url=url))
-
-
-@router.delete(
-    "/{board_id}/elements/{element_id}",
-    response_model=ApiResponse[DeleteElementResponse],
-)
-async def delete_element(
-    board_id: int,
-    element_id: str,
-    background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    service = WhiteboardService(db)
-    result = service.delete_element(board_id, element_id, current_user.id, background_tasks)
-    return ApiResponse(success=True, data=DeleteElementResponse(**result))
 
 # Document (Yjs snapshot) --------------------------------------------------
 

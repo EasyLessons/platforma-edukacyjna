@@ -38,6 +38,18 @@ describe('useYjsBoard', () => {
     expect(result.current.spatialIndex.size).toBe(0);
   });
 
+  it('mutators.deleteMany usuwa wiele elementów jako jedno cofnięcie', async () => {
+    const { result } = renderHook(() => useYjsBoard({ userId: 1, username: 'Ala' }));
+    act(() => result.current.mutators.batch([shape('a'), shape('b'), shape('c')]));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    });
+    act(() => result.current.mutators.deleteMany(['a', 'b', 'c']));
+    expect(result.current.elements).toEqual([]);
+    act(() => result.current.undo());
+    expect(result.current.elements.map((e) => e.id)).toEqual(['a', 'b', 'c']);
+  });
+
   it('mutators.batch - kolejność wejściowa, jedna pozycja undo', () => {
     const { result } = renderHook(() => useYjsBoard({ userId: 1, username: 'Ala' }));
 

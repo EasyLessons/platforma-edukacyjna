@@ -2,7 +2,7 @@
  * apiClient — skonfigurowana instancja Axios dla całego projektu.
  *
  * Request interceptor:
- *   Dodaje Authorization: Bearer <token> do każdego requestu.
+ *   Dodaje Authorization: Bearer <token> oraz X-Request-ID do każdego requestu.
  *
  * Response interceptor:
  *   - Rozpakowuje { success: true, data: T } → zwraca T bezpośrednio
@@ -14,6 +14,7 @@
  *     apiClient.get<BoardListResponse>('/api/v1/boards', { params: { workspace_id: wsId } });
  */
 import axios, {
+  AxiosError,
   AxiosInstance,
   AxiosRequestConfig,
   AxiosResponse,
@@ -25,6 +26,7 @@ import axios, {
 import { getAccessToken, setAccessToken, clearSession } from '../auth/tokenStore';
 import { refreshAccessToken, logoutAndRedirect, isPublicPath } from '../auth/tokenService';
 import { mapAxiosError } from '../errors';
+import { REQUEST_ID_HEADER, newRequestId } from './request-id';
 import type { ApiSuccessResponse } from './types';
 
 // KONFIGURACJA BAZOWA
@@ -49,6 +51,11 @@ apiClient.interceptors.request.use(
     if (token && config.headers) {
       config.headers['Authorization'] = `Bearer ${token}`;
     }
+    // Ponowienie po refreshu tokenu zachowuje id z pierwszej próby — to ta sama
+    // akcja użytkownika, w logach backendu obie próby będą pod jednym request_id.
+    if (config.headers && !config.headers[REQUEST_ID_HEADER]) {
+      config.headers[REQUEST_ID_HEADER] = newRequestId();
+    }
     return config;
   },
   (error) => Promise.reject(error)
@@ -69,8 +76,20 @@ apiClient.interceptors.response.use(
       if (data.success === true) {
         return { ...response, data: data.data };
       }
-      // success: false
-      return Promise.reject({ response });
+      // success: false przy HTTP 2xx. Odrzucenie z onFulfilled NIE trafia do onRejected
+      // tej samej pary interceptorow (Axios przekazuje je dalej do wolajacego), wiec
+      // mapujemy na AppError tutaj - inaczej komponent dostalby goly obiekt { response }.
+      return Promise.reject(
+        mapAxiosError(
+          new AxiosError(
+            data.error || 'Request failed',
+            AxiosError.ERR_BAD_RESPONSE,
+            response.config,
+            response.request,
+            response
+          )
+        )
+      );
     }
 
     // Odpowiedź bez wrappera (np. 204 No Content) — zwróć jak jest

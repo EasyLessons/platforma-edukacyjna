@@ -8,6 +8,7 @@ import {
   upsertElement as docUpsertElement,
   upsertElements as docUpsertElements,
   deleteElement as docDeleteElement,
+  deleteElements as docDeleteElements,
 } from '../yjs/board-doc';
 import { ElementSpatialIndex } from '../navigation/spatial-index';
 import type { DrawingElement } from '../types';
@@ -23,6 +24,7 @@ export interface UseYjsBoardOptions {
 export interface UseYjsBoardMutators {
   upsert: (element: DrawingElement) => void;
   delete: (id: string) => void;
+  deleteMany: (ids: string[]) => void;
   batch: (elements: DrawingElement[]) => void;
 }
 
@@ -134,6 +136,14 @@ export function useYjsBoard({ userId, username }: UseYjsBoardOptions): UseYjsBoa
         added.delete(id);
         updated.delete(id);
         spatialIndex.remove(id);
+
+        loadedIdsRef.current.delete(id);
+        setLoadedImages((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
       }
 
       const byId = new Map(getElements(doc).map((el) => [el.id, el]));
@@ -170,6 +180,7 @@ export function useYjsBoard({ userId, username }: UseYjsBoardOptions): UseYjsBoa
           createdBy: userId,
           createdByName: username,
         })),
+      deleteMany: (ids) => docDeleteElements(doc, ids, userId),
     }),
     [doc, userId, username]
   );

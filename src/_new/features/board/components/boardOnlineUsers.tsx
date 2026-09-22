@@ -20,7 +20,6 @@ const MAX_VISIBLE = 3;
 
 export function BoardOnlineUsers({ users }: BoardOnlineUsersProps) {
   const { getAvatarColorClass, getInitials } = useUserAvatar();
-  console.log('BoardOnlineUsers render, users:', JSON.stringify(users, null, 2));
 
   if (users.length === 0) {
     return <span className="text-gray-400 text-xs font-medium">—</span>;

@@ -38,24 +38,16 @@ import {
   safeInset,
   shouldShowTooSmallOverlay,
 } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
-import { useElements } from '../../hooks/use-elements';
-import { useHistory } from '../../hooks/use-history';
-import { useClipboard, offsetElement } from '../../hooks/use-clipboard';
+import { useClipboard } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 import { useYjsBoard, type UseYjsBoardReturn } from '../../hooks/use-yjs-board';
 import { useYjsSync } from '../../yjs/use-yjs-sync';
-
-// Yjs - feature flag
-import { WHITEBOARD_YJS_ENABLED } from '../../config/feature-flags';
 import { useAuth } from '@/_new/lib/auth';
 
 // ─── Komponenty narzędzi (przez re-exportery _new/) ──────────────────────────
 import Toolbar from '../toolbar/toolbar';
 import { ZoomControls } from '../toolbar/zoom-controls';
-// Komponenty narzędzi są teraz renderowane przez rejestr (tools/*.tool.tsx),
-// nie bezpośrednio w canvasie. Zostają tylko: typ refa ImageTool oraz widok
-// notatki Markdown (overlay HTML renderowany poza systemem narzędzi).
 import type { ImageToolRef } from '../toolbar/image-tool';
 import { MarkdownNoteView } from '../toolbar/markdown-note-tool';
 import { CalculatorTool } from '../toolbar/calculator-tool';
@@ -161,17 +153,10 @@ interface BoardElementsBinding {
   loadingProgress: number;
   isSaving: boolean;
   unsavedElements: Set<string>;
-  addElements: (elements: DrawingElement[]) => void;
-  updateElement: (element: DrawingElement) => void;
-  updateElements: (elements: DrawingElement[]) => void;
-  removeElement: (id: string) => void;
-  markUnsaved: (ids: string[]) => void;
   loadImage: (id: string, src: string) => void;
-  deleteElementDirectly: (boardId: number, id: string) => Promise<void>;
 }
 
 interface BoardHistoryBinding {
-  recordCommand: (command: import('../../commands').Command) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -192,19 +177,12 @@ function adaptYjsElements(board: UseYjsBoardReturn): BoardElementsBinding {
     loadingProgress: 100,
     isSaving: false,
     unsavedElements: EMPTY_UNSAVED_SET,
-    addElements: (elements) => board.mutators.batch(elements),
-    updateElement: (element) => board.mutators.upsert(element),
-    updateElements: (elements) => board.mutators.batch(elements),
-    removeElement: (id) => board.mutators.delete(id),
-    markUnsaved: () => {},
     loadImage: board.loadImage,
-    deleteElementDirectly: async () => {},
   };
 }
 
 function adaptYjsHistory(board: UseYjsBoardReturn): BoardHistoryBinding {
   return {
-    recordCommand: () => {},
     undo: board.undo,
     redo: board.redo,
     canUndo: board.canUndo,
@@ -382,153 +360,29 @@ export default function WhiteboardCanvasNew({
     };
   }, [bottomToastState]);
 
-  // ─── Broadcast refs — rozwiązanie problemu "kółkowej zależności" ────────────
-  // hist potrzebuje rt.broadcastElementCreated, ale rt inicjalizujemy po hist.
-  // Rozwiązanie: ref do funkcji broadcastu, wypełniany po inicjalizacji rt.
-  const broadcastCreatedRef = useRef<(el: DrawingElement) => Promise<void>>(async () => {});
-  const broadcastDeletedRef = useRef<(id: string) => Promise<void>>(async () => {});
-  const broadcastUpdatedRef = useRef<(el: DrawingElement) => Promise<void>>(async () => {});
-
   // ─── HOOK: viewport ─────────────────────────────────────────────────────────
   const vp = useViewport();
-
-  // ─── HOOK: elements ─────────────────────────────────────────────────────────
-  const legacyEl = useElements({ boardId });
 
   // ─── HOOK: selection ────────────────────────────────────────────────────────
   const sel = useSelection();
 
-  // ─── HOOK: history ──────────────────────────────────────────────────────────
-  const legacyHist = useHistory({
-    onDeleteElement: (boardIdNum, elementId) =>
-      legacyEl.deleteElementDirectly(boardIdNum, elementId),
-    onSaveElement: (boardIdNum, element) => legacyEl.saveElementDirectly(boardIdNum, element),
-    // Używamy ref żeby nie tworzyć pętli zależności z rt
-    onBroadcastCreated: (element) => broadcastCreatedRef.current(element),
-    onBroadcastDeleted: (elementId) => broadcastDeletedRef.current(elementId),
-    onBroadcastUpdated: (element) => broadcastUpdatedRef.current(element),
-    onRemoveElement: (elementId) => legacyEl.removeElement(elementId),
-    onAddElement: (element) => legacyEl.addElements([element]),
-    onUpdateElement: (element) => legacyEl.updateElement(element),
-    onLoadImage: legacyEl.loadImage,
-    onClearSelection: sel.clearSelection,
-    unsavedElementsRef: legacyEl.unsavedElementsRef,
-    boardIdRef,
-  });
-
   // ─── HOOK: yjs ─────────────────────────────────────────────────────────────
   const { user } = useAuth();
   const yjsBoard = useYjsBoard({ userId: user?.id ?? null, username: user?.username ?? null });
-  const el: BoardElementsBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsElements(yjsBoard) : legacyEl;
-  const hist: BoardHistoryBinding = WHITEBOARD_YJS_ENABLED ? adaptYjsHistory(yjsBoard) : legacyHist;
+  const el: BoardElementsBinding = adaptYjsElements(yjsBoard);
+  const hist: BoardHistoryBinding = adaptYjsHistory(yjsBoard);
 
-  // Snapshot + live transport Yjs
+  // Live transport + persystencja (Hocuspocus)
   useYjsSync({
     doc: yjsBoard.doc,
     boardId,
     userId: user?.id ?? null,
-    enabled: WHITEBOARD_YJS_ENABLED,
   });
 
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({
-    onRemoteElementAdded: (element) => {
-      // Uzupełnij bbox dla ścieżek przychodzących przez realtime (nie mają cache)
-      if (element.type === 'path' && !element.bbox) {
-        (element as DrawingPath).bbox = computePathBbox(element);
-      }
-      legacyEl.addElements([element]);
-    },
-    onRemoteElementUpdated: (partial) => {
-      // 🛠️ FIX (known-issues.md #2, Opcja B): `partial` może być NIEPEŁNY —
-      // przy zwykłym przesunięciu/resize/obrocie zdjęcia nadawca celowo NIE
-      // wysyła `src` (base64), bo my już je mamy. Dlatego SCALAMY przychodzące
-      // dane z lokalną kopią zamiast nadpisywać cały element — inaczej
-      // straciłbyś dane, których ten update w ogóle nie dotyczył.
-      const existing = legacyEl.elementsRef.current.find((e) => e.id === partial.id);
-      if (!existing) {
-        // Rzadki wyścig sieciowy: update dla elementu, którego jeszcze nie
-        // znamy lokalnie. Bez pełnych danych scalanie stworzyłoby zepsuty
-        // element (np. zdjęcie bez src) — ignorujemy, prawdziwy komplet
-        // danych dojdzie przez element-created albo sync-response.
-        return;
-      }
-      const merged = { ...existing, ...partial } as DrawingElement;
-      // Przy update ścieżki unieważnij cache — punkty mogły się zmienić
-      if (merged.type === 'path') {
-        (merged as DrawingPath).bbox = computePathBbox(merged as DrawingPath);
-      }
-      legacyEl.updateElement(merged);
-    },
-    onRemoteElementDeleted: (elementId) => {
-      legacyEl.removeElement(elementId);
-    },
-    onLoadRemoteImage: legacyEl.loadImage,
     onRemoteViewport: vp.applyRemoteViewport,
-
-    onElementsUpdated: (elements, geometryOnly) => {
-      // 🛠️ FIX (known-issues.md #2, Opcja B): przy `geometryOnly` (live drag
-      // wielu elementów naraz) elementy w paczce są NIEPEŁNE — scalamy z
-      // lokalną kopią. Element, którego jeszcze nie znamy przy geometryOnly,
-      // pomijamy (patrz komentarz w onRemoteElementUpdated wyżej). Przy
-      // tworzeniu nowych elementów (geometryOnly=false) dane są zawsze pełne.
-      const currentMap = new Map(legacyEl.elementsRef.current.map((e) => [e.id, e]));
-      const merged: DrawingElement[] = [];
-      elements.forEach((incoming) => {
-        const existing = currentMap.get(incoming.id);
-        if (existing) {
-          merged.push({ ...existing, ...incoming } as DrawingElement);
-        } else if (!geometryOnly) {
-          merged.push(incoming as DrawingElement);
-        }
-      });
-      if (merged.length === 0) return;
-      if (legacyEl.updateElements) {
-        legacyEl.updateElements(merged);
-      } else {
-        merged.forEach((e) => legacyEl.updateElement(e));
-      }
-    },
-
-    // 🔥 [SYNC] Ktoś wszedł i prosi o dane - wyślij mu całą naszą tablicę z pamięci RAM!
-    onSyncRequest: (requestingUserId) => {
-      // ⚠️ UŻYWAMY boardRt ZAMIAST rt!
-      if (legacyEl.elementsRef.current.length > 0 && boardRt.broadcastSyncResponse) {
-        boardRt
-          .broadcastSyncResponse(legacyEl.elementsRef.current, requestingUserId)
-          .catch(console.error);
-      }
-    },
-
-    // 🔥 DODANE [SYNC] To my weszliśmy i ktoś nam przysłał najświeższe dane - łatajmy dziury!
-    onSyncResponse: (incomingElements) => {
-      const currentMap = new Map(legacyEl.elementsRef.current.map((e) => [e.id, e]));
-      const toAdd: DrawingElement[] = [];
-      const toUpdate: DrawingElement[] = [];
-
-      incomingElements.forEach((incoming) => {
-        // Uzupełnij bbox dla ścieżek z sync (przyszły z sieci, nie mają cache)
-        if (incoming.type === 'path' && !incoming.bbox) {
-          (incoming as DrawingPath).bbox = computePathBbox(incoming);
-        }
-        if (currentMap.has(incoming.id)) {
-          toUpdate.push(incoming);
-        } else {
-          toAdd.push(incoming);
-        }
-      });
-
-      if (toAdd.length > 0) legacyEl.addElements(toAdd);
-      if (toUpdate.length > 0 && legacyEl.updateElements) legacyEl.updateElements(toUpdate);
-    },
   });
-
-  // Wypełnij broadcast refs gdy rt jest dostępne (bez ponownego renderowania)
-  useEffect(() => {
-    broadcastCreatedRef.current = rt.broadcastElementCreated;
-    broadcastDeletedRef.current = rt.broadcastElementDeleted;
-    broadcastUpdatedRef.current = rt.broadcastElementUpdated;
-  }, [rt.broadcastElementCreated, rt.broadcastElementDeleted, rt.broadcastElementUpdated]);
 
   // ─── HOOK: clipboard ────────────────────────────────────────────────────────
   const clip = useClipboard({
@@ -536,39 +390,19 @@ export default function WhiteboardCanvasNew({
     selectedElementIdsRef: sel.selectedElementIdsRef,
     viewportRef: vp.viewportRef,
     canvasRef,
-    boardIdRef,
-    onAddElements: el.addElements,
-    onBroadcastCreated: rt.broadcastElementCreated,
-    onBroadcastBatch: rt.broadcastElementsBatch,
-    onMarkUnsaved: el.markUnsaved,
-    // markUnsaved już wywołuje debouncedSave wewnętrznie — no-op tu wystarczy
-    onDebouncedSave: () => {},
+    onAddElements: yjsBoard.mutators.batch,
     onSelectElements: sel.selectElements,
     onLoadImage: el.loadImage,
-    onRecordCommand: hist.recordCommand,
   });
 
   // ─── SILNIK: WhiteboardEngine ────────────────────────────────────────────────
-  // Fasada nad hookami. Intencje create/update/delete zwijają rytuał
-  // (stan lokalny + persist + broadcast + zapis komendy) w jedno miejsce.
-  // Obiekt jest stabilny referencyjnie (useMemo []) — czyta runtime przez depsRef.
   const engine = useWhiteboardEngine({
     elementsRef: el.elementsRef,
-    loadedImages: el.loadedImages,
-    addElements: el.addElements,
-    updateElements: el.updateElements,
-    removeElement: el.removeElement,
-    markUnsaved: el.markUnsaved,
-    deleteElementDirectly: el.deleteElementDirectly,
+    mutators: yjsBoard.mutators,
     selectedElementIds: sel.selectedElementIds,
     selectElements: sel.selectElements,
     clearSelection: sel.clearSelection,
     viewportRef: vp.viewportRef,
-    broadcastElementCreated: rt.broadcastElementCreated,
-    broadcastElementUpdated: rt.broadcastElementUpdated,
-    broadcastElementDeleted: rt.broadcastElementDeleted,
-    broadcastElementsBatch: rt.broadcastElementsBatch,
-    recordCommand: hist.recordCommand,
     undo: hist.undo,
     redo: hist.redo,
     canUndo: hist.canUndo,
@@ -753,13 +587,6 @@ export default function WhiteboardCanvasNew({
     lastVpBroadcastRef.current = now;
     rt.broadcastViewportChange(vp.viewport.x, vp.viewport.y, vp.viewport.scale);
   }, [vp.viewport, vp.followingUserId, rt.broadcastViewportChange, rt.isConnected]);
-
-  // 📡 [SYNC] Gdy kanał WebSocket się połączy, poproś innych graczy o niezapisany stan
-  useEffect(() => {
-    if (rt.isConnected && rt.broadcastSyncRequest) {
-      rt.broadcastSyncRequest().catch(console.error);
-    }
-  }, [rt.isConnected, rt.broadcastSyncRequest]);
 
   // ─── RENDEROWANIE CANVAS ────────────────────────────────────────────────────
 
@@ -1668,15 +1495,13 @@ export default function WhiteboardCanvasNew({
 
   const handleTextUpdate = useCallback(
     (id: string, updates: Partial<TextElement>) => {
-      if (userRole === 'viewer') return;
+      if (engine.isReadOnly) return;
       const current = el.elementsRef.current.find((e) => e.id === id);
       if (!current) return;
       const updated = { ...current, ...updates } as DrawingElement;
-      el.updateElement(updated);
-      el.markUnsaved([id]);
-      rt.broadcastElementUpdated(updated);
+      engine.updateElements([current], [updated]);
     },
-    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+    [engine, el.elementsRef]
   );
 
   const handleTextDelete = useCallback(
@@ -1715,12 +1540,13 @@ export default function WhiteboardCanvasNew({
   /** Szybki update bez historii (podczas przeciągania) */
   const handleElementUpdate = useCallback(
     (id: string, updates: Partial<DrawingElement>) => {
-      if (userRole === 'viewer') return;
+      if (engine.isReadOnly) return;
       const current = el.elementsRef.current.find((e) => e.id === id);
       if (!current) return;
-      el.updateElement({ ...current, ...updates } as DrawingElement);
+      const updated = { ...current, ...updates } as DrawingElement;
+      engine.updateElements([current], [updated]);
     },
-    [userRole, el.elementsRef, el.updateElement]
+    [engine, el.elementsRef]
   );
 
   // Podpina handleElementUpdate do renderStateRef żeby redrawCanvas miał zawsze świeżą wersję
@@ -1763,8 +1589,6 @@ export default function WhiteboardCanvasNew({
           after.push(a);
         }
       }
-      // Commit tylko realnie zmienionych elementów — silnik robi persist + broadcast
-      // + zapis komendy (UpdateElementsCommand) + legacy snapshot.
       if (after.length > 0) engine.updateElements(before, after);
     },
     [engine, sel.selectedElementIdsRef]
@@ -1789,15 +1613,13 @@ export default function WhiteboardCanvasNew({
 
   const handleMarkdownContentChange = useCallback(
     (noteId: string, content: string) => {
-      if (userRole === 'viewer') return;
+      if (engine.isReadOnly) return;
       const current = el.elementsRef.current.find((e) => e.id === noteId);
       if (!current || current.type !== 'markdown') return;
       const updated = { ...current, content } as DrawingElement;
-      el.updateElement(updated);
-      el.markUnsaved([noteId]);
-      rt.broadcastElementUpdated(updated);
+      engine.updateElements([current], [updated]);
     },
-    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+    [engine, el.elementsRef]
   );
 
   const handleMarkdownEditStart = useCallback(
@@ -1816,7 +1638,7 @@ export default function WhiteboardCanvasNew({
 
   const handleTableCellChange = useCallback(
     (tableId: string, row: number, col: number, value: string) => {
-      if (userRole === 'viewer') return;
+      if (engine.isReadOnly) return;
       const current = el.elementsRef.current.find((e) => e.id === tableId);
       if (!current || current.type !== 'table') return;
       const table = current as TableElement;
@@ -1824,11 +1646,9 @@ export default function WhiteboardCanvasNew({
         ri === row ? r.map((c, ci) => (ci === col ? value : c)) : [...r]
       );
       const updated = { ...table, cells: newCells } as DrawingElement;
-      el.updateElement(updated);
-      el.markUnsaved([tableId]);
-      rt.broadcastElementUpdated(updated);
+      engine.updateElements([current], [updated]);
     },
-    [userRole, el.elementsRef, el.updateElement, el.markUnsaved, rt.broadcastElementUpdated]
+    [engine, el.elementsRef]
   );
 
   /** Przechodzi do następnej komórki tabeli (Tab) lub zamyka edytor (Enter/Escape) */

@@ -17,18 +17,17 @@ export interface UseYjsSyncOptions {
   doc: Y.Doc;
   boardId: string;
   userId: number | null;
-  enabled: boolean;
 }
 
 export interface UseYjsSyncResult {
   isConnected: boolean;
 }
 
-export function useYjsSync({ doc, boardId, userId, enabled }: UseYjsSyncOptions): UseYjsSyncResult {
+export function useYjsSync({ doc, boardId, userId }: UseYjsSyncOptions): UseYjsSyncResult {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    if (!enabled || !boardId || !userId) return;
+    if (!boardId || !userId) return;
 
     const provider = new HocuspocusProvider({
       url: WHITEBOARD_SYNC_URL,
@@ -45,7 +44,7 @@ export function useYjsSync({ doc, boardId, userId, enabled }: UseYjsSyncOptions)
       provider.destroy();
       setIsConnected(false);
     };
-  }, [doc, boardId, userId, enabled]);
+  }, [doc, boardId, userId]);
 
   return { isConnected };
 }
