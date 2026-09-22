@@ -83,21 +83,20 @@ Razem ~2.6 tys. linii łącznie z testami i komentarzami (vs ~27 tys. obecnego s
 | `updateScene` bez `captureUpdate: NEVER` | zdalne zmiany wpadają do lokalnego undo                                                       | błąd   |
 
 Wniosek: nie ma utrzymywanego gotowca. Sam „gotowiec" ma ~2 pliki, a jego sedno robi Excalidraw
-sam: **`reconcileElements`** (eksportowane z pakietu) + `updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })`
+sam: **`reconcileElements`** (eksportowane z pakietu), `updateScene({ elements, captureUpdate: CaptureUpdateAction.NEVER })`
+oraz `collaborators` w `updateScene` — dokładnie tak działa oficjalna kolaboracja (excalidraw-app/collab).
+Nasze wiązanie (`yjs/excalidraw-binding.ts`, 170 linii z komentarzami):
 
-- `collaborators` w `updateScene` — dokładnie tak działa oficjalna kolaboracja (excalidraw-app/collab).
-  Nasze wiązanie (`yjs/excalidraw-binding.ts`, 170 linii z komentarzami):
-
-* `Y.Map<id, element JSON>` — jeden wpis na element (Excalidraw traktuje element jako niemutowalną całość
+- `Y.Map<id, element JSON>` — jeden wpis na element (Excalidraw traktuje element jako niemutowalną całość
   z `version`/`versionNonce`; granularność per pole nic nie daje, a kosztuje).
-* lokalne -> Y.Doc: `onChange` (throttle 50 ms) -> zapis tylko elementów z nowszą `version` (echo po
+- lokalne -> Y.Doc: `onChange` (throttle 50 ms) -> zapis tylko elementów z nowszą `version` (echo po
   `updateScene` nie generuje zapisów — pokryte testem).
-* Y.Doc -> lokalne: `observe` tylko dla transakcji z obcym `origin` -> `reconcileElements` -> `updateScene(NEVER)`.
-* Usunięcia = `isDeleted: true` (tombstone, jak w Excalidraw); `gcDeleted(olderThanMs)` do sprzątania.
-* Pliki (obrazy, SVG wykresów) w osobnej `Y.Map<fileId, BinaryFileData>`; `addFiles` po stronie odbiorcy.
-* Awareness (`y-protocols`): `{user, pointer, button, selectedElementIds}` -> `updateScene({collaborators})`;
+- Y.Doc -> lokalne: `observe` tylko dla transakcji z obcym `origin` -> `reconcileElements` -> `updateScene(NEVER)`.
+- Usunięcia = `isDeleted: true` (tombstone, jak w Excalidraw); `gcDeleted(olderThanMs)` do sprzątania.
+- Pliki (obrazy, SVG wykresów) w osobnej `Y.Map<fileId, BinaryFileData>`; `addFiles` po stronie odbiorcy.
+- Awareness (`y-protocols`): `{user, pointer, button, selectedElementIds}` -> `updateScene({collaborators})`;
   Excalidraw sam rysuje kursory z nazwą i listę osób.
-* Undo/redo: natywne Excalidraw (lokalne, „cofnij tylko moje") — zdalne zmiany są poza historią dzięki `NEVER`.
+- Undo/redo: natywne Excalidraw (lokalne, „cofnij tylko moje") — zdalne zmiany są poza historią dzięki `NEVER`.
   Nie używamy `Y.UndoManager` — to celowe, bo Excalidraw ma własny model historii oparty o `Store`.
 
 Transport: `@hocuspocus/provider` (już w deps repo, ten sam co w `whiteboard-sync`) + `y-indexeddb`
