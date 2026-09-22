@@ -25,7 +25,6 @@ export default function BasicInfo({ user }: BasicInfoProps) {
 
   const handleSave = () => {
     // TODO: Zapisywanie firstName, lastName, email (wymaga odpowiedniego endpointu)
-    console.log('Saving user data:', formData);
     setIsEditing(false);
   };
 

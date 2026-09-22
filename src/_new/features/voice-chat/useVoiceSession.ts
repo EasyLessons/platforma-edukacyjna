@@ -14,6 +14,9 @@ import {
 } from './mediaSupport';
 import { closePeerConnection } from './remote-audio';
 import { startConnectionWatchdog } from './connection-watchdog';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/useVoiceSession');
 
 interface Deps {
   user: { id: number; username: string } | null;
@@ -156,7 +159,7 @@ export function useVoiceSession(d: Deps) {
     //    brak https albo brak API - komunikat od razu, bez otwierania kanalu.
     const supportIssue = getVoiceSupportIssue();
     if (supportIssue) {
-      console.warn(`🎤 [VOICE] Czat głosowy niedostępny: ${supportIssue.code}`);
+      log.warn(`Czat głosowy niedostępny: ${supportIssue.code}`);
       setVoiceError(supportIssue);
       return false;
     }
@@ -166,7 +169,7 @@ export function useVoiceSession(d: Deps) {
 
     try {
       // CLEAN START - wyczysc WSZYSTKO przed dolaczeniem
-      console.log('🎤 [VOICE] 🧹 Clean start - czyszczę wszystkie poprzednie połączenia...');
+      log.info('🧹 Clean start - czyszczę wszystkie poprzednie połączenia...');
       peerConnectionsRef.current.forEach((peerConn) => closePeerConnection(peerConn));
       peerConnectionsRef.current.clear();
       clearConnectionBookkeeping();
@@ -191,7 +194,7 @@ export function useVoiceSession(d: Deps) {
           },
         });
       } catch (error) {
-        console.error('🎤 [VOICE] Błąd dostępu do mikrofonu:', error);
+        log.error('Błąd dostępu do mikrofonu:', error);
         setVoiceError(mapGetUserMediaError(error));
         return false;
       }
@@ -201,20 +204,20 @@ export function useVoiceSession(d: Deps) {
       // 3) Kanal sygnalizacji (czekamy na SUBSCRIBED)
       const channel = await setupVoiceChannel();
       if (!channel) {
-        console.error('🎤 [VOICE] Nie można utworzyć kanału voice');
+        log.error('Nie można utworzyć kanału voice');
         abortJoin();
         setVoiceError(makeVoiceError('channel-failed'));
         return false;
       }
-      console.log('🎤 [VOICE] ✅ Kanał voice gotowy, kontynuuję...');
+      log.info('✅ Kanał voice gotowy, kontynuuję...');
 
       const audioTrack = stream.getAudioTracks()[0];
       if (audioTrack) {
         // Jesli push-to-talk, wycisz na start
         audioTrack.enabled = !settings.pushToTalk;
         // Diagnostyka echa: co ZAZADALISMY vs co przegladarka FAKTYCZNIE ustawila
-        console.log(`🎤 [VOICE] Audio track constraints:`, audioTrack.getConstraints());
-        console.log(`🎤 [VOICE] Audio track settings:`, audioTrack.getSettings?.());
+        log.debug(`Audio track constraints:`, audioTrack.getConstraints());
+        log.debug(`Audio track settings:`, audioTrack.getSettings?.());
       }
 
       setIsInVoiceChat(true);
@@ -236,19 +239,19 @@ export function useVoiceSession(d: Deps) {
       // 5) request-sync po 0,5 s i 2 s (backup); po 5 s tylko gdy nadal brak polaczen P2P
       setTimeout(() => {
         if (isInVoiceChatRef.current) {
-          console.log('🎤 [VOICE] Wysyłam voice-request-sync...');
+          log.info('Wysyłam voice-request-sync...');
           sendSelf('voice-request-sync');
         }
       }, 500);
       setTimeout(() => {
         if (isInVoiceChatRef.current) {
-          console.log('🎤 [VOICE] Backup voice-request-sync...');
+          log.info('Backup voice-request-sync...');
           sendSelf('voice-request-sync');
         }
       }, 2000);
       setTimeout(() => {
         if (isInVoiceChatRef.current && peerConnectionsRef.current.size === 0) {
-          console.log('🎤 [VOICE] ⚠️ Brak połączeń P2P - wysyłam force request-sync');
+          log.info('⚠️ Brak połączeń P2P - wysyłam force request-sync');
           sendSelf('voice-request-sync');
         }
       }, 5000);
@@ -265,10 +268,10 @@ export function useVoiceSession(d: Deps) {
         createPeerConnection,
       });
 
-      console.log('🎤 [VOICE] Dołączono do voice chat!');
+      log.info('Dołączono do voice chat!');
       return true;
     } catch (error) {
-      console.error('🎤 [VOICE] Błąd dołączania do voice chat:', error);
+      log.error('Błąd dołączania do voice chat:', error);
       abortJoin();
       setVoiceError(makeVoiceError('unknown'));
       return false;
@@ -303,7 +306,7 @@ export function useVoiceSession(d: Deps) {
   const leaveVoiceChat = useCallback(() => {
     if (!user) return;
 
-    console.log('🎤 [VOICE] Opuszczam voice chat');
+    log.info('Opuszczam voice chat');
 
     stopWatchdog();
     peerConnectionsRef.current.forEach((_peerConn, userId) => cleanupUserConnections(userId));
@@ -319,7 +322,7 @@ export function useVoiceSession(d: Deps) {
     channelRef.current = null;
     if (channelToClose) {
       setTimeout(() => {
-        console.log('🎤 [VOICE] Czyszczę kanał voice po opuszczeniu');
+        log.info('Czyszczę kanał voice po opuszczeniu');
         channelToClose.unsubscribe();
       }, 100);
     }

@@ -41,6 +41,9 @@ import {
 } from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('whiteboard/page');
 
 const DEFAULT_BOARD_SETTINGS: BoardSettings = {
   ai_enabled: true,
@@ -94,9 +97,9 @@ export function TablicaContent() {
       }
     }
 
-    console.log('📋 Board ID:', id);
+    log.debug('Board ID:', id);
     if (arkusz) {
-      console.log('📄 Arkusz path:', arkusz);
+      log.debug('Arkusz path:', arkusz);
     }
 
     // Pobierz dane tablicy z bazy
@@ -120,8 +123,7 @@ export function TablicaContent() {
           import('@/_new/features/board/utils/recentBoards').then(({ addRecentBoard }) =>
             addRecentBoard(board)
           );
-          console.log('✅ Załadowano dane tablicy:', board.name);
-          console.log('📦 Workspace ID:', board.workspace_id);
+          log.info('Załadowano dane tablicy, workspace ID:', board.workspace_id);
         } else {
           console.warn('⚠️ fetchBoardById zwróciło null dla tablicy', numericId);
         }
@@ -153,12 +155,12 @@ export function TablicaContent() {
         try {
           const roleData = await getMyRole(workspaceId);
           setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
-          console.log('👤 Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
+          log.info('Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
         } catch (error) {
           console.error('❌ Błąd pobierania roli:', error);
           // Domyślnie editor jeśli nie ma tokenu
           setUserRole('editor');
-          console.log('⚠️ Ustawiono domyślną rolę: editor (brak tokenu)');
+          log.info('Ustawiono domyślną rolę: editor (brak tokenu)');
         }
       }
     };
@@ -183,19 +185,19 @@ export function TablicaContent() {
           filter: `workspace_id=eq.${workspaceId}`,
         },
         async (payload: any) => {
-          console.log('🔄 Zmiana roli workspace member:', payload);
-          console.log('📊 Payload old:', payload.old, '| new:', payload.new);
+          // Sam typ zdarzenia - wiersz workspace_members nie ma trafiac do konsoli.
+          log.debug('Zmiana roli workspace member, zdarzenie:', payload.eventType);
 
           // Odśwież rolę (API zwraca tylko rolę dla aktualnego użytkownika)
           try {
             const roleData = await getMyRole(workspaceId);
             const oldRole = userRole;
             setUserRole(roleData.role as 'owner' | 'editor' | 'viewer');
-            console.log('✅ Zaktualizowano rolę z', oldRole, '→', roleData.role);
+            log.info('Zaktualizowano rolę z', oldRole, '→', roleData.role);
 
             // Reload strony jeśli rola się zmieniła na viewer (dla pewności)
             if (roleData.role === 'viewer' && oldRole !== 'viewer') {
-              console.log('🔄 Rola zmieniona na viewer - przeładowanie strony...');
+              log.info('Rola zmieniona na viewer - przeładowanie strony...');
               setTimeout(() => window.location.reload(), 500);
             }
           } catch (error) {

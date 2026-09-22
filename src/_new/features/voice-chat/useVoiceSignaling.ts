@@ -2,6 +2,9 @@ import { useCallback, MutableRefObject, useRef, useEffect } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '@/_new/lib/supabase/client';
 import { VoiceParticipant, VoiceEvent, PeerConnection } from './types';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/useVoiceSignaling');
 
 export function useVoiceSignaling(
   boardId: string | null,
@@ -46,7 +49,7 @@ export function useVoiceSignaling(
         return;
       }
 
-      console.log(`🎤 [VOICE] Tworzę kanał voice:${boardId}`);
+      log.info(`Tworzę kanał voice:${boardId}`);
 
       const channel = supabase.channel(`voice:${boardId}`, {
         config: {
@@ -59,12 +62,12 @@ export function useVoiceSignaling(
           const { userId, username } = payload as VoiceEvent & { type: 'voice-join' };
           if (userId === user.id) return;
 
-          console.log(`🎤 [VOICE] ${username} dołączył do voice chat`);
+          log.info(`${username} dołączył do voice chat`);
 
           // 🧹 ZAWSZE czyść istniejące połączenia tego użytkownika
           const existingConn = peerConnectionsRef.current.get(userId);
           if (existingConn) {
-            console.log(`🎤 [VOICE] 🧹 Czyszczę stare połączenie z ${username} przed nowym`);
+            log.info(`🧹 Czyszczę stare połączenie z ${username} przed nowym`);
             if (existingConn.audioElement) {
               existingConn.audioElement.pause();
               existingConn.audioElement.srcObject = null;
@@ -97,7 +100,7 @@ export function useVoiceSignaling(
           if (isInVoiceChatRef.current && localStreamRef.current) {
             // Małe opóźnienie żeby cleanup się zakończył
             setTimeout(() => {
-              console.log(`🎤 [VOICE] Wysyłam voice-sync do ${username}`);
+              log.info(`Wysyłam voice-sync do ${username}`);
 
               // Odpowiedz że my też jesteśmy w voice chat
               channel.send({
@@ -133,7 +136,7 @@ export function useVoiceSignaling(
           }
           lastSyncTimeRef.current.set(userId, now);
 
-          console.log(`🎤 [VOICE] Otrzymano voice-sync od ${username} (muted: ${remoteMuted})`);
+          log.info(`Otrzymano voice-sync od ${username} (muted: ${remoteMuted})`);
 
           // Dodaj do listy uczestników jeśli jeszcze nie ma lub aktualizuj
           setParticipants((prev) => {
@@ -196,7 +199,7 @@ export function useVoiceSignaling(
           const { userId } = payload as VoiceEvent & { type: 'voice-leave' };
           if (userId === user.id) return;
 
-          console.log(`🎤 [VOICE] User ${userId} opuścił voice chat`);
+          log.info(`User ${userId} opuścił voice chat`);
           cleanupUserConnections(userId);
           clearPendingIce(userId);
         })
@@ -239,11 +242,11 @@ export function useVoiceSignaling(
         })
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            console.log(`🎤 [VOICE] ✅ Kanał voice:${boardId} SUBSCRIBED`);
+            log.info(`✅ Kanał voice:${boardId} SUBSCRIBED`);
             channelRef.current = channel;
             resolve(channel);
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.error(`🎤 [VOICE] ❌ Kanał voice błąd: ${status}`);
+            log.error(`❌ Kanał voice błąd: ${status}`);
             // Nie zostawiaj subskrypcji po nieudanym dolaczeniu.
             channel.unsubscribe();
             resolve(null);
@@ -267,11 +270,11 @@ export function useVoiceSignaling(
     // Jeśli boardId się zmienił i byliśmy w voice chat - opuść
     if (prevBoardIdRef.current !== boardId && prevBoardIdRef.current !== null) {
       if (isInVoiceChatRef.current) {
-        console.log('🎤 [VOICE] BoardId się zmienił - opuszczam voice chat');
+        log.info('BoardId się zmienił - opuszczam voice chat');
         leaveVoiceChatRef.current?.();
       } else if (channelRef.current) {
         // Nie byliśmy w voice chat ale kanał istnieje - wyczyść
-        console.log('🎤 [VOICE] Czyszczę kanał voice przy zmianie boardId');
+        log.info('Czyszczę kanał voice przy zmianie boardId');
         channelRef.current.unsubscribe();
         channelRef.current = null;
       }

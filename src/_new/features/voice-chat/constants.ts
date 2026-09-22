@@ -1,4 +1,7 @@
 import { VoiceSettings } from './types';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('voice-chat/constants');
 
 export const DEFAULT_SETTINGS: VoiceSettings = {
   microphoneVolume: 1,
@@ -39,7 +42,7 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
 
   if (xirsysIdent && xirsysSecret && xirsysChannel) {
     try {
-      console.log('🎤 [VOICE] 🔍 Pobieram serwery TURN z Xirsys API...');
+      log.info('🔍 Pobieram serwery TURN z Xirsys API...');
 
       const auth = btoa(`${xirsysIdent}:${xirsysSecret}`);
 
@@ -54,8 +57,8 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('🎤 [VOICE] ✅ Xirsys API response:', data);
-        console.log('🎤 [VOICE] 📊 data.v struktura:', JSON.stringify(data.v, null, 2));
+        // Nie logujemy calej odpowiedzi ani data.v - zawieraja login/haslo TURN.
+        log.debug('Xirsys API status:', data.s, '| typ data.v:', typeof data.v);
 
         if (data.s === 'ok' && data.v) {
           // Xirsys API może zwracać różne formaty
@@ -63,17 +66,17 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
 
           if (data.v.iceServers && Array.isArray(data.v.iceServers)) {
             // Format 1: { v: { iceServers: [...] } }
-            console.log('🎤 [VOICE] 📋 Format: v.iceServers array');
+            log.debug('Format: v.iceServers array');
             xirsysServers = data.v.iceServers;
           } else if (Array.isArray(data.v)) {
             // Format 2: { v: [...] } - bezpośrednio array
-            console.log('🎤 [VOICE] 📋 Format: v jest array');
+            log.debug('Format: v jest array');
             xirsysServers = data.v;
           } else if (typeof data.v === 'object') {
             // Format 3: może być { v: { stun: [...], turn: [...] } }
-            console.log('🎤 [VOICE] 📋 Format: v jest object, sprawdzam właściwości');
+            log.debug('Format: v jest object, sprawdzam właściwości');
             const vKeys = Object.keys(data.v);
-            console.log('🎤 [VOICE] 🔑 Klucze w data.v:', vKeys);
+            log.debug('Klucze w data.v:', vKeys);
 
             // Spróbuj różnych kluczy
             if (data.v.stun && data.v.turn) {
@@ -89,7 +92,7 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
                 xirsysData.username &&
                 xirsysData.credential
               ) {
-                console.log('🎤 [VOICE] 🎯 Konwertuję format Xirsys na RTCIceServer');
+                log.info('🎯 Konwertuję format Xirsys na RTCIceServer');
 
                 // Przekształć format Xirsys: { username, urls[], credential }
                 // Na standardowy: [{ urls: url1, username, credential }, { urls: url2, username, credential }]
@@ -99,7 +102,7 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
                   credential: xirsysData.credential,
                 }));
 
-                console.log('🎤 [VOICE] ✅ Przekształcono Xirsys serwery:', xirsysServers.length);
+                log.info('✅ Przekształcono Xirsys serwery:', xirsysServers.length);
               }
             } else {
               // Ostatnia próba - może to są bezpośrednio serwery ICE
@@ -110,30 +113,32 @@ export const getIceServers = async (): Promise<RTCIceServer[]> => {
             }
           }
 
-          console.log('🎤 [VOICE] 🎯 Xirsys servers do dodania:', xirsysServers);
+          // Tylko liczba - wpisy zawieraja credential TURN.
+          const xirsysCount = Array.isArray(xirsysServers) ? xirsysServers.length : -1;
+          log.debug('Xirsys serwery do dodania:', xirsysCount);
 
           if (Array.isArray(xirsysServers) && xirsysServers.length > 0) {
-            console.log('🎤 [VOICE] ✅ Dodaję serwery Xirsys:', xirsysServers.length);
+            log.info('✅ Dodaję serwery Xirsys:', xirsysServers.length);
             servers.push(...xirsysServers);
             return servers;
           } else {
-            console.error('🎤 [VOICE] ❌ Nie mogę sparsować Xirsys serwerów:', xirsysServers);
+            log.error('❌ Nie mogę sparsować Xirsys serwerów (typ:', typeof xirsysServers, ')');
           }
         } else {
-          console.error('🎤 [VOICE] ❌ Xirsys API error:', data);
+          log.error('❌ Xirsys API error, status:', data?.s);
         }
       } else {
-        console.error('🎤 [VOICE] ❌ Xirsys API HTTP error:', response.status, response.statusText);
+        log.error('❌ Xirsys API HTTP error:', response.status, response.statusText);
       }
     } catch (error) {
-      console.error('🎤 [VOICE] ❌ Xirsys API fetch error:', error);
+      log.error('❌ Xirsys API fetch error:', error);
     }
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
   // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
   // ═══════════════════════════════════════════════════════════════════════════
-  console.log('🎤 [VOICE] ⚠️ Używam fallback TURN serwerów');
+  log.info('⚠️ Używam fallback TURN serwerów');
   // numb.viagenie.ca usuniety 17.09.2026: domena nie ma juz rekordu DNS, a martwy
   // serwer TURN tylko wydluzal zbieranie kandydatow ICE.
   servers.push(
