@@ -19,7 +19,10 @@ import {
   isPointInBoundingBox,
   isPointInElement,
   findTopmostElementAt,
-  findFirstElementAt,
+  distancePointToSegment,
+  distancePointToPolyline,
+  lineHitTolerance,
+  MIN_LINE_HIT_PX,
   selectionRectFromPoints,
   elementIntersectsSelectionRect,
   getElementIdsInSelectionRect,
@@ -146,12 +149,131 @@ describe('hit-testing', () => {
     ).toBe(false);
   });
 
-  it('findTopmostElementAt bierze ostatni z tablicy, findFirstElementAt pierwszy', () => {
+  it('findTopmostElementAt: przy kilku trafieniach wygrywa ostatni z tablicy (najwyzej)', () => {
     const a = shape('a', 0, 0, 2, 2);
     const b = shape('b', 0, 0, 2, 2);
     expect(findTopmostElementAt({ x: 1, y: 1 }, [a, b])?.id).toBe('b');
-    expect(findFirstElementAt({ x: 1, y: 1 }, [a, b])?.id).toBe('a');
+    expect(findTopmostElementAt({ x: 1, y: 1 }, [b, a])?.id).toBe('a');
     expect(findTopmostElementAt({ x: 9, y: 9 }, [a, b])).toBeNull();
+  });
+
+  it('distancePointToSegment: rzut na odcinek, poza koncami - odleglosc do konca, odcinek zdegenerowany', () => {
+    const a = { x: 0, y: 0 };
+    const b = { x: 10, y: 0 };
+    expect(distancePointToSegment({ x: 5, y: 3 }, a, b)).toBeCloseTo(3);
+    expect(distancePointToSegment({ x: 14, y: 3 }, a, b)).toBeCloseTo(5); // do (10,0)
+    expect(distancePointToSegment({ x: -3, y: 4 }, a, b)).toBeCloseTo(5); // do (0,0)
+    expect(distancePointToSegment({ x: 3, y: 4 }, a, a)).toBeCloseTo(5);
+  });
+
+  it('distancePointToPolyline: minimum po odcinkach; jeden punkt = kropka; pusta = Infinity', () => {
+    const poly = [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+    ];
+    expect(distancePointToPolyline({ x: 12, y: 5 }, poly)).toBeCloseTo(2);
+    expect(distancePointToPolyline({ x: 3, y: 4 }, [{ x: 0, y: 0 }])).toBeCloseTo(5);
+    expect(distancePointToPolyline({ x: 0, y: 0 }, [])).toBe(Infinity);
+  });
+
+  it('lineHitTolerance: max(polowa grubosci, 4 px) przeliczone na jednostki swiata wg zoomu', () => {
+    // zoom 1: 100 px = 1 jednostka; kreska 2 px -> polowa 1 px < 4 px -> 0.04
+    expect(lineHitTolerance(2, 1)).toBeCloseTo(MIN_LINE_HIT_PX / 100);
+    // gruba kreska 20 px -> polowa 10 px -> 0.1
+    expect(lineHitTolerance(20, 1)).toBeCloseTo(0.1);
+    // zoom 2: te same 4 px ekranu to o polowe mniej jednostek swiata
+    expect(lineHitTolerance(2, 2)).toBeCloseTo(MIN_LINE_HIT_PX / 200);
+    // zoom 0.5: cienka kreska - 4 px ekranu = 0.08 jednostki
+    expect(lineHitTolerance(2, 0.5)).toBeCloseTo(0.08);
+    expect(lineHitTolerance(2, 0)).toBeCloseTo(lineHitTolerance(2, 1)); // zoom 0 -> jak 1
+  });
+
+  it('path: trafienie zalezy od zoomu (te same 4 px ekranu)', () => {
+    const p = path('p', [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    // 0.03 jednostki od kreski = 3 px przy zoom 1 (trafia), 1.5 px przy zoom 0.5 (trafia),
+    // 6 px przy zoom 2 (nie trafia)
+    expect(isPointInElement({ x: 0.5, y: 0.03 }, p, 1)).toBe(true);
+    expect(isPointInElement({ x: 0.5, y: 0.03 }, p, 0.5)).toBe(true);
+    expect(isPointInElement({ x: 0.5, y: 0.03 }, p, 2)).toBe(false);
+  });
+
+  it('path: pressure-sensitive widths poszerzaja trafienie; jeden punkt = kropka; pusta = brak', () => {
+    const thin = path('t', [
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
+    const thick: DrawingPath = { ...thin, widths: [30, 30] }; // polowa 15 px = 0.15
+    expect(isPointInElement({ x: 0.5, y: 0.1 }, thin)).toBe(false);
+    expect(isPointInElement({ x: 0.5, y: 0.1 }, thick)).toBe(true);
+    expect(isPointInElement({ x: 0.02, y: 0.02 }, path('d', [{ x: 0, y: 0 }]))).toBe(true);
+    expect(isPointInElement({ x: 0, y: 0 }, path('e', []))).toBe(false);
+  });
+
+  it('shape line/arrow: po odleglosci od odcinka, nie po bbox; strzalka takze po grocie', () => {
+    const line: Shape = { ...shape('l', 0, 0, 2, 2), shapeType: 'line', strokeWidth: 2 };
+    expect(isPointInElement({ x: 1, y: 1 }, line)).toBe(true); // na przekatnej
+    expect(isPointInElement({ x: 1.5, y: 0.5 }, line)).toBe(false); // w bbox, daleko od kreski
+    expect(isPointInElement({ x: 1, y: 1.03 }, line)).toBe(true); // ~2 px od kreski
+
+    const arrow: Shape = { ...line, id: 'a', shapeType: 'arrow' };
+    expect(isPointInElement({ x: 1.5, y: 0.5 }, arrow)).toBe(false);
+    // grot: 15 px = 0.15 jednostki od konca (2,2), ramie pod katem 45-30 = 15 stopni od osi X
+    // (w strone startu): koniec ramienia ~ (2 - 0.15*cos15, 2 - 0.15*sin15) = (1.855, 1.961)
+    expect(isPointInElement({ x: 1.86, y: 1.96 }, arrow)).toBe(true);
+    expect(isPointInElement({ x: 1.86, y: 1.96 }, line)).toBe(false); // linia bez grotu
+
+    // prostokat/kolo: nadal wnetrze po bbox (bez zmian)
+    expect(isPointInElement({ x: 1.5, y: 0.5 }, shape('r', 0, 0, 2, 2))).toBe(true);
+  });
+
+  it('REGRESJA ramka (marquee): sciezka nadal wpada po bbox (podglad) i po punktach (final)', () => {
+    // kolko o promieniu 1; ramka w srodku, daleko od kreski i bez zadnego punktu
+    const c = path(
+      'c',
+      Array.from({ length: 33 }, (_, i) => {
+        const a = (i / 32) * Math.PI * 2;
+        return { x: Math.cos(a), y: Math.sin(a) };
+      })
+    );
+    const inside = { minX: -0.2, minY: -0.2, maxX: 0.2, maxY: 0.2 };
+    expect(elementIntersectsSelectionRect(c, inside, 'bbox')).toBe(true);
+    expect(elementIntersectsSelectionRect(c, inside, 'points')).toBe(false);
+    // ramka lapiaca fragment kreski: oba tryby
+    const onStroke = { minX: 0.9, minY: -0.1, maxX: 1.1, maxY: 0.1 };
+    expect(elementIntersectsSelectionRect(c, onStroke, 'bbox')).toBe(true);
+    expect(elementIntersectsSelectionRect(c, onStroke, 'points')).toBe(true);
+    expect([...getElementIdsInSelectionRect([c], inside, 'bbox')]).toEqual(['c']);
+    expect([...getElementIdsInSelectionRect([c], inside, 'points')]).toEqual([]);
+  });
+
+  describe('trafienie w sciezke (path) - po odleglosci od kreski, nie po bbox', () => {
+    /** Kolko z dlugopisu: 32 punkty na obwodzie o promieniu r wokol (cx, cy). */
+    const circle = (id: string, cx: number, cy: number, r: number): DrawingPath =>
+      path(
+        id,
+        Array.from({ length: 33 }, (_, i) => {
+          const a = (i / 32) * Math.PI * 2;
+          return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+        })
+      );
+
+    it('srodek kolka (wewnatrz bbox, daleko od kreski) NIE jest trafieniem', () => {
+      expect(isPointInElement({ x: 0, y: 0 }, circle('c', 0, 0, 1))).toBe(false);
+    });
+
+    it('punkt na kresce kolka jest trafieniem', () => {
+      expect(isPointInElement({ x: 1, y: 0 }, circle('c', 0, 0, 1))).toBe(true);
+    });
+
+    it('prostokat w srodku kolka narysowany wczesniej: klik w srodek trafia w prostokat', () => {
+      const inner = shape('rect', -0.2, -0.2, 0.2, 0.2);
+      const c = circle('circle', 0, 0, 1);
+      expect(findTopmostElementAt({ x: 0, y: 0 }, [inner, c])?.id).toBe('rect');
+    });
   });
 
   it('selectionRectFromPoints normalizuje rogi', () => {

@@ -14,6 +14,8 @@
  * - pivot resize = ORYGINALNY przeciwlegly rog, MIN_SIZE = 0.1,
  * - uchwyty e/w tylko dla text/markdown/image/table,
  * - podglad zaznaczenia: sciezka po bbox; finalne zaznaczenie: po punktach.
+ * Zmiana wzgledem oryginalu (fix zaznaczania): klik trafia w sciezki/linie po
+ * odleglosci od kreski, a przy kilku trafieniach wygrywa element najwyzej.
  * ============================================================================
  */
 
@@ -31,7 +33,6 @@ import {
 } from '@/_new/features/whiteboard/selection/snap-utils';
 import { ElementRegistry } from '@/_new/features/whiteboard/handlers/element-registry';
 import {
-  findFirstElementAt,
   findTopmostElementAt,
   getElementIdsInSelectionRect,
   isPointInBoundingBox,
@@ -415,7 +416,8 @@ export function SelectTool({
       }
     }
 
-    const clickedElement = findFirstElementAt(worldPoint, elements);
+    // Najwyzej narysowany element pod kursorem; sciezki/linie po odleglosci od kreski
+    const clickedElement = findTopmostElementAt(worldPoint, elements, viewport.scale);
 
     if (clickedElement) {
       let newSelection: Set<string>;
