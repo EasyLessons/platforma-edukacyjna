@@ -38,6 +38,22 @@ services:
     ports:
       - '6379:6379'
 
+  # PROTOTYP (gałąź proto/excalidraw-yjs): serwer Yjs bez auth dla /proto-excalidraw/*.
+  # Nie startuje domyślnie - tylko `docker compose --profile proto up proto-yjs`.
+  # Prościej lokalnie: `npm run proto:yjs` (ten sam skrypt, bez kontenera).
+  proto-yjs:
+    image: node:20-alpine
+    profiles: ['proto']
+    working_dir: /app
+    command: sh -c "npm ci --no-audit --no-fund --ignore-scripts && node scripts/proto-yjs-server.mjs"
+    ports:
+      - '1235:1235'
+    volumes:
+      - .:/app
+      - /app/node_modules
+    environment:
+      - PROTO_YJS_PORT=1235
+
   whiteboard-sync:
     build: ./whiteboard-sync
     ports:
