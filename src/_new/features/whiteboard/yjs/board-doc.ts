@@ -135,6 +135,14 @@ export function deleteElement(doc: Y.Doc, id: string, origin: TransactionOrigin)
   }, origin);
 }
 
+/** Usuwa wiele elementów w jednej transakcji (jedna pozycja undo). */
+export function deleteElements(doc: Y.Doc, ids: string[], origin: TransactionOrigin): void {
+  doc.transact(() => {
+    const elements = getElementsMap(doc);
+    for (const id of ids) elements.delete(id);
+  }, origin);
+}
+
 /** Zasiewa pusty doc z uporządkowanej tablicy (kolejność -> z-order).
  * Do ładowania z `GET /elements` i do testów. Czyści mapę na starcie.
  */

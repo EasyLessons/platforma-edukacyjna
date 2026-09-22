@@ -9,6 +9,7 @@ import {
   upsertElement,
   upsertElements,
   deleteElement,
+  deleteElements,
   hydrate,
 } from './board-doc';
 import type { DrawingPath, Shape, TextElement } from '../types';
@@ -114,6 +115,23 @@ describe('deleteElement', () => {
 
     expect(getElement(doc, 'a')).toBeNull();
     expect(getElements(doc).map((e) => e.id)).toEqual(['b']);
+  });
+});
+
+// deleteElements (batch)
+
+describe('deleteElements (batch)', () => {
+  it('usuwa wiele elementów w jednej transakcji (jedno cofnięcie)', () => {
+    const doc = createBoardDoc();
+    const um = new Y.UndoManager(getElementsMap(doc), { trackedOrigins: new Set(['user-1']) });
+    upsertElements(doc, [shape('a'), shape('b'), shape('c')], 'user-1');
+    um.stopCapturing(); // nowa transakcja poniżej ma być osobnym krokiem undo
+
+    deleteElements(doc, ['a', 'b', 'c'], 'user-1');
+    expect(getElements(doc)).toEqual([]);
+
+    um.undo();
+    expect(getElements(doc).map((e) => e.id)).toEqual(['a', 'b', 'c']);
   });
 });
 

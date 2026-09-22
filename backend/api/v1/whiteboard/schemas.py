@@ -1,6 +1,6 @@
 """Schemas dla modułu whiteboard (sesja tablicy)."""
 from datetime import datetime
-from typing import Optional, Any, Dict
+from typing import Optional
 from pydantic import BaseModel
 
 
@@ -17,31 +17,6 @@ class OnlineStatusResponse(BaseModel):
     status: str
     board_id: int
     user_id: int
-
-
-class BoardElement(BaseModel):
-    element_id: str
-    type: str
-    data: Dict[str, Any]
-
-
-class BoardElementWithAuthor(BaseModel):
-    element_id: str
-    type: str
-    data: Dict[str, Any]
-    created_by_id: Optional[int] = None
-    created_by_username: Optional[str] = None
-    created_at: Optional[datetime] = None
-
-
-class SaveElementsResponse(BaseModel):
-    success: bool
-    saved: int
-
-
-class DeleteElementResponse(BaseModel):
-    success: bool
-    message: str
 
 
 class UploadImageResponse(BaseModel):
