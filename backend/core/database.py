@@ -187,3 +187,32 @@ def get_db():
                 # Połączenie mogło zostać ubite zdalnie; ignorujemy przy cleanupie,
                 # bo i tak kończymy request.
                 logger.warning("DB session close failed: stale/closed SSL connection")
+
+
+# ============================================
+# HEALTH - lekki ping bazy (GET /api/v1/health)
+# ============================================
+#
+# get_db() ma retry ze sleepami (~1,5 s) i jako dependency FastAPI rzuca PRZED
+# wejściem do endpointu (=> generyczne 500 zamiast 503 z opisem). Health potrzebuje
+# JEDNEGO szybkiego pinga z własnym timeoutem, dlatego dostaje fabrykę sesji
+# (podmienialną w testach przez app.dependency_overrides[get_session_factory])
+# i woła ping_db() w wątku.
+#
+def get_session_factory() -> sessionmaker:
+    """Dependency FastAPI zwracające fabrykę sesji (SessionLocal). Do podmiany w testach."""
+    return SessionLocal
+
+
+def ping_db(session_factory: sessionmaker | None = None) -> None:
+    """
+    Jednorazowe SELECT 1 bez retry.
+
+    Rzuca wyjątek SQLAlchemy/psycopg2, gdy baza nie odpowiada - wywołujący
+    (health) sam decyduje, co z nim zrobić. Zawsze zamyka sesję.
+    """
+    db = (session_factory or SessionLocal)()
+    try:
+        db.execute(text("SELECT 1"))
+    finally:
+        db.close()
