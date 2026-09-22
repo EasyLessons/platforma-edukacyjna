@@ -154,6 +154,32 @@ describe('hit-testing', () => {
     expect(findTopmostElementAt({ x: 9, y: 9 }, [a, b])).toBeNull();
   });
 
+  describe('trafienie w sciezke (path) - po odleglosci od kreski, nie po bbox', () => {
+    /** Kolko z dlugopisu: 32 punkty na obwodzie o promieniu r wokol (cx, cy). */
+    const circle = (id: string, cx: number, cy: number, r: number): DrawingPath =>
+      path(
+        id,
+        Array.from({ length: 33 }, (_, i) => {
+          const a = (i / 32) * Math.PI * 2;
+          return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) };
+        })
+      );
+
+    it('srodek kolka (wewnatrz bbox, daleko od kreski) NIE jest trafieniem', () => {
+      expect(isPointInElement({ x: 0, y: 0 }, circle('c', 0, 0, 1))).toBe(false);
+    });
+
+    it('punkt na kresce kolka jest trafieniem', () => {
+      expect(isPointInElement({ x: 1, y: 0 }, circle('c', 0, 0, 1))).toBe(true);
+    });
+
+    it('prostokat w srodku kolka narysowany wczesniej: klik w srodek trafia w prostokat', () => {
+      const inner = shape('rect', -0.2, -0.2, 0.2, 0.2);
+      const c = circle('circle', 0, 0, 1);
+      expect(findTopmostElementAt({ x: 0, y: 0 }, [inner, c])?.id).toBe('rect');
+    });
+  });
+
   it('selectionRectFromPoints normalizuje rogi', () => {
     expect(selectionRectFromPoints({ x: 5, y: 1 }, { x: 1, y: 5 })).toEqual({
       minX: 1,
