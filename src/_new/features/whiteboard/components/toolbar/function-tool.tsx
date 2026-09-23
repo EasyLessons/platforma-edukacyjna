@@ -1,25 +1,21 @@
-﻿/**
+/**
  * ============================================================================
- * PLIK: src/app/tablica/toolbar/FunctionTool.tsx
+ * PLIK: components/toolbar/function-tool.tsx
  * ============================================================================
  *
  * IMPORTUJE Z:
  * - react (useState, useCallback, useRef, useEffect)
  * - ../whiteboard/types (ViewportTransform, FunctionPlot)
- * - ../whiteboard/viewport (transformPoint, zoomViewport, panViewportWithWheel, constrainViewport)
- * - ../whiteboard/utils (evaluateExpression)
+ * - navigation/viewport-math (zoomViewport, panViewportWithWheel, constrainViewport)
+ * - ./function-tool/function-plot (validateExpression, sampleFunctionPoints)
+ * - ./function-tool/plot-geometry (projectPointsToScreen, buildSvgPath)
+ * - ./function-tool/function-help-modal (FunctionHelpModal)
  *
  * EKSPORTUJE:
  * - FunctionTool (component) - narzędzie rysowania funkcji matematycznych
  *
  * UŻYWANE PRZEZ:
- * - WhiteboardCanvas.tsx (aktywne gdy tool === 'function')
- *
- * ⚠️ ZALEŻNOŚCI:
- * - types.ts - używa FunctionPlot
- * - viewport.ts - używa funkcji transformacji i zoom/pan
- * - utils.ts - używa evaluateExpression do parsowania wyrażeń
- * - WhiteboardCanvas.tsx - dostarcza callback'i: onFunctionCreate, onViewportChange
+ * - tools/function.tool.tsx (aktywne gdy tool === 'function')
  *
  * ⚠️ WAŻNE - WHEEL EVENTS:
  * - Overlay ma touchAction: 'none' - blokuje domyślny zoom przeglądarki
@@ -28,6 +24,7 @@
  *
  * PRZEZNACZENIE:
  * Rysowanie wykresów funkcji matematycznych z live preview i edycją parametrów.
+ * Czysta logika (walidacja, próbkowanie, geometria) leży w `./function-tool/`.
  * ============================================================================
  */
 
@@ -36,12 +33,13 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { ViewportTransform, FunctionPlot } from '@/_new/features/whiteboard/types';
 import {
-  transformPoint,
   zoomViewport,
   panViewportWithWheel,
   constrainViewport,
 } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { evaluateExpression } from '@/_new/features/whiteboard/elements/math-eval';
+import { validateExpression, sampleFunctionPoints } from './function-tool/function-plot';
+import { projectPointsToScreen, buildSvgPath } from './function-tool/plot-geometry';
+import { FunctionHelpModal } from './function-tool/function-help-modal';
 
 interface FunctionToolProps {
   viewport: ViewportTransform;
@@ -55,6 +53,13 @@ interface FunctionToolProps {
   onViewportChange?: (viewport: ViewportTransform) => void;
   isGestureActive?: boolean;
 }
+
+const VERTICAL_SLIDER_CLASS =
+  'hover:cursor-pointer absolute h-28 w-2 appearance-none bg-transparent cursor-default accent-blue-500';
+const VERTICAL_SLIDER_STYLE = {
+  writingMode: 'bt-lr' as any,
+  WebkitAppearance: 'slider-vertical',
+} as const;
 
 export function FunctionTool({
   viewport,
@@ -85,7 +90,7 @@ export function FunctionTool({
     }
   }, []);
 
-  // 🆕 Handler dla wheel event - obsługuje zoom i pan
+  // Handler dla wheel event - obsługuje zoom i pan
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (!onViewportChange) return;
@@ -114,33 +119,16 @@ export function FunctionTool({
     [viewport, canvasWidth, canvasHeight, onViewportChange]
   );
 
-  // Walidacja wyrażenia matematycznego
-  const validateExpression = useCallback((expr: string): boolean => {
-    if (!expr.trim()) {
-      setError('Wprowadź wyrażenie matematyczne');
-      return false;
-    }
-
-    try {
-      // Test na kilku punktach
-      for (let x = -10; x <= 10; x += 1) {
-        const y = evaluateExpression(expr, x);
-        if (!isFinite(y)) {
-          setError('Wyrażenie zwraca nieprawidłowe wartości');
-          return false;
-        }
-      }
-      setError(null);
-      return true;
-    } catch (e) {
-      setError('Nieprawidłowe wyrażenie matematyczne');
-      return false;
-    }
-  }, []);
+  const handleExpressionChange = (value: string) => {
+    setExpression(value);
+    setError(null);
+  };
 
   // Generuj funkcję
   const handleGenerate = useCallback(() => {
-    if (!validateExpression(expression)) return;
+    const validationError = validateExpression(expression);
+    setError(validationError);
+    if (validationError) return;
 
     const newFunction: FunctionPlot = {
       id: Date.now().toString(),
@@ -156,38 +144,17 @@ export function FunctionTool({
     onFunctionCreate(newFunction);
     setExpression(''); // Reset po dodaniu
     setError(null);
-  }, [expression, color, lineWidth, xRange, yRange, onFunctionCreate, validateExpression]);
+  }, [expression, color, lineWidth, xRange, yRange, onFunctionCreate]);
 
   // Renderuj live preview funkcji
   const renderPreview = () => {
     if (!expression.trim()) return null;
 
     try {
-      const points: { x: number; y: number }[] = [];
-      const step = 0.1;
-
-      for (let worldX = -xRange; worldX <= xRange; worldX += step) {
-        try {
-          const worldY = evaluateExpression(expression, worldX);
-          if (!isFinite(worldY) || Math.abs(worldY) > yRange) continue;
-
-          const screenPos = transformPoint(
-            { x: worldX, y: -worldY },
-            viewport,
-            canvasWidth,
-            canvasHeight
-          );
-          points.push(screenPos);
-        } catch (e) {
-          // Ignoruj punkty z błędami (np. log(-1))
-        }
-      }
-
-      if (points.length < 2) return null;
-
-      const pathData = points
-        .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
-        .join(' ');
+      const points = sampleFunctionPoints({ expression, xRange, yRange });
+      const screenPoints = projectPointsToScreen(points, viewport, canvasWidth, canvasHeight);
+      const pathData = buildSvgPath(screenPoints);
+      if (!pathData) return null;
 
       return (
         <svg
@@ -206,7 +173,7 @@ export function FunctionTool({
           />
         </svg>
       );
-    } catch (e) {
+    } catch {
       return null;
     }
   };
@@ -231,10 +198,7 @@ export function FunctionTool({
             ref={inputRef}
             type="text"
             value={expression}
-            onChange={(e) => {
-              setExpression(e.target.value);
-              setError(null);
-            }}
+            onChange={(e) => handleExpressionChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 handleGenerate();
@@ -268,11 +232,8 @@ export function FunctionTool({
                 max="100"
                 value={xRange}
                 onChange={(e) => setXRange(Number(e.target.value))}
-                className="hover:cursor-pointer absolute h-28 w-2 appearance-none bg-transparent cursor-default accent-blue-500"
-                style={{
-                  writingMode: 'bt-lr' as any,
-                  WebkitAppearance: 'slider-vertical',
-                }}
+                className={VERTICAL_SLIDER_CLASS}
+                style={VERTICAL_SLIDER_STYLE}
               />
             </div>
           </div>
@@ -290,11 +251,8 @@ export function FunctionTool({
                 max="100"
                 value={yRange}
                 onChange={(e) => setYRange(Number(e.target.value))}
-                className="hover:cursor-pointer absolute h-28 w-2 appearance-none bg-transparent cursor-default accent-blue-500"
-                style={{
-                  writingMode: 'bt-lr' as any,
-                  WebkitAppearance: 'slider-vertical',
-                }}
+                className={VERTICAL_SLIDER_CLASS}
+                style={VERTICAL_SLIDER_STYLE}
               />
             </div>
           </div>
@@ -312,11 +270,8 @@ export function FunctionTool({
                 max="8"
                 value={lineWidth}
                 onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                className="hover:cursor-pointer absolute h-28 w-2 appearance-none bg-transparent cursor-default accent-blue-500"
-                style={{
-                  writingMode: 'bt-lr' as any,
-                  WebkitAppearance: 'slider-vertical',
-                }}
+                className={VERTICAL_SLIDER_CLASS}
+                style={VERTICAL_SLIDER_STYLE}
               />
             </div>
             <div className="w-7 h-7 border border-gray-300 rounded-full flex items-center justify-center mt-2">
@@ -420,321 +375,21 @@ export function FunctionTool({
 
       {/* Modal pomocy */}
       {isHelpOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-[1000]"
-          onClick={() => setIsHelpOpen(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-2xl max-w-5xl w-full mx-4 max-h-[85vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header */}
-            <div className="sticky top-0 bg-blue-500 text-white px-8 py-5 rounded-t-lg flex items-center justify-between shadow-lg">
-              <h2 className="text-2xl font-bold">📐 Narzędzie Function - Przewodnik</h2>
-              <button
-                onClick={() => setIsHelpOpen(false)}
-                className="w-10 h-10 rounded-full bg-white bg-opacity-20 hover:bg-opacity-30 transition-colors flex items-center justify-center font-bold text-lg"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-8 space-y-8">
-              {/* Opis */}
-              <div>
-                <h3 className="text-2xl font-semibold text-black mb-3">Co to narzędzie robi?</h3>
-                <p className="text-black text-base leading-relaxed">
-                  Narzędzie <strong>Function</strong> pozwala rysować wykresy funkcji matematycznych
-                  na tablicy. Wpisz wyrażenie matematyczne (np.{' '}
-                  <code className="bg-gray-100 px-2 py-0.5 rounded text-black">sin(x)</code>),
-                  dostosuj zakres i kolory, a funkcja zostanie narysowana na wykresie kartezjańskim.
-                </p>
-              </div>
-
-              {/* Formularz do testowania */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border-2 border-blue-200">
-                <h3 className="text-2xl font-semibold text-black mb-4">🧪 Wypróbuj funkcję</h3>
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-black mb-2">
-                      Wyrażenie matematyczne:
-                    </label>
-                    <input
-                      type="text"
-                      value={expression}
-                      onChange={(e) => {
-                        setExpression(e.target.value);
-                        setError(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && expression.trim()) {
-                          handleGenerate();
-                          setIsHelpOpen(false);
-                        }
-                      }}
-                      placeholder="np. sin(x), x^2, sqrt(x)"
-                      className="w-full px-4 py-3 text-base text-black border-2 border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 transition-colors"
-                    />
-                    {error && <p className="text-red-600 text-sm mt-2 font-medium">⚠️ {error}</p>}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">
-                        Zakres X: ±{xRange}
-                      </label>
-                      <input
-                        type="range"
-                        min="5"
-                        max="50"
-                        value={xRange}
-                        onChange={(e) => setXRange(Number(e.target.value))}
-                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-black mb-2">
-                        Zakres Y: ±{yRange}
-                      </label>
-                      <input
-                        type="range"
-                        min="10"
-                        max="100"
-                        value={yRange}
-                        onChange={(e) => setYRange(Number(e.target.value))}
-                        className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm font-semibold text-black">Kolor:</label>
-                      <input
-                        type="color"
-                        value={color}
-                        onChange={(e) => onColorChange(e.target.value)}
-                        className="w-12 h-12 rounded border-2 border-gray-300 cursor-pointer hover:border-blue-400 transition-colors"
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 flex-1">
-                      <label className="text-sm font-semibold text-black">Grubość:</label>
-                      <input
-                        type="range"
-                        min="1"
-                        max="8"
-                        value={lineWidth}
-                        onChange={(e) => onLineWidthChange(Number(e.target.value))}
-                        className="flex-1 h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                      />
-                      <span className="text-sm text-black font-bold w-10 text-right">
-                        {lineWidth}px
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      handleGenerate();
-                      setIsHelpOpen(false);
-                    }}
-                    disabled={!expression.trim()}
-                    className="w-full px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-base font-semibold"
-                  >
-                    ➕ Dodaj funkcję do tablicy
-                  </button>
-                </div>
-              </div>
-
-              {/* Operatory */}
-              <div>
-                <h3 className="text-2xl font-semibold text-black mb-3">🔢 Operatory</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">+</code>
-                    <span className="text-black ml-3 text-base">Dodawanie</span>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">-</code>
-                    <span className="text-black ml-3 text-base">Odejmowanie</span>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">*</code>
-                    <span className="text-black ml-3 text-base">Mnożenie</span>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">/</code>
-                    <span className="text-black ml-3 text-base">Dzielenie</span>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">^</code>
-                    <span className="text-black ml-3 text-base">Potęgowanie</span>
-                  </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-600 text-lg">%</code>
-                    <span className="text-black ml-3 text-base">Reszta z dzielenia</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Funkcje matematyczne */}
-              <div>
-                <h3 className="text-3xl font-semibold text-black mb-4">📊 Funkcje matematyczne</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-700 text-2xl">sqrt(x)</code>
-                    <span className="text-black text-xl ml-3">Pierwiastek kwadratowy</span>
-                  </div>
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-blue-700 text-2xl">cbrt(x)</code>
-                    <span className="text-black text-xl ml-3">Pierwiastek sześcienny</span>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-green-700 text-2xl">sin(x)</code>
-                    <span className="text-black text-xl ml-3">Sinus</span>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-green-700 text-2xl">cos(x)</code>
-                    <span className="text-black text-xl ml-3">Cosinus</span>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-green-700 text-2xl">tan(x)</code>
-                    <span className="text-black text-xl ml-3">Tangens</span>
-                  </div>
-                  <div className="bg-green-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-green-700 text-2xl">asin(x)</code>
-                    <span className="text-black text-xl ml-3">Arcus sinus</span>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-purple-700 text-2xl">log(x)</code>
-                    <span className="text-black text-xl ml-3">Logarytm naturalny (ln)</span>
-                  </div>
-                  <div className="bg-purple-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-purple-700 text-2xl">log10(x)</code>
-                    <span className="text-black text-xl ml-3">Logarytm dziesiętny</span>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-orange-700 text-2xl">abs(x)</code>
-                    <span className="text-black text-xl ml-3">Wartość bezwzględna</span>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-orange-700 text-2xl">exp(x)</code>
-                    <span className="text-black text-xl ml-3">e^x</span>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-orange-700 text-2xl">ceil(x)</code>
-                    <span className="text-black text-xl ml-3">Zaokrąglenie w górę</span>
-                  </div>
-                  <div className="bg-orange-50 p-4 rounded-lg">
-                    <code className="font-mono font-bold text-orange-700 text-2xl">floor(x)</code>
-                    <span className="text-black text-xl ml-3">Zaokrąglenie w dół</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Stałe */}
-              <div>
-                <h3 className="text-3xl font-semibold text-black mb-4">🔣 Stałe matematyczne</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-yellow-50 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-yellow-700 text-2xl">pi</code>
-                    <span className="text-black ml-4 text-xl">π ≈ 3.14159...</span>
-                  </div>
-                  <div className="bg-yellow-50 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-yellow-700 text-2xl">e</code>
-                    <span className="text-black ml-4 text-xl">e ≈ 2.71828...</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Przykłady */}
-              <div>
-                <h3 className="text-3xl font-semibold text-black mb-4">✨ Przykłady wyrażeń</h3>
-                <div className="space-y-4">
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-blue-800 text-2xl">sin(x)</code>
-                    <span className="text-black ml-4 text-xl">- fala sinusoidalna</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-green-50 to-green-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-green-800 text-2xl">x^2</code>
-                    <span className="text-black ml-4 text-xl">- parabola</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-purple-800 text-2xl">sqrt(x)</code>
-                    <span className="text-black ml-4 text-xl">- pierwiastek kwadratowy</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-orange-800 text-2xl">
-                      2*sin(x) + cos(x)
-                    </code>
-                    <span className="text-black ml-4 text-xl">
-                      - kombinacja funkcji trygonometrycznych
-                    </span>
-                  </div>
-                  <div className="bg-gradient-to-r from-red-50 to-red-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-red-800 text-2xl">1/x</code>
-                    <span className="text-black ml-4 text-xl">- hiperbola</span>
-                  </div>
-                  <div className="bg-gradient-to-r from-pink-50 to-pink-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-pink-800 text-2xl">abs(x)</code>
-                    <span className="text-black ml-4 text-xl">
-                      - wartość bezwzględna (kształt V)
-                    </span>
-                  </div>
-                  <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 p-5 rounded-lg">
-                    <code className="font-mono font-bold text-indigo-800 text-2xl">log(x)</code>
-                    <span className="text-black ml-4 text-xl">- logarytm naturalny</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Wskazówki - zielone tło matematyczne */}
-              <div className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white p-8 rounded-xl shadow-lg">
-                <h3 className="text-3xl font-semibold mb-4 flex items-center gap-2">
-                  <span>💡</span>
-                  <span>Wskazówki</span>
-                </h3>
-                <ul className="space-y-3 text-xl">
-                  <li className="flex items-start gap-2">
-                    <span className="text-white font-bold">•</span>
-                    <span>
-                      Możesz łączyć funkcje:{' '}
-                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
-                        sin(x^2)
-                      </code>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-white font-bold">•</span>
-                    <span>
-                      Automatyczne mnożenie działa:{' '}
-                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
-                        2x
-                      </code>{' '}
-                      ={' '}
-                      <code className="bg-white bg-opacity-20 px-2 py-1 rounded text-white font-mono">
-                        2*x
-                      </code>
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-white font-bold">•</span>
-                    <span>Użyj suwaków do dostosowania zakresu widocznego wykresu</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-white font-bold">•</span>
-                    <span>Live preview pokazuje jak będzie wyglądał wykres przed dodaniem</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-white font-bold">•</span>
-                    <span>Scroll + Ctrl - zoom in/out, Scroll - przesuwanie w pionie</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
+        <FunctionHelpModal
+          expression={expression}
+          error={error}
+          xRange={xRange}
+          yRange={yRange}
+          color={color}
+          lineWidth={lineWidth}
+          onExpressionChange={handleExpressionChange}
+          onXRangeChange={setXRange}
+          onYRangeChange={setYRange}
+          onColorChange={onColorChange}
+          onLineWidthChange={onLineWidthChange}
+          onGenerate={handleGenerate}
+          onClose={() => setIsHelpOpen(false)}
+        />
       )}
     </div>
   );
