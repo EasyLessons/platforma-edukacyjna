@@ -166,15 +166,18 @@ interface BoardHistoryBinding {
 /** Pusta, stabilna referencja */
 const EMPTY_UNSAVED_SET = new Set<string>();
 
-function adaptYjsElements(board: UseYjsBoardReturn): BoardElementsBinding {
+function adaptYjsElements(
+  board: UseYjsBoardReturn,
+  loading: { isLoading: boolean; progress: number }
+): BoardElementsBinding {
   return {
     elements: board.elements,
     elementsRef: board.elementsRef,
     spatialIndex: board.spatialIndex,
     loadedImages: board.loadedImages,
     elementsWithAuthor: board.elementsWithAuthor,
-    isLoading: false,
-    loadingProgress: 100,
+    isLoading: loading.isLoading,
+    loadingProgress: loading.progress,
     isSaving: false,
     unsavedElements: EMPTY_UNSAVED_SET,
     loadImage: board.loadImage,
@@ -367,17 +370,28 @@ export default function WhiteboardCanvasNew({
   const sel = useSelection();
 
   // ─── HOOK: yjs ─────────────────────────────────────────────────────────────
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const yjsBoard = useYjsBoard({ userId: user?.id ?? null, username: user?.username ?? null });
-  const el: BoardElementsBinding = adaptYjsElements(yjsBoard);
   const hist: BoardHistoryBinding = adaptYjsHistory(yjsBoard);
 
   // Live transport + persystencja (Hocuspocus)
-  useYjsSync({
+  const yjsSync = useYjsSync({
     doc: yjsBoard.doc,
     boardId,
     userId: user?.id ?? null,
   });
+
+  // Overlay do pierwszej synchronizacji.
+  const isSyncExpected =
+    Boolean(boardId) && !Number.isNaN(Number(boardId)) && (authLoading || user != null);
+  const el: BoardElementsBinding = adaptYjsElements(yjsBoard, {
+    isLoading: isSyncExpected && !yjsSync.hasSynced && !yjsSync.authError,
+    progress: yjsSync.hasSynced ? 100 : yjsSync.isConnected ? 50 : 10,
+  });
+
+  useEffect(() => {
+    if (yjsSync.authError) showBottomToast('Nie udało się połączyć z tablicą. Odśwież stronę.');
+  }, [yjsSync.authError, showBottomToast]);
 
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({
