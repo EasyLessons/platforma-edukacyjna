@@ -44,7 +44,7 @@ async def mark_opened(
 # Settings --------------------------------------------------
 
 @router.get("/{board_id}/settings", response_model=ApiResponse[BoardSettings])
-async def get_settings(
+def get_settings(
     board_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -54,7 +54,7 @@ async def get_settings(
 
 
 @router.put("/{board_id}/settings", response_model=ApiResponse[BoardSettings])
-async def update_settings(
+def update_settings(
     board_id: int,
     patch: BoardSettingsPatch,
     db: Session = Depends(get_db),
@@ -91,7 +91,7 @@ async def upload_image(
     "/{board_id}/doc",
     response_model=ApiResponse[SaveDocumentResponse],
 )
-async def save_document(
+def save_document(
     board_id: int,
     request: SaveDocumentRequest,
     db: Session = Depends(get_db),
@@ -105,7 +105,7 @@ async def save_document(
     "/{board_id}/doc",
     response_model=ApiResponse[DocumentResponse],
 )
-async def get_document(
+def get_document(
     board_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -120,7 +120,7 @@ async def get_document(
     "/{board_id}/access",
     response_model=ApiResponse[AccessCheckResponse],
 )
-async def check_access(
+def check_access(
     board_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
