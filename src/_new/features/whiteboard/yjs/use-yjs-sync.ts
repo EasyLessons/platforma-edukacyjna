@@ -10,6 +10,9 @@ import { useEffect, useState } from 'react';
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { getAccessToken } from '@/_new/lib/auth/tokenStore';
+import { createLogger } from '@/_new/lib/logger';
+
+const log = createLogger('whiteboard/use-yjs-sync');
 
 const WHITEBOARD_SYNC_URL = process.env.NEXT_PUBLIC_WHITEBOARD_SYNC_URL ?? 'ws://localhost:1234';
 
@@ -21,10 +24,14 @@ export interface UseYjsSyncOptions {
 
 export interface UseYjsSyncResult {
   isConnected: boolean;
+  hasSynced: boolean;
+  authError: string | null;
 }
 
 export function useYjsSync({ doc, boardId, userId }: UseYjsSyncOptions): UseYjsSyncResult {
   const [isConnected, setIsConnected] = useState(false);
+  const [hasSynced, setHasSynced] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!boardId || !userId) return;
@@ -35,16 +42,22 @@ export function useYjsSync({ doc, boardId, userId }: UseYjsSyncOptions): UseYjsS
       document: doc,
       token: () => getAccessToken() ?? '',
       onStatus: ({ status }) => setIsConnected(status === 'connected'),
+      onSynced: ({ state }) => {
+        if (state) setHasSynced(true);
+      },
       onAuthenticationFailed: ({ reason }) => {
-        console.error(`[whiteboard-sync] uwierzytelnianie nie powiodło się: ${reason}`);
+        log.error(`uwierzytelnianie nie powiodło się: ${reason}`);
+        setAuthError(reason);
       },
     });
 
     return () => {
       provider.destroy();
       setIsConnected(false);
+      setHasSynced(false);
+      setAuthError(null);
     };
   }, [doc, boardId, userId]);
 
-  return { isConnected };
+  return { isConnected, hasSynced, authError };
 }
