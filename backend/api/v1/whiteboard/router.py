@@ -126,5 +126,6 @@ def check_access(
     current_user: User = Depends(get_current_user),
 ):
     service = WhiteboardService(db)
-    result = service.check_access(board_id, current_user.id)
+    result = service.check_access(board_id, current_user)
     return ApiResponse(success=True, data=result)
+    

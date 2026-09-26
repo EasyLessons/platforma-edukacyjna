@@ -13,7 +13,7 @@ import binascii
 from datetime import datetime
 from sqlalchemy.orm import Session
 from core.exceptions import NotFoundError, ValidationError
-from core.models import Board, BoardDocument, BoardUsers, User
+from core.models import Board, BoardDocument, BoardUsers, User, WorkspaceMember
 from .schemas import (
     BoardSettings, BoardSettingsPatch,
     DocumentResponse, AccessCheckResponse,
@@ -34,6 +34,20 @@ class WhiteboardService:
         if not board:
             raise NotFoundError("Tablica nie znaleziona")
         return board
+
+    def _get_board_for_member(self, board_id: int, user_id: int) -> Board:
+        """Tablica, jeśli user jest członkiem workspace'a."""
+        board = (
+            self.db.query(Board)
+            .join(WorkspaceMember, WorkspaceMember.workspace_id == Board.workspace_id)
+            .filter(Board.id == board_id, WorkspaceMember.user_id == user_id)
+            .first()
+        )
+        if board:
+            return board
+        # Rozróżnienie braku tablicy od braku dostępu
+        self._get_board_or_404(board_id)
+        raise NotFoundError("Nie masz dostępu do tej tablicy (nie jesteś członkiem workspace'a)")
 
     # Online presence --------------------------------------------------
 
@@ -98,8 +112,7 @@ class WhiteboardService:
     # Document (Yjs snapshot) --------------------------------------------------
 
     def save_document(self, board_id: int, snapshot_base64: str, user_id: int) -> None:
-        board = self._get_board_or_404(board_id)
-        require_membership(self.db, board.workspace_id, user_id)
+        self._get_board_for_member(board_id, user_id)
 
         try:
             snapshot = base64.b64decode(snapshot_base64, validate=True)
@@ -124,8 +137,7 @@ class WhiteboardService:
         self.db.commit()
 
     def load_document(self, board_id: int, user_id: int) -> DocumentResponse:
-        board = self._get_board_or_404(board_id)
-        require_membership(self.db, board.workspace_id, user_id)
+        self._get_board_for_member(board_id, user_id)
 
         doc = self.db.query(BoardDocument).filter(
             BoardDocument.board_id == board_id
@@ -140,12 +152,9 @@ class WhiteboardService:
 
     # Access check --------------------------------------------------
 
-    def check_access(self, board_id: int, user_id: int) -> AccessCheckResponse:
+    def check_access(self, board_id: int, user: User) -> AccessCheckResponse:
         """Sprawdza czy użytkownik ma dostęp do tablicy i zwraca info o nim."""
-        board = self._get_board_or_404(board_id)
-        require_membership(self.db, board.workspace_id, user_id)
-
-        user = self.db.query(User).filter(User.id == user_id).first()
+        self._get_board_for_member(board_id, user.id)
 
         return AccessCheckResponse(
             has_access=True,
