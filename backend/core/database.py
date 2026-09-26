@@ -37,7 +37,6 @@ import time
 import logging
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import NullPool
 from sqlalchemy.exc import OperationalError
 from core.config import get_settings
 from sqlalchemy.ext.declarative import declarative_base
@@ -47,25 +46,18 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# ============================================
-# ENGINE - Silnik połączenia z bazą danych
-# ============================================
-# 
-# NullPool — wyłącza LOKALNY connection pool w SQLAlchemy.
+# Lokalna pula połączeń (QueuePool, domyślna w SQLAlchemy).
 #
-# DLACZEGO?
-#   Neon używa wbudowanego PgBouncer pooler (widać w URL: "...pooler.eu-west-2...").
-#   PgBouncer już zarządza pulą połączeń po stronie serwera.
-#   Jeśli SQLAlchemy też trzyma swój pool, to mamy "double pooling":
-#     SQLAlchemy trzyma stare połączenie → Neon/PgBouncer je zamyka po timeout →
-#     SQLAlchemy próbuje użyć martwego połączenia → "server closed the connection unexpectedly"
-#
-#   NullPool = każdy request tworzy NOWE połączenie i zamyka je po zakończeniu.
-#   PgBouncer i tak je zrecykluje po stronie serwera — zero marnotrawstwa.
+# NullPool otwierał za każdym razem nowe połączenie co powodowało niepotrzebny narzut przy wielu requestach.
+#   pool_pre_ping zapobiega błędom SSL timeout w Neon serverless (Neon zamyka nieaktywne połączenia po ~5 minutach).
+#   pool_recycle sprząta połączenia, które są starsze niż 300 sekund (5 minut) i wymusza ponowne połączenie.
 #
 engine = create_engine(
     settings.database_url,
-    poolclass=NullPool,  # Bez lokalnego poola — Neon pooler zarządza połączeniami
+    pool_size=5,
+    max_overflow=10,
+    pool_pre_ping=True,
+    pool_recycle=300,
     connect_args={
         # Nie pozwól requestom wisieć przy problemach sieci/SSL do Neon.
         "connect_timeout": 5,
@@ -164,7 +156,7 @@ def get_db():
     for attempt in range(MAX_RETRIES):
         db = SessionLocal()
         try:
-            db.execute(text("SELECT 1"))  # Eagerly test connection (cold start Neon)
+            db.connection()
             last_exc = None
             break
         except OperationalError as e:
