@@ -41,6 +41,7 @@ import {
 } from '@/_new/features/whiteboard/hooks/use-whiteboard-sidebar';
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
+import { usePrewarmWhiteboardSync } from '@/_new/features/whiteboard/yjs/prewarm-sync';
 import { createLogger } from '@/_new/lib/logger';
 
 const log = createLogger('whiteboard/page');
@@ -80,6 +81,9 @@ export function TablicaContent() {
 
   // Sidebar tablicy
   const sidebar = useWhiteboardSidebar();
+
+  // Prewarm whiteboard-sync
+  usePrewarmWhiteboardSync();
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
