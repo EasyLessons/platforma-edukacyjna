@@ -1,0 +1,1 @@
+"""Jednorazowe skrypty administracyjne uruchamiane lokalnie (python -m scripts.<nazwa>)."""

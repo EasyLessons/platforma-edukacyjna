@@ -49,6 +49,7 @@ async def upload_board_image(
     board_id: int,
     file_bytes: bytes,
     content_type: str,
+    object_name: str | None = None,
 ) -> str:
     """
     Uploaduje obraz do Supabase Storage i zwraca publiczny URL.
@@ -84,7 +85,7 @@ async def upload_board_image(
 
     ext = ALLOWED_CONTENT_TYPES[content_type]
     # Losowa nazwa pliku (uuid4) — nie chcemy kolizji ani zgadywalnych URL-i
-    path = f"{board_id}/{uuid.uuid4().hex}.{ext}"
+    path = f"{board_id}/{object_name or uuid.uuid4().hex}.{ext}"
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -94,6 +95,7 @@ async def upload_board_image(
                     "Authorization": f"Bearer {service_role_key}",
                     "apikey": service_role_key,
                     "Content-Type": content_type,
+                    **({"x-upsert": "true"} if object_name else {}),
                 },
                 content=file_bytes,
             )
