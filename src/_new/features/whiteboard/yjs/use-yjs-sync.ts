@@ -11,10 +11,9 @@ import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { getAccessToken } from '@/_new/lib/auth/tokenStore';
 import { createLogger } from '@/_new/lib/logger';
+import { WHITEBOARD_SYNC_URL } from './sync-url';
 
 const log = createLogger('whiteboard/use-yjs-sync');
-
-const WHITEBOARD_SYNC_URL = process.env.NEXT_PUBLIC_WHITEBOARD_SYNC_URL ?? 'ws://localhost:1234';
 
 export interface UseYjsSyncOptions {
   doc: Y.Doc;
