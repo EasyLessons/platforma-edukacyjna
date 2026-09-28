@@ -21,6 +21,11 @@ vi.mock('@new/lib/auth', () => ({
   isPublicPath: vi.fn((pathname: string) => pathname === '/login'),
 }));
 
+vi.mock('@new/lib/auth/tokenService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@new/lib/auth/tokenService')>()),
+  refreshAccessToken: vi.fn().mockRejectedValue(new Error('Refresh failed')),
+}));
+
 const mock = new MockAdapter(apiClient, { onNoMatch: 'throwException' });
 
 beforeEach(() => mock.reset());

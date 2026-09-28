@@ -13,6 +13,7 @@
  *
  */
 import { getAccessToken, setAccessToken, clearSession } from './tokenStore';
+import { RefreshUnavailableError } from './refresh-error';
 
 interface JwtPayload {
   sub: string; // user_id
@@ -78,11 +79,21 @@ export async function refreshAccessToken(): Promise<string> {
   refreshPromise = (async () => {
     try {
       const BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      const response = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
-        method: 'POST',
-        credentials: 'include', // wysyła HttpOnly cookie
-      });
+      let response: Response;
+      try {
+        response = await fetch(`${BASE_URL}/api/v1/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include', // wysyła HttpOnly cookie
+        });
+      } catch {
+        // Brak sieci / serwer nieosiągalny - sesja może być nadal ważna.
+        throw new RefreshUnavailableError();
+      }
 
+      if (response.status >= 500) {
+        // Błąd po stronie serwera - nie przesądza o sesji.
+        throw new RefreshUnavailableError(`Refresh: HTTP ${response.status}`);
+      }
       if (!response.ok) {
         throw new Error('Refresh failed');
       }

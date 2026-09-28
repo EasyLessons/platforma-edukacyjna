@@ -20,6 +20,7 @@ import { apiMock, resetApiMock } from '@/test/mocks/apiClientMock';
 import { getAccessToken, setAccessToken, removeAccessToken } from '../auth/tokenStore';
 import { refreshAccessToken, logoutAndRedirect, isPublicPath } from '../auth/tokenService';
 import { AppError, ErrorCode } from '../errors';
+import { RefreshUnavailableError } from '../auth/refresh-error';
 
 vi.mock('../auth/tokenService', () => ({
   refreshAccessToken: vi.fn(),
@@ -284,6 +285,18 @@ describe('apiClient - nieudany refresh', () => {
     }
     expect(refreshAccessToken).toHaveBeenCalledTimes(1);
     expect(logoutAndRedirect).toHaveBeenCalledTimes(2);
+  });
+
+  it('refresh niedostępny (brak sieci / 5xx) → AppError sieciowy, BEZ wylogowania i czyszczenia tokenu', async () => {
+    vi.mocked(refreshAccessToken).mockRejectedValue(new RefreshUnavailableError());
+    apiMock.onGet('/api/v1/me').reply(401, { detail: 'Token expired' });
+
+    const err = await apiClient.get('/api/v1/me').catch((e) => e);
+
+    expect(err).toBeInstanceOf(AppError);
+    expect((err as AppError).isNetworkError()).toBe(true);
+    expect(logoutAndRedirect).not.toHaveBeenCalled();
+    expect(getAccessToken()).toBe(OLD_TOKEN);
   });
 });
 
