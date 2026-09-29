@@ -106,7 +106,7 @@ import type {
 } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
-import { compressAndUploadImage, DemoUploadBlockedError } from '../../elements/image-compress';
+import { compressAndUploadImage, ImageUploadBlockedError } from '../../elements/image-compress';
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
@@ -1488,7 +1488,7 @@ export default function WhiteboardCanvasNew({
       }
       return false;
     } catch (err) {
-      if (err instanceof DemoUploadBlockedError) {
+      if (err instanceof ImageUploadBlockedError) {
         showBottomToast(err.message);
       }
       return false;
@@ -1909,7 +1909,7 @@ export default function WhiteboardCanvasNew({
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
           } catch (error) {
-            if (error instanceof DemoUploadBlockedError) {
+            if (error instanceof ImageUploadBlockedError) {
               showBottomToast(error.message);
             } else {
               console.error('Błąd podczas ładowania PDF:', error);
@@ -1932,7 +1932,7 @@ export default function WhiteboardCanvasNew({
                 height: imgH,
               } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current), file.name));
             } catch (error) {
-              if (error instanceof DemoUploadBlockedError) {
+              if (error instanceof ImageUploadBlockedError) {
                 showBottomToast(error.message);
               } else {
                 console.error('Blad uploadu obrazka:', error);
