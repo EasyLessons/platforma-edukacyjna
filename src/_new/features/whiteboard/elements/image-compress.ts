@@ -28,6 +28,7 @@
  */
 
 import { uploadBoardImage } from '../api/whiteboardApi';
+import { AppError } from '@/_new/lib/errors';
 
 export const MAX_IMAGE_DIMENSION_PX = 1600;
 export const IMAGE_JPEG_QUALITY = 0.82;
@@ -106,15 +107,29 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 export const DEMO_IMAGE_BLOCKED_MESSAGE =
   'W trybie demo nie mozna wstawiac wlasnych zdjec — zaloz darmowe konto, zeby zapisywac obrazy.';
 
-/**
- * Rzucany, gdy upload nie ma dokad trafic, bo tablica nie istnieje w bazie
- * (tryb demo: boardId to string `demo-...`, wiec Number() daje NaN).
- * Wolajacy ma pokazac `message` uzytkownikowi zamiast dusic blad w konsoli.
- */
-export class DemoUploadBlockedError extends Error {
+/** Wstawienie obrazu zablokowane z powodem do pokazania użytkownikowi. */
+export class ImageUploadBlockedError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ImageUploadBlockedError';
+  }
+}
+
+export class DemoUploadBlockedError extends ImageUploadBlockedError {
   constructor(message: string = DEMO_IMAGE_BLOCKED_MESSAGE) {
     super(message);
     this.name = 'DemoUploadBlockedError';
+  }
+}
+
+export const OFFLINE_IMAGE_BLOCKED_MESSAGE =
+  'Wstawianie obrazów wymaga połączenia z internetem. Resztę tablicy możesz edytować offline.';
+
+/** Brak połączenia przy uploadzie - obraz nie może trafić do Storage. */
+export class ImageUploadOfflineError extends ImageUploadBlockedError {
+  constructor(message: string = OFFLINE_IMAGE_BLOCKED_MESSAGE) {
+    super(message);
+    this.name = 'ImageUploadOfflineError';
   }
 }
 
@@ -130,6 +145,11 @@ export async function compressAndUploadImage(
   }
   const { dataUrl, width, height } = await compressImageDataUrl(rawDataUrl);
   const blob = await dataUrlToBlob(dataUrl);
-  const { url } = await uploadBoardImage(boardId, blob, filename);
-  return { url, width, height };
+  try {
+    const { url } = await uploadBoardImage(boardId, blob, filename);
+    return { url, width, height };
+  } catch (err) {
+    if (err instanceof AppError && err.isNetworkError()) throw new ImageUploadOfflineError();
+    throw err;
+  }
 }

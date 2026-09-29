@@ -8,6 +8,7 @@ vi.mock('./tokenStore', () => ({
 }));
 
 import { setAccessToken } from './tokenStore';
+import { RefreshUnavailableError } from './refresh-error';
 
 // Helper: tworzy prawdziwy base64 JWT z podanym payload
 function makeJwt(payload: object): string {
@@ -102,6 +103,22 @@ describe('refreshAccessToken', () => {
     } as Response);
 
     await expect(refreshAccessToken()).rejects.toThrow('Refresh failed');
+  });
+
+  it('rzuca RefreshUnavailableError gdy fetch się nie powiedzie (brak sieci)', async () => {
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(RefreshUnavailableError);
+  });
+
+  it('rzuca RefreshUnavailableError przy 5xx', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      json: async () => ({}),
+    } as Response);
+
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(RefreshUnavailableError);
   });
 
   it('rzuca błąd gdy brak access_token w odpowiedzi', async () => {

@@ -48,7 +48,7 @@ import {
 } from '@/_new/features/whiteboard/navigation/viewport-math';
 import {
   compressAndUploadImage,
-  DemoUploadBlockedError,
+  ImageUploadBlockedError,
 } from '@/_new/features/whiteboard/elements/image-compress';
 
 export interface ImageToolRef {
@@ -283,7 +283,7 @@ export const ImageTool = forwardRef<ImageToolRef, ImageToolProps>(
           onImageCreate(newImage);
         }
       } catch (err) {
-        if (err instanceof DemoUploadBlockedError) {
+        if (err instanceof ImageUploadBlockedError) {
           onUploadBlocked?.(err.message);
         } else {
           console.error('File upload error:', err);

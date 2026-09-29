@@ -25,6 +25,7 @@ import axios, {
 // i session-api (ktore importuja apiClient), co dawaloby cykl lib/api <-> lib/auth.
 import { getAccessToken, setAccessToken, clearSession } from '../auth/tokenStore';
 import { refreshAccessToken, logoutAndRedirect, isPublicPath } from '../auth/tokenService';
+import { RefreshUnavailableError } from '../auth/refresh-error';
 import { mapAxiosError } from '../errors';
 import { REQUEST_ID_HEADER, newRequestId } from './request-id';
 import type { ApiSuccessResponse } from './types';
@@ -130,8 +131,16 @@ apiClient.interceptors.response.use(
             `Bearer ${newToken}`;
         }
         return apiClient(originalRequest);
-      } catch {
-        // Refresh nie powiódł się — wyloguj
+      } catch (refreshError) {
+        // Serwer auth chwilowo niedostępny.
+        if (refreshError instanceof RefreshUnavailableError) {
+          return Promise.reject(
+            mapAxiosError(
+              new AxiosError(refreshError.message, AxiosError.ERR_NETWORK, error.config)
+            )
+          );
+        }
+        // Refresh odrzucony przez serwer - wyloguj.
         clearSession();
         logoutAndRedirect();
         // Gdy logoutAndRedirect NIE przekieruje (ścieżka publiczna: /login,

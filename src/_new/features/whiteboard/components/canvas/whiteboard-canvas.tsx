@@ -42,7 +42,8 @@ import { useClipboard } from '../../hooks/use-clipboard';
 import { useSelection } from '../../hooks/use-selection';
 import { useRealtime } from '../../hooks/use-realtime';
 import { useYjsBoard, type UseYjsBoardReturn } from '../../hooks/use-yjs-board';
-import { useYjsSync } from '../../yjs/use-yjs-sync';
+import { useYjsSync, ACCESS_DENIED, SESSION_EXPIRED } from '../../yjs/use-yjs-sync';
+import { useYjsLocalCache } from '../../yjs/use-yjs-local-cache';
 import { useAuth } from '@/_new/lib/auth';
 
 // ─── Komponenty narzędzi (przez re-exportery _new/) ──────────────────────────
@@ -105,7 +106,7 @@ import type {
 } from '../../types';
 import type { GuideLine } from '../../selection/snap-utils';
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
-import { compressAndUploadImage, DemoUploadBlockedError } from '../../elements/image-compress';
+import { compressAndUploadImage, ImageUploadBlockedError } from '../../elements/image-compress';
 
 import { useBoardRealtime } from '@/app/context/BoardRealtimeContext';
 
@@ -151,8 +152,6 @@ interface BoardElementsBinding {
   elementsWithAuthor: import('../../api/whiteboardApi').BoardElementWithAuthor[];
   isLoading: boolean;
   loadingProgress: number;
-  isSaving: boolean;
-  unsavedElements: Set<string>;
   loadImage: (id: string, src: string) => void;
 }
 
@@ -162,9 +161,6 @@ interface BoardHistoryBinding {
   canUndo: boolean;
   canRedo: boolean;
 }
-
-/** Pusta, stabilna referencja */
-const EMPTY_UNSAVED_SET = new Set<string>();
 
 function adaptYjsElements(
   board: UseYjsBoardReturn,
@@ -178,8 +174,6 @@ function adaptYjsElements(
     elementsWithAuthor: board.elementsWithAuthor,
     isLoading: loading.isLoading,
     loadingProgress: loading.progress,
-    isSaving: false,
-    unsavedElements: EMPTY_UNSAVED_SET,
     loadImage: board.loadImage,
   };
 }
@@ -374,24 +368,51 @@ export default function WhiteboardCanvasNew({
   const yjsBoard = useYjsBoard({ userId: user?.id ?? null, username: user?.username ?? null });
   const hist: BoardHistoryBinding = adaptYjsHistory(yjsBoard);
 
-  // Live transport + persystencja (Hocuspocus)
+  // Kopia lokalna (IndexedDB)
+  const localCache = useYjsLocalCache({ doc: yjsBoard.doc, boardId, userId: user?.id ?? null });
+
+  // Live transport + persystencja (Hocuspocus) - po kopii lokalnej, żeby serwer wysłał różnicę a nie całą kopię.
   const yjsSync = useYjsSync({
     doc: yjsBoard.doc,
     boardId,
     userId: user?.id ?? null,
+    enabled: localCache.isReady,
   });
 
-  // Overlay do pierwszej synchronizacji.
+  // Overlay, gdy nie ma czego pokazać (brak kopii lokalnej i brak połączenia z serwerem).
   const isSyncExpected =
     Boolean(boardId) && !Number.isNaN(Number(boardId)) && (authLoading || user != null);
+  const hasBoardContent = yjsSync.hasSynced || localCache.hasLocalContent;
   const el: BoardElementsBinding = adaptYjsElements(yjsBoard, {
-    isLoading: isSyncExpected && !yjsSync.hasSynced && !yjsSync.authError,
+    isLoading: isSyncExpected && !hasBoardContent && !yjsSync.authError,
     progress: yjsSync.hasSynced ? 100 : yjsSync.isConnected ? 50 : 10,
   });
 
+  // Status dla StatusIndicators
+  const isBoardOffline =
+    isSyncExpected &&
+    localCache.isReady &&
+    hasBoardContent &&
+    !yjsSync.isConnected &&
+    !yjsSync.authError;
+  const isBoardSyncing = hasBoardContent && yjsSync.isConnected && !yjsSync.isSynced;
+
+  // Serwer potwierdził wszystko - kopia lokalna nie ma niewysłanych zmian.
+  const { setDirty: setLocalCacheDirty, clear: clearLocalCache } = localCache;
   useEffect(() => {
-    if (yjsSync.authError) showBottomToast('Nie udało się połączyć z tablicą. Odśwież stronę.');
-  }, [yjsSync.authError, showBottomToast]);
+    if (yjsSync.isSynced && yjsSync.unsyncedChanges === 0) setLocalCacheDirty(false);
+  }, [yjsSync.isSynced, yjsSync.unsyncedChanges, setLocalCacheDirty]);
+
+  useEffect(() => {
+    if (yjsSync.authError === ACCESS_DENIED) {
+      clearLocalCache();
+      showBottomToast('Nie masz już dostępu do tej tablicy.');
+    } else if (yjsSync.authError === SESSION_EXPIRED) {
+      showBottomToast(
+        'Sesja wygasła. Zaloguj się ponownie - zmiany są zapisywane na tym urządzeniu.'
+      );
+    }
+  }, [yjsSync.authError, clearLocalCache, showBottomToast]);
 
   // ─── HOOK: realtime ─────────────────────────────────────────────────────────
   const rt = useRealtime({
@@ -1467,7 +1488,7 @@ export default function WhiteboardCanvasNew({
       }
       return false;
     } catch (err) {
-      if (err instanceof DemoUploadBlockedError) {
+      if (err instanceof ImageUploadBlockedError) {
         showBottomToast(err.message);
       }
       return false;
@@ -1888,7 +1909,7 @@ export default function WhiteboardCanvasNew({
               await new Promise((resolve) => setTimeout(resolve, 50));
             }
           } catch (error) {
-            if (error instanceof DemoUploadBlockedError) {
+            if (error instanceof ImageUploadBlockedError) {
               showBottomToast(error.message);
             } else {
               console.error('Błąd podczas ładowania PDF:', error);
@@ -1911,7 +1932,7 @@ export default function WhiteboardCanvasNew({
                 height: imgH,
               } = await compressAndUploadImage(rawDataUrl, Number(boardIdRef.current), file.name));
             } catch (error) {
-              if (error instanceof DemoUploadBlockedError) {
+              if (error instanceof ImageUploadBlockedError) {
                 showBottomToast(error.message);
               } else {
                 console.error('Blad uploadu obrazka:', error);
@@ -2442,11 +2463,7 @@ export default function WhiteboardCanvasNew({
         />
 
         {/* ── STATUS INDICATORS ─────────────────────────────────────────── */}
-        <StatusIndicators
-          isSaving={el.isSaving}
-          unsavedCount={el.unsavedElements.size}
-          isConnected={rt.isConnected}
-        />
+        <StatusIndicators isSyncing={isBoardSyncing} isOffline={isBoardOffline} />
 
         {/* ── MATH CHATBOT ──────────────────────────────────────────────── */}
         {settings.ai_enabled && (
@@ -2541,6 +2558,3 @@ export default function WhiteboardCanvasNew({
     </div>
   );
 }
-
-// Kursory narzędzi pochodzą teraz z rejestru (ToolDefinition.cursor) —
-// patrz tools/registry.ts. Stara funkcja toolToCursor została usunięta.

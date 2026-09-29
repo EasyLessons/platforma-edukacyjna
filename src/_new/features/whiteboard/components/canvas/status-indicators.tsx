@@ -1,55 +1,60 @@
 /**
  * status-indicators.tsx
  *
- * Trzy małe badge'e w prawym górnym/dolnym rogu informujące o stanie zapisu i połączenia.
+ * Stan połączenia tablicy z whiteboard-sync:
+ * - synchronizacja - połączono, trwa wymiana stanu z serwerem,
+ * - offline - brak połączenia; zmiany zapisują się lokalnie i wyślą po połączeniu.
  *
- * Co każdy badge robi:
- *  - SavingIndicator (zielony, spinner) — pojawia się gdy trwa zapis do bazy danych.
- *    Zapis jest debounced (2 sekundy opóźnienia po ostatniej zmianie), więc ten badge
- *    mignie tylko na chwilę po każdej serii rysowania.
- *  - UnsavedIndicator (żółty) — liczy elementy które zostały zmienione ale jeszcze
- *    nie zapisane (czekają na debounce). Informuje użytkownika że nie powinien zamykać
- *    zakładki zanim nie zniknie.
- *  - ConnectionIndicator (żółty, puls) — pojawia się w prawym DOLNYM rogu gdy WebSocket
- *    Supabase Realtime się rozłączy. Supabase automatycznie próbuje reconnect.
- *
- * Wydzielono z: WhiteboardCanvas.tsx linie 4075–4108 (był inline JSX w return).
+ * Badge pojawia się dopiero po krótkim opóźnieniu, aby uniknąć migania.
  */
 
-// ─── Typy ────────────────────────────────────────────────────────────────────
+import { useEffect, useState } from 'react';
 
-interface StatusIndicatorsProps {
-  isSaving: boolean;
-  unsavedCount: number;
-  isConnected: boolean;
+const SHOW_DELAY_MS = 1_500;
+
+/** true dopiero, gry `value` jest true nieprzerwanie przez `delayMs`. */
+function useDelayedFlag(value: boolean, delayMs: number): boolean {
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (!value) return;
+    const timer = setTimeout(() => setShown(true), delayMs);
+    return () => {
+      clearTimeout(timer);
+      setShown(false);
+    };
+  }, [value, delayMs]);
+
+  return value && shown;
 }
 
-// ─── Komponent ───────────────────────────────────────────────────────────────
+interface StatusIndicatorsProps {
+  /** Połączono, trwa synchronizacja z serwerem. */
+  isSyncing: boolean;
+  /** Brak połączenia - edycja zapisuje się lokalnie. */
+  isOffline: boolean;
+}
 
-export function StatusIndicators({ isSaving, unsavedCount, isConnected }: StatusIndicatorsProps) {
+export function StatusIndicators({ isSyncing, isOffline }: StatusIndicatorsProps) {
+  const showSyncing = useDelayedFlag(isSyncing, SHOW_DELAY_MS);
+  const showOffline = useDelayedFlag(isOffline, SHOW_DELAY_MS);
+
   return (
     <>
-      {/* Zapis w toku */}
-      {isSaving && (
+      {showSyncing && (
         <div className="absolute top-20 right-4 bg-green-100 text-green-700 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 z-50">
           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-600" />
-          <span className="text-sm font-medium">Zapisywanie...</span>
+          <span className="text-sm font-medium">Synchronizacja...</span>
         </div>
       )}
 
-      {/* Niezapisane zmiany — widoczne tylko gdy nie trwa właśnie zapis */}
-      {unsavedCount > 0 && !isSaving && (
-        <div className="absolute top-20 right-4 bg-yellow-100 text-yellow-700 px-4 py-2 rounded-lg shadow-md flex items-center gap-2 z-50">
-          <span className="text-sm font-medium">Niezapisane zmiany: {unsavedCount}</span>
-        </div>
-      )}
-
-      {/* Brak połączenia z Supabase Realtime */}
-      {!isConnected && (
+      {showOffline && (
         <div className="absolute bottom-4 right-4 bg-yellow-100 border border-yellow-400 rounded-lg px-3 py-2 shadow-lg z-50">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-yellow-500 animate-pulse" />
-            <span className="text-sm text-yellow-800">Reconnecting...</span>
+            <span className="text-sm text-yellow-800">
+              Offline - zmiany zapisują się na tym urządzeniu
+            </span>
           </div>
         </div>
       )}
