@@ -43,7 +43,7 @@ export default function UserMenuPopup({ onClose, user }: UserMenuPopupProps) {
   };
 
   const handleLogout = () => {
-    logout();
+    if (!logout()) return;
     onClose();
     router.push('/');
   };

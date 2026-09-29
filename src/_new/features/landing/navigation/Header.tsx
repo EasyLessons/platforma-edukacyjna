@@ -40,7 +40,7 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    logout();
+    if (!logout()) return;
     router.push('/');
   };
 

@@ -9,10 +9,10 @@
  *   - cookie: middleware Next.js (src/middleware.ts) sprawdza czy user jest zalogowany
  *     przed renderowaniem chronionych stron — nie ma dostępu do localStorage
  */
+import { clearAllBoardCaches } from '@/_new/lib/board-cache/board-cache';
 
 // Access token - in-memory only
 // Przy odświeżeniu strony bootstrap AuthContext odtwarza token przez /me + /refresh
-
 let _accessToken: string | null = null;
 
 export function getAccessToken(): string | null {
@@ -63,8 +63,10 @@ export function removeStoredUser(): void {
 
 // Logout helper
 
-/** Czyści dane sesji z localStorage i cookies */
-export function clearSession(): void {
+/** Czyści dane sesji z localStorage, cookies
+ * oraz lokalne kopie tablic (IndexedDB).*/
+export function clearSession({ keepDirty = true }: { keepDirty?: boolean } = {}): void {
   removeAccessToken();
   removeStoredUser();
+  clearAllBoardCaches({ keepDirty });
 }

@@ -10,7 +10,8 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-import { setAccessToken, removeAccessToken, setStoredUser, removeStoredUser } from './tokenStore';
+import { setAccessToken, setStoredUser, clearSession } from './tokenStore';
+import { getDirtyBoardCaches, sweepForeignBoardCaches } from '@/_new/lib/board-cache/board-cache';
 import { refreshAccessToken } from './tokenService';
 import { getCurrentUser, logoutUser } from './session-api';
 import type { User } from '@/_new/shared/types/user';
@@ -20,7 +21,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (token: string, userData: User) => void;
-  logout: () => void;
+  logout: () => boolean;
   updateUser: (updates: Partial<User>) => void;
 }
 
@@ -37,12 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userData = await getCurrentUser();
         setIsLoggedIn(true);
         setUser(userData);
+        sweepForeignBoardCaches(userData.id);
       } catch {
         try {
           await refreshAccessToken();
           const userData = await getCurrentUser();
           setIsLoggedIn(true);
           setUser(userData);
+          sweepForeignBoardCaches(userData.id);
         } catch {
           setIsLoggedIn(false);
           setUser(null);
@@ -60,14 +63,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStoredUser(userData);
     setIsLoggedIn(true);
     setUser(userData);
+    sweepForeignBoardCaches(userData.id);
   };
 
   const logout = () => {
+    const dirty = user ? getDirtyBoardCaches(user.id) : [];
+    if (
+      dirty.length > 0 &&
+      !window.confirm(
+        `Masz niewysłane zmiany na ${dirty.length} ${dirty.length === 1 ? 'tablicy' : 'tablicach'}. ` +
+          'Otwórz je z połączeniem z internetem, żeby je zapisać. Wylogować mimo to? Zmiany przepadną.'
+      )
+    ) {
+      return false;
+    }
     logoutUser().catch(() => {}); // powiadom backend (fire and forget)
-    removeAccessToken();
-    removeStoredUser();
+    clearSession({ keepDirty: false });
     setIsLoggedIn(false);
     setUser(null);
+    return true;
   };
 
   const updateUser = (updates: Partial<User>) => {

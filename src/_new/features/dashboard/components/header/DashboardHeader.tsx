@@ -361,7 +361,7 @@ export default function DashboardHeader({
                     variant="primary"
                     leftIcon={<LogOut size={16} />}
                     onClick={() => {
-                      logout();
+                      if (!logout()) return;
                       setShowMobileMenu(false);
                       router.push('/');
                     }}
