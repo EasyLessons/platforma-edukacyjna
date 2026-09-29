@@ -324,6 +324,27 @@ Zostają w folderze `_mock/` jako zalążek przyszłych sekcji konta (opis w `RE
 
 Osobny PR per feature, każdy warning z uzasadnieniem: albo brakująca zależność naprawdę powinna tam być, albo `useRef`/`useEffectEvent` zamiast `eslint-disable`. Nie wyciszać hurtowo dyrektywą.
 
+## 7. Kopie lokalne tablic (IndexedDB) — konsekwencje operacyjne (średni priorytet, świadome)
+
+**Zgłoszone:** 29.09.2026, PR `feat/whiteboard-local-cache`.
+
+### Co się dzieje
+
+Przeglądarki trzymają kopie tablic w IndexedDB (opis: `architecture/pipelines.md` §2b, „Kopia lokalna”). CRDT scala kopię klienta z serwerem przy każdym połączeniu, więc stan serwera nie jest już jedynym źródłem prawdy dla zmian, które klient ma lokalnie.
+
+### Skutki
+
+1. **Przywrócenie tablicy z backupu częściowo się cofa.** Klient, który ma w kopii nowsze elementy, przy następnym połączeniu wyśle je z powrotem na serwer. Dotyczyło to już wcześniej otwartych kart; kopia lokalna rozszerza to na karty zamknięte (do 14 dni).
+2. **Zalogowanie innego konta na tej samej przeglądarce usuwa niewysłane zmiany poprzedniego użytkownika** (`sweepForeignBoardCaches`) — świadomie, bezpieczeństwo danych ważniejsze.
+3. **Wylogowanie, gdy tablica jest otwarta w innej karcie**: usunięcie bazy czeka, aż ta karta zostanie zamknięta (blokada IndexedDB, w konsoli ostrzeżenie `usunięcie … czeka na zamknięcie innej karty`).
+
+### Procedura: przywracanie tablicy z backupu
+
+1. Podbić `CACHE_VERSION` w `src/_new/lib/board-cache/board-cache.ts` i wdrożyć frontend — każdy klient przy następnym logowaniu/otwarciu tablicy usunie stare kopie.
+2. Wstrzymać whiteboard-sync (Render → Suspend), żeby dokument w pamięci Hocuspocusa nie nadpisał przywróconego.
+3. Przywrócić wiersz `board_documents`, wznowić whiteboard-sync.
+4. Otwarte w tym czasie karty nadal mają starą wersję w pamięci — jeśli to istotne, poprosić użytkowników tablicy o przeładowanie przed kontynuowaniem pracy.
+
 ## Zasada
 
 Nowy błąd znaleziony w czasie pracy/testów → nowy wpis tutaj, w tym samym formacie (odtworzenie, root cause, opcje naprawy), z priorytetem. Jak coś zostanie naprawione, wpis przenosimy na dół pod `## Naprawione` (do stworzenia gdy pierwszy taki przypadek się pojawi) zamiast kasować — żeby było widać historię.
