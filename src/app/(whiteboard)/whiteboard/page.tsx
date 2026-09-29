@@ -23,7 +23,6 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import Image from 'next/image';
 import { Suspense, useState, useEffect } from 'react';
 
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
@@ -42,6 +41,7 @@ import {
 import type { BoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi';
 import { usePrewarmWhiteboardSync } from '@/_new/features/whiteboard/yjs/prewarm-sync';
+import { clearBoardCache } from '@/_new/lib/board-cache/board-cache';
 import { createLogger } from '@/_new/lib/logger';
 
 const log = createLogger('whiteboard/page');
@@ -60,7 +60,6 @@ const DEFAULT_BOARD_SETTINGS: BoardSettings = {
 export function TablicaContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [showTooltip, setShowTooltip] = useState(false);
   const [boardId, setBoardId] = useState<string | null>(null);
   const [arkuszPath, setArkuszPath] = useState<string | null>(null);
   const [boardName, setBoardName] = useState<string>('Moja tablica');
@@ -108,8 +107,8 @@ export function TablicaContent() {
 
     // Pobierz dane tablicy z bazy
     const loadBoardData = async () => {
+      const numericId = parseInt(id, 10);
       try {
-        const numericId = parseInt(id, 10);
         if (isNaN(numericId)) return;
         const board = await fetchBoardById(numericId);
         if (board) {
@@ -139,12 +138,13 @@ export function TablicaContent() {
           error?.status === 403 ||
           error?.status === 404
         ) {
-          console.error('❌ Brak dostępu do tablicy:', error.message);
+          console.error('Brak dostępu do tablicy:', error.message);
           setAccessDenied(true);
+          clearBoardCache(numericId);
         } else if (error instanceof Error) {
-          console.error('❌ Błąd ładowania danych tablicy:', error.message);
+          console.error('Błąd ładowania danych tablicy:', error.message);
         } else {
-          console.error('❌ Nieznany błąd ładowania danych tablicy:', error);
+          console.error('Nieznany błąd ładowania danych tablicy:', error);
         }
       }
     };
@@ -363,25 +363,3 @@ export default function TablicaPage() {
     </Suspense>
   );
 }
-
-/**
- * ═══════════════════════════════════════════════════════════════════════════
- * 📚 JAK UŻYWAĆ
- * ═══════════════════════════════════════════════════════════════════════════
- *
- * URL:
- * /whiteboard?boardId=123  → Tablica o ID 123
- * /tablica              → Domyślna tablica "demo-board"
- *
- * PRZYKŁAD LINKU Z DASHBOARD:
- * <Link href="/whiteboard?boardId=456">Otwórz tablicę</Link>
- *
- * CO DZIAŁA:
- * ✅ Przycisk powrotu (logo EasyLesson) w lewym górnym rogu
- * ✅ Tooltip "Wróć do panelu" po najechaniu
- * ✅ Synchronizacja realtime przez BoardRealtimeProvider
- * ✅ boardId z URL query params
- * ✅ Lista użytkowników online (OnlineUsers w WhiteboardCanvas)
- *
- * ═══════════════════════════════════════════════════════════════════════════
- */
