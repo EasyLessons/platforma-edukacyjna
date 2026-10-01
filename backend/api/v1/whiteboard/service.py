@@ -12,7 +12,7 @@ import base64
 import binascii
 from datetime import datetime
 from sqlalchemy.orm import Session
-from core.exceptions import NotFoundError, ValidationError
+from core.exceptions import AppException, NotFoundError, ValidationError
 from core.models import Board, BoardDocument, BoardUsers, User, WorkspaceMember
 from .schemas import (
     BoardSettings, BoardSettingsPatch,
@@ -21,6 +21,11 @@ from .schemas import (
 from .storage import upload_board_image
 from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_board_owner
+
+
+def can_edit(role: str) -> bool:
+    """Czy rola w workspace pozwala zmieniać treść tablicy (viewer tylko ogląda)."""
+    return role != "viewer"
 
 
 class WhiteboardService:
@@ -37,14 +42,19 @@ class WhiteboardService:
 
     def _get_board_for_member(self, board_id: int, user_id: int) -> Board:
         """Tablica, jeśli user jest członkiem workspace'a."""
-        board = (
-            self.db.query(Board)
+        board, _ = self._get_board_and_role(board_id, user_id)
+        return board
+
+    def _get_board_and_role(self, board_id: int, user_id: int) -> tuple[Board, str]:
+        """Tablica i rola usera w jej workspace (owner/editor/viewer), jeśli jest członkiem."""
+        row = (
+            self.db.query(Board, WorkspaceMember.role)
             .join(WorkspaceMember, WorkspaceMember.workspace_id == Board.workspace_id)
             .filter(Board.id == board_id, WorkspaceMember.user_id == user_id)
             .first()
         )
-        if board:
-            return board
+        if row:
+            return row[0], row[1]
         # Rozróżnienie braku tablicy od braku dostępu
         self._get_board_or_404(board_id)
         raise NotFoundError("Nie masz dostępu do tej tablicy (nie jesteś członkiem workspace'a)")
@@ -112,7 +122,9 @@ class WhiteboardService:
     # Document (Yjs snapshot) --------------------------------------------------
 
     def save_document(self, board_id: int, snapshot_base64: str, user_id: int) -> None:
-        self._get_board_for_member(board_id, user_id)
+        _, role = self._get_board_and_role(board_id, user_id)
+        if not can_edit(role):
+            raise AppException("Rola viewer nie może zapisywać tablicy", status_code=403)
 
         try:
             snapshot = base64.b64decode(snapshot_base64, validate=True)
@@ -154,10 +166,12 @@ class WhiteboardService:
 
     def check_access(self, board_id: int, user: User) -> AccessCheckResponse:
         """Sprawdza czy użytkownik ma dostęp do tablicy i zwraca info o nim."""
-        self._get_board_for_member(board_id, user.id)
+        _, role = self._get_board_and_role(board_id, user.id)
 
         return AccessCheckResponse(
             has_access=True,
             user_id=user.id,
             username=user.username,
+            role=role,
+            can_edit=can_edit(role),
         )
