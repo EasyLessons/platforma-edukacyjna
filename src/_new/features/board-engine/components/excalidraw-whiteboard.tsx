@@ -14,6 +14,19 @@ import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
 import type { BoardUser } from './excalidraw-board';
 
+/**
+ * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
+ * Pliki kopiuje scripts/copy-excalidraw-assets.mjs (predev/prebuild). Excalidraw liczy
+ * adresy fontów przy pierwszym użyciu, więc wystarczy ustawić to przed jego załadowaniem.
+ */
+export const EXCALIDRAW_ASSET_PATH = '/excalidraw-assets/';
+declare global {
+  interface Window {
+    EXCALIDRAW_ASSET_PATH?: string | string[];
+  }
+}
+if (typeof window !== 'undefined') window.EXCALIDRAW_ASSET_PATH = EXCALIDRAW_ASSET_PATH;
+
 const ExcalidrawBoard = dynamic(() => import('./excalidraw-board').then((m) => m.ExcalidrawBoard), {
   ssr: false,
   loading: () => <BoardLoading label="Ładowanie tablicy..." />,
