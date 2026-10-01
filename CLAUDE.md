@@ -1,7 +1,8 @@
 # CLAUDE.md - EasyLesson (platforma-edukacyjna)
 
 Czyta to kazda sesja Claude Code uruchomiona w tym repo. Nadrzedne zasady
-(brak push, brak merge do main, raport sesji) sa w `..\..\CLAUDE.md` (Projekty_IT).
+(merge wlasnych PR-ow po zielonym CI, bez bezposredniego pusha do main, raport sesji) sa w
+`..\..\CLAUDE.md` (Projekty_IT).
 Pelna dokumentacja architektury jest w `docs/` - zacznij od `docs/README.md`.
 NIE tworz rownoleglej dokumentacji obok `docs/`.
 
@@ -65,4 +66,6 @@ w planie). Nie dziel plikow "dla statystyki" poza zakresem PR-a.
    edytowales (np. caly plik jako +/-), to znaczy ze cos poszlo nie tak
    z koncami linii (repo ma `core.autocrlf=true`, prettier pisze LF).
    ZATRZYMAJ SIE i powiedz Patrykowi, nie commituj dalej.
-5. Pracujesz na osobnym branchu. Zero `git push`, zero merge do `main`.
+5. Pracujesz na osobnym branchu, push tylko tej galezi. Wlasny PR mergujesz sam
+   (`gh pr merge N --merge --delete-branch`) po zielonym CI i bez konfliktow; PR-ow Bartka nie
+   mergujesz ani nie zmieniasz. Po merge'u sprawdz deploy (Vercel/Render), przy awarii PR z `git revert`.

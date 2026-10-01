@@ -47,6 +47,13 @@ class Settings(BaseSettings):
     verification_code_expire_minutes: int = 15  # czas ważności kodu weryfikacji/resetu hasła
 
     port: int = 8000
+
+    # === WHITEBOARD-SYNC (klucz serwis-serwis) ===
+    # whiteboard-sync czyta/zapisuje snapshot tablicy (GET/POST /whiteboard/{id}/doc) z naglowkiem
+    # X-Sync-Service-Token zamiast tokenu usera, ktory wygasa po 15 min trwajacego polaczenia.
+    # Ta sama wartosc musi byc w env whiteboard-sync. Pusty = klucz serwisu wylaczony
+    # (dziala tylko token usera). Wygeneruj: python -c "import secrets; print(secrets.token_urlsafe(32))"
+    sync_service_token: str = ""
     
     # === KONFIGURACJA PYDANTIC ===
     # .env czytany w developmencie; w produkcji (Render) zmienne ida z systemu.
