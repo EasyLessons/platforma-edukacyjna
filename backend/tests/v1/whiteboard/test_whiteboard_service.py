@@ -12,7 +12,7 @@ from api.v1.whiteboard.schemas import (
     DocumentResponse, AccessCheckResponse,
 )
 from core.exceptions import NotFoundError, AppException, ValidationError
-from core.models import Board, BoardUsers, BoardDocument
+from core.models import Board, BoardUsers, BoardDocument, WorkspaceMember
 from core.presence import PresenceService
 
 
@@ -148,6 +148,21 @@ class TestAccessCheck:
         assert result.has_access is True
         assert result.user_id == test_user.id
         assert result.username == test_user.username
+        assert result.role == "owner"
+        assert result.can_edit is True
+
+    def test_viewer_has_access_without_edit(self, db_session, test_user, test_user2, shared_workspace):
+        board = _shared_board(db_session, shared_workspace, test_user)
+        _set_role(db_session, shared_workspace, test_user2, "viewer")
+        result = WhiteboardService(db_session).check_access(board.id, test_user2)
+        assert result.role == "viewer"
+        assert result.can_edit is False
+
+    def test_editor_can_edit(self, db_session, test_user, test_user2, shared_workspace):
+        board = _shared_board(db_session, shared_workspace, test_user)
+        result = WhiteboardService(db_session).check_access(board.id, test_user2)
+        assert result.role == "editor"
+        assert result.can_edit is True
 
     def test_non_member_raises_404(self, db_session, test_board, test_user2):
         service = WhiteboardService(db_session)
@@ -158,3 +173,39 @@ class TestAccessCheck:
         service = WhiteboardService(db_session)
         with pytest.raises(NotFoundError):
             service.check_access(999999, test_user)
+
+class TestViewerCannotSave:
+
+    def test_viewer_save_document_raises_403(self, db_session, test_user, test_user2, shared_workspace):
+        board = _shared_board(db_session, shared_workspace, test_user)
+        _set_role(db_session, shared_workspace, test_user2, "viewer")
+        snapshot = base64.b64encode(b"").decode("ascii")
+        with pytest.raises(AppException) as exc:
+            WhiteboardService(db_session).save_document(board.id, snapshot, test_user2.id)
+        assert exc.value.status_code == 403
+        assert db_session.query(BoardDocument).filter(BoardDocument.board_id == board.id).first() is None
+
+    def test_viewer_can_still_load_document(self, db_session, test_user, test_user2, shared_workspace):
+        board = _shared_board(db_session, shared_workspace, test_user)
+        _set_role(db_session, shared_workspace, test_user2, "viewer")
+        result = WhiteboardService(db_session).load_document(board.id, test_user2.id)
+        assert result.snapshot is None
+
+
+def _shared_board(db_session, workspace, creator):
+    board = Board(
+        name="Shared Board", icon="PenTool", bg_color="bg-gray-500",
+        workspace_id=workspace.id, created_by=creator.id,
+        last_modified_by=creator.id, last_modified=datetime.utcnow(),
+    )
+    db_session.add(board)
+    db_session.commit()
+    return board
+
+
+def _set_role(db_session, workspace, user, role):
+    member = db_session.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace.id, WorkspaceMember.user_id == user.id
+    ).first()
+    member.role = role
+    db_session.commit()

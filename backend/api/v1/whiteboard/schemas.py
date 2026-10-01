@@ -55,3 +55,6 @@ class AccessCheckResponse(BaseModel):
     has_access: bool
     user_id: int
     username: str
+    # Rola w workspace tablicy; whiteboard-sync ustawia viewerowi połączenie tylko do odczytu.
+    role: str
+    can_edit: bool
