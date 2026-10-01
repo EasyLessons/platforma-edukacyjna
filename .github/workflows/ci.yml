@@ -184,6 +184,21 @@ jobs:
             test-results/
           retention-days: 7
 
+  # Testy whiteboard-sync (vitest): auth.ts z atrapa backendu + prawdziwy serwer Hocuspocus
+  # (rola viewer tylko do odczytu).
+  sync-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: whiteboard-sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm test
+
   # --- Bezpieczenstwo ---------------------------------------------------------
   # Trzy joby ponizej nie buduja ani nie testuja kodu - pilnuja zaleznosci i sekretow.
   # Polityka i lista wyjatkow: docs/architecture/ci-cd.md, sekcja "Co sprawdza CI".
