@@ -1,7 +1,8 @@
 # ADR: silnik tablicy — własny vs Excalidraw vs tldraw (+ plan płatności)
 
 **Data:** 22.09.2026
-**Status:** propozycja do decyzji Patryka i Bartka. Zero zmian w kodzie w tej sesji.
+**Status:** **zaakceptowany 01.10.2026 - Opcja 2 (Excalidraw)**, patrz sekcja „Decyzja 01.10.2026” na końcu.
+(Pierwotnie: propozycja do decyzji Patryka i Bartka, 22.09.2026.)
 **Baza pomiarów:** `origin/main@18d7f52` (merge PR #63). Liczby z `git ls-files | xargs wc -l`,
 nie z dokumentacji. Fakty o bibliotekach sprawdzone w sieci 22.09.2026 — linki przy każdym.
 **Dane empiryczne:** równolegle powstaje prototyp Excalidraw + Yjs na gałęzi
@@ -389,3 +390,24 @@ do faktur. Jeśli ktokolwiek zaproponuje "prosty cron do subskrypcji" — odsył
   [webhooks](https://docs.stripe.com/webhooks), [Customer Portal](https://docs.stripe.com/customer-management)
 - Faktury PL: [Stripto](https://stripto.pl/automatyczne-faktury-stripe), [Striplo](https://striplo.pl/),
   [Billio](https://billio.pl/), [KSeF terminy](https://ksef.podatki.gov.pl/informacje-ogolne-ksef-20/zakres-obowiazkowego-ksef/)
+
+---
+
+## Decyzja 01.10.2026
+
+ADR zaakceptowany przez Patryka: **Opcja 2 — Excalidraw**. Prototyp #72 sprawdzony ręcznie przez Patryka
+(2 przeglądarki, sync, kursory, f(x) — działa). Ustalenia:
+
+1. **Notatka Markdown/KaTeX** → element `embeddable` z `renderEmbeddable` (własny React: `react-markdown` + `rehype-katex`),
+   treść w `customData.content`.
+2. **Tabela** → opcja A: grupa `rectangle` + `label` + mini-toolbar (dodaj/usuń wiersz/kolumnę), dane w `customData.table`.
+3. **Zaznaczanie po obrysie** akceptowane; kształty domyślnie z lekkim wypełnieniem (klik w środek zaznacza).
+4. **Wygląd:** płótno Excalidraw w kolorach EasyLesson (zmienne CSS na `.excalidraw`), nasze panele (nagłówek, sidebar,
+   ustawienia, SmartSearch, kalkulator, czat) dookoła. Własny pasek narzędzi — nie teraz.
+5. **Wykres f(x):** statyczny SVG edytowany z panelu (jak w prototypie).
+6. **Wdrożenie za flagą** `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw` (domyślnie stary silnik). Stary kod znika dopiero po tygodniu
+   lekcji bez regresji (etap F).
+7. **PR #79** (refaktor function-tool starego silnika) — do zamknięcia bez merge.
+
+Realizacja etapu A: PR #88–#92 (feature `src/_new/features/board-engine/`, strony za flagą, motyw, fonty bez CDN, e2e).
+Bezpieczeństwo `whiteboard-sync` (rola viewer na serwerze, zapis `/doc` kluczem serwisu): PR #95, #96.
