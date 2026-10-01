@@ -18,6 +18,9 @@
  * daje NaN i warstwa REST wychodzi wczesniej (use-elements.ts, engine).
  * Jedyne miejsce, ktore tego nie sprawdzalo - markOpened w useRealtimeChannel -
  * dostalo guard isDemoBoard.
+ *
+ * Przy NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw demo renderuje tablice Excalidraw
+ * tylko lokalnie (whiteboard-sync wymaga tokenu i liczbowego id tablicy).
  */
 
 'use client';
@@ -32,6 +35,8 @@ import {
 } from '@/_new/features/whiteboard/components/layout/board-header';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
 import { BoardRealtimeProvider } from '../../../context/BoardRealtimeContext';
+import { isExcalidrawEngine } from '@/_new/features/board-engine';
+import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
 
 export default function DemoBoardPage() {
   const params = useParams<{ sessionId: string }>();
@@ -52,6 +57,21 @@ export default function DemoBoardPage() {
     return (
       <div className="flex h-dvh items-center justify-center text-gray-600">
         Przygotowuje tablice...
+      </div>
+    );
+  }
+
+  if (isExcalidrawEngine) {
+    return (
+      <div className="relative h-dvh w-screen overflow-hidden">
+        <BoardHeaderFrame compact={!metrics.showFullHeader}>
+          <BoardLogoButton
+            href="/"
+            tooltip="Wróć na stronę główną"
+            compact={metrics.isPhoneLayout}
+          />
+        </BoardHeaderFrame>
+        <ExcalidrawWhiteboard boardId={boardId} userRole="editor" guest={guest} />
       </div>
     );
   }
