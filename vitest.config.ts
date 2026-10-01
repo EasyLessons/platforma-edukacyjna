@@ -5,16 +5,25 @@ import path from 'path';
 export default defineConfig({
   plugins: [tsconfigPaths()],
   resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-      '@new': path.resolve(__dirname, './src/_new'),
-    },
+    alias: [
+      { find: '@new', replacement: path.resolve(__dirname, './src/_new') },
+      { find: '@', replacement: path.resolve(__dirname, './src') },
+      // Excalidraw 0.18 (ESM) importuje `roughjs/bin/rough` bez rozszerzenia; Node/Vite
+      // w trybie ESM tego nie rozwiaze. Dotyczy testow features/board-engine.
+      { find: /^roughjs\/bin\/(.*)$/, replacement: 'roughjs/bin/$1.js' },
+    ],
   },
   test: {
     globals: true,
     environment: 'jsdom',
-    setupFiles: ['./src/test/setup.ts'],
+    setupFiles: ['./src/test/setup.ts', './src/test/setup-canvas-stub.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    server: {
+      deps: {
+        // Excalidraw musi przejsc przez Vite (alias roughjs powyzej), nie przez Node ESM.
+        inline: ['@excalidraw/excalidraw'],
+      },
+    },
     exclude: ['node_modules', '.next'],
     coverage: {
       provider: 'v8',
