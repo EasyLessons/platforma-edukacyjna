@@ -121,10 +121,14 @@ class WhiteboardService:
 
     # Document (Yjs snapshot) --------------------------------------------------
 
-    def save_document(self, board_id: int, snapshot_base64: str, user_id: int) -> None:
-        _, role = self._get_board_and_role(board_id, user_id)
-        if not can_edit(role):
-            raise AppException("Rola viewer nie może zapisywać tablicy", status_code=403)
+    def save_document(self, board_id: int, snapshot_base64: str, user_id: int | None) -> None:
+        """user_id=None: whiteboard-sync z kluczem serwisu (rolę sprawdził przy połączeniu)."""
+        if user_id is None:
+            self._get_board_or_404(board_id)
+        else:
+            _, role = self._get_board_and_role(board_id, user_id)
+            if not can_edit(role):
+                raise AppException("Rola viewer nie może zapisywać tablicy", status_code=403)
 
         try:
             snapshot = base64.b64decode(snapshot_base64, validate=True)
@@ -148,8 +152,12 @@ class WhiteboardService:
             ))
         self.db.commit()
 
-    def load_document(self, board_id: int, user_id: int) -> DocumentResponse:
-        self._get_board_for_member(board_id, user_id)
+    def load_document(self, board_id: int, user_id: int | None) -> DocumentResponse:
+        """user_id=None: whiteboard-sync z kluczem serwisu."""
+        if user_id is None:
+            self._get_board_or_404(board_id)
+        else:
+            self._get_board_for_member(board_id, user_id)
 
         doc = self.db.query(BoardDocument).filter(
             BoardDocument.board_id == board_id
