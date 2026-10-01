@@ -23,6 +23,7 @@
     "src/**/*.{ts,tsx,js,jsx,json,css,md}": "prettier --write"
   },
   "dependencies": {
+    "@excalidraw/excalidraw": "0.18.1",
     "@google/generative-ai": "^0.24.1",
     "@hocuspocus/provider": "^2.15.0",
     "@mdx-js/loader": "^3.1.1",
