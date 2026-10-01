@@ -19,7 +19,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type * as Y from 'yjs';
-import { Excalidraw, CaptureUpdateAction, reconcileElements } from '@excalidraw/excalidraw';
+import {
+  Excalidraw,
+  CaptureUpdateAction,
+  exportToBlob,
+  reconcileElements,
+} from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
 import type {
   ExcalidrawImperativeAPI,
@@ -55,6 +60,20 @@ import { FunctionPanel } from './function-panel';
 const PUSH_THROTTLE_MS = 50;
 const POINTER_THROTTLE_MS = 40;
 
+/** Hak dla testów e2e (Playwright) - tylko przy NEXT_PUBLIC_E2E=1. */
+declare global {
+  interface Window {
+    __boardEngine?: {
+      api: ExcalidrawImperativeAPI;
+      /** Rozmiar PNG z eksportu całej sceny (bajty). */
+      exportPng: () => Promise<number>;
+      /** Nazwy użytkowników w awareness (łącznie z własną); null bez połączenia. */
+      awarenessUsers: () => (string | null)[] | null;
+    };
+  }
+}
+const EXPOSE_E2E_HOOK = process.env.NEXT_PUBLIC_E2E === '1';
+
 export interface BoardUser {
   id: number;
   name: string;
@@ -83,6 +102,17 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
   const lastPointerPushRef = useRef(0);
   const editingIdRef = useRef<string | null>(null);
 
+  // Excalidraw inicjalizuje scenę asynchronicznie (initializeScene): po `await initialData`
+  // nadpisuje elementy i appState, w tym `collaborators`. Wszystko, co wpiszemy przez
+  // updateScene wcześniej, przepada - dlatego wiązanie i awareness startują dopiero po
+  // pierwszym onChange (Excalidraw nie woła go, dopóki isLoading === true).
+  const initialDataRequestedRef = useRef(false);
+  const [sceneReady, setSceneReady] = useState(false);
+  const initialData = useCallback(async () => {
+    initialDataRequestedRef.current = true;
+    return null;
+  }, []);
+
   // --- lokalne -> Y.Doc ----------------------------------------------------
 
   const flushPending = useCallback(() => {
@@ -97,6 +127,9 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
 
   const handleChange = useCallback(
     (elements: readonly OrderedExcalidrawElement[], appState: AppState, files: BinaryFiles) => {
+      if (!initialDataRequestedRef.current) return;
+      setSceneReady(true);
+
       pendingRef.current = { elements, files };
       if (!pushTimerRef.current) pushTimerRef.current = setTimeout(flushPending, PUSH_THROTTLE_MS);
 
@@ -115,7 +148,7 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
   // --- Y.Doc <-> Excalidraw ------------------------------------------------
 
   useEffect(() => {
-    if (!api) return;
+    if (!api || !sceneReady) return;
 
     const binding = new ExcalidrawYjsBinding(doc, `excalidraw-local:${doc.clientID}`);
     bindingRef.current = binding;
@@ -146,12 +179,37 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
       unobserveFiles();
       bindingRef.current = null;
     };
-  }, [api, doc, flushPending]);
+  }, [api, sceneReady, doc, flushPending]);
+
+  useEffect(() => {
+    if (!api || !EXPOSE_E2E_HOOK) return;
+    window.__boardEngine = {
+      api,
+      exportPng: async () => {
+        const blob = await exportToBlob({
+          elements: api.getSceneElements(),
+          appState: api.getAppState(),
+          files: api.getFiles(),
+          mimeType: 'image/png',
+        });
+        return blob.size;
+      },
+      awarenessUsers: () =>
+        awareness
+          ? [...awareness.getStates().values()].map(
+              (st) => (st as Partial<LocalAwarenessState>).user?.name ?? null
+            )
+          : null,
+    };
+    return () => {
+      if (window.__boardEngine?.api === api) delete window.__boardEngine;
+    };
+  }, [api, awareness]);
 
   // --- awareness: tożsamość + kursory innych -------------------------------
 
   useEffect(() => {
-    if (!api || !awareness) return;
+    if (!api || !sceneReady || !awareness) return;
 
     const me: LocalAwarenessState = {
       user: { name: user.name, color: pickUserColor(user.id) },
@@ -168,7 +226,7 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
       awareness.setLocalState(null);
       api.updateScene({ collaborators: new Map() });
     };
-  }, [api, awareness, user.id, user.name]);
+  }, [api, sceneReady, awareness, user.id, user.name]);
 
   const handlePointerUpdate = useCallback(
     (payload: {
@@ -243,6 +301,7 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
     <div style={{ width: '100%', height: '100%' }} data-testid="excalidraw-board">
       <Excalidraw
         excalidrawAPI={setApi}
+        initialData={initialData}
         onChange={handleChange}
         onPointerUpdate={handlePointerUpdate}
         renderTopRightUI={renderTopRightUI}

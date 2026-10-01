@@ -43,6 +43,8 @@ import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi
 import { usePrewarmWhiteboardSync } from '@/_new/features/whiteboard/yjs/prewarm-sync';
 import { clearBoardCache } from '@/_new/lib/board-cache/board-cache';
 import { createLogger } from '@/_new/lib/logger';
+import { isExcalidrawEngine } from '@/_new/features/board-engine';
+import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
 
 const log = createLogger('whiteboard/page');
 
@@ -324,20 +326,26 @@ export function TablicaContent() {
           />
         )}
 
-        {/* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */}
-        <BoardRealtimeProvider boardId={boardId ?? ''}>
-          {/* VOICE CHAT PROVIDER - P2P audio */}
-          <VoiceChatProvider boardId={boardId ?? ''}>
-            <WhiteboardCanvas
-              boardId={boardId ?? ''}
-              arkuszPath={arkuszPath}
-              userRole={userRole || 'editor'}
-              boardSettings={boardSettings}
-              toolbarLeftOffset={0}
-              isSidebarOpen={sidebar.isOpen}
-            />
-          </VoiceChatProvider>
-        </BoardRealtimeProvider>
+        {isExcalidrawEngine ? (
+          // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Czat głosowy,
+          // arkusze i narzędzia matematyczne dochodzą w etapie B migracji.
+          <ExcalidrawWhiteboard boardId={boardId} userRole={userRole || 'editor'} />
+        ) : (
+          /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */
+          <BoardRealtimeProvider boardId={boardId ?? ''}>
+            {/* VOICE CHAT PROVIDER - P2P audio */}
+            <VoiceChatProvider boardId={boardId ?? ''}>
+              <WhiteboardCanvas
+                boardId={boardId ?? ''}
+                arkuszPath={arkuszPath}
+                userRole={userRole || 'editor'}
+                boardSettings={boardSettings}
+                toolbarLeftOffset={0}
+                isSidebarOpen={sidebar.isOpen}
+              />
+            </VoiceChatProvider>
+          </BoardRealtimeProvider>
+        )}
       </div>
     </div>
   );
