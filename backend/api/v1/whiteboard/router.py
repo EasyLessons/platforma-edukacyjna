@@ -23,6 +23,7 @@ from .schemas import (
     AccessCheckResponse,
 )
 from .service import WhiteboardService
+from .dependencies import DocCaller, get_doc_caller
 
 router = APIRouter(tags=["Whiteboard"])
 
@@ -95,10 +96,10 @@ def save_document(
     board_id: int,
     request: SaveDocumentRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    caller: DocCaller = Depends(get_doc_caller),
 ):
     service = WhiteboardService(db)
-    service.save_document(board_id, request.snapshot, current_user.id)
+    service.save_document(board_id, request.snapshot, caller.user.id if caller.user else None)
     return ApiResponse(success=True, data=SaveDocumentResponse(success=True))
 
 @router.get(
@@ -108,10 +109,10 @@ def save_document(
 def get_document(
     board_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    caller: DocCaller = Depends(get_doc_caller),
 ):
     service = WhiteboardService(db)
-    result = service.load_document(board_id, current_user.id)
+    result = service.load_document(board_id, caller.user.id if caller.user else None)
     return ApiResponse(success=True, data=result)
 
 # Access check --------------------------------------------------
