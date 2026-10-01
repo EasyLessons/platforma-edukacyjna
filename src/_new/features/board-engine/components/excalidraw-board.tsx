@@ -26,8 +26,10 @@ import {
   reconcileElements,
 } from '@excalidraw/excalidraw';
 import '@excalidraw/excalidraw/index.css';
+import './excalidraw-theme.css';
 import type {
   ExcalidrawImperativeAPI,
+  ExcalidrawProps,
   AppState,
   BinaryFiles,
   BinaryFileData,
@@ -56,6 +58,7 @@ import {
 } from '../math/function-element';
 import type { FunctionSpec } from '../math/function-plot';
 import { FunctionPanel } from './function-panel';
+import { backgroundForTool } from '../config/default-fill';
 
 const PUSH_THROTTLE_MS = 50;
 const POINTER_THROTTLE_MS = 40;
@@ -74,6 +77,20 @@ declare global {
 }
 const EXPOSE_E2E_HOOK = process.env.NEXT_PUBLIC_E2E === '1';
 
+/**
+ * Menu Excalidraw bez akcji, które u nas nie mają sensu albo dublują nasze panele:
+ * wczytywanie/zapis pliku .excalidraw (tablica zapisuje się sama przez whiteboard-sync).
+ * Zostają: eksport obrazu, czyszczenie płótna (z cofaniem), kolor tła, pomoc.
+ */
+const UI_OPTIONS: ExcalidrawProps['UIOptions'] = {
+  canvasActions: {
+    loadScene: false,
+    saveToActiveFile: false,
+    export: false,
+    toggleTheme: false,
+  },
+};
+
 export interface BoardUser {
   id: number;
   name: string;
@@ -87,9 +104,17 @@ export interface ExcalidrawBoardProps {
   user: BoardUser;
   /** Tryb tylko do odczytu (rola viewer). */
   viewMode?: boolean;
+  /** Siatka na płótnie (ustawienie tablicy `grid_visible`). */
+  gridVisible?: boolean;
 }
 
-export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: ExcalidrawBoardProps) {
+export function ExcalidrawBoard({
+  doc,
+  awareness,
+  user,
+  viewMode = false,
+  gridVisible = true,
+}: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [editingSpec, setEditingSpec] = useState<FunctionSpec | null>(null);
 
@@ -101,6 +126,7 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
   } | null>(null);
   const lastPointerPushRef = useRef(0);
   const editingIdRef = useRef<string | null>(null);
+  const lastToolRef = useRef<string | null>(null);
 
   // Excalidraw inicjalizuje scenę asynchronicznie (initializeScene): po `await initialData`
   // nadpisuje elementy i appState, w tym `collaborators`. Wszystko, co wpiszemy przez
@@ -133,6 +159,19 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
       pendingRef.current = { elements, files };
       if (!pushTimerRef.current) pushTimerRef.current = setTimeout(flushPending, PUSH_THROTTLE_MS);
 
+      // Domyślne lekkie wypełnienie kształtów - tylko przy zmianie narzędzia (config/default-fill.ts)
+      const tool = appState.activeTool.type;
+      if (tool !== lastToolRef.current) {
+        lastToolRef.current = tool;
+        const background = backgroundForTool(tool, appState.currentItemBackgroundColor);
+        if (background && api) {
+          api.updateScene({
+            appState: { currentItemBackgroundColor: background },
+            captureUpdate: CaptureUpdateAction.NEVER,
+          });
+        }
+      }
+
       // Zaznaczony dokładnie jeden wykres -> panel przechodzi w tryb edycji
       const ids = Object.keys(appState.selectedElementIds);
       const sel = ids.length === 1 ? elements.find((e) => e.id === ids[0]) : undefined;
@@ -142,7 +181,7 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
         setEditingSpec(isFunctionElement(sel) ? sel.customData.spec : null);
       }
     },
-    [flushPending]
+    [api, flushPending]
   );
 
   // --- Y.Doc <-> Excalidraw ------------------------------------------------
@@ -289,16 +328,22 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
     [api]
   );
 
+  // Na telefonie prawy górny róg należy do paska narzędzi Excalidraw - f(x) jako pływający
+  // przycisk nad stopką (widoczność przełącza CSS w excalidraw-theme.css).
   const renderTopRightUI = useCallback(
-    () =>
-      viewMode ? null : (
+    (isMobile: boolean) =>
+      viewMode || isMobile ? null : (
         <FunctionPanel editingSpec={editingSpec} onAdd={addFunction} onUpdate={updateFunction} />
       ),
     [viewMode, editingSpec, addFunction, updateFunction]
   );
 
   return (
-    <div style={{ width: '100%', height: '100%' }} data-testid="excalidraw-board">
+    <div
+      className="easylesson-board"
+      style={{ position: 'relative', width: '100%', height: '100%' }}
+      data-testid="excalidraw-board"
+    >
       <Excalidraw
         excalidrawAPI={setApi}
         initialData={initialData}
@@ -306,9 +351,21 @@ export function ExcalidrawBoard({ doc, awareness, user, viewMode = false }: Exca
         onPointerUpdate={handlePointerUpdate}
         renderTopRightUI={renderTopRightUI}
         viewModeEnabled={viewMode}
+        gridModeEnabled={gridVisible}
+        UIOptions={UI_OPTIONS}
         langCode="pl-PL"
         isCollaborating={awareness != null}
       />
+      {!viewMode && (
+        <div className="easylesson-fx-mobile">
+          <FunctionPanel
+            editingSpec={editingSpec}
+            onAdd={addFunction}
+            onUpdate={updateFunction}
+            placement="up-left"
+          />
+        </div>
+      )}
     </div>
   );
 }

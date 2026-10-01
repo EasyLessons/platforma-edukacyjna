@@ -17,9 +17,16 @@ interface FunctionPanelProps {
   editingSpec: FunctionSpec | null;
   onAdd: (spec: FunctionSpec) => void;
   onUpdate: (spec: FunctionSpec) => void;
+  /** 'up-left' - panel otwiera się w górę i w lewo (pływający przycisk w prawym dolnym rogu). */
+  placement?: 'down-right' | 'up-left';
 }
 
-export function FunctionPanel({ editingSpec, onAdd, onUpdate }: FunctionPanelProps) {
+export function FunctionPanel({
+  editingSpec,
+  onAdd,
+  onUpdate,
+  placement = 'down-right',
+}: FunctionPanelProps) {
   const [open, setOpen] = useState(false);
   const [spec, setSpec] = useState<FunctionSpec>(DEFAULT_FUNCTION_SPEC);
   const [error, setError] = useState<string | null>(null);
@@ -43,7 +50,10 @@ export function FunctionPanel({ editingSpec, onAdd, onUpdate }: FunctionPanelPro
   };
 
   return (
-    <div className="flex items-start gap-2" data-testid="function-panel">
+    <div
+      className={`flex gap-2 ${placement === 'up-left' ? 'flex-row-reverse items-end' : 'items-start'}`}
+      data-testid="function-panel"
+    >
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

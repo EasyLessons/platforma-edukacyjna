@@ -1,0 +1,49 @@
+/*
+ * Płótno Excalidraw w kolorach EasyLesson + miejsce na nasz nagłówek.
+ *
+ * Excalidraw nie pozwala podmienić swoich komponentów UI - skórujemy go przez
+ * zmienne CSS na `.excalidraw` (decyzja Patryka z 01.10.2026, ADR #75).
+ * Wartości domyślne Excalidraw: node_modules/@excalidraw/excalidraw/dist/prod/index.css.
+ * Tylko jasny motyw (tablica EasyLesson nie ma trybu ciemnego).
+ */
+
+.easylesson-board .excalidraw {
+  /* Akcent: zielony z przycisków EasyLesson (Tailwind green-600 i pochodne) */
+  --color-primary: #16a34a;
+  --color-primary-darker: #15803d;
+  --color-primary-darkest: #166534;
+  --color-primary-hover: #15803d;
+  --color-primary-light: #dcfce7;
+  --color-primary-light-darker: #bbf7d0;
+  --color-brand-hover: #15803d;
+  --color-brand-active: #166534;
+  --color-surface-primary-container: #dcfce7;
+  --color-on-primary-container: #14532d;
+  /* Zaznaczenie: niebieski jak na starej tablicy (Tailwind blue-500) */
+  --color-selection: #3b82f6;
+}
+
+/*
+ * Lewy górny róg zajmuje nagłówek EasyLesson (BoardHeaderFrame: 56 px + odstęp od góry),
+ * więc menu Excalidraw (hamburger z eksportem obrazu, pomocą, tłem płótna) schodzi pod niego.
+ */
+.easylesson-board .excalidraw:not(.excalidraw--mobile) .App-menu_top > *:first-child {
+  margin-top: 72px;
+}
+
+/* Telefon: pasek narzędzi Excalidraw jest na górze na całą szerokość - pod nasz przycisk sidebara. */
+.easylesson-board .excalidraw.excalidraw--mobile .App-top-bar {
+  margin-top: calc(64px + env(safe-area-inset-top, 0px));
+}
+
+/* f(x) na telefonie: pływający przycisk nad stopką Excalidraw (na desktopie jest w prawym górnym rogu). */
+.easylesson-fx-mobile {
+  display: none;
+  position: absolute;
+  right: 12px;
+  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+}
+.easylesson-board:has(.excalidraw--mobile) .easylesson-fx-mobile {
+  display: block;
+}
