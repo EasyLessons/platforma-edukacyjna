@@ -39,6 +39,9 @@ tsconfig.tsbuildinfo
 # Vercel
 .vercel
 
+# Fonty Excalidraw kopiowane z node_modules przy dev/build (scripts/copy-excalidraw-assets.mjs)
+/public/excalidraw-assets/
+
 # OS
 .DS_Store
 Thumbs.db

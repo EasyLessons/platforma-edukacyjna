@@ -4,7 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-excalidraw-assets.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/copy-excalidraw-assets.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint src --ext .js,.jsx,.ts,.tsx",
