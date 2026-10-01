@@ -329,7 +329,11 @@ export function TablicaContent() {
         {isExcalidrawEngine ? (
           // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Czat głosowy,
           // arkusze i narzędzia matematyczne dochodzą w etapie B migracji.
-          <ExcalidrawWhiteboard boardId={boardId} userRole={userRole || 'editor'} />
+          <ExcalidrawWhiteboard
+            boardId={boardId}
+            userRole={userRole || 'editor'}
+            gridVisible={boardSettings.grid_visible}
+          />
         ) : (
           /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */
           <BoardRealtimeProvider boardId={boardId ?? ''}>

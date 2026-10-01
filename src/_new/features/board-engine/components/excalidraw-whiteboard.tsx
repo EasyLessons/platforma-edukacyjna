@@ -26,6 +26,12 @@ export interface ExcalidrawWhiteboardProps {
   userRole: BoardRole;
   /** Tożsamość gościa (demo). Bez niej używany jest zalogowany użytkownik. */
   guest?: { id: number; username: string };
+  /**
+   * Ustawienia tablicy (panel ustawień). Na razie działa `grid_visible`.
+   * TODO(decyzja): `toolbar_visible` - pasek to pasek Excalidraw (własny pasek "nie teraz");
+   * `ai_enabled` / `smartsearch_visible` dotyczą paneli z etapu B.
+   */
+  gridVisible?: boolean;
 }
 
 export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
@@ -33,7 +39,7 @@ export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
   return <BoardSession key={props.boardId} {...props} />;
 }
 
-function BoardSession({ boardId, userRole, guest }: ExcalidrawWhiteboardProps) {
+function BoardSession({ boardId, userRole, guest, gridVisible }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
@@ -69,6 +75,7 @@ function BoardSession({ boardId, userRole, guest }: ExcalidrawWhiteboardProps) {
         awareness={connection.awareness}
         user={me}
         viewMode={userRole === 'viewer'}
+        gridVisible={gridVisible}
       />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
