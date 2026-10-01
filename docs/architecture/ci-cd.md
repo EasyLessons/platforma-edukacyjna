@@ -39,6 +39,7 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 | `frontend-arch` | `npm run depcruise` (dependency-cruiser: granice importów `app -> _new/features -> _new/{shared,lib}`, brak cykli/sierot) | to samo |
 | `frontend-build` | `npm run build` (sanity-check kompilacji) | to samo |
 | `sync-typecheck` | `npx tsc --noEmit` w `whiteboard-sync/` | to samo |
+| `sync-test` | `npm test` (vitest) w `whiteboard-sync/` - autoryzacja i rola viewer na prawdziwym serwerze Hocuspocus. **Jeszcze nie w wymaganych checkach** | to samo |
 | `frontend-audit` | `npm audit --omit=dev` na zależnościach produkcyjnych (dziś `--audit-level=critical` do czasu podbicia `pdfjs-dist` do 6.x, potem `high`); pełny audyt z dev tylko informacyjnie; `whiteboard-sync` osobno na `high` | `npm audit --audit-level=critical --omit=dev` |
 | `backend-audit` | `pip-audit -r requirements.txt --strict` w `backend/`; podatności bez poprawki w obrębie naszego majora są wpisane z powodem w `backend/pip-audit-ignore.txt` (każdy wpis ma warunek usunięcia). Każda nowa podatność spoza listy = czerwony job | `pip install pip-audit`, potem komenda z joba |
 | `gitleaks` | binarka `gitleaks` (bez licencji, w przeciwieństwie do `gitleaks-action` dla organizacji): commity z PR skanowane z twardym failem; cała historia tylko informacyjnie (`continue-on-error`) do czasu rotacji 4 starych wpisów i allowlisty w `.gitleaks.toml` | `gitleaks git --redact .` |
