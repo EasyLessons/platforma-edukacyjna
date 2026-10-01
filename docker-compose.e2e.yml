@@ -1,0 +1,27 @@
+# Baza + Redis dla testow E2E (Playwright) uruchamianych LOKALNIE.
+# Backend i frontend startuje sam Playwright (webServer w playwright.config.ts),
+# wiec tu sa tylko uslugi, ktorych nie da sie odpalic bez Dockera.
+#
+#   docker compose -f docker-compose.e2e.yml up -d
+#   npm run test:e2e
+#   docker compose -f docker-compose.e2e.yml down -v
+#
+# Porty sa NIESTANDARDOWE (55432 / 56379), zeby nie kolidowac z lokalnym
+# Postgresem ani z redisem z glownego docker-compose.yml. W CI (GitHub Actions)
+# te same uslugi ida jako `services:` na standardowych portach - patrz
+# E2E_DATABASE_URL / E2E_REDIS_URL w playwright.config.ts.
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_PASSWORD: e2e
+      POSTGRES_DB: e2e
+    ports:
+      - '55432:5432'
+    tmpfs:
+      - /var/lib/postgresql/data
+  redis:
+    image: redis:7-alpine
+    ports:
+      - '56379:6379'

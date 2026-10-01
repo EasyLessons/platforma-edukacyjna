@@ -67,6 +67,7 @@ src/
 | Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze, model Y.Doc |
 | Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
 | Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo |
+| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN |
 
 ---
 
@@ -132,6 +133,30 @@ npx vitest run src/app/api/chat/route.test.ts
 
 ---
 
+## E2E (Playwright) - tablica na Excalidraw
+
+`e2e/*.spec.ts` + `playwright.config.ts`. Testują tablicę z `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw` na pełnym
+stosie: backend (seed `backend/scripts/seed_e2e.py`: właściciel, edytor i viewer w jednym workspace), prawdziwy
+`whiteboard-sync` z autoryzacją, frontend. Serwery startuje Playwright (`webServer`), bazę i Redisa - Docker.
+Stan aplikacji czytają przez `window.__boardEngine` (wystawiane tylko przy `NEXT_PUBLIC_E2E=1`).
+
+```bash
+docker compose -f docker-compose.e2e.yml up -d     # Postgres :55432 + Redis :56379
+npm --prefix whiteboard-sync ci                    # raz
+# PowerShell: $env:E2E_PYTHON="$PWD\backend\.venv\Scripts\python.exe"
+E2E_PYTHON=backend/.venv/Scripts/python.exe npm run test:e2e
+docker compose -f docker-compose.e2e.yml down -v   # sprzątanie
+```
+
+- Frontend musi być na porcie **3000** (tylko ten `localhost` jest w CORS backendu). Gdy 3000 jest zajęty, ustaw
+  np. `E2E_FRONTEND_PORT=3210` - Chromium dostaje wtedy `--disable-web-security` (tylko lokalnie).
+- Backend (8210) i whiteboard-sync (1294) są na nietypowych portach, a `reuseExistingServer` jest domyślnie wyłączone,
+  żeby Playwright nie "pożyczył" cudzego serwera bez seeda. Ponowne użycie działających serwerów: `E2E_REUSE=1`.
+- Backend limituje logowanie (10 prób / 5 min na login) - helpery logują każdego użytkownika raz na przebieg.
+  Przy częstych lokalnych powtórkach: `docker compose -f docker-compose.e2e.yml exec redis redis-cli FLUSHALL`.
+
+---
+
 ## Gdzie NIE ma testów (frontend)
 
 Katalogi z kodem i zerem testów — kolejność wg ryzyka:
@@ -151,7 +176,7 @@ Backend bez testów: `assets/`, `onboarding/`, `whiteboard/router.py`, `whiteboa
 
 ## Znane ograniczenia
 
-- Brak testów E2E (wymagają działającego Dockera z pełnym środowiskiem: backend, redis, whiteboard-sync).
+- E2E pokrywają tylko tablicę na Excalidraw (za flagą); stary silnik, logowanie przez Google, dashboard i czat głosowy nie mają testów E2E.
 - Brak testów WebSocket dla synchronizacji tablicy (Supabase Realtime w ścieżce legacy, Hocuspocus w ścieżce Yjs) — trudne do izolacji; model `Y.Doc` jest testowany jednostkowo (`yjs/board-doc.test.ts`).
 - `pytest-asyncio` 0.21.1 ma bug z `@pytest_asyncio.fixture` w trybie STRICT — testy integracyjne backendowe używają synchronicznego `TestClient` zamiast async httpx.
 - Lokalnie na Windows `prettier --check` może zgłaszać setki plików przez `core.autocrlf=true` (CRLF) — CI na Linuksie jest miarodajne.

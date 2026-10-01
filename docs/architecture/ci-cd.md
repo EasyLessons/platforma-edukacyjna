@@ -39,6 +39,7 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 | `frontend-arch` | `npm run depcruise` (dependency-cruiser: granice importów `app -> _new/features -> _new/{shared,lib}`, brak cykli/sierot) | to samo |
 | `frontend-build` | `npm run build` (sanity-check kompilacji) | to samo |
 | `sync-typecheck` | `npx tsc --noEmit` w `whiteboard-sync/` | to samo |
+| `e2e-board-engine` | Playwright (`e2e/`) na pełnym stosie: Postgres + Redis (services), backend z `scripts/seed_e2e.py`, `whiteboard-sync`, frontend z `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`. **Jeszcze nie w wymaganych checkach** - dodać po kilku stabilnych przebiegach | `npm run test:e2e` (opis w `docs/testing.md`, sekcja E2E) |
 | `sync-test` | `npm test` (vitest) w `whiteboard-sync/` - autoryzacja i rola viewer na prawdziwym serwerze Hocuspocus. **Jeszcze nie w wymaganych checkach** | to samo |
 | `frontend-audit` | `npm audit --omit=dev` na zależnościach produkcyjnych (dziś `--audit-level=critical` do czasu podbicia `pdfjs-dist` do 6.x, potem `high`); pełny audyt z dev tylko informacyjnie; `whiteboard-sync` osobno na `high` | `npm audit --audit-level=critical --omit=dev` |
 | `backend-audit` | `pip-audit -r requirements.txt --strict` w `backend/`; podatności bez poprawki w obrębie naszego majora są wpisane z powodem w `backend/pip-audit-ignore.txt` (każdy wpis ma warunek usunięcia). Każda nowa podatność spoza listy = czerwony job | `pip install pip-audit`, potem komenda z joba |

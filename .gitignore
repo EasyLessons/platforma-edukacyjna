@@ -39,6 +39,12 @@ tsconfig.tsbuildinfo
 # Vercel
 .vercel
 
+# Playwright (E2E) - raporty i stan seeda (e2e/.state/seed.json)
+playwright-report/
+test-results/
+blob-report/
+e2e/.state/
+
 # Fonty Excalidraw kopiowane z node_modules przy dev/build (scripts/copy-excalidraw-assets.mjs)
 /public/excalidraw-assets/
 
