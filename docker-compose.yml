@@ -48,5 +48,8 @@ services:
     environment:
       - PORT=1234
       - BACKEND_URL=http://backend:8000
+      # Ta sama wartosc co SYNC_SERVICE_TOKEN w backend/.env (compose bierze ja z .env w rootcie
+      # albo z powloki). Pusta = zapis tokenem usera, jak przed wprowadzeniem klucza.
+      - SYNC_SERVICE_TOKEN=${SYNC_SERVICE_TOKEN:-}
     depends_on:
       - backend
