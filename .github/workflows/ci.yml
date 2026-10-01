@@ -124,6 +124,66 @@ jobs:
       - run: npm ci
       - run: npx tsc --noEmit
 
+  # E2E tablicy na Excalidraw (Playwright, e2e/): pelny stos - Postgres + Redis jako
+  # services, backend z seedem, prawdziwy whiteboard-sync z autoryzacja i frontend
+  # zbudowany z NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw. Serwery startuje sam
+  # playwright.config.ts (webServer). Job nie jest (jeszcze) w wymaganych checkach
+  # rulesetu - po kilku stabilnych przebiegach dodac go tam (docs/architecture/ci-cd.md).
+  e2e-board-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: e2e
+          POSTGRES_PASSWORD: e2e
+          POSTGRES_DB: e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      CI: 'true'
+      E2E_DATABASE_URL: postgresql://e2e:e2e@localhost:5432/e2e
+      E2E_REDIS_URL: redis://localhost:6379/0
+      E2E_PYTHON: python
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm ci
+        working-directory: whiteboard-sync
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
   # --- Bezpieczenstwo ---------------------------------------------------------
   # Trzy joby ponizej nie buduja ani nie testuja kodu - pilnuja zaleznosci i sekretow.
   # Polityka i lista wyjatkow: docs/architecture/ci-cd.md, sekcja "Co sprawdza CI".
