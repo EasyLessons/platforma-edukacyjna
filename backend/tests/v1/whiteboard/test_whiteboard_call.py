@@ -1,160 +1,25 @@
 """
-Testy rozmowy glosowej tablicy - POST /api/v1/whiteboard/{id}/call (api/v1/whiteboard/call.py).
-
-API Daily jest podmienione na httpx.MockTransport (FakeDaily) - zadnych prawdziwych wywolan.
-Klucz i token sa losowane w runtime (zadnych literalow wygladajacych na sekret).
+Testy rozmowy glosowej tablicy - POST /api/v1/whiteboard/{id}/call (api/v1/whiteboard/call.py):
+kto moze tworzyc/dolaczac, wymogi pokoju, token, bledy Daily, sprzatanie pokoi.
+Limity kosztow, zuzycie, admin i szukanie klucza: test_whiteboard_call_guard.py.
 """
-import json
 import logging
-import secrets
 import time
 from datetime import datetime
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
-from redis.exceptions import ConnectionError as RedisConnectionError
 
 import api.v1.whiteboard.call as call
-from api.v1.auth.utils import create_access_token
-from core import redis_client as redis_client_module
 from core.config import get_settings
-from core.database import get_db
-from core.models import WorkspaceMember
-from main import app
 
-API_KEY = secrets.token_urlsafe(24)
-DAILY_TOKEN = secrets.token_urlsafe(48)
-DAILY_DOMAIN = "https://easylesson-test.daily.co"
-ROOM_TTL_MINUTES = 180
+from .daily_fake import (
+    API_KEY, DAILY_DOMAIN, DAILY_TOKEN, add_board, add_member, budget_of, daily_error, post_call, registry,
+    room_of,
+)
 
-
-def user_headers(user_id: int) -> dict:
-    settings = get_settings()
-    token = create_access_token({"sub": str(user_id)}, settings.secret_key, settings.algorithm)
-    return {"Authorization": f"Bearer {token}"}
-
-
-def daily_error(status: int, error: str, info: str = "") -> httpx.Response:
-    return httpx.Response(status, json={"error": error, "info": info})
-
-
-class FakeDaily:
-    """Atrapa REST API Daily: pokoje w pamieci + nagrane zadania + nadpisywane odpowiedzi."""
-
-    def __init__(self):
-        self.rooms: dict[str, dict] = {}
-        self.requests: list[httpx.Request] = []
-        # (metoda, sciezka) -> lista odpowiedzi/wyjatkow zuzywanych po kolei (ostatnia zostaje)
-        self.overrides: dict[tuple[str, str], list] = {}
-        self.missing_room_response = lambda: daily_error(404, "not-found", "room not found")
-
-    # --- pomocnicze dla testow ---
-
-    def add_room(self, name: str, *, exp: int | None = None, privacy: str = "private") -> None:
-        self.rooms[name] = {
-            "id": secrets.token_hex(8),
-            "name": name,
-            "api_created": True,
-            "privacy": privacy,
-            "url": f"{DAILY_DOMAIN}/{name}",
-            "created_at": "2026-10-02T10:00:00.000Z",
-            "config": {"exp": exp if exp is not None else int(time.time()) + 600},
-        }
-
-    def override(self, method: str, path: str, *responses) -> None:
-        self.overrides[(method, path)] = list(responses)
-
-    def calls(self, method: str | None = None, path: str | None = None) -> list[httpx.Request]:
-        return [
-            r for r in self.requests
-            if (method is None or r.method == method) and (path is None or r.url.path == f"/v1{path}")
-        ]
-
-    def body(self, method: str, path: str, index: int = -1) -> dict:
-        return json.loads(self.calls(method, path)[index].content)
-
-    # --- transport ---
-
-    def handler(self, request: httpx.Request) -> httpx.Response:
-        self.requests.append(request)
-        assert request.url.host == "api.daily.co"
-        path = request.url.path.removeprefix("/v1")
-
-        queue = self.overrides.get((request.method, path))
-        if queue:
-            item = queue.pop(0) if len(queue) > 1 else queue[0]
-            if isinstance(item, Exception):
-                raise item
-            if callable(item):
-                return item(request)
-            return httpx.Response(item.status_code, content=item.content, headers={"content-type": "application/json"})
-
-        if request.method == "POST" and path == "/meeting-tokens":
-            return httpx.Response(200, json={"token": DAILY_TOKEN})
-        if request.method == "GET" and path == "/rooms":
-            return httpx.Response(200, json={"total_count": len(self.rooms), "data": list(self.rooms.values())})
-        if request.method == "POST" and path == "/rooms":
-            payload = json.loads(request.content)
-            if payload["name"] in self.rooms:
-                return daily_error(400, "invalid-request-error", f"a room named {payload['name']} already exists")
-            self.add_room(payload["name"], exp=payload["properties"]["exp"], privacy=payload.get("privacy", "public"))
-            return httpx.Response(200, json=self.rooms[payload["name"]])
-        if path.startswith("/rooms/"):
-            name = path.removeprefix("/rooms/")
-            room = self.rooms.get(name)
-            if room is None:
-                return self.missing_room_response()
-            if request.method == "DELETE":
-                del self.rooms[name]
-                return httpx.Response(200, json={"deleted": True, "name": name})
-            if request.method == "POST":
-                room["config"].update(json.loads(request.content).get("properties", {}))
-            return httpx.Response(200, json=room)
-        return daily_error(404, "not-found")
-
-
-@pytest.fixture
-def daily(monkeypatch):
-    fake = FakeDaily()
-    real_client = httpx.AsyncClient
-    monkeypatch.setattr(
-        call.httpx,
-        "AsyncClient",
-        lambda **kwargs: real_client(transport=httpx.MockTransport(fake.handler), **kwargs),
-    )
-    monkeypatch.setattr(call, "DAILY_RATE_LIMIT_BACKOFF_SECONDS", 0)
-    return fake
-
-
-@pytest.fixture
-def client(db_session, monkeypatch, redis_client):
-    settings = get_settings()
-    monkeypatch.setattr(settings, "daily_api_key", API_KEY)
-    monkeypatch.setattr(settings, "daily_room_prefix", "easylesson")
-    monkeypatch.setattr(settings, "daily_room_ttl_minutes", ROOM_TTL_MINUTES)
-    monkeypatch.setattr(redis_client_module, "get_redis_client", lambda: redis_client)
-
-    def override_get_db():
-        yield db_session
-
-    app.dependency_overrides[get_db] = override_get_db
-    with TestClient(app, raise_server_exceptions=False) as c:
-        yield c
-    app.dependency_overrides.clear()
-
-
-def add_member(db_session, board, user, role: str) -> None:
-    db_session.add(WorkspaceMember(workspace_id=board.workspace_id, user_id=user.id, role=role))
-    db_session.commit()
-
-
-def post_call(client, board_id: int, user_id: int):
-    return client.post(f"/api/v1/whiteboard/{board_id}/call", headers=user_headers(user_id))
-
-
-def room_of(board) -> str:
-    return f"easylesson-board-{board.id}"
+HOUR = 3600
+TTL = 90 * 60  # domyslny czas pokoju (DAILY_ROOM_TTL_MINUTES)
 
 
 def assert_no_secrets(response, caplog) -> None:
@@ -177,20 +42,19 @@ class TestNotConfigured:
         assert r.json()["success"] is False
         assert daily.requests == []
 
-    def test_domyslna_konfiguracja_ma_pusty_klucz(self):
-        from core.config import Settings
+    def test_wylacznik_call_enabled_daje_503_bez_wywolan_http(self, client, daily, monkeypatch, test_user, test_board):
+        monkeypatch.setattr(get_settings(), "call_enabled", False)
 
-        assert Settings.model_fields["daily_api_key"].default == ""
+        r = post_call(client, test_board.id, test_user.id)
 
-    def test_domyslnie_pokoj_wygasa_po_3_h(self):
-        from core.config import Settings
+        assert r.status_code == 503
+        assert r.json()["code"] == "VOICE_DISABLED"
+        assert daily.requests == []
 
-        assert Settings.model_fields["daily_room_ttl_minutes"].default == 180
-
-    def test_nie_czlonek_bez_klucza_dostaje_404_a_nie_503(self, client, daily, monkeypatch, test_user2, test_board):
+    def test_nie_czlonek_przy_wylaczonych_rozmowach_dostaje_404(self, client, daily, monkeypatch, test_user2, test_board):
+        monkeypatch.setattr(get_settings(), "call_enabled", False)
         monkeypatch.setattr(get_settings(), "daily_api_key", "")
-        r = post_call(client, test_board.id, test_user2.id)
-        assert r.status_code == 404
+        assert post_call(client, test_board.id, test_user2.id).status_code == 404
 
 
 class TestAccess:
@@ -203,36 +67,132 @@ class TestAccess:
         assert daily.requests == []
 
     def test_nieistniejaca_tablica_404(self, client, daily, test_user):
-        r = post_call(client, 999999, test_user.id)
-        assert r.status_code == 404
+        assert post_call(client, 999999, test_user.id).status_code == 404
         assert daily.requests == []
 
     def test_bez_logowania_401(self, client, daily, test_board):
-        r = client.post(f"/api/v1/whiteboard/{test_board.id}/call")
-        assert r.status_code == 401
+        assert client.post(f"/api/v1/whiteboard/{test_board.id}/call").status_code == 401
         assert daily.requests == []
 
-    def test_viewer_moze_dolaczyc_ale_nie_jest_ownerem(self, client, daily, db_session, test_user2, test_board):
-        add_member(db_session, test_board, test_user2, "viewer")
+    def test_niezweryfikowany_email_403_i_zero_wywolan_daily(self, client, daily, db_session, unverified_user, test_board):
+        add_member(db_session, test_board, unverified_user, "editor")
+        daily.add_room(room_of(test_board))
+
+        r = post_call(client, test_board.id, unverified_user.id)
+
+        assert r.status_code == 403
+        assert daily.requests == []
+
+    @pytest.mark.asyncio
+    async def test_niezweryfikowany_email_jest_odrzucany_takze_w_serwisie(self, daily, db_session, unverified_user, test_board):
+        from api.v1.whiteboard.service import WhiteboardService
+        from core.exceptions import AppException
+
+        with pytest.raises(AppException) as error:
+            await WhiteboardService(db_session).create_call(test_board.id, unverified_user, "127.0.0.1")
+
+        assert error.value.code == "VOICE_EMAIL_NOT_VERIFIED"
+        assert daily.requests == []
+
+    def test_wlasciciel_tworzy_pokoj(self, client, daily, test_user, test_board):
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 200
+        assert len(daily.calls("POST", "/rooms")) == 1
+        assert set(r.json()["data"]) == {"room_url", "token", "expires_at"}
+
+    @pytest.mark.parametrize("role", ["viewer", "editor"])
+    def test_czlonek_nie_tworzy_pokoju_gdy_rozmowa_sie_nie_zaczela(
+        self, client, daily, db_session, test_user2, test_board, role
+    ):
+        add_member(db_session, test_board, test_user2, role)
+
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert r.json()["code"] == "VOICE_CALL_NOT_STARTED"
+        assert "poczekaj na nauczyciela" in r.json()["error"]
+        assert daily.writes() == []
+        assert daily.calls("POST", "/meeting-tokens") == []
+
+    @pytest.mark.parametrize("role", ["viewer", "editor"])
+    def test_czlonek_dolacza_do_aktywnego_pokoju_i_nie_przesuwa_exp(
+        self, client, daily, db_session, test_user2, test_board, role
+    ):
+        add_member(db_session, test_board, test_user2, role)
+        exp = int(time.time()) + 20 * 60
+        daily.add_room(room_of(test_board), exp=exp)
 
         r = post_call(client, test_board.id, test_user2.id)
 
         assert r.status_code == 200
-        assert daily.body("POST", "/meeting-tokens")["properties"]["is_owner"] is False
+        assert daily.writes() == []  # zero zapisow w Daily - takze przy konczacym sie pokoju
+        assert daily.rooms[room_of(test_board)]["config"]["exp"] == exp
+        assert daily.token_properties()["permissions"] == {"canAdmin": False}
 
-    def test_editor_nie_jest_ownerem(self, client, daily, db_session, test_user2, test_board):
+    def test_czlonek_nie_dolacza_do_wygaslego_pokoju(self, client, daily, db_session, test_user2, test_board):
         add_member(db_session, test_board, test_user2, "editor")
-        assert post_call(client, test_board.id, test_user2.id).status_code == 200
-        assert daily.body("POST", "/meeting-tokens")["properties"]["is_owner"] is False
+        daily.add_room(room_of(test_board), exp=int(time.time()) - 10)
 
-    def test_wlasciciel_przestrzeni_jest_ownerem(self, client, daily, test_user, test_board):
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert daily.writes() == []
+        assert daily.calls("POST", "/meeting-tokens") == []
+
+    def test_rola_owner_bez_bycia_tworca_przestrzeni_nie_tworzy_pokoju(self, client, daily, db_session, test_user2, test_board):
+        add_member(db_session, test_board, test_user2, "owner")
+
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert daily.writes() == []
+
+
+class TestAllowedCreators:
+
+    def test_wlasciciel_spoza_listy_nie_tworzy_pokoju(self, client, daily, monkeypatch, test_user, test_board):
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", str(test_user.id + 1000))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 403
+        assert r.json()["code"] == "VOICE_CREATE_NOT_ALLOWED"
+        assert daily.writes() == []
+        assert daily.calls("POST", "/meeting-tokens") == []
+
+    def test_wlasciciel_z_listy_tworzy_pokoj(self, client, daily, monkeypatch, test_user, test_board):
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", f" 999999 , {test_user.id} ")
         assert post_call(client, test_board.id, test_user.id).status_code == 200
-        assert daily.body("POST", "/meeting-tokens")["properties"]["is_owner"] is True
+
+    @pytest.mark.parametrize("value", ["1,", ",1", "1,,999", " 1 , "])
+    def test_puste_segmenty_listy_sa_pomijane(self, client, daily, monkeypatch, test_user, test_board, value):
+        assert test_user.id == 1
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", value)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+    @pytest.mark.parametrize("value", ["abc", "1;2", "1,,x", "1 2", "-1", "1.5", ",", ",,", "１", "1,abc,"])
+    def test_smieciowa_lista_zamyka_tworzenie(self, client, daily, monkeypatch, test_user, test_board, value):
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", value)
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 403
+        assert daily.writes() == []
+
+    def test_wlasciciel_spoza_listy_moze_dolaczyc_do_aktywnego_pokoju(self, client, daily, monkeypatch, test_user, test_board):
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", "999999")
+        daily.add_room(room_of(test_board))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 200
+        assert daily.writes() == []
 
 
 class TestRoom:
 
-    def test_brak_pokoju_tworzy_prywatny_z_wygasaniem(self, client, daily, test_user, test_board):
+    def test_nowy_pokoj_ma_wymagane_wlasciwosci(self, client, daily, test_user, test_board):
         before = int(time.time())
 
         r = post_call(client, test_board.id, test_user.id)
@@ -243,91 +203,183 @@ class TestRoom:
         assert created["name"] == name
         assert created["privacy"] == "private"
         props = created["properties"]
-        assert before + 180 * 60 <= props["exp"] <= int(time.time()) + 180 * 60
-        # Wymaganie twarde zlecenia (koszty): exp max 3 h + eject_at_room_exp.
+        assert before + TTL <= props["exp"] <= int(time.time()) + TTL
         assert props["eject_at_room_exp"] is True
+        assert props["max_participants"] == 4
         assert props["start_video_off"] is True
         assert props["start_audio_off"] is False
-        assert "enable_knocking" not in props
+        # platne funkcje: jawnie wylaczone albo nieustawione
+        assert props["enable_dialout"] is False
+        assert props["enable_transcription_storage"] is False
+        assert props["enable_knocking"] is False
+        assert props["permissions"] == {"canAdmin": False}
+        for forbidden in ("enable_recording", "sip", "streaming_endpoints", "auto_transcription_settings"):
+            assert forbidden not in props
         assert r.json()["data"]["room_url"] == f"{DAILY_DOMAIN}/{name}"
         assert r.headers["cache-control"] == "no-store"
 
-    def test_brak_pokoju_jako_400_not_found(self, client, daily, test_user, test_board):
-        daily.missing_room_response = lambda: daily_error(400, "invalid-request-error", "room x not found")
-
-        r = post_call(client, test_board.id, test_user.id)
-
-        assert r.status_code == 200
-        assert len(daily.calls("POST", "/rooms")) == 1
-
-    def test_istniejacy_pokoj_tylko_przesuwa_wygasanie(self, client, daily, test_user, test_board):
-        name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) + 60)
+    @pytest.mark.parametrize("ttl, expected", [(999, 3 * HOUR), (0, 600), (60, HOUR)])
+    def test_exp_ma_twardy_sufit_3_h_niezaleznie_od_env(self, client, daily, monkeypatch, test_user, test_board, ttl, expected):
+        monkeypatch.setattr(get_settings(), "daily_room_ttl_minutes", ttl)
         before = int(time.time())
 
-        r = post_call(client, test_board.id, test_user.id)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert r.status_code == 200
-        assert daily.calls("POST", "/rooms") == []
-        assert daily.calls("GET", "/rooms") == []
-        assert daily.body("POST", f"/rooms/{name}") == {"properties": {"exp": daily.rooms[name]["config"]["exp"]}}
-        assert daily.rooms[name]["config"]["exp"] >= before + 180 * 60
+        assert before + expected <= daily.body("POST", "/rooms")["properties"]["exp"] <= int(time.time()) + expected
 
-    def test_wyscig_przy_tworzeniu_konczy_sie_ponownym_get(self, client, daily, test_user, test_board):
+    @pytest.mark.parametrize("value, expected", [(500, 20), (0, 2), (6, 6)])
+    def test_max_participants_z_env_z_sufitem(self, client, daily, monkeypatch, test_user, test_board, value, expected):
+        monkeypatch.setattr(get_settings(), "call_max_participants", value)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        assert daily.body("POST", "/rooms")["properties"]["max_participants"] == expected
+
+    def test_brak_pokoju_jako_400_not_found(self, client, daily, test_user, test_board):
+        daily.missing_room_response = lambda: daily_error(400, "invalid-request-error", "room x not found")
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        assert len(daily.calls("POST", "/rooms")) == 1
+
+    def test_aktywny_pokoj_wlasciciela_nie_jest_ruszany(self, client, daily, test_user, test_board):
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        writes = len(daily.writes())
+
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        assert len(daily.writes()) == writes  # odswiezenie strony: zero zapisow w Daily
+
+    def test_wyscig_przy_tworzeniu_konczy_sie_ponownym_get(self, client, daily, sync_redis_client, test_user, test_board):
         name = room_of(test_board)
 
-        def someone_else_created_it(request):
-            daily.add_room(name)
+        def lost_race(request):
+            daily.add_room(name, exp=int(time.time()) + HOUR, register=False)
             return daily_error(400, "invalid-request-error", f"a room named {name} already exists")
 
-        daily.override("POST", "/rooms", someone_else_created_it)
+        daily.override("POST", "/rooms", lost_race)
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 200
-        assert len(daily.calls("GET", f"/rooms/{name}")) == 1
         assert r.json()["data"]["room_url"] == f"{DAILY_DOMAIN}/{name}"
+        # rejestr i budzet ida za prawdziwym `exp` przejetego pokoju
+        assert registry(sync_redis_client)[name] == daily.rooms[name]["config"]["exp"]
+        assert HOUR - 5 <= budget_of(sync_redis_client, test_user.id) <= HOUR
 
-    def test_tworzenie_nieudane_i_pokoju_nadal_brak_daje_502(self, client, daily, caplog, test_user, test_board):
-        daily.override("POST", "/rooms", daily_error(400, "invalid-request-error", f"room limit reached {API_KEY}"))
+    def test_daily_odrzuca_wlasciwosc_nie_tworzymy_luzniejszego_pokoju(self, client, daily, caplog, test_user, test_board):
+        daily.override("POST", "/rooms", daily_error(400, "invalid-request-error", "unknown property enable_dialout"))
 
-        with caplog.at_level(logging.DEBUG):
+        with caplog.at_level(logging.ERROR):
             r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
         assert r.json()["code"] == "VOICE_PROVIDER_ERROR"
-        assert "room limit" not in r.text
-        assert "room limit reached" in caplog.text
+        assert len(daily.calls("POST", "/rooms")) == 1  # zadnej drugiej proby z ubozszym zestawem
         assert daily.calls("POST", "/meeting-tokens") == []
-        assert_no_secrets(r, caplog)
+        assert "unknown property" in caplog.text
 
-    def test_publiczny_pokoj_nie_dostaje_tokenu(self, client, daily, test_user, test_board):
-        daily.add_room(room_of(test_board), privacy="public")
+    @pytest.mark.parametrize("ignored", ["eject_at_room_exp", "max_participants"])
+    def test_pokoj_utworzony_bez_wymaganych_ustawien_jest_kasowany(self, client, daily, test_user, test_board, ignored):
+        daily.ignored_room_properties = {ignored}
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
+        assert room_of(test_board) not in daily.rooms
         assert daily.calls("POST", "/meeting-tokens") == []
 
-    def test_odpowiedz_bez_adresu_pokoju_daje_502(self, client, daily, test_user, test_board):
-        name = room_of(test_board)
-        daily.override("POST", f"/rooms/{name}", httpx.Response(200, json={"name": name, "privacy": "private"}))
+    @pytest.mark.parametrize(
+        "response",
+        [
+            daily_error(402, "payment-required", "billing"),
+            daily_error(400, "invalid-request-error", "account has reached the maximum number of rooms"),
+            daily_error(403, "forbidden-error", "room limit reached"),
+        ],
+    )
+    def test_limit_pokoi_albo_platnosc_daje_czytelny_kod_i_log(self, client, daily, caplog, test_user, test_board, response):
+        daily.override("POST", "/rooms", response)
 
-        r = post_call(client, test_board.id, test_user.id)
+        with caplog.at_level(logging.ERROR):
+            r = post_call(client, test_board.id, test_user.id)
 
-        assert r.status_code == 502
+        assert r.status_code == 503
+        assert r.json()["code"] == "VOICE_PROVIDER_LIMIT"
+        assert "limit konta" in caplog.text
         assert daily.calls("POST", "/meeting-tokens") == []
 
     def test_prefiks_z_konfiguracji_jest_czyszczony(self, client, daily, monkeypatch, test_user, test_board):
-        monkeypatch.setattr(get_settings(), "daily_room_prefix", "Dev_El/../x")
-
+        monkeypatch.setattr(get_settings(), "daily_room_prefix", " Dev_Śr/../x ")
         assert post_call(client, test_board.id, test_user.id).status_code == 200
-
-        assert daily.body("POST", "/rooms")["name"] == f"develx-board-{test_board.id}"
+        assert daily.body("POST", "/rooms")["name"] == f"devrx-board-{test_board.id}"
 
     def test_pusty_prefiks_wraca_do_domyslnego(self, monkeypatch):
-        monkeypatch.setattr(get_settings(), "daily_room_prefix", " -- ")
+        monkeypatch.setattr(get_settings(), "daily_room_prefix", "--")
         assert call.room_name_for_board(7) == "easylesson-board-7"
+
+
+NONCOMPLIANT = [
+    {"privacy": "public"},
+    {"eject_at_room_exp": False},
+    {"eject_at_room_exp": None},
+    {"max_participants": 50},
+    {"max_participants": None},
+    {"enable_recording": "cloud"},
+    {"enable_recording": ["local"]},
+    {"enable_dialout": True},
+    {"sip": {"sip_mode": "dial-in", "display_name": "x"}},
+    {"streaming_endpoints": [{"name": "rtmp"}]},
+    {"enable_transcription_storage": True},
+    {"auto_transcription_settings": {"language": "pl"}},
+    {"enable_knocking": True},
+    {"permissions": {"canAdmin": True}},
+    {"permissions": {"canAdmin": ["participants"]}},
+    {"permissions": {"canAdmin": ["streaming", "transcription"]}},
+    {"permissions": "admin"},
+    {"exp": "far"},
+    {"exp": None},
+]
+
+
+class TestNoncompliantRoom:
+    """Pokoj utworzony recznie albo przez stara wersje - nigdy nie dostaje tokenu w zastanym stanie."""
+
+    def add(self, daily, name, overrides):
+        overrides = dict(overrides)
+        if overrides.get("exp") == "far":
+            overrides["exp"] = int(time.time()) + 24 * HOUR
+        privacy = overrides.pop("privacy", "private")
+        room = daily.add_room(name, privacy=privacy)
+        room["config"].update(overrides)
+        room["config"] = {k: v for k, v in room["config"].items() if v is not None}
+
+    @pytest.mark.parametrize("overrides", NONCOMPLIANT)
+    def test_dolaczajacy_dostaje_odmowe(self, client, daily, db_session, test_user2, test_board, overrides):
+        add_member(db_session, test_board, test_user2, "editor")
+        self.add(daily, room_of(test_board), overrides)
+
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert daily.calls("POST", "/meeting-tokens") == []
+        assert daily.writes() == []
+
+    @pytest.mark.parametrize("overrides", NONCOMPLIANT)
+    def test_wlasciciel_zastepuje_pokoj_zgodnym(self, client, daily, test_user, test_board, overrides):
+        name = room_of(test_board)
+        self.add(daily, name, overrides)
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 200
+        assert len(daily.calls("DELETE", f"/rooms/{name}")) == 1
+        assert call._room_problem(daily.rooms[name], name, int(time.time())) is None
+
+    def test_nieudane_kasowanie_niezgodnego_pokoju_daje_502_bez_tokenu(self, client, daily, test_user, test_board):
+        name = room_of(test_board)
+        self.add(daily, name, {"privacy": "public"})
+        daily.override("DELETE", f"/rooms/{name}", daily_error(500, "server-error"))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 502
+        assert daily.calls("POST", "/meeting-tokens") == []
 
 
 class TestRoomUrl:
@@ -340,6 +392,7 @@ class TestRoomUrl:
             "https://evildaily.co/{name}",
             "https://daily.co.evil.example/{name}",
             "https://.daily.co/{name}",
+            "https://-.daily.co/{name}",
             "http://easylesson-test.daily.co/{name}",
             "https://user@easylesson-test.daily.co/{name}",
             "https://easylesson-test.daily.co:8443/{name}",
@@ -349,23 +402,34 @@ class TestRoomUrl:
             "https://easylesson-test.daily.co/{name}?t=1",
             "https://easylesson-test.daily.co/{name}#x",
             "https://easylesson-test.daily.co@evil.example/{name}",
+            "https://evil.example\\.daily.co/{name}",
+            "https://evil.example\\@x.daily.co/{name}",
+            "https://evil.example .daily.co/{name}",
+            "https://evil.example\t.daily.co/{name}",
+            "https://evil.example;.daily.co/{name}",
+            "https://evil.example%2f.daily.co/{name}",
+            "https://evil.example%2F.daily.co/{name}",
+            "https://a.b.daily.co/{name}",
+            "https://easylesson-test.daily.co/{name}\n",
+            " https://easylesson-test.daily.co/{name}",
+            "https://easylesson-test.daily.co/{name}%2f",
+            "https://easylesson-test.dаily.co/{name}",  # cyrylickie "а"
             "javascript:alert(1)",
             12345,
             None,
         ],
     )
-    def test_adres_pokoju_spoza_daily_daje_502_bez_tokenu(self, client, daily, test_user, test_board, url):
+    def test_adres_pokoju_spoza_daily_nie_dostaje_tokenu(self, client, daily, db_session, test_user2, test_board, url):
         name = room_of(test_board)
         if isinstance(url, str):
             url = url.replace("{name}", name)
-        daily.override(
-            "POST", f"/rooms/{name}", httpx.Response(200, json={"name": name, "privacy": "private", "url": url})
-        )
+        assert call._is_daily_room_url(url, name) is False
+        add_member(db_session, test_board, test_user2, "editor")
+        daily.add_room(name)["url"] = url
 
-        r = post_call(client, test_board.id, test_user.id)
+        r = post_call(client, test_board.id, test_user2.id)
 
-        assert r.status_code == 502
-        assert r.json()["code"] == "VOICE_PROVIDER_ERROR"
+        assert r.status_code == 409
         assert "evil" not in r.text
         assert daily.calls("POST", "/meeting-tokens") == []
 
@@ -374,147 +438,164 @@ class TestRoomUrl:
         assert call._is_daily_room_url(f"https://Konto-1.daily.co/{name}", name) is True
 
 
-class TestExpiredRoom:
-    """Wariant [NIEPOTWIERDZONE]: Daily odmawia przesuniecia `exp` wygaslego pokoju."""
+class TestExtend:
 
-    def refuse_update(self, daily, name):
-        daily.override("POST", f"/rooms/{name}", daily_error(400, "invalid-request-error", "room has expired"))
+    def test_wlasciciel_przedluza_konczacy_sie_pokoj(self, client, daily, sync_redis_client, test_user, test_board):
+        name = room_of(test_board)
+        old_exp = int(time.time()) + 10 * 60
+        daily.add_room(name, exp=old_exp)
 
-    @pytest.mark.parametrize("expired_ago", [30, 3600])
-    def test_wygasly_pokoj_ktorego_nie_da_sie_odswiezyc_jest_tworzony_od_nowa(
-        self, client, daily, test_user, test_board, expired_ago
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 200
+        new_exp = daily.body("POST", f"/rooms/{name}")["properties"]["exp"]
+        assert int(time.time()) + TTL - 5 <= new_exp <= int(time.time()) + TTL
+        # budzet: pozostaly czas przejetego pokoju + przyrost; rejestr idzie za nowym exp
+        assert new_exp - int(time.time()) <= budget_of(sync_redis_client, test_user.id) <= new_exp - int(time.time()) + 5
+        assert registry(sync_redis_client)[name] == new_exp
+
+    def test_bez_budzetu_pokoj_nie_jest_przedluzany_ale_token_jest(
+        self, client, daily, clock, monkeypatch, sync_redis_client, test_user, test_board
     ):
+        monkeypatch.setattr(get_settings(), "call_user_daily_minutes_cap", 90)
         name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) - expired_ago)
-        self.refuse_update(daily, name)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200  # caly budzet: 90 min
+        exp = daily.rooms[name]["config"]["exp"]
+        daily.presence[name] = [{"id": "p1"}]
+        clock.advance(80 * 60)
+        writes = len(daily.writes())
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 200
-        assert [q.url.path for q in daily.calls("DELETE")] == [f"/v1/rooms/{name}"]
-        assert len(daily.calls("POST", "/rooms")) == 2
-        # Wlasny pokoj naprawia sciezka samonaprawy, a nie ogolne sprzatanie (limity listy/kasowan).
-        assert daily.calls("GET", f"/rooms/{name}") != []
-        assert daily.rooms[name]["config"]["exp"] > int(time.time())
-        assert daily.rooms[name]["privacy"] == "private"
-        assert daily.body("POST", "/meeting-tokens")["properties"]["room_name"] == name
+        assert len(daily.writes()) == writes
+        assert daily.rooms[name]["config"]["exp"] == exp
+        assert budget_of(sync_redis_client, test_user.id) == TTL
 
-    def test_wazny_pokoj_nie_jest_kasowany_gdy_aktualizacja_sie_nie_udala(self, client, daily, test_user, test_board):
+    def test_nieudane_przedluzenie_zwraca_rezerwacje(self, client, daily, sync_redis_client, test_user, test_board):
         name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) + 600)
-        self.refuse_update(daily, name)
+        old_exp = int(time.time()) + 10 * 60
+        daily.add_room(name, exp=old_exp)
+        daily.override("POST", f"/rooms/{name}", daily_error(500, "server-error"))
 
         r = post_call(client, test_board.id, test_user.id)
-
-        assert r.status_code == 200
-        assert daily.calls("DELETE") == []
-        assert len(daily.calls("POST", "/rooms")) == 1
-
-    def test_pokoj_skasowany_w_miedzyczasie_tez_jest_tworzony(self, client, daily, test_user, test_board):
-        name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) - 30)
-        self.refuse_update(daily, name)
-
-        def already_gone(request):
-            del daily.rooms[name]
-            return daily_error(404, "not-found", "room not found")
-
-        daily.override("DELETE", f"/rooms/{name}", already_gone)
-
-        assert post_call(client, test_board.id, test_user.id).status_code == 200
-        assert name in daily.rooms
-
-    def test_nieudane_kasowanie_albo_ponowne_tworzenie_daje_502(self, client, daily, caplog, test_user, test_board):
-        name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) - 30)
-        self.refuse_update(daily, name)
-        daily.override("DELETE", f"/rooms/{name}", daily_error(500, "server-error", f"x {API_KEY}"))
-
-        with caplog.at_level(logging.DEBUG):
-            r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
-        assert len(daily.calls("POST", "/rooms")) == 1
-        assert daily.calls("POST", "/meeting-tokens") == []
-        assert_no_secrets(r, caplog)
+        # Daily nie przesunal exp (potwierdzone ponownym GET): zostaje tylko czas przejetego pokoju
+        assert 10 * 60 - 5 <= budget_of(sync_redis_client, test_user.id) <= 10 * 60
+        assert registry(sync_redis_client)[name] == old_exp
 
-        # Kasowanie sie udaje, ale pokoj nadal nie daje sie utworzyc -> 502, bez petli.
-        del daily.overrides[("DELETE", f"/rooms/{name}")]
-        daily.requests.clear()
-        daily.override("POST", "/rooms", daily_error(400, "invalid-request-error", "already exists"))
-        assert post_call(client, test_board.id, test_user.id).status_code == 502
-        assert len(daily.calls("POST", "/rooms")) == 2
-        assert len(daily.calls("DELETE")) == 1
+    def test_przedluzenie_o_nieznanym_wyniku_zostawia_dluzsza_rezerwacje(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
+        name = room_of(test_board)
+        daily.add_room(name, exp=int(time.time()) + 10 * 60)
+        daily.override("POST", f"/rooms/{name}", httpx.ReadTimeout("timeout"))
+        daily.override("GET", f"/rooms/{name}", httpx.Response(200, json=daily.rooms[name]), httpx.ReadTimeout("t"))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 504
+        assert registry(sync_redis_client)[name] >= int(time.time()) + TTL - 5  # zawyzenie, nie zanizenie
+        assert budget_of(sync_redis_client, test_user.id) >= TTL - 5
 
 
 class TestCleanup:
 
+    def old_rooms(self, daily, count, start=900):
+        for i in range(count):
+            daily.add_room(f"easylesson-board-{start + i}", exp=int(time.time()) - HOUR)
+
     def test_przy_tworzeniu_kasuje_tylko_wygasle_pokoje_z_naszym_prefiksem(self, client, daily, test_user, test_board):
-        past = int(time.time()) - 3600
-        daily.add_room("easylesson-board-901", exp=past)
-        daily.add_room("easylesson-board-902")              # jeszcze wazny
-        daily.add_room("inny-projekt", exp=past)             # nie nasz
-        daily.add_room("easylesson-board-903-x", exp=past)   # nie pasuje do wzorca
-        daily.add_room("dev-board-904", exp=past)            # inny prefiks
-        daily.add_room("easylesson-board-905", exp=int(time.time()) - 60)  # wygasl przed chwila
+        self.old_rooms(daily, 2)
+        daily.add_room("easylesson-board-950", exp=int(time.time()) + HOUR)  # aktywny
+        daily.add_room("easylesson-board-951", exp=int(time.time()) - 60)  # w okresie karencji
+        daily.add_room("cudzy-pokoj", exp=int(time.time()) - HOUR)
+        daily.add_room("easylesson-board-abc", exp=int(time.time()) - HOUR)
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert [r.url.path for r in daily.calls("DELETE")] == ["/v1/rooms/easylesson-board-901"]
-        assert "easylesson-board-902" in daily.rooms
-        assert "easylesson-board-905" in daily.rooms
+        assert "easylesson-board-900" not in daily.rooms and "easylesson-board-901" not in daily.rooms
+        for kept in ("easylesson-board-950", "easylesson-board-951", "cudzy-pokoj", "easylesson-board-abc"):
+            assert kept in daily.rooms
 
     def test_pokoj_odswiezony_po_pobraniu_listy_nie_jest_kasowany(self, client, daily, test_user, test_board):
-        """Wyscig: lista mowi 'wygasl', ale inna tablica wlasnie przesunela `exp` tego pokoju."""
-        other = "easylesson-board-901"
-        daily.add_room(other, exp=int(time.time()) - 3600)
-        stale_list = httpx.Response(200, json={"data": [json.loads(json.dumps(daily.rooms[other]))]})
-        daily.override("GET", "/rooms", stale_list)
-        daily.rooms[other]["config"]["exp"] = int(time.time()) + 180 * 60
+        self.old_rooms(daily, 1)
+        stale = dict(daily.rooms["easylesson-board-900"], config={"exp": int(time.time()) - HOUR})
+        daily.override("GET", "/rooms", httpx.Response(200, json={"total_count": 1, "data": [stale]}))
+        daily.rooms["easylesson-board-900"]["config"]["exp"] = int(time.time()) + HOUR
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert len(daily.calls("GET", f"/rooms/{other}")) == 1
-        assert daily.calls("DELETE") == []
-        assert other in daily.rooms
+        assert "easylesson-board-900" in daily.rooms
+        assert daily.calls("DELETE", "/rooms/easylesson-board-900") == []
 
-    def test_sprzatanie_ma_limit_kasowan(self, client, daily, test_user, test_board):
-        for i in range(call.CLEANUP_MAX_DELETES + 3):
-            daily.add_room(f"easylesson-board-{9000 + i}", exp=1)
+    def test_limit_dotyczy_prob_a_nie_udanych_kasowan(self, client, daily, test_user, test_board):
+        self.old_rooms(daily, 12)
+        for i in range(12):
+            daily.override("DELETE", f"/rooms/easylesson-board-{900 + i}", daily_error(500, "server-error"))
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert len(daily.calls("DELETE")) == call.CLEANUP_MAX_DELETES
+        assert len(daily.calls("DELETE")) == call.CLEANUP_MAX_ATTEMPTS
 
-    def test_blad_sprzatania_nie_blokuje_rozmowy(self, client, daily, test_user, test_board):
-        daily.override("GET", "/rooms", httpx.ReadTimeout("timeout"))
+    def test_wygasly_pokoj_z_rejestru_jest_kasowany_nawet_gdy_lista_go_nie_zwraca(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
+        self.old_rooms(daily, 1)
+        sync_redis_client.zadd("call:rooms", {"easylesson-board-900": int(time.time()) - HOUR})
+        daily.override("GET", "/rooms", httpx.Response(200, json={"total_count": 0, "data": []}))
+
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        daily.rooms.clear()
-        daily.override("GET", "/rooms", httpx.Response(200, json={"data": "nie-lista"}))
+        assert "easylesson-board-900" not in daily.rooms
+        assert sync_redis_client.zscore("call:rooms", "easylesson-board-900") is None
+
+    @pytest.mark.parametrize(
+        "failure", [daily_error(500, "server-error"), httpx.ConnectError("down"), httpx.Response(200, json=[1, 2])]
+    )
+    def test_blad_sprzatania_nie_blokuje_rozmowy(self, client, daily, test_user, test_board, failure):
+        self.old_rooms(daily, 2)
+        daily.override("GET", "/rooms/easylesson-board-900", failure)
+        daily.override("DELETE", "/rooms/easylesson-board-901", failure)
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        daily.rooms.clear()
-        daily.add_room("easylesson-board-901", exp=1)
-        del daily.overrides[("GET", "/rooms")]
-        daily.override("DELETE", "/rooms/easylesson-board-901", daily_error(500, "server-error"))
+    def test_stary_wpis_rejestru_nie_kasuje_nowego_pokoju_o_tej_samej_nazwie(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
+        daily.add_room("easylesson-board-900", exp=int(time.time()) + HOUR)
+        sync_redis_client.zadd("call:rooms", {"easylesson-board-900|1|4": int(time.time()) - 2 * HOUR})
+
         assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        assert "easylesson-board-900" in daily.rooms
+        assert sync_redis_client.zscore("call:rooms", "easylesson-board-900|1|4") is None
+        assert registry(sync_redis_client)["easylesson-board-900"] > int(time.time())
 
 
 class TestToken:
 
-    def test_token_ma_pokoj_wygasanie_i_uzytkownika(self, client, daily, test_user, test_board):
+    def test_token_tworzacego(self, client, daily, test_user, test_board):
         before = int(time.time())
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 200
-        props = daily.body("POST", "/meeting-tokens")["properties"]
+        props = daily.token_properties()
+        room_exp = daily.rooms[room_of(test_board)]["config"]["exp"]
         assert props["room_name"] == room_of(test_board)
         assert props["user_id"] == str(test_user.id)
         assert props["user_name"] == test_user.username
-        assert before + 3600 <= props["exp"] <= int(time.time()) + 3600
-        assert props["eject_at_token_exp"] is False
+        # krotki czas na WEJSCIE, a pobyt najdluzej do exp pokoju i nigdy ponad 3 h
+        assert before + 300 <= props["exp"] <= int(time.time()) + 300
+        assert props["exp"] <= room_exp
+        assert props["exp"] + props["eject_after_elapsed"] <= room_exp
+        assert 0 < props["eject_after_elapsed"] <= 3 * HOUR
+        assert props["is_owner"] is False
+        # nikt nie jest adminem spotkania - takze tworzacy (admin moglby nadac innym platne funkcje)
+        assert props["permissions"] == {"canAdmin": False}
+        assert props["enable_recording_ui"] is False
+        assert "enable_recording" not in props and "start_cloud_recording" not in props
         assert props["start_video_off"] is True
         assert props["start_audio_off"] is False
 
@@ -524,37 +605,59 @@ class TestToken:
         assert expires_at.utcoffset().total_seconds() == 0
         assert int(expires_at.timestamp()) == props["exp"]
 
-    def test_kazde_zadanie_do_daily_niesie_klucz_w_naglowku(self, client, daily, test_user, test_board):
-        post_call(client, test_board.id, test_user.id)
+    @pytest.mark.parametrize("minutes_left", [7, 20, 170])
+    def test_token_dolaczajacego_nie_pozwala_zostac_po_exp_pokoju(
+        self, client, daily, db_session, test_user2, test_board, minutes_left
+    ):
+        add_member(db_session, test_board, test_user2, "viewer")
+        room_exp = int(time.time()) + minutes_left * 60
+        daily.add_room(room_of(test_board), exp=room_exp)
 
-        assert len(daily.requests) >= 3
-        assert all(r.headers["authorization"] == f"Bearer {API_KEY}" for r in daily.requests)
-        assert all(API_KEY not in str(r.url) for r in daily.requests)
+        assert post_call(client, test_board.id, test_user2.id).status_code == 200
+
+        props = daily.token_properties()
+        assert props["exp"] <= room_exp
+        assert props["exp"] + props["eject_after_elapsed"] <= room_exp
+        assert props["eject_after_elapsed"] >= 1
+        assert props["is_owner"] is False
+        assert props["permissions"] == {"canAdmin": False}
+        assert props["start_video_off"] is True
+
+    def test_pokoj_tuz_przed_wygasnieciem_nie_wydaje_tokenu_dolaczajacemu(self, client, daily, db_session, test_user2, test_board):
+        add_member(db_session, test_board, test_user2, "viewer")
+        daily.add_room(room_of(test_board), exp=int(time.time()) + 200)
+
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert r.json()["code"] == "VOICE_CALL_ENDING"
+        assert "kończy" in r.json()["error"] and "nie zaczęła" not in r.json()["error"]
+        assert daily.requests == []  # odmowa lokalna, zero wywolan Daily
 
     def test_user_name_ze_znakami_specjalnymi(self, client, daily, db_session, test_user, test_board):
-        test_user.username = "  Jan‮\x00\n\tKowalski​ <script>\"ą🙂  "
+        test_user.username = 'Zażółć "gęślą" <jaźń> & 日本'
         db_session.commit()
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert daily.body("POST", "/meeting-tokens")["properties"]["user_name"] == 'Jan Kowalski <script>"ą🙂'
+        assert daily.token_properties()["user_name"] == 'Zażółć "gęślą" <jaźń> & 日本'
 
     @pytest.mark.parametrize(
         "raw, expected",
         [
+            ("  Jan   Kowalski ", "Jan Kowalski"),
+            ("a\x00b\x1fc‮d​", "abcd"),
             ("x" * 200, "x" * 64),
-            ("\x00\x1f‮", "Uczestnik"),
             ("", "Uczestnik"),
             (None, "Uczestnik"),
-            ("a\r\nb", "a b"),
-            ("Zażółć Gęślą", "Zażółć Gęślą"),
+            ("​​", "Uczestnik"),
         ],
     )
     def test_clean_user_name(self, raw, expected):
         assert call.clean_user_name(raw) == expected
 
     def test_odpowiedz_bez_tokenu_daje_502(self, client, daily, test_user, test_board):
-        daily.override("POST", "/meeting-tokens", httpx.Response(200, json={}))
+        daily.override("POST", "/meeting-tokens", httpx.Response(200, json={"token": ""}))
         r = post_call(client, test_board.id, test_user.id)
         assert r.status_code == 502
         assert r.json()["code"] == "VOICE_PROVIDER_ERROR"
@@ -564,20 +667,20 @@ class TestToken:
             r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 200
-        assert API_KEY not in r.text
         assert API_KEY not in caplog.text
         assert DAILY_TOKEN not in caplog.text
+        assert "wydano token" in caplog.text
+        assert "zużycie miesiąca=0 min" in caplog.text
 
 
 class TestProviderErrors:
 
     @pytest.mark.parametrize(
-        "status, error",
-        [(401, "authentication-error"), (403, "forbidden-error"), (500, "server-error"), (402, "payment-required")],
+        "status, error", [(401, "authentication-error"), (403, "forbidden-error"), (500, "server-error")]
     )
     def test_blad_daily_daje_502_bez_tresci_daily(self, client, daily, caplog, test_user, test_board, status, error):
         name = room_of(test_board)
-        daily.override("POST", f"/rooms/{name}", daily_error(status, error, f"sekretna tresc daily {API_KEY}"))
+        daily.override("GET", f"/rooms/{name}", daily_error(status, error, f"sekretna tresc daily {API_KEY}"))
 
         with caplog.at_level(logging.DEBUG):
             r = post_call(client, test_board.id, test_user.id)
@@ -592,7 +695,7 @@ class TestProviderErrors:
         assert_no_secrets(r, caplog)
 
     def test_zly_klucz_jest_nazwany_w_logu(self, client, daily, caplog, test_user, test_board):
-        daily.override("POST", f"/rooms/{room_of(test_board)}", daily_error(401, "authentication-error"))
+        daily.override("GET", f"/rooms/{room_of(test_board)}", daily_error(401, "authentication-error"))
 
         with caplog.at_level(logging.ERROR):
             post_call(client, test_board.id, test_user.id)
@@ -600,18 +703,17 @@ class TestProviderErrors:
         assert "DAILY_API_KEY" in caplog.text
 
     def test_blad_przy_tokenie_daje_502(self, client, daily, caplog, test_user, test_board):
-        daily.override("POST", "/meeting-tokens", daily_error(400, "invalid-request-error", f"bad {DAILY_TOKEN}"))
+        daily.override("POST", "/meeting-tokens", daily_error(400, "invalid-request-error", "bad"))
 
         with caplog.at_level(logging.DEBUG):
             r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
-        assert API_KEY not in r.text
-        assert DAILY_TOKEN not in r.text
-        assert API_KEY not in caplog.text
+        assert r.json()["code"] == "VOICE_PROVIDER_ERROR"
+        assert_no_secrets(r, caplog)
 
     def test_timeout_daje_504(self, client, daily, caplog, test_user, test_board):
-        daily.override("POST", f"/rooms/{room_of(test_board)}", httpx.ReadTimeout("timeout"))
+        daily.override("GET", f"/rooms/{room_of(test_board)}", httpx.ReadTimeout("timeout"))
 
         with caplog.at_level(logging.DEBUG):
             r = post_call(client, test_board.id, test_user.id)
@@ -621,7 +723,7 @@ class TestProviderErrors:
         assert_no_secrets(r, caplog)
 
     def test_blad_sieci_daje_502(self, client, daily, caplog, test_user, test_board):
-        daily.override("POST", f"/rooms/{room_of(test_board)}", httpx.ConnectError(f"refused {API_KEY}"))
+        daily.override("POST", "/rooms", httpx.ConnectError(f"connect failed {API_KEY}"))
 
         with caplog.at_level(logging.DEBUG):
             r = post_call(client, test_board.id, test_user.id)
@@ -631,7 +733,9 @@ class TestProviderErrors:
         assert_no_secrets(r, caplog)
 
     def test_429_jest_ponawiane_raz(self, client, daily, test_user, test_board):
-        daily.override("POST", "/meeting-tokens", daily_error(429, "rate-limit-error"), httpx.Response(200, json={"token": DAILY_TOKEN}))
+        daily.override(
+            "POST", "/meeting-tokens", daily_error(429, "rate-limit-error"), httpx.Response(200, json={"token": DAILY_TOKEN})
+        )
 
         r = post_call(client, test_board.id, test_user.id)
 
@@ -644,29 +748,31 @@ class TestProviderErrors:
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
-        assert r.json()["code"] == "VOICE_PROVIDER_ERROR"
         assert len(daily.calls("POST", "/meeting-tokens")) == 2
 
+    def test_nieudane_tworzenie_zwraca_rezerwacje_budzetu(self, client, daily, sync_redis_client, test_user, test_board):
+        daily.override("POST", "/rooms", daily_error(500, "server-error"))
 
-class TestRateLimit:
+        assert post_call(client, test_board.id, test_user.id).status_code == 502
 
-    def test_limit_per_uzytkownik(self, client, daily, db_session, monkeypatch, test_user, test_user2, test_board):
-        monkeypatch.setattr(call, "CALL_RATE_LIMIT", 2)
-        add_member(db_session, test_board, test_user2, "viewer")
+        assert budget_of(sync_redis_client, test_user.id) == 0
+        assert sync_redis_client.zcard("call:rooms") == 0
 
+
+class TestOneRoomPerCreator:
+
+    def test_nowa_rozmowa_na_innej_tablicy_konczy_poprzednia(
+        self, client, daily, db_session, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        second = add_board(db_session, test_workspace, test_user)
         assert post_call(client, test_board.id, test_user.id).status_code == 200
-        assert post_call(client, test_board.id, test_user.id).status_code == 200
-        blocked = post_call(client, test_board.id, test_user.id)
-        assert blocked.status_code == 429
-        assert blocked.json()["code"] == "RATE_LIMITED"
-        # Inny uzytkownik (to samo IP - klasa za jednym NAT-em) nie jest blokowany.
-        assert post_call(client, test_board.id, test_user2.id).status_code == 200
 
-    def test_awaria_redis_przepuszcza(self, client, daily, monkeypatch, test_user, test_board):
-        class BrokenRedis:
-            async def incr(self, key):
-                raise RedisConnectionError("redis down")
+        assert post_call(client, second.id, test_user.id).status_code == 200
 
-        monkeypatch.setattr(redis_client_module, "get_redis_client", lambda: BrokenRedis())
-
-        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        assert room_of(test_board) not in daily.rooms
+        assert room_of(second) in daily.rooms
+        # budzet: poprzedni (pusty) pokoj rozliczony do chwili skasowania (minimum 1 min) + nowy pokoj
+        assert TTL + 60 <= budget_of(sync_redis_client, test_user.id) <= TTL + 70
+        rooms = registry(sync_redis_client)
+        assert rooms[room_of(test_board)] <= int(time.time())  # rezerwacja skonczona, zostaje okres karencji
+        assert rooms[room_of(second)] > int(time.time())
