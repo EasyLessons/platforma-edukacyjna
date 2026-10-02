@@ -34,15 +34,24 @@ beforeEach(() => {
 });
 
 describe('GET /api/turn', () => {
-  it('401 bez tokenu - nie dotyka Xirsys', async () => {
-    mockAuthenticate.mockResolvedValue({ ok: false, status: 401, error: 'unauthorized' });
-
+  it('401 bez tokenu - bez zapytania do backendu i bez Xirsys', async () => {
     const res = await GET(makeRequest(null));
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: 'unauthorized' });
     expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(mockAuthenticate.mock.calls[0][0]).toBeNull();
+    expect(mockAuthenticate).not.toHaveBeenCalled();
+    expect(mockGetIceServers).not.toHaveBeenCalled();
+  });
+
+  it('401 gdy backend odrzuca token - nie dotyka Xirsys', async () => {
+    mockAuthenticate.mockResolvedValue({ ok: false, status: 401, error: 'unauthorized' });
+
+    const res = await GET(makeRequest('zly'));
+
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: 'unauthorized' });
+    expect(res.headers.get('cache-control')).toBe('no-store');
     expect(mockGetIceServers).not.toHaveBeenCalled();
   });
 
@@ -89,25 +98,55 @@ describe('GET /api/turn', () => {
     });
   });
 
-  it('rate limit per IP: 61. zadanie w minucie -> 429, przed auth i przed Xirsys', async () => {
-    mockAuthenticate.mockResolvedValue({ ok: true, userId: 7 });
-    const ip = '203.0.113.77';
+  it('rate limit per uzytkownik: 61. zadanie w minucie -> 429, przed Xirsys', async () => {
+    mockAuthenticate.mockResolvedValue({ ok: true, userId: 101 });
 
     for (let i = 0; i < 60; i++) {
-      expect((await GET(makeRequest('tok', ip))).status).toBe(200);
+      expect((await GET(makeRequest('tok'))).status).toBe(200);
     }
-    mockAuthenticate.mockClear();
     mockGetIceServers.mockClear();
 
-    const res = await GET(makeRequest('tok', ip));
+    // Zmiana IP nie pomaga - licznik jest per userId.
+    const res = await GET(makeRequest('tok'));
 
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: 'rate_limit' });
     expect(res.headers.get('cache-control')).toBe('no-store');
-    expect(mockAuthenticate).not.toHaveBeenCalled();
     expect(mockGetIceServers).not.toHaveBeenCalled();
 
-    // Inne IP nie jest objete blokada.
+    // Inny uzytkownik z tego samego IP nie jest objety blokada.
+    mockAuthenticate.mockResolvedValue({ ok: true, userId: 102 });
+    expect((await GET(makeRequest('tok2', '203.0.113.77'))).status).toBe(200);
+  });
+
+  it('regresja: zadania bez tokenu / ze zlym tokenem nie zuzywaja limitu zalogowanych z tego IP', async () => {
+    const ip = '203.0.113.88';
+    mockAuthenticate.mockImplementation(async (header: string | null) =>
+      header === 'Bearer good'
+        ? { ok: true, userId: 201 }
+        : { ok: false, status: 401, error: 'unauthorized' }
+    );
+
+    for (let i = 0; i < 70; i++) {
+      expect((await GET(makeRequest(null, ip))).status).toBe(401);
+      expect((await GET(makeRequest('bad', ip))).status).toBe(401);
+    }
+
+    const res = await GET(makeRequest('good', ip));
+
+    expect(res.status).toBe(200);
+    expect(mockGetIceServers).toHaveBeenCalledTimes(1);
+  });
+
+  it('brak userId w odpowiedzi backendu -> limit per IP (awaryjnie)', async () => {
+    mockAuthenticate.mockResolvedValue({ ok: true, userId: null });
+    const ip = '203.0.113.99';
+
+    for (let i = 0; i < 60; i++) {
+      expect((await GET(makeRequest('tok', ip))).status).toBe(200);
+    }
+
+    expect((await GET(makeRequest('tok', ip))).status).toBe(429);
     expect((await GET(makeRequest('tok'))).status).toBe(200);
   });
 });
