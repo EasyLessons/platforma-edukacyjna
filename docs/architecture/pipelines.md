@@ -76,6 +76,48 @@ Wejście na tablicę
 - **Obrazy offline**: upload do Storage wymaga sieci → `ImageUploadOfflineError` i toast; reszta tablicy działa.
 - **`CACHE_VERSION`** (`board-cache.ts`) to wyłącznik awaryjny: podbicie + deploy = klienci usuwają stare kopie (patrz `known-issues.md` #7).
 
+### 2c. Obrazy tablicy — silnik Excalidraw (za flagą `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`)
+
+Obraz wklejony lub wrzucony na tablicę Excalidraw **nie trafia do `Y.Doc` jako dataURL** (snapshot `board_documents` puchł) — plik leży w Supabase Storage, w dokumencie jest samo odwołanie. Stary silnik (`upload-image`, publiczny bucket `board-images`) działa jak dotąd.
+
+```
+User A wkleja / wrzuca obraz (Excalidraw sam zmniejsza do 1440 px, odrzuca > 4 MB)
+  → obraz widać lokalnie od razu; element-obraz NIE idzie do Y.Doc (files/board-file-sync.ts: shareable)
+  → POST /api/v1/whiteboard/{id}/files (multipart, pole `file`)             backend: whiteboard/files.py
+      · can_edit (viewer 403, nie-członek 404), limit 5 MB czytany strumieniowo (413)
+      · typ po TREŚCI, przekodowanie do WEBP max 1600 px (core/image_sanitizer.py; GIF → pierwsza klatka)
+      · zapis kluczem service_role do PRYWATNEGO bucketu `board-files` pod `{board_id}/{uuid hex}.webp`
+        (nazwa z serwera; bucket tworzony przy pierwszym uploadzie - core/storage.py: ensure_bucket)
+  → wpis w Y.Map `excalidraw-files`: { id, mimeType, created, ref: { v: 1, name: "<32 hex>.webp" } }
+  → dopiero teraz element-obraz trafia do Y.Doc (whiteboard-sync rozsyła go jak każdy inny)
+User B (także viewer) dostaje wpis z `ref`
+  → GET /api/v1/whiteboard/{id}/files/{name} przez apiClient (token; backend sprawdza członkostwo
+    i wydaje plik z prywatnego bucketu: image/webp, nosniff, Cache-Control: private)
+  → blob → dataURL tylko w pamięci karty → api.addFiles
+```
+
+- **Format wpisu pliku** (`yjs/excalidraw-binding.ts`): odwołanie `{ id, mimeType, created, ref: { v: 1, name } }` albo inline `{ id, mimeType, dataURL, created }`. Czytane są **oba** — inline zostaje dla SVG wykresów f(x), tablic bez serwera (demo, gość) i wpisów sprzed tej zmiany.
+- **`ref.name` pochodzi od innych edytorów**, więc przed wstawieniem do adresu jest sprawdzane wzorcem `^[0-9a-f]{32}\.webp$` (front: `files/board-file-api.ts`, backend: `files.py`). Ścieżkę w buckecie backend składa z `board_id` z URL-a, dla którego sprawdził dostęp — nie da się sięgnąć po plik innej tablicy.
+- **Błędy wysyłki**: sieć/5xx/429 → 3 ponowienia (1 s, 3 s, 8 s); potem (albo od razu przy 400/403/409/413) element jest usuwany lokalnie i pojawia się komunikat. Bez sieci plik czeka na zdarzenie `online`. Pliki z odbioru nie są wysyłane ponownie.
+- **Storage niedostępny**: brak `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` albo bucketu nie da się utworzyć → `503 STORAGE_NOT_CONFIGURED`; front zapisuje wtedy obraz po staremu (dataURL w `Y.Doc`) i loguje błąd. Backend **nigdy** nie przełącza się na bucket publiczny. Wtedy trzeba ręcznie utworzyć prywatny bucket `board-files` (Supabase → Storage).
+- **Bucket istnieje, ale jest publiczny** (np. utworzony ręcznie): przed pierwszym uploadem w procesie backend pyta `GET /storage/v1/bucket/board-files` (`core/storage.py: _bucket_is_public`). `public: true` → log ERROR + ten sam `503 STORAGE_NOT_CONFIGURED` (ponowne sprawdzenie najwcześniej po 60 s, więc po przestawieniu bucketu na prywatny upload wraca bez restartu). `public: false` jest pamiętane do końca procesu. Gdy samego sprawdzenia nie da się wykonać (sieć, 5xx), upload **nie** jest blokowany, a sprawdzenie powtarza się przy następnym.
+- **Limity uploadu** (`whiteboard/files.py`, wszystko PRZED czytaniem ciała): 60/min na IP i 30/min na konto (`429 RATE_LIMITED`); najwyżej 4 uploady w toku w procesie (`503 UPLOAD_BUSY`) i 2 na konto (`429 TOO_MANY_UPLOADS`), oba z `Retry-After` — to ogranicza z góry szczyt pamięci (ok. 4 × 15 MB + jedno dekodowanie ~145 MB) i kolejkę przed semaforem dekodowania wspólnym z awatarami. Front wysyła najwyżej 2 obrazy naraz i traktuje 429/503 jako błąd przejściowy (ponowienia). Pobieranie: 600/min na konto. Limity w Redis są fail-open.
+- **Quota tablicy (miękka)**: 300 plików / 100 MB na tablicę → `409 BOARD_FILE_QUOTA_EXCEEDED` (komunikat na froncie, bez ponowień). Licznik siedzi w Redis (`board_files:{id}:count|bytes`), rośnie po udanym zapisie i znika przy usunięciu tablicy.
+- **SVG**: inline zostają tylko SVG wykresów f(x) (id pliku `fn-<hash>`). SVG wklejony przez użytkownika na tablicy z serwerem jest odrzucany z komunikatem (backend przyjmuje wyłącznie rastry); na tablicy demo/gościa zostaje inline jak dotąd.
+- **Usunięcie tablicy** kasuje folder `{board_id}/` w `board-files` (`boards/service.py` → `files.delete_board_files`, listowanie stronami po 1000).
+
+Znane ograniczenia:
+
+- **Sieroty**: plik skasowanego elementu zostaje w Storage do usunięcia tablicy (cofnięcie / tombstone mogą przywrócić element, więc plików nie kasujemy pojedynczo).
+- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` (ani `delete_board_folder` starego silnika) — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia ręcznie albo osobnym zadaniem (lista `board_id` przed kaskadą + `delete_board_files` dla każdej).
+- **Quota tablicy nie jest rozliczeniem**: po utracie danych Redis licznik startuje od zera, równoległe uploady mogą przekroczyć limit o kilka plików, a awaria Redis wyłącza limit. Nie ma limitu łącznego na konto ani workspace.
+- **Limit uploadów w toku jest na proces**: zakłada jeden proces backendu (to samo założenie co semafor dekodowania w `auth/avatar.py`); przy wielu workerach każdy miałby własny licznik.
+- **Flaga `public` bucketu jest sprawdzana raz na proces**: przestawienie działającego bucketu na publiczny zostanie wykryte dopiero po restarcie backendu.
+- **Zamknięcie karty przed końcem wysyłki** = obraz przepada (istniał tylko lokalnie, nie było go jeszcze w `Y.Doc`).
+- **Brak leniwej migracji**: stare wpisy z dataURL zostają w dokumencie; nowe obrazy idą już do Storage.
+- **Brak limitu rozmiaru snapshotu** po stronie `/doc` i `whiteboard-sync`; front tylko loguje ostrzeżenie, gdy plik inline > 200 KB.
+- Ruch obrazów idzie przez backend (proxy), nie bezpośrednio ze Storage; przeglądarka trzyma plik w prywatnym cache.
+
 ## 3. Powiadomienia (np. zaproszenie do workspace'u)
 
 To jest inny pipeline niż tablica: tu event **inicjuje backend**, nie frontend drugiego usera.

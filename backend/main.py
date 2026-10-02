@@ -128,7 +128,8 @@ async def app_exception_handler(request, exc: AppException):
             error=exc.message,
             code=exc.code,
             data=exc.details
-        ).model_dump(mode='json')
+        ).model_dump(mode='json'),
+        headers=exc.headers,
     )
 
 @app.exception_handler(Exception)

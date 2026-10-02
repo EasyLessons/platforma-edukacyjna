@@ -21,6 +21,7 @@ from core.presence import PresenceService
 
 from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
 from api.v1.whiteboard.storage import delete_board_folder
+from api.v1.whiteboard.files import delete_board_files
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -219,6 +220,8 @@ class BoardService:
         self.db.commit()
 
         await delete_board_folder(board_id)
+        # Obrazy silnika Excalidraw (prywatny bucket board-files) - best-effort jak wyzej.
+        await delete_board_files(board_id)
 
         logger.info(f"Tablica usunięta: {board_id}")
         return {"success": True, "message": "Tablica została pomyślnie usunięta."}

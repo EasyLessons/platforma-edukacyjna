@@ -10,6 +10,8 @@ Dlaczego przekodowanie, a nie samo sprawdzenie naglowka (SEC-03):
 
 Dozwolone wejscie: JPEG (takze z segmentem MPF - "MPO"), PNG, WEBP. SVG, GIF, HTML i reszta sa odrzucane, bo Pillow
 dostaje jawna liste dekoderow (`formats=`).
+Wolajacy moze podac wlasna liste (`formats=`), np. obrazy tablicy dopuszczaja tez GIF
+(`BOARD_INPUT_FORMATS`): z animacji brana jest tylko PIERWSZA klatka, wynik to nadal WEBP.
 
 Pamiec ("decompression bomb"): plik 1 KB potrafi opisywac dziesiatki megapikseli.
 Wymiary znamy z naglowka PRZED dekodowaniem i odrzucamy za duze, a limit zalezy od tego,
@@ -37,6 +39,8 @@ from PIL import Image, ImageOps, PngImagePlugin, UnidentifiedImageError
 from core.exceptions import AppException
 
 ALLOWED_INPUT_FORMATS = ("JPEG", "PNG", "WEBP")
+# Formaty, ktore wolajacy moze wlaczyc przez `formats=` (kazdy ma zmierzony koszt piksela).
+SUPPORTED_INPUT_FORMATS = ("JPEG", "PNG", "WEBP", "GIF")
 # JPEG z segmentem MPF (zdjecia prosto z aparatu/telefonu: podglad, mapa glebi) dekoder
 # JPEG Pillow zglasza jako "MPO". To zwykly JPEG - dekodujemy tylko pierwsza klatke.
 _FORMAT_ALIASES = {"MPO": "JPEG"}
@@ -51,7 +55,8 @@ DEFAULT_MAX_DECODE_BYTES = 100 * 1024 * 1024
 # WEBP (dekoder trzyma kilka kopii klatki), JPEG progresywny CMYK (bufory wspolczynnikow).
 # Daje to ok. 10 Mpx dla PNG (zrzut ekranu 4K sie miesci), 8 Mpx dla JPEG progresywnego
 # lub wieloskanowego (ten sam koszt: bufory wspolczynnikow) i ok. 6 Mpx dla WEBP.
-_FULL_DECODE_BYTES_PER_PIXEL = {"PNG": 10, "WEBP": 17, "JPEG": 13}
+# GIF (pierwsza klatka, paleta z przezroczystoscia -> RGBA): zmierzone 16,6 B/px.
+_FULL_DECODE_BYTES_PER_PIXEL = {"PNG": 10, "WEBP": 17, "JPEG": 13, "GIF": 17}
 # Chunki tekstowe PNG (tEXt/zTXt/iTXt) Pillow rozpakowuje do pamieci OBOK pikseli, domyslnie
 # do 64 MB - plik 77 KB podnosil szczyt o ponad 60 MB ponad budzet. Tekst i tak wyrzucamy,
 # wiec 8 MB to duzy zapas (zwykle to kilka KB XMP); plik z wiekszym tekstem jest odrzucany.
@@ -80,9 +85,10 @@ class SanitizedImage:
     height: int
 
 
-def _invalid_image() -> AppException:
+def _invalid_image(formats: tuple[str, ...] = ALLOWED_INPUT_FORMATS) -> AppException:
+    names = ", ".join(formats[:-1]) + f" ani {formats[-1]}" if len(formats) > 1 else formats[0]
     return AppException(
-        "Plik nie jest poprawnym obrazem JPEG, PNG ani WEBP",
+        f"Plik nie jest poprawnym obrazem {names}",
         code="INVALID_FILE_TYPE",
         status_code=400,
     )
@@ -211,10 +217,15 @@ def sanitize_image(
     max_pixels: int = DEFAULT_MAX_PIXELS,
     max_decode_bytes: int = DEFAULT_MAX_DECODE_BYTES,
     max_input_side: int = DEFAULT_MAX_INPUT_SIDE,
+    formats: tuple[str, ...] = ALLOWED_INPUT_FORMATS,
 ) -> SanitizedImage:
     """
-    Dekoduje `data` (tylko JPEG/PNG/WEBP), zmniejsza do `max_side` x `max_side`
+    Dekoduje `data` (domyslnie tylko JPEG/PNG/WEBP), zmniejsza do `max_side` x `max_side`
     (z zachowaniem proporcji) i zapisuje od nowa jako WEBP bez metadanych.
+
+    `formats` - lista dekoderow Pillow dopuszczonych dla tego wywolania (podzbior
+    SUPPORTED_INPUT_FORMATS). Z plikow wieloklatkowych (GIF, animowany WEBP/PNG) brana
+    jest tylko pierwsza klatka.
 
     `max_pixels` to limit ogolny (w praktyce: jednoskanowy JPEG baseline); obrazy dekodowane w pelnej
     rozdzielczosci ogranicza dodatkowo budzet pamieci `max_decode_bytes` (opis modulu).
@@ -222,14 +233,17 @@ def sanitize_image(
     Funkcja jest synchroniczna i obciaza CPU - z kodu async wolaj przez
     `run_in_threadpool`. Rzuca AppException 400 (INVALID_FILE_TYPE / IMAGE_TOO_LARGE).
     """
+    unsupported = [f for f in formats if f not in SUPPORTED_INPUT_FORMATS]
+    if unsupported or not formats:
+        raise ValueError(f"Nieobslugiwane formaty wejsciowe: {unsupported}")
     if not data:
-        raise _invalid_image()
+        raise _invalid_image(formats)
 
     try:
         with warnings.catch_warnings():
             # DecompressionBombWarning (> MAX_IMAGE_PIXELS Pillow) traktujemy jak blad.
             warnings.simplefilter("error", Image.DecompressionBombWarning)
-            with Image.open(io.BytesIO(data), formats=ALLOWED_INPUT_FORMATS) as img:
+            with Image.open(io.BytesIO(data), formats=formats) as img:
                 # Image.open czyta tylko naglowek - wymiary znamy PRZED dekodowaniem pikseli.
                 width, height = img.size
                 fmt = _FORMAT_ALIASES.get(img.format, img.format)
@@ -252,11 +266,11 @@ def sanitize_image(
     except AppException:
         raise
     except (UnidentifiedImageError, Image.DecompressionBombError, Image.DecompressionBombWarning):
-        raise _invalid_image()
+        raise _invalid_image(formats)
     except Exception:
         # Pillow rzuca rozne wyjatki dla uszkodzonych plikow (OSError, SyntaxError,
         # ValueError, struct.error...) - dla klienta to zawsze "niepoprawny obraz".
-        raise _invalid_image()
+        raise _invalid_image(formats)
 
     # Zadnych metadanych z oryginalu (EXIF, ICC, XMP, komentarze) w pliku wynikowym.
     clean.info.clear()
