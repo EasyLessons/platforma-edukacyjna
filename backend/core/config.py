@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     # (dziala tylko token usera). Wygeneruj: python -c "import secrets; print(secrets.token_urlsafe(32))"
     sync_service_token: str = ""
 
+    # === ROZMOWA GLOSOWA (Daily) ===
+    # Klucz API Daily - TYLKO backend (api/v1/whiteboard/call.py), nigdy przegladarka.
+    # Pusty = rozmowy wylaczone: POST /whiteboard/{id}/call zwraca 503 VOICE_NOT_CONFIGURED.
+    daily_api_key: str = ""
+    # Prefiks nazw pokoi (<prefix>-board-<id>). Inna wartosc dla dev/stagingu na tym samym
+    # koncie Daily, zeby srodowiska nie dzielily pokoi. Tylko male litery, cyfry i myslnik.
+    daily_room_prefix: str = "easylesson"
+    # Po ilu minutach od OSTATNIEGO dolaczenia pokoj wygasa (uczestnicy sa wtedy rozlaczani).
+    # Krotki czas = pokoje nie zajmuja limitu konta i zapomniana karta nie nabija minut.
+    daily_room_ttl_minutes: int = 180
+
     # === CORS (SEC-04) ===
     # Jawna lista originow rozdzielona przecinkami (env ALLOWED_ORIGINS). Credentials
     # (refresh cookie) sa wlaczone, wiec kazdy origin wpisujemy osobno - zadnych wildcardow.
