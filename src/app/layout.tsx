@@ -1,21 +1,11 @@
-import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
 import { AuthProvider } from '@/_new/lib/auth';
 import { QueryProvider } from '@/_new/lib/query-provider';
 import Script from 'next/script';
-
-const plusJakarta = Plus_Jakarta_Sans({
-  variable: '--font-plus-jakarta',
-  subsets: ['latin'],
-  preload: false,
-});
-
-const playfair = Playfair_Display({
-  variable: '--font-playfair',
-  subsets: ['latin'],
-  style: ['normal', 'italic'],
-  preload: false,
-});
+import {
+  plusJakartaSansRoot as plusJakarta,
+  playfairDisplayRoot as playfair,
+} from '@new/shared/fonts';
 
 export const metadata = {
   title: 'EasyLesson - Korepetycje online z AI',

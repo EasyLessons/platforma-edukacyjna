@@ -1,14 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Youtube, Instagram, Facebook, Mail, Phone } from 'lucide-react';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 import NewsletterSection from './mega-menus/NewsletterSectionProps';
-
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '600', '700', '800'],
-  display: 'swap',
-});
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();

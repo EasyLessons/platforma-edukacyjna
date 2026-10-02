@@ -24,6 +24,20 @@ export default [
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'prefer-const': 'error',
       'react-hooks/exhaustive-deps': 'warn',
+      // Fonty tylko lokalnie: next/font/google pobiera pliki z Google Fonts w trakcie
+      // `next build` i przy niedostepnosci Google build w CI pada losowo.
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            {
+              name: 'next/font/google',
+              message:
+                'Uzyj fontow z @new/shared/fonts (next/font/local, pliki woff2 w repo) - bez pobierania z Google Fonts podczas builda.',
+            },
+          ],
+        },
+      ],
     },
   },
 ];
