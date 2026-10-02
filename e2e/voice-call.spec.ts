@@ -110,8 +110,8 @@ test('rozmowa z atrapą Daily: okno z ramką, zwinięcie jej nie usuwa, rozłąc
   await expect(callFrames(page)).toHaveAttribute('allow', /microphone/);
   await expect(callFrames(page)).toHaveAttribute('allow', /display-capture/);
   await expect(callFrames(page)).toHaveAttribute('src', /easylesson-e2e\.daily\.co/);
-  // Token idzie do ramki przez postMessage - nie w adresie ramki ani strony.
-  expect(await callFrames(page).getAttribute('src')).not.toContain(token);
+  // daily-js przekazuje token ramce w jej własnym adresie (domena Daily, parametr `t`) -
+  // do adresu NASZEJ strony token trafić nie może.
   expect(page.url()).not.toContain(token);
 
   // Zwinięcie: ta sama ramka zostaje w DOM (odmontowanie zerwałoby rozmowę).

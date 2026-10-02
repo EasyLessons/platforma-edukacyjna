@@ -2,7 +2,7 @@
  * API rozmowy przy tablicy (Daily). Backend tworzy/odświeża pokój i wydaje meeting token;
  * klucz Daily nigdy nie trafia do przeglądarki.
  *
- * `token` to poświadczenie wejścia do rozmowy - nie logować i nie wkładać do adresu URL.
+ * `token` to poświadczenie wejścia do rozmowy - nie logować i nie wkładać do adresu strony.
  */
 import { apiClient } from '@/_new/lib/api';
 import { AppError, ErrorCode } from '@/_new/lib/errors';

@@ -158,7 +158,7 @@ describe('DailyCallProvider - start rozmowy', () => {
     expect(frames()).toHaveLength(1);
   });
 
-  it('token rozmowy nie trafia do logów ani do adresu ramki', async () => {
+  it('token rozmowy nie trafia do logów ani do adresu strony', async () => {
     const spies = (['log', 'debug', 'info', 'warn', 'error'] as const).map((level) =>
       vi.spyOn(console, level).mockImplementation(() => {})
     );
@@ -170,7 +170,6 @@ describe('DailyCallProvider - start rozmowy', () => {
 
     const logged = JSON.stringify(spies.flatMap((spy) => spy.mock.calls));
     expect(logged).not.toContain(callToken);
-    expect(document.body.innerHTML).not.toContain(callToken);
     expect(window.location.href).not.toContain(callToken);
     vi.unstubAllEnvs();
   });

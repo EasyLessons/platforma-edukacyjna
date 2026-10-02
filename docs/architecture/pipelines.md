@@ -146,7 +146,9 @@ Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider 
   i odmontowaniu. `destroy()` w daily-js czeka na odpowiedź ramki — po 3 s bez odpowiedzi ramka jest usuwana
   i `destroy()` wołane drugi raz (inaczej instancja zostałaby w rejestrze daily-js).
 - **Token rozmowy** żyje tylko w zmiennej lokalnej `start()` — nie trafia do stanu Reacta, logów (`createLogger`
-  loguje wyłącznie kod/status błędu) ani adresu URL (do ramki idzie przez `postMessage`).
+  loguje wyłącznie kod/status błędu) ani adresu naszej strony. daily-js przekazuje go ramce w jej własnym adresie
+  na domenie Daily (`https://<konto>.daily.co/<pokój>?t=...`) — tak działa Prebuilt; token jest krótkotrwały
+  i wydany dla jednego użytkownika.
 - **Grzeczne wyłączenie** (bez wyjątków, tablica działa dalej): `503 VOICE_NOT_CONFIGURED` (brak klucza) →
   "Rozmowy głosowe są chwilowo wyłączone"; `502/504`, sieć, `404/405` (backend sprzed endpointu) →
   "Nie udało się połączyć z rozmową" + "Spróbuj ponownie"; `429` → prośba o odczekanie; inne kody `VOICE_*`

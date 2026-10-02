@@ -11,8 +11,9 @@
  * Zasady, których pilnuje ten plik:
  *  - `@daily-co/daily-js` ładuje się dynamicznie dopiero po kliknięciu (nie trafia do
  *    głównego bundla tablicy),
- *  - token rozmowy żyje tylko w zmiennej lokalnej `start()` - nie trafia do stanu, logów
- *    ani adresu URL,
+ *  - token rozmowy żyje tylko w zmiennej lokalnej `start()` - nie trafia do stanu Reacta,
+ *    logów ani adresu naszej strony (daily-js sam dokleja go do adresu ramki na domenie
+ *    Daily jako `?t=` - tak działa Prebuilt),
  *  - ramka Daily siedzi w kontenerze, który jest w DOM przez cały czas życia providera;
  *    zwinięcie okna tylko go chowa (odmontowanie albo `display: none` zrywa rozmowę),
  *  - każda ścieżka błędu kończy się komunikatem w stronie, nigdy wyjątkiem.
