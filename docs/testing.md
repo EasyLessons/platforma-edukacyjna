@@ -180,7 +180,7 @@ Backend bez testów: `assets/`, `onboarding/`, `whiteboard/router.py`, `whiteboa
 
 ## Znane ograniczenia
 
-- E2E pokrywają tylko tablicę na Excalidraw (za flagą); stary silnik, logowanie przez Google, dashboard i stary czat głosowy nie mają testów E2E. Rozmowa na Daily (`e2e/voice-call*.spec.ts`) jest sprawdzana bez klucza (komunikat „wyłączone”, brak ramki) i z atrapą odpowiedzi (`page.route`) — prawdziwego połączenia z Daily testy nie nawiązują; to zostaje testem ręcznym na dwóch urządzeniach.
+- E2E pokrywają tylko tablicę na Excalidraw (za flagą); stary silnik, logowanie przez Google, dashboard i stary czat głosowy nie mają testów E2E. Rozmowa na Daily (`e2e/voice-call*.spec.ts`) jest sprawdzana bez klucza (503 `VOICE_NOT_CONFIGURED` → komunikat „Rozmowa chwilowo niedostępna.”, brak ramki; owner i viewer) i z atrapą odpowiedzi (`page.route`) — prawdziwego połączenia z Daily testy nie nawiązują; to zostaje testem ręcznym na dwóch urządzeniach.
 - Brak testów WebSocket dla synchronizacji tablicy (Supabase Realtime w ścieżce legacy, Hocuspocus w ścieżce Yjs) — trudne do izolacji; model `Y.Doc` jest testowany jednostkowo (`yjs/board-doc.test.ts`).
 - `pytest-asyncio` 0.21.1 ma bug z `@pytest_asyncio.fixture` w trybie STRICT — testy integracyjne backendowe używają synchronicznego `TestClient` zamiast async httpx.
 - Lokalnie na Windows `prettier --check` może zgłaszać setki plików przez `core.autocrlf=true` (CRLF) — CI na Linuksie jest miarodajne.

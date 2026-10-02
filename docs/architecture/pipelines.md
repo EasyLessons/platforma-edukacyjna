@@ -162,46 +162,7 @@ UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Author
 
 ## 5. Rozmowa przy tablicy (Daily) i stary voice chat (WebRTC)
 
-Dostawcę wybiera flaga `NEXT_PUBLIC_VOICE_PROVIDER` (`src/_new/features/voice-call/config/voice-provider.ts`):
-brak / `daily` = **Daily** (domyślnie, od 10.2026), `legacy` = stary czat WebRTC + Xirsys (wyjście awaryjne,
-kod zostaje do osobnego PR-a usuwającego). Zmienna jest wklejana w buildzie — zmiana = redeploy na Vercelu.
-
-### 5a. Daily (`features/voice-call`)
-
-```
-Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider boardId wokół OBU silników
-  (tylko liczbowe id tablicy; demo i gość nie mają providera, więc przycisk się nie renderuje)
-  → przycisk "Rozmowa" (CallButton): stary silnik - pasek online-users.tsx; Excalidraw - slot topRightExtra
-    w board-engine (prawy górny róg, na telefonie pływający przycisk nad stopką; także dla viewera)
-  → klik → test wsparcia przeglądarki (voice-chat/mediaSupport: https, mediaDevices, przeglądarka w aplikacji)
-  → POST /api/v1/whiteboard/{id}/call (apiClient) → { room_url, token, expires_at }
-      backend: członkostwo tablicy → pokój Daily (prywatny) + meeting token; DAILY_API_KEY tylko na Renderze
-      front: room_url musi być https://<konto>.daily.co/... (callApi.isDailyRoomUrl) - inny adres = błąd, bez ramki
-  → await import('@daily-co/daily-js') (dopiero po kliknięciu - poza głównym bundlem tablicy)
-  → DailyIframe.createFrame(kontener panelu, { startVideoOff: true, lang: 'pl', ... }) → call.join({ url, token })
-  → Daily Prebuilt w iframe: ekran wejścia (test mikrofonu), audio, kamera na życzenie, TURN/reconnect po stronie Daily
-```
-
-- **Okno rozmowy** (`components/call-panel.tsx`): pływający panel (komputer: pod paskiem w prawym górnym rogu;
-  telefon: dolny arkusz na pół ekranu). Zwinięcie zostawia samą belkę (wycisz / rozwiń / rozłącz) — kontener
-  z iframe **zostaje w DOM** (wysokość 0 + `visibility: hidden`); odmontowanie albo `display: none` zrywa rozmowę.
-- **Jedna instancja naraz**: `destroy()` przy "Rozłącz", wyjściu z okna Daily (`left-meeting`), zmianie tablicy
-  i odmontowaniu. `destroy()` w daily-js czeka na odpowiedź ramki — po 3 s bez odpowiedzi ramka jest usuwana
-  i `destroy()` wołane drugi raz (inaczej instancja zostałaby w rejestrze daily-js).
-- **Token rozmowy** żyje tylko w zmiennej lokalnej `start()` — nie trafia do stanu Reacta, logów (`createLogger`
-  loguje wyłącznie kod/status błędu) ani adresu naszej strony. daily-js przekazuje go ramce w jej własnym adresie
-  na domenie Daily (`https://<konto>.daily.co/<pokój>?t=...`) — tak działa Prebuilt; token jest krótkotrwały
-  i wydany dla jednego użytkownika.
-- **Grzeczne wyłączenie** (bez wyjątków, tablica działa dalej): `503 VOICE_NOT_CONFIGURED` (brak klucza) →
-  "Rozmowy głosowe są chwilowo wyłączone"; `502/504`, sieć, `404/405` (backend sprzed endpointu) →
-  "Nie udało się połączyć z rozmową" + "Spróbuj ponownie"; `429` → prośba o odczekanie; inne kody `VOICE_*`
-  → komunikat z backendu; brak `mediaDevices`/https → komunikat z `mediaSupport`.
-- **Nagłówki**: projekt nie ma dziś CSP ani `Permissions-Policy`, więc nic nie blokuje ramki Daily. Przy wdrażaniu
-  SEC-16 trzeba dopuścić Daily — wymagane wartości są w `docs/security/AUDYT-2026-09.md`, sekcja 3d.
-
-### 5b. Stary voice chat (`features/voice-chat`, tylko `NEXT_PUBLIC_VOICE_PROVIDER=legacy`)
-
-Dwie ścieżki: **Daily** (decyzja 02.10.2026, docelowa — backend opisany w 5a; frontend w osobnym PR) i dotychczasowy własny WebRTC + Xirsys (opis niżej, zostaje do czasu usunięcia).
+Dwie ścieżki, wybierane flagą `NEXT_PUBLIC_VOICE_PROVIDER` (`src/_new/features/voice-call/config/voice-provider.ts`): brak / `daily` = **Daily** (decyzja 02.10.2026, domyślna — backend w 5a, frontend w 5c), `legacy` = dotychczasowy własny WebRTC + Xirsys (5b, wyjście awaryjne; kod zostaje do osobnego PR-a usuwającego). Zmienna jest wklejana w buildzie — zmiana = redeploy na Vercelu.
 
 ### 5a. Rozmowa przez Daily — backend
 
@@ -246,6 +207,50 @@ User dołącza do tablicy → VoiceChatProvider (src/_new/features/voice-chat/Vo
 **Limit per użytkownik, nie per IP.** Klasa siedzi za jednym NAT-em, więc licznik per IP liczony przed autoryzacją pozwalałby niezalogowanemu z tej samej sieci (pętla żądań bez tokenu) odciąć wszystkim TURN. Żądania bez tokenu / ze złym tokenem nie zużywają niczyjego limitu i nie docierają do Xirsys.
 
 **Region TURN.** `global.xirsys.net` dobiera serwery TURN wg położenia wołającego, a wołającym jest funkcja serwerowa (na Vercel domyślnie `iad1`, USA), nie przeglądarka ucznia. Jeśli w odpowiedzi `/api/turn` hosty TURN nie są europejskie: ustaw region funkcji projektu na europejski (Vercel → Settings → Functions) albo `XIRSYS_API_HOST` na regionalny host Xirsys (akceptowane tylko `*.xirsys.net` / `*.xirsys.com`).
+
+### 5c. Rozmowa przez Daily — frontend (`features/voice-call`)
+
+```
+Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider boardId wokół OBU silników
+  (tylko liczbowe id tablicy; demo i gość nie mają providera, więc przycisk się nie renderuje)
+  → przycisk "Rozmowa" (CallButton): stary silnik - pasek online-users.tsx; Excalidraw - slot topRightExtra
+    w board-engine (prawy górny róg, na telefonie pływający przycisk nad stopką; także dla viewera)
+  → klik → test wsparcia przeglądarki (voice-chat/mediaSupport: https, mediaDevices, przeglądarka w aplikacji)
+  → POST /api/v1/whiteboard/{id}/call (apiClient) → { room_url, token, expires_at }   (backend: 5a)
+      front: room_url musi być https://<konto>.daily.co/... (callApi.isDailyRoomUrl) - inny adres = błąd, bez ramki
+      odmowa → komunikat wg pola `code` (tabela niżej), bez ramki
+  → await import('@daily-co/daily-js') (dopiero po kliknięciu - poza głównym bundlem tablicy)
+  → DailyIframe.createFrame(kontener panelu, { startVideoOff: true, lang: 'pl', ... }) → call.join({ url, token })
+  → Daily Prebuilt w iframe: ekran wejścia (test mikrofonu), audio, kamera na życzenie, TURN/reconnect po stronie Daily
+  → koniec: "Rozłącz" / wyjście w oknie Daily / zdarzenie `error` z Daily (m.in. wygaśnięcie pokoju) → destroy(), panel znika
+```
+
+- **Ten sam przycisk dla wszystkich.** Nauczyciel (właściciel przestrzeni) i uczeń widzą ten sam przycisk „Rozmowa”; o tym, kto tworzy pokój, decyduje backend. Uczeń, który kliknie przed nauczycielem, dostaje `409 VOICE_CALL_NOT_STARTED` i komunikat z przyciskiem „Spróbuj ponownie”. UI nie ma funkcji prowadzącego — w spotkaniu Daily nikt nie jest ownerem ani adminem.
+- **Zero automatycznego odpytywania.** Każde żądanie do endpointu to kliknięcie („Rozmowa” albo „Spróbuj ponownie”) — nie ma timerów, ponowień w tle ani reakcji na powrót do karty / sieci (limit żądań backendu na użytkownika). Pilnują tego testy (`daily-call-provider.test.tsx`: 30 min wirtualnego czasu bez kliknięcia = jedno żądanie).
+- **Token tylko na wejście.** Żyje wyłącznie w zmiennej lokalnej `start()` — nie trafia do stanu Reacta, pamięci przeglądarki, logów (`createLogger` loguje tylko kod/status błędu) ani adresu naszej strony; daily-js przekazuje go ramce w jej adresie na domenie Daily (`https://<konto>.daily.co/<pokój>?t=...`) — tak działa Prebuilt. Token jest krótkotrwały (ważny kilka minut, tylko do wejścia), więc **każde** dołączenie i ponowne dołączenie pobiera nowy z endpointu.
+- **Koniec czasu pokoju.** Pokój ma limit czasu i wyrzuca uczestników po jego upływie. Daily zgłasza to zdarzeniem `error` (`exp-room`, albo `ejected` = limit pobytu z tokenu) — front pokazuje „Rozmowa została zakończona (limit czasu pokoju). Nauczyciel może rozpocząć nową.”, zamyka ramkę i wraca do stanu początkowego (bez ostrzeżeń w konsoli, bez samoczynnego dołączania). Pozostałe zdarzenia: `no-room` → „Rozmowa została zakończona. Nauczyciel może rozpocząć nową.”, `exp-token` → „Czas na dołączenie do rozmowy minął. Spróbuj ponownie.”, `meeting-full` → „W rozmowie jest już komplet uczestników.”, reszta (m.in. `connection-error`) → „Rozmowa została przerwana. Dołącz ponownie.”.
+- **Okno rozmowy** (`components/call-panel.tsx`): pływający panel (komputer: pod paskiem w prawym górnym rogu; telefon: dolny arkusz na pół ekranu). Zwinięcie zostawia samą belkę (wycisz / rozwiń / rozłącz) — kontener z iframe **zostaje w DOM** (wysokość 0 + `visibility: hidden`); odmontowanie albo `display: none` zrywa rozmowę.
+- **Jedna instancja naraz**: `destroy()` przy „Rozłącz”, wyjściu z okna Daily (`left-meeting`), błędzie Daily, zmianie tablicy i odmontowaniu. `destroy()` w daily-js czeka na odpowiedź ramki — po 3 s bez odpowiedzi ramka jest usuwana i `destroy()` wołane drugi raz (inaczej instancja zostałaby w rejestrze daily-js).
+- **Nagłówki**: projekt nie ma dziś CSP ani `Permissions-Policy`, więc nic nie blokuje ramki Daily. Przy wdrażaniu SEC-16 trzeba dopuścić Daily — wymagane wartości są w `docs/security/AUDYT-2026-09.md`, sekcja 3d.
+
+**Kod odpowiedzi → komunikat w UI** (`call-errors.ts`; rozróżniamy po polu `code`, nie po statusie HTTP; treści błędu z backendu front **nie** pokazuje; każda odmowa = komunikat w stronie, bez ramki i bez wyjątku, tablica działa dalej). Tabela obejmuje kontrakt backendu z zabezpieczeniami kosztów; starszy backend zwraca z niej tylko `VOICE_NOT_CONFIGURED`, `VOICE_PROVIDER_ERROR`, `VOICE_PROVIDER_TIMEOUT` i `RATE_LIMITED`.
+
+| `code` (HTTP) | Komunikat | „Spróbuj ponownie” |
+| --- | --- | --- |
+| `VOICE_NOT_CONFIGURED` (503), `VOICE_DISABLED` (503) | Rozmowa chwilowo niedostępna. | nie (stan „wyłączone”) |
+| `VOICE_CALL_NOT_STARTED` (409) | Rozmowa jeszcze się nie zaczęła - poczekaj, aż nauczyciel ją rozpocznie. | tak (ręcznie) |
+| `VOICE_CALL_ENDING` (409) | Rozmowa właśnie się kończy - poproś nauczyciela o rozpoczęcie nowej. | tak (ręcznie) |
+| `VOICE_CREATE_NOT_ALLOWED` (403) | To konto nie może jeszcze rozpoczynać rozmów. | nie |
+| `AUTH_ERROR` (403), `VOICE_EMAIL_NOT_VERIFIED` (403) | Potwierdź adres e-mail, aby korzystać z rozmów. | nie |
+| `RATE_LIMITED` (429) | Zbyt wiele prób - spróbuj ponownie za chwilę. | tak |
+| `VOICE_CALL_BUSY` (429) | Rozmowa jest właśnie uruchamiana - spróbuj ponownie za chwilę. | tak |
+| `VOICE_USER_LIMIT` (429) | Dzienny limit rozmów dla tego konta został wyczerpany. | nie |
+| `VOICE_MONTHLY_LIMIT` (429) | Limit rozmów w tym miesiącu wyczerpany. | nie |
+| `VOICE_PROVIDER_LIMIT` (503), `VOICE_PROVIDER_ERROR` (502), `VOICE_PROVIDER_TIMEOUT` (504), `VOICE_GUARD_UNAVAILABLE` (503), `VOICE_USAGE_UNAVAILABLE` (503) | Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę. | tak |
+| 404 / 405, błąd sieci, nieznany kod, `AUTH_ERROR` 401, nieprawidłowa odpowiedź albo adres pokoju | Nie udało się połączyć z rozmową. Spróbuj ponownie. | tak |
+| (bez żądania) brak `mediaDevices` / https / przeglądarka w aplikacji | komunikat z `voice-chat/mediaSupport` | nie |
+
+**Stan po wdrożeniu, dopóki na Renderze nie ma `DAILY_API_KEY`:** przycisk „Rozmowa” w **obu** silnikach pokazuje „Rozmowa chwilowo niedostępna.” (503 `VOICE_NOT_CONFIGURED`), tablica działa normalnie. Stary czat wraca przez `NEXT_PUBLIC_VOICE_PROVIDER=legacy` na Vercelu + redeploy.
 
 ## 6. SmartSearch (wyszukiwanie wzorów)
 
