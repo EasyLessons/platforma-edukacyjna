@@ -37,7 +37,9 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **Redis** — presence na tablicy (`backend/core/presence.py`, sorted set z TTL) i rate limit auth. W testach `fakeredis`.
 
-**WebRTC (Xirsys jako TURN/STUN provider)** — połączenia głosowe peer-to-peer między użytkownikami na tej samej tablicy, sygnalizacja przez Supabase Broadcast.
+**Daily (`@daily-co/daily-js`, Daily Prebuilt w iframe)** — rozmowa przy tablicy (audio, kamera na życzenie) w obu silnikach; pokój i meeting token wydaje backend (`POST /api/v1/whiteboard/{id}/call`, klucz `DAILY_API_KEY` tylko na Renderze). Domyślny dostawca od 10.2026 (`NEXT_PUBLIC_VOICE_PROVIDER`, przepływ: `pipelines.md` par. 5). `@daily-co/daily-react` celowo nie jest używany (własnego UI rozmowy nie budujemy).
+
+**WebRTC (Xirsys jako TURN/STUN provider)** — stary czat głosowy peer-to-peer (sygnalizacja przez Supabase Broadcast); działa już tylko przy `NEXT_PUBLIC_VOICE_PROVIDER=legacy`, do usunięcia osobnym PR-em.
 
 **PDF.js (`pdfjs-dist`)** — odczyt/renderowanie PDF-ów w przeglądarce (materiały wgrywane na tablicę).
 
@@ -69,4 +71,4 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **Docker + docker-compose** — uruchomienie całości (frontend + backend + redis + whiteboard-sync) lokalnie jednym poleceniem, patrz `docker-compose.yml` i `README.md`.
 
-**Neon (Postgres serverless)**, **Supabase (Realtime + Storage)**, **Redis**, **Resend (email)**, **Xirsys (WebRTC TURN/STUN)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`). Backend deployowany na Render, frontend na Vercel (patrz `ci-cd.md`); `whiteboard-sync` ma `Procfile`/`Dockerfile`, hosting do ustalenia.
+**Neon (Postgres serverless)**, **Supabase (Realtime + Storage)**, **Redis**, **Resend (email)**, **Daily (rozmowa przy tablicy)**, **Xirsys (WebRTC TURN/STUN, tryb `legacy`)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`). Backend deployowany na Render, frontend na Vercel (patrz `ci-cd.md`); `whiteboard-sync` ma `Procfile`/`Dockerfile`, hosting do ustalenia.
