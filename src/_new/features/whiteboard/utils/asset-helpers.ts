@@ -38,13 +38,20 @@ const MAX_THUMBNAIL_LENGTH = 512 * 1024;
  * SEC-07: miniatura to dowolny string zapisany w bazie (także stare rekordy), więc NIE wolno
  * wstawiać jej jako HTML. SVG załadowane przez `<img>` działa w trybie statycznym: przeglądarka
  * nie wykonuje skryptów ani handlerów zdarzeń i nie pobiera zasobów zewnętrznych.
- * Zwraca null, gdy treść nie jest SVG - wtedy panel pokazuje pustą ramkę.
+ * Zwraca null, gdy treść nie jest SVG albo nie da się jej zakodować - wtedy panel pokazuje
+ * pustą ramkę. Nigdy nie rzuca.
  */
 export function thumbnailToDataUri(thumbnail: string | null | undefined): string | null {
   if (typeof thumbnail !== 'string') return null;
   if (thumbnail.length > MAX_THUMBNAIL_LENGTH) return null;
   if (!/^\s*<svg[\s>]/i.test(thumbnail)) return null;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(thumbnail)}`;
+  try {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(thumbnail)}`;
+  } catch {
+    // encodeURIComponent rzuca URIError dla niesparowanego surogatu UTF-16. Funkcja jest wołana
+    // w renderze, więc wyjątek wywróciłby cały panel - uszkodzona miniatura = pusta ramka.
+    return null;
+  }
 }
 
 /** Zwraca bounding box grupy elementów (w układzie tablicy). */

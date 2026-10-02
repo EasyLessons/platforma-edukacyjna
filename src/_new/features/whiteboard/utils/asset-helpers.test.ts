@@ -192,4 +192,13 @@ describe('thumbnailToDataUri (SEC-07)', () => {
     const big = '<svg xmlns="http://www.w3.org/2000/svg">' + 'a'.repeat(600_000) + '</svg>';
     expect(thumbnailToDataUri(big)).toBeNull();
   });
+
+  it('nie rzuca dla niesparowanego surogatu UTF-16 (encodeURIComponent -> URIError)', () => {
+    // Wywolanie jest w renderze panelu - wyjatek wywrocilby cala liste zasobow.
+    expect(() => thumbnailToDataUri('<svg>\ud800</svg>')).not.toThrow();
+    expect(thumbnailToDataUri('<svg>\ud800</svg>')).toBeNull();
+    expect(thumbnailToDataUri('<svg>\udc00\ud800</svg>')).toBeNull();
+    // Poprawna para surogatow (emoji) nadal sie koduje.
+    expect(thumbnailToDataUri('<svg>😀</svg>')).not.toBeNull();
+  });
 });
