@@ -105,6 +105,28 @@ async def _identifier_from_body(request: Request, field: str) -> str | None:
     return normalize_identifier(body.get(field))
 
 
+async def enforce_rate_limit(
+    scope: str, subject: str, limit: int, window_seconds: int, redis_client=None
+) -> None:
+    """
+    Jeden licznik `limit` / `window_seconds` dla dowolnego podmiotu (np. "user:5", "ip:1.2.3.4")
+    - do wywołania z kodu endpointu PO autoryzacji (zależność `rate_limit` liczy tylko IP/body).
+    Przekroczenie -> 429 RATE_LIMITED. `RedisError` NIE jest tu łapany: wołający decyduje,
+    czy awaria Redis przepuszcza żądanie, czy je odrzuca.
+    """
+    redis_client = redis_client or get_redis_client()
+    key = f"ratelimit:{scope}:{subject}"
+    current = await redis_client.incr(key)
+    if current == 1 or await redis_client.ttl(key) == -1:
+        await redis_client.expire(key, window_seconds)
+    if current > limit:
+        raise AppException(
+            "Zbyt wiele prób, spróbuj ponownie później.",
+            code="RATE_LIMITED",
+            status_code=429,
+        )
+
+
 def rate_limit(
     scope: str,
     limit: int,
