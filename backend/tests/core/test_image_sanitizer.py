@@ -19,6 +19,16 @@ def make_image(fmt: str, size=(64, 48), mode="RGB", color=(200, 30, 30), **save_
     return buf.getvalue()
 
 
+def make_png_with_text(size, megabytes: int, **image_kwargs) -> bytes:
+    """PNG z `megabytes` chunkami zTXt, kazdy 1 MB po dekompresji (w pliku ~1 KB)."""
+    from PIL.PngImagePlugin import PngInfo
+
+    info = PngInfo()
+    for i in range(megabytes):
+        info.add_text(f"k{i}", "A" * (1024 * 1024 - 1), zip=True)
+    return make_image("PNG", size=size, pnginfo=info, **image_kwargs)
+
+
 def decode(data: bytes) -> Image.Image:
     img = Image.open(io.BytesIO(data))
     img.load()
@@ -50,6 +60,24 @@ class TestAcceptedFormats:
 
         assert out.mode == "RGBA"
         assert out.getpixel((0, 0))[3] == 0
+
+    def test_jpeg_z_segmentem_mpf_jest_przyjmowany(self):
+        """
+        Regresja: zdjecie z aparatu/telefonu z segmentem MPF Pillow otwiera jako "MPO"
+        (mimo formats=JPEG/PNG/WEBP) - bylo odrzucane jako INVALID_FILE_TYPE.
+        """
+        second = Image.new("RGB", (800, 600), (9, 9, 9))
+        data = make_image("MPO", size=(800, 600), save_all=True, append_images=[second])
+        assert Image.open(io.BytesIO(data)).format == "MPO"  # sanity
+
+        result = sanitize_image(data, max_side=512)
+
+        assert (result.width, result.height) == (512, 384)
+        out = decode(result.data)
+        assert out.format == "WEBP"
+        assert getattr(out, "n_frames", 1) == 1
+        r, g, b = out.convert("RGB").getpixel((10, 10))
+        assert r > 150 and g < 80 and b < 80  # pierwsza klatka, nie druga
 
     def test_paleta_png_jest_obslugiwana(self):
         data = make_image("PNG", mode="P", color=3)
@@ -194,6 +222,23 @@ class TestRejected:
             sanitize_image(data, max_side=512, max_decode_bytes=1_000_000)
         assert exc.value.code == "IMAGE_TOO_LARGE"
 
+    def test_odrzuca_png_z_ogromnym_tekstem_po_dekompresji(self):
+        """
+        Regresja: 63 chunki zTXt po 1 MB (plik ~70 KB) Pillow rozpakowywal do pamieci
+        obok pikseli - ponad 60 MB poza budzetem dekodowania.
+        """
+        data = make_png_with_text(size=(64, 64), megabytes=63)
+        assert len(data) < 200_000
+
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data, max_side=512)
+
+        assert exc.value.code == "INVALID_FILE_TYPE"
+
+    def test_png_z_tekstem_w_limicie_przechodzi(self):
+        data = make_png_with_text(size=(64, 64), megabytes=2)
+        assert sanitize_image(data, max_side=512).width == 64
+
     def test_jpeg_baseline_25_mpx_nadal_przechodzi(self):
         """Zdjecie z telefonu: dekoder JPEG zmniejsza je juz przy dekodowaniu."""
         result = sanitize_image(make_image("JPEG", size=(5000, 5000)), max_side=512)
@@ -273,8 +318,25 @@ class TestMemoryBudget:
         ],
     )
     def test_szczyt_pamieci_miesci_sie_w_budzecie(self, tmp_path, fmt, mode, size, color, save_kwargs):
+        self.assert_peak_within_budget(
+            tmp_path, make_image(fmt, size=size, mode=mode, color=color, **save_kwargs)
+        )
+
+    def test_jpeg_z_mpf_25_mpx_jest_zmniejszany_przy_dekodowaniu(self, tmp_path):
+        """MPO to JPEG baseline - ma isc sciezka `draft`, a nie pelnym dekodowaniem."""
+        second = Image.new("RGB", (5000, 5000), (9, 9, 9))
+        self.assert_peak_within_budget(
+            tmp_path, make_image("MPO", size=(5000, 5000), save_all=True, append_images=[second])
+        )
+
+    def test_tekst_png_w_limicie_miesci_sie_w_budzecie(self, tmp_path):
+        """Najwiekszy PNG + maksymalna dozwolona ilosc tekstu (7 z 8 MB) nadal w budzecie."""
+        data = make_png_with_text(size=(3162, 3162), megabytes=7, mode="P", color=3, transparency=3)
+        self.assert_peak_within_budget(tmp_path, data)
+
+    def assert_peak_within_budget(self, tmp_path, data: bytes) -> None:
         source = tmp_path / "input.bin"
-        source.write_bytes(make_image(fmt, size=size, mode=mode, color=color, **save_kwargs))
+        source.write_bytes(data)
 
         proc = subprocess.run(
             [sys.executable, "-c", _MEASURE_PEAK_SCRIPT, str(source)],

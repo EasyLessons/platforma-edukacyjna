@@ -184,6 +184,44 @@ class TestRejectedContent:
         """Jedno dekodowanie to do ~100 MB RAM (budzet sanitizera) - nie rownolegle."""
         assert avatar_module._decode_slots._value == 1
 
+    def test_anulowanie_zadania_nie_zwalnia_slotu_przed_koncem_dekodowania(self, monkeypatch):
+        """
+        Regresja: `async with semafor` oddawal slot w chwili anulowania korutyny (zerwane
+        polaczenie), a watek dekodujacy pracowal dalej - dwa dekodowania mogly sie nalozyc.
+        """
+        import threading
+
+        started, finish = threading.Event(), threading.Event()
+
+        def slow_sanitize(raw, *, max_side):
+            started.set()
+            finish.wait(timeout=10)
+            raise AppException("x", code="INVALID_FILE_TYPE", status_code=400)
+
+        monkeypatch.setattr(avatar_module, "sanitize_image", slow_sanitize)
+
+        async def scenario():
+            slots = asyncio.Semaphore(1)
+            monkeypatch.setattr(avatar_module, "_decode_slots", slots)
+            task = asyncio.create_task(avatar_module._sanitize_one_at_a_time(b"x"))
+            while not started.is_set():
+                await asyncio.sleep(0.01)
+            task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await task
+            locked_while_thread_runs = slots.locked()
+            finish.set()
+            for _ in range(200):
+                if not slots.locked():
+                    break
+                await asyncio.sleep(0.01)
+            return locked_while_thread_runs, slots.locked()
+
+        locked_while_thread_runs, locked_after = asyncio.run(scenario())
+
+        assert locked_while_thread_runs is True
+        assert locked_after is False
+
 
 class TestSizeLimit:
 

@@ -29,7 +29,7 @@ from starlette.formparsers import MultiPartException, MultiPartParser
 from core import redis_client as redis_client_module
 from core.database import get_db
 from core.exceptions import AppException, NotFoundError
-from core.image_sanitizer import sanitize_image
+from core.image_sanitizer import SanitizedImage, sanitize_image
 from core.logging import get_logger
 from core.models import User
 from core.responses import ApiResponse
@@ -58,6 +58,24 @@ AVATAR_RATE_WINDOW_SECONDS = 600
 # Dekodowanie najwiekszego dozwolonego obrazu to chwilowo do ~100 MB RAM (budzet i pomiar:
 # core/image_sanitizer.py) - backend to jeden proces na malej instancji, wiec jedno naraz.
 _decode_slots = asyncio.Semaphore(1)
+
+
+def _release_decode_slot(task: "asyncio.Task[SanitizedImage]") -> None:
+    _decode_slots.release()
+    if not task.cancelled():
+        task.exception()  # odebrane tutaj, gdy zadanie HTTP juz nie czeka na wynik
+
+
+async def _sanitize_one_at_a_time(raw: bytes) -> SanitizedImage:
+    """
+    Dekoduje obraz w watku, najwyzej jeden naraz. Slot zwalnia WATEK po zakonczeniu pracy,
+    a nie korutyna: przy anulowaniu zadania (zerwane polaczenie) `async with` oddalby slot
+    od razu, a dekodowanie w watku trwaloby dalej - i nakladalo sie z nastepnym.
+    """
+    await _decode_slots.acquire()
+    task = asyncio.ensure_future(run_in_threadpool(sanitize_image, raw, max_side=AVATAR_MAX_SIDE))
+    task.add_done_callback(_release_decode_slot)
+    return await asyncio.shield(task)
 
 
 def _too_large() -> AppException:
@@ -224,8 +242,7 @@ async def upload_avatar(
 
     raw = await _read_avatar_file(request)
 
-    async with _decode_slots:
-        image = await run_in_threadpool(sanitize_image, raw, max_side=AVATAR_MAX_SIDE)
+    image = await _sanitize_one_at_a_time(raw)
     del raw
 
     # Nazwa w calosci z serwera: bez nazwy pliku, rozszerzenia ani id od klienta.

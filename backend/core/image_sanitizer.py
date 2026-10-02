@@ -8,7 +8,7 @@ Dlaczego przekodowanie, a nie samo sprawdzenie naglowka (SEC-03):
     komentarze i wszystko, co ktos dokleil do pliku (poliglot obraz+HTML/JS);
   * wymiary sa ograniczone, wiec do Storage nie trafi nic duzego.
 
-Dozwolone wejscie: JPEG, PNG, WEBP. SVG, GIF, HTML i reszta sa odrzucane, bo Pillow
+Dozwolone wejscie: JPEG (takze z segmentem MPF - "MPO"), PNG, WEBP. SVG, GIF, HTML i reszta sa odrzucane, bo Pillow
 dostaje jawna liste dekoderow (`formats=`).
 
 Pamiec ("decompression bomb"): plik 1 KB potrafi opisywac dziesiatki megapikseli.
@@ -26,11 +26,14 @@ import io
 import warnings
 from dataclasses import dataclass
 
-from PIL import Image, ImageOps, UnidentifiedImageError
+from PIL import Image, ImageOps, PngImagePlugin, UnidentifiedImageError
 
 from core.exceptions import AppException
 
 ALLOWED_INPUT_FORMATS = ("JPEG", "PNG", "WEBP")
+# JPEG z segmentem MPF (zdjecia prosto z aparatu/telefonu: podglad, mapa glebi) dekoder
+# JPEG Pillow zglasza jako "MPO". To zwykly JPEG - dekodujemy tylko pierwsza klatke.
+_FORMAT_ALIASES = {"MPO": "JPEG"}
 
 # JPEG baseline (dekodowany od razu w zmniejszeniu): zdjecia z telefonow maja 12-24 Mpx.
 DEFAULT_MAX_PIXELS = 25_000_000
@@ -42,6 +45,12 @@ DEFAULT_MAX_DECODE_BYTES = 100 * 1024 * 1024
 # Daje to ok. 10 Mpx dla PNG (zrzut ekranu 4K sie miesci), 8 Mpx dla JPEG progresywnego
 # i ok. 6 Mpx dla WEBP.
 _FULL_DECODE_BYTES_PER_PIXEL = {"PNG": 10, "WEBP": 17, "JPEG": 13}
+# Chunki tekstowe PNG (tEXt/zTXt/iTXt) Pillow rozpakowuje do pamieci OBOK pikseli, domyslnie
+# do 64 MB - plik 77 KB podnosil szczyt o ponad 60 MB ponad budzet. Tekst i tak wyrzucamy,
+# wiec 8 MB to duzy zapas (zwykle to kilka KB XMP); plik z wiekszym tekstem jest odrzucany.
+# Ustawienie globalne Pillow - sanitizer jest jedynym miejscem w backendzie, ktore go uzywa.
+MAX_PNG_TEXT_BYTES = 8 * 1024 * 1024
+PngImagePlugin.MAX_TEXT_MEMORY = min(PngImagePlugin.MAX_TEXT_MEMORY, MAX_PNG_TEXT_BYTES)
 # Limit boku: obrazy typu 1 x 8 000 000 rozsadzaja bufory filtra skalujacego.
 DEFAULT_MAX_INPUT_SIDE = 10_000
 
@@ -138,10 +147,11 @@ def sanitize_image(
             with Image.open(io.BytesIO(data), formats=ALLOWED_INPUT_FORMATS) as img:
                 # Image.open czyta tylko naglowek - wymiary znamy PRZED dekodowaniem pikseli.
                 width, height = img.size
-                scaled_decode = img.format == "JPEG" and not img.info.get("progressive")
+                fmt = _FORMAT_ALIASES.get(img.format, img.format)
+                scaled_decode = fmt == "JPEG" and not img.info.get("progressive")
                 pixel_limit = max_pixels
                 if not scaled_decode:
-                    per_pixel = _FULL_DECODE_BYTES_PER_PIXEL[img.format]
+                    per_pixel = _FULL_DECODE_BYTES_PER_PIXEL[fmt]
                     pixel_limit = min(max_pixels, max_decode_bytes // per_pixel)
                 if (
                     width < 1
