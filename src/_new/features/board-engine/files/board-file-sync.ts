@@ -13,14 +13,18 @@
  *            w pamięci karty -> `addFiles`. Wpis z `dataURL` (stary format) - jak dawniej.
  *
  * Zostają w dokumencie jako dataURL (jak dawniej):
- *   - SVG (wykresy funkcji są małe i generowane lokalnie),
+ *   - SVG wykresów funkcji (małe, generowane lokalnie; id `fn-<hash>`),
  *   - wszystko na tablicy bez serwera (`boardId === null`: demo, gość),
  *   - obraz, dla którego backend odpowiedział 503 STORAGE_NOT_CONFIGURED (bucket nie
- *     istnieje i nie dało się go utworzyć) - tablica ma działać mimo to.
+ *     istnieje, nie dało się go utworzyć albo jest publiczny) - tablica ma działać mimo to.
+ * Inne SVG (wklejone przez użytkownika) na tablicy z serwerem są odrzucane z komunikatem:
+ * backend ich nie przyjmuje, a inline rozdmuchiwałyby dokument dowolną treścią.
  *
- * Błędy wysyłki: ponowienia z rosnącym odstępem (sieć, 5xx, 429), potem `onUploadFailed`
+ * Błędy wysyłki: ponowienia z rosnącym odstępem (sieć, 5xx, 429 - w tym 429 TOO_MANY_UPLOADS
+ * i 503 UPLOAD_BUSY, gdy backend ma komplet uploadów w toku), potem `onUploadFailed`
  * (komponent usuwa element lokalnie i pokazuje komunikat). Bez sieci plik czeka w kolejce
- * do zdarzenia `online` i nie zużywa prób.
+ * do zdarzenia `online` i nie zużywa prób. Naraz idą najwyżej MAX_PARALLEL_UPLOADS wysyłki
+ * (tyle backend przyjmuje od jednego konta) - reszta czeka w kolejce.
  *
  * Znane ograniczenia (docs/architecture/pipelines.md, "Obrazy tablicy"): zamknięcie karty przed
  * końcem wysyłki = obraz przepada (był tylko lokalny); pliki skasowanych elementów
@@ -31,6 +35,7 @@ import { createLogger, type Logger } from '@/_new/lib/logger';
 import {
   isFileRef,
   isInlineFile,
+  isStoredFile,
   type StoredFile,
   type StoredInlineFile,
 } from '../yjs/excalidraw-binding';
@@ -39,10 +44,14 @@ import { blobToDataURL, dataURLToBlob } from './data-url';
 
 const SVG_MIME = 'image/svg+xml';
 const STORAGE_NOT_CONFIGURED = 'STORAGE_NOT_CONFIGURED';
+/** Id pliku wykresu funkcji (`fileIdForSpec` w math/function-element.ts: `fn-` + hash FNV). */
+export const FUNCTION_PLOT_FILE_ID_PATTERN = /^fn-[0-9a-f]{1,8}$/;
 
 /** Odstępy kolejnych ponowień (wysyłka i pobieranie). */
 export const DEFAULT_RETRY_DELAYS_MS = [1_000, 3_000, 8_000];
 export const MAX_PARALLEL_DOWNLOADS = 4;
+/** Backend przyjmuje od jednego konta 2 uploady naraz (files.py: MAX_UPLOADS_IN_FLIGHT_PER_USER). */
+export const MAX_PARALLEL_UPLOADS = 2;
 /** Plik inline większy niż to trafia do logu - dokument rośnie (limitu twardego nie ma). */
 export const INLINE_WARN_BYTES = 200 * 1024;
 /**
@@ -52,7 +61,8 @@ export const INLINE_WARN_BYTES = 200 * 1024;
  */
 export const RETRY_AFTER_FAILURE_MS = 5_000;
 
-export type UploadFailure = 'too-large' | 'unsupported' | 'forbidden' | 'failed';
+export type UploadFailure =
+  'too-large' | 'dimensions' | 'unsupported' | 'svg' | 'quota' | 'forbidden' | 'failed';
 
 /** Część wiązania Y.Doc, której potrzebuje ten moduł (excalidraw-binding.ts). */
 export interface FileBinding {
@@ -123,6 +133,13 @@ function isRetryable(err: unknown): boolean {
 }
 
 function failureReason(err: unknown): UploadFailure {
+  // Kod backendu jest dokładniejszy niż status: 400 to także "za duże wymiary".
+  switch (errorCode(err)) {
+    case 'IMAGE_TOO_LARGE':
+      return 'dimensions';
+    case 'BOARD_FILE_QUOTA_EXCEEDED':
+      return 'quota';
+  }
   switch (errorStatus(err)) {
     case 413:
       return 'too-large';
@@ -156,6 +173,9 @@ export class BoardFileSync {
   private readonly log: Logger;
 
   private readonly uploads = new Map<string, PendingUpload>();
+  /** Wysyłki czekające na wolne miejsce (najwyżej MAX_PARALLEL_UPLOADS żądań naraz). */
+  private readonly uploadQueue: PendingUpload[] = [];
+  private activeUploads = 0;
   /** Pliki, których wysyłka ostatecznie się nie udała (id -> czas) - nie próbujemy w kółko. */
   private readonly failedUploads = new Map<string, number>();
 
@@ -201,9 +221,10 @@ export class BoardFileSync {
     let used: Set<string> | null = null;
 
     for (const file of Object.values(files)) {
-      if (!file || !isInlineFile(file) || this.binding.hasFile(file.id)) continue;
+      if (!isInlineFile(file) || this.binding.hasFile(file.id)) continue;
 
-      if (this.boardId === null || file.mimeType === SVG_MIME) {
+      const isSvg = file.mimeType === SVG_MIME;
+      if (this.boardId === null || (isSvg && FUNCTION_PLOT_FILE_ID_PATTERN.test(file.id))) {
         inline.push(file);
         continue;
       }
@@ -216,11 +237,15 @@ export class BoardFileSync {
           .filter((el) => !el.isDeleted && imageFileId(el))
           .map((el) => imageFileId(el) as string)
       );
-      if (used.has(file.id)) {
-        // Także obraz wstawiony ponownie po wcześniejszej nieudanej wysyłce.
-        this.failedUploads.delete(file.id);
-        this.startUpload(file);
+      if (!used.has(file.id)) continue;
+      if (isSvg) {
+        // SVG spoza wykresów: ani do Storage (backend przyjmuje tylko rastry), ani inline.
+        this.failUpload(file.id, 'svg', 'SVG wklejony przez użytkownika');
+        continue;
       }
+      // Także obraz wstawiony ponownie po wcześniejszej nieudanej wysyłce.
+      this.failedUploads.delete(file.id);
+      this.startUpload(file);
     }
 
     this.pushInline(inline);
@@ -268,6 +293,11 @@ export class BoardFileSync {
     }
     upload.waitingForNetwork = false;
 
+    if (this.activeUploads >= MAX_PARALLEL_UPLOADS) {
+      this.uploadQueue.push(upload);
+      return;
+    }
+
     let blob: Blob;
     try {
       blob = dataURLToBlob(file.dataURL);
@@ -276,6 +306,7 @@ export class BoardFileSync {
       return;
     }
 
+    this.activeUploads += 1;
     try {
       const result = await this.transport.upload(this.boardId as string, blob);
       if (this.disposed) return;
@@ -298,6 +329,10 @@ export class BoardFileSync {
     } catch (err) {
       if (this.disposed) return;
       this.handleUploadError(upload, err);
+    } finally {
+      this.activeUploads -= 1;
+      const next = this.uploadQueue.shift();
+      if (next && !this.disposed) void this.attemptUpload(next);
     }
   }
 
@@ -349,6 +384,8 @@ export class BoardFileSync {
     const inline: StoredInlineFile[] = [];
 
     for (const entry of entries) {
+      // Mapa plików pochodzi też od innych klientów: `null` / nie-obiekt pomijamy bez wyjątku.
+      if (!isStoredFile(entry)) continue;
       if (isInlineFile(entry)) {
         inline.push(entry);
         continue;
@@ -452,6 +489,7 @@ export class BoardFileSync {
     for (const timer of this.timers) clearTimeout(timer);
     this.timers.clear();
     this.uploads.clear();
+    this.uploadQueue.length = 0;
     this.downloadQueue.length = 0;
     this.downloadsWaitingForNetwork.length = 0;
   }

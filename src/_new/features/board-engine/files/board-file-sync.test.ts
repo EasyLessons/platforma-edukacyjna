@@ -9,6 +9,8 @@ import {
 } from '../yjs/excalidraw-binding';
 import {
   BoardFileSync,
+  FUNCTION_PLOT_FILE_ID_PATTERN,
+  MAX_PARALLEL_UPLOADS,
   RETRY_AFTER_FAILURE_MS,
   type BoardFileSyncOptions,
   type UploadFailure,
@@ -629,5 +631,170 @@ describe('BoardFileSync - odbiór', () => {
     ]);
     await settle();
     expect(h.transport.download).not.toHaveBeenCalled();
+  });
+});
+
+describe('BoardFileSync - poprawki po przeglądzie PR #106', () => {
+  const svgFile = (id: string): StoredInlineFile => ({
+    id,
+    mimeType: 'image/svg+xml',
+    dataURL: `data:image/svg+xml;base64,${btoa('<svg/>')}`,
+    created: 1,
+  });
+  const USER_SVG_ID = 'a'.repeat(40);
+
+  it('SVG wklejony przez użytkownika: odrzucony z powodem "svg", nie trafia do dokumentu ani backendu', async () => {
+    const h = harness();
+    const files = { [USER_SVG_ID]: svgFile(USER_SVG_ID) };
+    const elements = [imageEl('e1', USER_SVG_ID)];
+
+    h.sync.syncLocal(files, elements);
+    h.sync.syncLocal(files, elements);
+    await settle();
+
+    expect(h.onUploadFailed).toHaveBeenCalledTimes(1);
+    expect(h.onUploadFailed).toHaveBeenCalledWith(USER_SVG_ID, 'svg');
+    expect(h.transport.upload).not.toHaveBeenCalled();
+    expect(h.binding.hasFile(USER_SVG_ID)).toBe(false);
+    expect(h.sync.shareable(elements)).toEqual([]);
+  });
+
+  it('SVG użytkownika nieużywany przez żaden element nie wywołuje komunikatu', async () => {
+    const h = harness();
+    h.sync.syncLocal({ [USER_SVG_ID]: svgFile(USER_SVG_ID) }, [rectEl('r1')]);
+    await settle();
+
+    expect(h.onUploadFailed).not.toHaveBeenCalled();
+    expect(h.binding.hasFile(USER_SVG_ID)).toBe(false);
+  });
+
+  it('SVG użytkownika na tablicy lokalnej (demo) zostaje inline jak dotąd', async () => {
+    const h = harness(undefined, { boardId: null });
+    h.sync.syncLocal({ [USER_SVG_ID]: svgFile(USER_SVG_ID) }, [imageEl('e1', USER_SVG_ID)]);
+    await settle();
+
+    expect(h.onUploadFailed).not.toHaveBeenCalled();
+    expect(h.binding.getFile(USER_SVG_ID)).toEqual(svgFile(USER_SVG_ID));
+  });
+
+  it('wzorzec id wykresu funkcji nie obejmuje id nadawanych przez Excalidraw (sha1)', () => {
+    expect(FUNCTION_PLOT_FILE_ID_PATTERN.test('fn-1a2b3c4d')).toBe(true);
+    expect(FUNCTION_PLOT_FILE_ID_PATTERN.test(USER_SVG_ID)).toBe(false);
+    expect(FUNCTION_PLOT_FILE_ID_PATTERN.test('fn-../x')).toBe(false);
+  });
+
+  it.each([
+    [400, 'IMAGE_TOO_LARGE', 'dimensions'],
+    [400, 'INVALID_FILE_TYPE', 'unsupported'],
+    [409, 'BOARD_FILE_QUOTA_EXCEEDED', 'quota'],
+  ] as const)('HTTP %i %s: bez ponowień, powód "%s"', async (status, code, reason) => {
+    const h = harness();
+    h.transport.upload.mockRejectedValue(apiError(status, code));
+
+    h.sync.syncLocal({ img1: pngFile() }, [imageEl('e1', 'img1')]);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(h.transport.upload).toHaveBeenCalledTimes(1);
+    expect(h.onUploadFailed).toHaveBeenCalledWith('img1', reason);
+  });
+
+  it.each([
+    [429, 'TOO_MANY_UPLOADS'],
+    [429, 'RATE_LIMITED'],
+    [503, 'UPLOAD_BUSY'],
+  ] as const)(
+    'HTTP %i %s to błąd przejściowy: ponowienie z odstępem, bez dataURL w dokumencie',
+    async (status, code) => {
+      const h = harness();
+      h.transport.upload
+        .mockRejectedValueOnce(apiError(status, code))
+        .mockResolvedValueOnce(uploaded());
+
+      h.sync.syncLocal({ img1: pngFile() }, [imageEl('e1', 'img1')]);
+      await settle();
+      expect(h.transport.upload).toHaveBeenCalledTimes(1);
+      expect(h.binding.hasFile('img1')).toBe(false);
+
+      await vi.advanceTimersByTimeAsync(RETRY[0] + 1);
+      await settle();
+
+      expect(h.transport.upload).toHaveBeenCalledTimes(2);
+      expect(h.onUploadFailed).not.toHaveBeenCalled();
+      expect(isFileRef(h.binding.getFile('img1') as StoredFile)).toBe(true);
+    }
+  );
+
+  it('najwyżej 2 wysyłki równolegle, reszta czeka w kolejce i wszystkie dochodzą', async () => {
+    const h = harness();
+    const resolvers: Array<(value: UploadedBoardFile) => void> = [];
+    h.transport.upload.mockImplementation(
+      () => new Promise<UploadedBoardFile>((resolve) => resolvers.push(resolve))
+    );
+    const ids = ['i0', 'i1', 'i2', 'i3', 'i4'];
+    const files = Object.fromEntries(ids.map((id) => [id, pngFile(id)]));
+    const elements = ids.map((id) => imageEl(`e-${id}`, id));
+
+    h.sync.syncLocal(files, elements);
+    await settle();
+    expect(resolvers).toHaveLength(MAX_PARALLEL_UPLOADS);
+    expect(h.sync.pendingUploads).toBe(5);
+
+    for (let done = 0; done < ids.length; done++) {
+      resolvers[done](uploaded(`${String(done).repeat(32)}.webp`));
+      await settle();
+      expect(resolvers.length).toBeLessThanOrEqual(done + 1 + MAX_PARALLEL_UPLOADS);
+    }
+
+    expect(h.transport.upload).toHaveBeenCalledTimes(5);
+    expect(h.sync.pendingUploads).toBe(0);
+    expect(ids.every((id) => isFileRef(h.binding.getFile(id)))).toBe(true);
+  });
+
+  it('nieudana wysyłka zwalnia miejsce dla następnej z kolejki', async () => {
+    const h = harness();
+    h.transport.upload
+      .mockRejectedValueOnce(apiError(413))
+      .mockRejectedValueOnce(apiError(413))
+      .mockResolvedValueOnce(uploaded());
+    const ids = ['i0', 'i1', 'i2'];
+
+    h.sync.syncLocal(
+      Object.fromEntries(ids.map((id) => [id, pngFile(id)])),
+      ids.map((id) => imageEl(`e-${id}`, id))
+    );
+    await settle();
+
+    expect(h.transport.upload).toHaveBeenCalledTimes(3);
+    expect(h.onUploadFailed).toHaveBeenCalledTimes(2);
+    expect(isFileRef(h.binding.getFile('i2'))).toBe(true);
+  });
+
+  it('odbiór: wpis null / nie-obiekt / bez id jest pomijany bez wyjątku, poprawne wpisy przechodzą', async () => {
+    const h = harness();
+    const garbage = [null, undefined, 7, 'tekst', [], {}, { id: 5, dataURL: 'x' }];
+    const entries = [
+      ...garbage,
+      pngFile('ok-inline'),
+      { id: 'ok-ref', mimeType: 'image/webp', created: 1, ref: { v: 1, name: FILE_NAME } },
+    ] as unknown as StoredFile[];
+
+    expect(() => h.sync.receive(entries)).not.toThrow();
+    await settle();
+
+    expect(h.addFiles.mock.calls[0][0]).toEqual([pngFile('ok-inline')]);
+    expect(h.transport.download).toHaveBeenCalledTimes(1);
+  });
+
+  it('wysyłka: wpis null / nie-obiekt w plikach Excalidraw jest pomijany bez wyjątku', async () => {
+    const h = harness();
+    const files = { zly: null, liczba: 3, img1: pngFile() } as unknown as Record<
+      string,
+      StoredFile
+    >;
+
+    expect(() => h.sync.syncLocal(files, [imageEl('e1', 'img1')])).not.toThrow();
+    await settle();
+
+    expect(h.transport.upload).toHaveBeenCalledTimes(1);
   });
 });

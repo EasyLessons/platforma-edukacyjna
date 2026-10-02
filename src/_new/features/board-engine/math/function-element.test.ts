@@ -6,6 +6,7 @@ import {
   updateFunctionElement,
 } from './function-element';
 import { DEFAULT_FUNCTION_SPEC } from './function-plot';
+import { FUNCTION_PLOT_FILE_ID_PATTERN } from '../files/board-file-sync';
 
 describe('function-element', () => {
   it('buildFunctionElement tworzy element image z customData i plikiem SVG', () => {
@@ -25,6 +26,14 @@ describe('function-element', () => {
     expect(fileIdForSpec(DEFAULT_FUNCTION_SPEC)).not.toBe(
       fileIdForSpec({ ...DEFAULT_FUNCTION_SPEC, expression: 'cos(x)' })
     );
+  });
+
+  it('id pliku wykresu pasuje do wzorca, po którym board-file-sync zostawia SVG inline', () => {
+    for (const expression of ['sin(x)', 'x^2', '1/x', 'abs(x) - 3']) {
+      expect(fileIdForSpec({ ...DEFAULT_FUNCTION_SPEC, expression })).toMatch(
+        FUNCTION_PLOT_FILE_ID_PATTERN
+      );
+    }
   });
 
   it('updateFunctionElement podbija wersję, zmienia fileId i nie mutuje oryginału', () => {

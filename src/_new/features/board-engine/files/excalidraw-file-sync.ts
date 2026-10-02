@@ -15,7 +15,10 @@ import { BoardFileSync, type BoardFileSyncOptions, type UploadFailure } from './
 
 export const UPLOAD_FAILURE_MESSAGES: Record<UploadFailure, string> = {
   'too-large': 'Obraz jest za duży (maksymalnie 5 MB) - nie został dodany.',
+  dimensions: 'Obraz ma zbyt duże wymiary - zmniejsz go i dodaj ponownie.',
   unsupported: 'Ten format obrazu nie jest obsługiwany (PNG, JPG, WEBP, GIF) - nie został dodany.',
+  svg: 'Pliki SVG nie są obsługiwane na tablicy - dodaj obraz jako PNG lub JPG.',
+  quota: 'Ta tablica osiągnęła limit obrazów - obraz nie został dodany.',
   forbidden: 'Nie masz uprawnień do dodawania obrazów na tej tablicy.',
   failed: 'Nie udało się wgrać obrazu - spróbuj ponownie.',
 };

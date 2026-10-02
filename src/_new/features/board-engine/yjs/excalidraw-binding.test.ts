@@ -2,9 +2,11 @@ import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
 import {
   ExcalidrawYjsBinding,
+  FILES_KEY,
   isFileRef,
   isInlineFile,
   isNewerVersion,
+  isStoredFile,
   type StoredElement,
   type StoredFile,
 } from './excalidraw-binding';
@@ -198,5 +200,52 @@ describe('ExcalidrawYjsBinding', () => {
       [0, 0],
       [1, 1],
     ]);
+  });
+});
+
+describe('ExcalidrawYjsBinding - śmieciowe wpisy w mapie plików', () => {
+  const GARBAGE: unknown[] = [null, undefined, 0, 'tekst', [], {}, { id: 1 }];
+  const good = {
+    id: 'dobry',
+    mimeType: 'image/png',
+    dataURL: 'data:image/png;base64,AA==',
+    created: 1,
+  };
+
+  it('isInlineFile / isFileRef / isStoredFile nie rzucają dla null i nie-obiektów', () => {
+    for (const value of GARBAGE) {
+      expect(isStoredFile(value)).toBe(false);
+      expect(isInlineFile(value)).toBe(false);
+      expect(isFileRef(value)).toBe(false);
+    }
+  });
+
+  it('getFiles i obserwator zdalny pomijają wpis null zapisany przez innego klienta', () => {
+    const docA = new Y.Doc();
+    const docB = new Y.Doc();
+    docA.on('update', (u: Uint8Array) => Y.applyUpdate(docB, u, 'net'));
+    const b = new ExcalidrawYjsBinding(docB, 'B');
+    const onFiles = vi.fn();
+    b.observeRemoteFiles(onFiles);
+
+    const rawFiles = docA.getMap<unknown>(FILES_KEY);
+    docA.transact(() => {
+      rawFiles.set('zly', null);
+      rawFiles.set('liczba', 5);
+      rawFiles.set('dobry', good);
+    });
+
+    expect(b.getFiles()).toEqual([good]);
+    expect(onFiles.mock.calls.flatMap((c) => c[0])).toEqual([good]);
+  });
+
+  it('pushFiles pomija null i nie-obiekty', () => {
+    const a = new ExcalidrawYjsBinding(new Y.Doc(), 'A');
+
+    expect(a.pushFiles([null, 3, good] as unknown as StoredFile[])).toBe(1);
+    expect(a.pushFiles({ zly: null, dobry: good } as unknown as Record<string, StoredFile>)).toBe(
+      0
+    );
+    expect(a.getFiles()).toEqual([good]);
   });
 });

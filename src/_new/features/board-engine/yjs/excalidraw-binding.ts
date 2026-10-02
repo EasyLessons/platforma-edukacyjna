@@ -60,13 +60,31 @@ export interface StoredFileRef extends StoredFileBase {
 
 export type StoredFile = StoredInlineFile | StoredFileRef;
 
-export function isInlineFile(file: StoredFile): file is StoredInlineFile {
-  return typeof file.dataURL === 'string';
+/**
+ * Czy wartość z mapy plików w ogóle jest wpisem pliku (obiekt z `id`). Mapa pochodzi także
+ * od innych klientów - `null`, liczba czy napis nie mogą wywrócić odbioru (TypeError).
+ */
+export function isStoredFile(value: unknown): value is StoredFile {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    typeof (value as { id?: unknown }).id === 'string'
+  );
+}
+
+export function isInlineFile(file: unknown): file is StoredInlineFile {
+  return isStoredFile(file) && typeof file.dataURL === 'string';
 }
 
 /** Wpis-odwołanie (bez dataURL). Kształtu `ref` NIE sprawdza - to robi odbiorca. */
-export function isFileRef(file: StoredFile): file is StoredFileRef {
-  return !isInlineFile(file) && typeof file.ref === 'object' && file.ref !== null;
+export function isFileRef(file: unknown): file is StoredFileRef {
+  return (
+    isStoredFile(file) &&
+    typeof file.dataURL !== 'string' &&
+    typeof file.ref === 'object' &&
+    file.ref !== null
+  );
 }
 
 export type RemoteListener = (elements: StoredElement[]) => void;
@@ -111,7 +129,9 @@ export class ExcalidrawYjsBinding {
   /** Dopisuje pliki, których jeszcze nie ma (pliki są niemutowalne - id = hash zawartości). */
   pushFiles(files: Record<string, StoredFile> | readonly StoredFile[]): number {
     const list = Array.isArray(files) ? files : Object.values(files);
-    const missing = (list as StoredFile[]).filter((f) => !this.files.has(f.id));
+    const missing = (list as unknown[]).filter(
+      (f): f is StoredFile => isStoredFile(f) && !this.files.has(f.id)
+    );
     if (missing.length === 0) return 0;
     this.doc.transact(() => {
       for (const f of missing) this.files.set(f.id, toPlainJson(f));
@@ -152,8 +172,9 @@ export class ExcalidrawYjsBinding {
     return Array.from(this.elements.values());
   }
 
+  /** Wpisy plików z dokumentu; wartości, które nie są wpisem pliku (np. `null`), są pomijane. */
   getFiles(): StoredFile[] {
-    return Array.from(this.files.values());
+    return Array.from(this.files.values()).filter(isStoredFile);
   }
 
   /** Liczba elementów żywych / skasowanych - do statystyk i testów. */
@@ -183,7 +204,7 @@ export class ExcalidrawYjsBinding {
       const added: StoredFile[] = [];
       for (const key of event.keysChanged) {
         const f = this.files.get(key);
-        if (f) added.push(f);
+        if (isStoredFile(f)) added.push(f);
       }
       if (added.length) listener(added);
     };
