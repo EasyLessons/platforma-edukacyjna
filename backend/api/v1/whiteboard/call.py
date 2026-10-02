@@ -6,7 +6,7 @@ POST /api/v1/whiteboard/{board_id}/call (router.py -> WhiteboardService.create_c
 
   1. przesuwa wygasanie pokoju tablicy albo tworzy go, gdy nie istnieje (pokoj PRYWATNY,
      nazwa `<prefix>-board-<id>`; pokoje maja `exp`, wiec nie zajmuja limitu pokoi konta
-     na stale - wygasle usuwa samo Daily; wygasniecie NIE rozlacza trwajacej rozmowy),
+     na stale - przy tworzeniu nowego sprzatamy tez wygasle pokoje z naszym prefiksem),
   2. wydaje meeting token dla tego uzytkownika i TEGO pokoju,
   3. zwraca adres pokoju + token. Klucz API zostaje na serwerze.
 
@@ -58,6 +58,13 @@ USER_NAME_FALLBACK = "Uczestnik"
 # Adres pokoju z odpowiedzi Daily trafia do iframe z mikrofonem/kamera razem z tokenem,
 # wiec przyjmujemy tylko https://<subdomena>.daily.co/<nazwa pokoju>.
 DAILY_ROOM_HOST_SUFFIX = ".daily.co"
+
+# Sprzatanie wygaslych pokoi (limit 50 pokoi na koncie Daily) - tylko przy tworzeniu nowego.
+# Przed kazdym DELETE pokoj jest pobierany ponownie: lista moze byc nieaktualna, a pokoju
+# odswiezonego w miedzyczasie przez inna tablice nie wolno skasowac.
+CLEANUP_LIST_LIMIT = 100
+CLEANUP_MAX_DELETES = 5
+CLEANUP_GRACE_SECONDS = 300
 
 # Limit per UZYTKOWNIK, liczony po autoryzacji: klasa siedzi za jednym NAT-em, wiec limit
 # per IP odcinalby wszystkich naraz (ten sam powod co przy /api/turn - docs pipelines.md).
@@ -219,6 +226,49 @@ def _checked_room_url(room: dict, name: str) -> str:
     return url
 
 
+def _is_expired_for_cleanup(room: dict, now: int) -> bool:
+    exp = _room_exp(room)
+    return exp is not None and exp <= now - CLEANUP_GRACE_SECONDS
+
+
+async def _delete_expired_rooms(client: httpx.AsyncClient, own_name: str, now: int, api_key: str) -> None:
+    """
+    Best-effort: kasuje wygasle pokoje INNYCH tablic z naszym prefiksem, zeby nie zajmowaly
+    limitu pokoi konta. Nigdy nie rzuca - blad sprzatania nie moze zablokowac rozmowy.
+    """
+    ours = re.compile(rf"^{re.escape(own_name[: own_name.rindex('-') + 1])}\d+$")
+    try:
+        response = await _request(client, "GET", "/rooms", params={"limit": CLEANUP_LIST_LIMIT})
+        if response.status_code != 200:
+            logger.warning(f"Daily - lista pokoi do sprzątania: HTTP {response.status_code}")
+            return
+        rooms = _body(response).get("data")
+        deleted = 0
+        for room in rooms if isinstance(rooms, list) else []:
+            if deleted >= CLEANUP_MAX_DELETES:
+                break
+            name = room.get("name") if isinstance(room, dict) else None
+            if not isinstance(name, str) or name == own_name or not ours.fullmatch(name):
+                continue
+            if not _is_expired_for_cleanup(room, now):
+                continue
+            # Lista mogla sie zestarzec: ktos wlasnie odswiezyl ten pokoj (POST /call innej tablicy).
+            fresh = await _request(client, "GET", f"/rooms/{name}")
+            if fresh.status_code != 200 or not _is_expired_for_cleanup(_body(fresh), int(time.time())):
+                continue
+            result = await _request(client, "DELETE", f"/rooms/{name}")
+            if result.status_code == 200:
+                deleted += 1
+            else:
+                logger.warning(f"Daily - kasowanie wygasłego pokoju {name}: HTTP {result.status_code}")
+        if deleted:
+            logger.info(f"Daily - skasowano wygasłe pokoje: {deleted}")
+    except AppException:
+        logger.warning("Daily - sprzątanie wygasłych pokoi nieudane (pomijam)")
+    except Exception as e:  # nieoczekiwany ksztalt odpowiedzi itp.
+        logger.warning(f"Daily - sprzątanie wygasłych pokoi nieudane: {_log_text(type(e).__name__, api_key)}")
+
+
 async def _create_room(client: httpx.AsyncClient, name: str, exp: int) -> httpx.Response:
     return await _request(
         client,
@@ -229,9 +279,10 @@ async def _create_room(client: httpx.AsyncClient, name: str, exp: int) -> httpx.
             "privacy": "private",
             "properties": {
                 "exp": exp,
-                # Wygasniecie pokoju blokuje tylko NOWE wejscia - trwajaca lekcja nie moze
-                # zostac przerwana przez backend (zlecenie 02.10.2026).
-                "eject_at_room_exp": False,
+                # Bezpiecznik kosztow (wymaganie twarde zlecenia 02.10.2026, pkt 5): zapomniana
+                # karta nie nabija minut po wygasnieciu pokoju. Kazde dolaczenie przesuwa `exp`,
+                # wiec pokoj wygasa DAILY_ROOM_TTL_MINUTES po OSTATNIM wywolaniu endpointu.
+                "eject_at_room_exp": True,
                 "start_video_off": True,
                 "start_audio_off": False,
                 "enable_prejoin_ui": True,
@@ -257,6 +308,8 @@ async def _ensure_room(client: httpx.AsyncClient, name: str, now: int, api_key: 
             f"info={_log_text(_body(updated).get('info'), api_key)} - próbuję utworzyć"
         )
 
+    await _delete_expired_rooms(client, name, now, api_key)
+
     created = await _create_room(client, name, exp)
     if created.status_code == 200:
         return _checked_room_url(_body(created), name)
@@ -274,6 +327,7 @@ async def _ensure_room(client: httpx.AsyncClient, name: str, now: int, api_key: 
 
     # Pokoj istnieje, ale wygasl i Daily nie pozwolil przesunac `exp` (zachowanie
     # niepotwierdzone w dokumentacji): kasujemy WLASNY wygasly pokoj i tworzymy go raz jeszcze.
+    # Pokoj ma eject_at_room_exp, wiec po wygasnieciu nikogo w nim nie ma.
     logger.warning(f"Daily - pokój {name} wygasł i nie dał się odświeżyć, tworzę od nowa")
     deleted = await _request(client, "DELETE", f"/rooms/{name}")
     if deleted.status_code != 200 and not _is_room_missing(deleted):

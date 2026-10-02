@@ -26,7 +26,7 @@ from main import app
 API_KEY = secrets.token_urlsafe(24)
 DAILY_TOKEN = secrets.token_urlsafe(48)
 DAILY_DOMAIN = "https://easylesson-test.daily.co"
-ROOM_TTL_MINUTES = 1440
+ROOM_TTL_MINUTES = 180
 
 
 def user_headers(user_id: int) -> dict:
@@ -182,10 +182,10 @@ class TestNotConfigured:
 
         assert Settings.model_fields["daily_api_key"].default == ""
 
-    def test_domyslnie_pokoj_wygasa_po_24_h(self):
+    def test_domyslnie_pokoj_wygasa_po_3_h(self):
         from core.config import Settings
 
-        assert Settings.model_fields["daily_room_ttl_minutes"].default == 24 * 60
+        assert Settings.model_fields["daily_room_ttl_minutes"].default == 180
 
     def test_nie_czlonek_bez_klucza_dostaje_404_a_nie_503(self, client, daily, monkeypatch, test_user2, test_board):
         monkeypatch.setattr(get_settings(), "daily_api_key", "")
@@ -243,9 +243,9 @@ class TestRoom:
         assert created["name"] == name
         assert created["privacy"] == "private"
         props = created["properties"]
-        assert before + 24 * 3600 <= props["exp"] <= int(time.time()) + 24 * 3600
-        # Lekcja nie moze zostac przerwana: wygasniecie pokoju nie wyrzuca uczestnikow.
-        assert props["eject_at_room_exp"] is False
+        assert before + 180 * 60 <= props["exp"] <= int(time.time()) + 180 * 60
+        # Wymaganie twarde zlecenia (koszty): exp max 3 h + eject_at_room_exp.
+        assert props["eject_at_room_exp"] is True
         assert props["start_video_off"] is True
         assert props["start_audio_off"] is False
         assert "enable_knocking" not in props
@@ -271,7 +271,7 @@ class TestRoom:
         assert daily.calls("POST", "/rooms") == []
         assert daily.calls("GET", "/rooms") == []
         assert daily.body("POST", f"/rooms/{name}") == {"properties": {"exp": daily.rooms[name]["config"]["exp"]}}
-        assert daily.rooms[name]["config"]["exp"] >= before + 24 * 3600
+        assert daily.rooms[name]["config"]["exp"] >= before + 180 * 60
 
     def test_wyscig_przy_tworzeniu_konczy_sie_ponownym_get(self, client, daily, test_user, test_board):
         name = room_of(test_board)
@@ -393,6 +393,8 @@ class TestExpiredRoom:
         assert r.status_code == 200
         assert [q.url.path for q in daily.calls("DELETE")] == [f"/v1/rooms/{name}"]
         assert len(daily.calls("POST", "/rooms")) == 2
+        # Wlasny pokoj naprawia sciezka samonaprawy, a nie ogolne sprzatanie (limity listy/kasowan).
+        assert daily.calls("GET", f"/rooms/{name}") != []
         assert daily.rooms[name]["config"]["exp"] > int(time.time())
         assert daily.rooms[name]["privacy"] == "private"
         assert daily.body("POST", "/meeting-tokens")["properties"]["room_name"] == name
@@ -445,18 +447,58 @@ class TestExpiredRoom:
         assert len(daily.calls("DELETE")) == 1
 
 
-class TestNoAccountCleanup:
+class TestCleanup:
 
-    def test_backend_nie_listuje_ani_nie_kasuje_cudzych_pokoi(self, client, daily, test_user, test_board):
+    def test_przy_tworzeniu_kasuje_tylko_wygasle_pokoje_z_naszym_prefiksem(self, client, daily, test_user, test_board):
         past = int(time.time()) - 3600
         daily.add_room("easylesson-board-901", exp=past)
-        daily.add_room("inny-projekt", exp=past)
+        daily.add_room("easylesson-board-902")              # jeszcze wazny
+        daily.add_room("inny-projekt", exp=past)             # nie nasz
+        daily.add_room("easylesson-board-903-x", exp=past)   # nie pasuje do wzorca
+        daily.add_room("dev-board-904", exp=past)            # inny prefiks
+        daily.add_room("easylesson-board-905", exp=int(time.time()) - 60)  # wygasl przed chwila
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
+        assert [r.url.path for r in daily.calls("DELETE")] == ["/v1/rooms/easylesson-board-901"]
+        assert "easylesson-board-902" in daily.rooms
+        assert "easylesson-board-905" in daily.rooms
+
+    def test_pokoj_odswiezony_po_pobraniu_listy_nie_jest_kasowany(self, client, daily, test_user, test_board):
+        """Wyscig: lista mowi 'wygasl', ale inna tablica wlasnie przesunela `exp` tego pokoju."""
+        other = "easylesson-board-901"
+        daily.add_room(other, exp=int(time.time()) - 3600)
+        stale_list = httpx.Response(200, json={"data": [json.loads(json.dumps(daily.rooms[other]))]})
+        daily.override("GET", "/rooms", stale_list)
+        daily.rooms[other]["config"]["exp"] = int(time.time()) + 180 * 60
+
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        assert len(daily.calls("GET", f"/rooms/{other}")) == 1
         assert daily.calls("DELETE") == []
-        assert daily.calls("GET", "/rooms") == []
-        assert "easylesson-board-901" in daily.rooms
+        assert other in daily.rooms
+
+    def test_sprzatanie_ma_limit_kasowan(self, client, daily, test_user, test_board):
+        for i in range(call.CLEANUP_MAX_DELETES + 3):
+            daily.add_room(f"easylesson-board-{9000 + i}", exp=1)
+
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        assert len(daily.calls("DELETE")) == call.CLEANUP_MAX_DELETES
+
+    def test_blad_sprzatania_nie_blokuje_rozmowy(self, client, daily, test_user, test_board):
+        daily.override("GET", "/rooms", httpx.ReadTimeout("timeout"))
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        daily.rooms.clear()
+        daily.override("GET", "/rooms", httpx.Response(200, json={"data": "nie-lista"}))
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        daily.rooms.clear()
+        daily.add_room("easylesson-board-901", exp=1)
+        del daily.overrides[("GET", "/rooms")]
+        daily.override("DELETE", "/rooms/easylesson-board-901", daily_error(500, "server-error"))
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
 
 
 class TestToken:
