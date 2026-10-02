@@ -8,15 +8,18 @@ import { createContext, useContext } from 'react';
 export type CallStatus = 'idle' | 'loading' | 'active';
 
 /**
- * disabled - rozmowy wyłączone na serwerze (brak klucza Daily);
+ * disabled - rozmowy wyłączone na serwerze (brak klucza Daily, wyłącznik);
  * unsupported - przeglądarka nie da mikrofonu (http, przeglądarka w aplikacji, stary iOS);
- * error - reszta (sieć, błąd dostawcy, brak endpointu) - można ponowić.
+ * info - zwykły stan, nie awaria (rozmowa jeszcze się nie zaczęła, limit, koniec czasu pokoju);
+ * error - awaria (sieć, błąd dostawcy, brak endpointu, zerwane połączenie).
  */
-export type CallNoticeKind = 'disabled' | 'unsupported' | 'error';
+export type CallNoticeKind = 'disabled' | 'unsupported' | 'info' | 'error';
 
 export interface CallNotice {
   kind: CallNoticeKind;
   message: string;
+  /** Czy pokazać "Spróbuj ponownie". Ponowienie jest zawsze ręczne - nic nie odpytuje serwera samo. */
+  retry: boolean;
 }
 
 export interface DailyCallContextValue {

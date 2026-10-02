@@ -180,66 +180,195 @@ describe('DailyCallProvider - błędy', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
   });
 
-  it('503 VOICE_NOT_CONFIGURED -> komunikat "wyłączone", brak ramki, przycisk zostaje', async () => {
-    api.createBoardCall.mockRejectedValueOnce(
-      new AppError('Rozmowy nie są skonfigurowane', 'VOICE_NOT_CONFIGURED', 503)
-    );
+  const RETRY = 'Spróbuj ponownie';
+  const message = () => screen.getByTestId('call-notice-message');
+
+  // Kontrakt POST /api/v1/whiteboard/{id}/call: [kod, status, komunikat, rodzaj, czy jest ponowienie].
+  // Treść błędu z backendu ("surowy ...") nie może trafić do UI.
+  it.each([
+    ['VOICE_NOT_CONFIGURED', 503, 'Rozmowa chwilowo niedostępna.', 'disabled', false],
+    ['VOICE_DISABLED', 503, 'Rozmowa chwilowo niedostępna.', 'disabled', false],
+    [
+      'VOICE_CALL_NOT_STARTED',
+      409,
+      'Rozmowa jeszcze się nie zaczęła - poczekaj, aż nauczyciel ją rozpocznie.',
+      'info',
+      true,
+    ],
+    [
+      'VOICE_CALL_ENDING',
+      409,
+      'Rozmowa właśnie się kończy - poproś nauczyciela o rozpoczęcie nowej.',
+      'info',
+      true,
+    ],
+    [
+      'VOICE_CREATE_NOT_ALLOWED',
+      403,
+      'To konto nie może jeszcze rozpoczynać rozmów.',
+      'info',
+      false,
+    ],
+    ['AUTH_ERROR', 403, 'Potwierdź adres e-mail, aby korzystać z rozmów.', 'info', false],
+    [
+      'VOICE_EMAIL_NOT_VERIFIED',
+      403,
+      'Potwierdź adres e-mail, aby korzystać z rozmów.',
+      'info',
+      false,
+    ],
+    ['RATE_LIMITED', 429, 'Zbyt wiele prób - spróbuj ponownie za chwilę.', 'info', true],
+    [
+      'VOICE_CALL_BUSY',
+      429,
+      'Rozmowa jest właśnie uruchamiana - spróbuj ponownie za chwilę.',
+      'info',
+      true,
+    ],
+    [
+      'VOICE_USER_LIMIT',
+      429,
+      'Dzienny limit rozmów dla tego konta został wyczerpany.',
+      'info',
+      false,
+    ],
+    ['VOICE_MONTHLY_LIMIT', 429, 'Limit rozmów w tym miesiącu wyczerpany.', 'info', false],
+    [
+      'VOICE_PROVIDER_LIMIT',
+      503,
+      'Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę.',
+      'error',
+      true,
+    ],
+    [
+      'VOICE_PROVIDER_ERROR',
+      502,
+      'Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę.',
+      'error',
+      true,
+    ],
+    [
+      'VOICE_PROVIDER_TIMEOUT',
+      504,
+      'Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę.',
+      'error',
+      true,
+    ],
+    [
+      'VOICE_GUARD_UNAVAILABLE',
+      503,
+      'Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę.',
+      'error',
+      true,
+    ],
+    [
+      'VOICE_USAGE_UNAVAILABLE',
+      503,
+      'Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę.',
+      'error',
+      true,
+    ],
+  ])('%s (%i) -> "%s"', async (code, status, text, kind, retry) => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    api.createBoardCall.mockRejectedValueOnce(new AppError(`surowy ${code}`, code, status));
     renderCall();
     clickCall();
 
     const notice = await screen.findByTestId('call-notice');
     expect(notice).toHaveAttribute('role', 'status');
-    expect(notice).toHaveAttribute('data-kind', 'disabled');
-    expect(notice).toHaveTextContent('Rozmowy głosowe są chwilowo wyłączone');
-    expect(screen.queryByText('Spróbuj ponownie')).not.toBeInTheDocument();
+    expect(notice).toHaveAttribute('data-kind', kind);
+    expect(message().textContent).toBe(text);
+    expect(notice).not.toHaveTextContent('surowy');
+    expect(screen.queryByText(RETRY) !== null).toBe(retry);
+    // Bez ramki, bez okna, przycisk wraca do stanu początkowego - tablica działa dalej.
     expect(daily.createFrame).not.toHaveBeenCalled();
     expect(frames()).toHaveLength(0);
     expect(panel()).not.toBeVisible();
     expect(screen.getByTestId('call-button')).toBeEnabled();
+    expect(screen.getByTestId('call-button')).toHaveTextContent('Rozmowa');
+    expect(consoleError).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByText('Zamknij'));
+    expect(screen.queryByTestId('call-notice')).not.toBeInTheDocument();
+  });
+
+  it('401 AUTH_ERROR (sesja) nie jest brane za niepotwierdzony e-mail', async () => {
+    api.createBoardCall.mockRejectedValueOnce(
+      new AppError('Wymagane logowanie', ErrorCode.AUTH_ERROR, 401)
+    );
+    renderCall();
+    clickCall();
+    await screen.findByTestId('call-notice');
+    expect(message().textContent).toBe('Nie udało się połączyć z rozmową. Spróbuj ponownie.');
   });
 
   it.each([
-    ['404 (backend bez endpointu)', new AppError('Nie znaleziono', ErrorCode.NOT_FOUND, 404)],
-    ['405', new AppError('Method Not Allowed', ErrorCode.APP_ERROR, 405)],
-    ['502 dostawcy', new AppError('Błąd dostawcy', 'VOICE_PROVIDER_ERROR', 502)],
-    ['504 dostawcy', new AppError('Timeout', 'VOICE_PROVIDER_TIMEOUT', 504)],
-    ['błąd sieci', new AppError('Brak połączenia z serwerem', ErrorCode.NETWORK_ERROR, 0)],
-    ['nieznany wyjątek', new Error('boom')],
-  ])('%s -> komunikat błędu i można ponowić', async (_name, error) => {
+    ['404 (brak endpointu / tablicy)', new AppError('surowy 404', ErrorCode.NOT_FOUND, 404)],
+    ['405', new AppError('surowy 405', ErrorCode.APP_ERROR, 405)],
+    ['błąd sieci', new AppError('surowy brak sieci', ErrorCode.NETWORK_ERROR, 0)],
+    ['nieznany kod VOICE_*', new AppError('surowy nieznany', 'VOICE_SOMETHING_NEW', 503)],
+    ['nieznany kod 409', new AppError('surowy konflikt', ErrorCode.CONFLICT, 409)],
+    ['500 bez kodu', new AppError('surowy 500', ErrorCode.APP_ERROR, 500)],
+    ['nieznany wyjątek', new Error('surowy boom')],
+  ])('%s -> ogólny komunikat (bez treści z backendu) i można ponowić', async (_name, error) => {
     api.createBoardCall.mockRejectedValueOnce(error);
     renderCall();
     clickCall();
 
     const notice = await screen.findByTestId('call-notice');
     expect(notice).toHaveAttribute('data-kind', 'error');
-    expect(notice).toHaveTextContent('Nie udało się połączyć z rozmową');
+    expect(message().textContent).toBe('Nie udało się połączyć z rozmową. Spróbuj ponownie.');
+    expect(notice).not.toHaveTextContent('surowy');
     expect(frames()).toHaveLength(0);
 
-    fireEvent.click(screen.getByText('Spróbuj ponownie'));
+    fireEvent.click(screen.getByText(RETRY));
     await waitFor(() => expect(daily.createFrame).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(panel()).toBeVisible());
     expect(api.createBoardCall).toHaveBeenCalledTimes(2);
     expect(screen.queryByTestId('call-notice')).not.toBeInTheDocument();
   });
 
-  it('429 -> prośba o odczekanie; inny kod VOICE_* -> komunikat z backendu', async () => {
-    api.createBoardCall.mockRejectedValueOnce(
-      new AppError('Zbyt wiele żądań', 'RATE_LIMITED', 429)
-    );
-    renderCall();
-    clickCall();
-    expect(await screen.findByTestId('call-notice')).toHaveTextContent('Zbyt wiele prób');
+  it.each([
+    ['VOICE_CALL_NOT_STARTED', 409],
+    ['VOICE_CALL_ENDING', 409],
+    ['RATE_LIMITED', 429],
+    ['VOICE_PROVIDER_ERROR', 502],
+  ])(
+    '%s: zero odpytywania - kolejne żądanie dopiero po kliknięciu "Spróbuj ponownie"',
+    async (code, status) => {
+      vi.useFakeTimers();
+      try {
+        api.createBoardCall.mockRejectedValueOnce(new AppError('odmowa', code, status));
+        renderCall();
+        clickCall();
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(screen.getByTestId('call-notice')).toBeInTheDocument();
+        expect(api.createBoardCall).toHaveBeenCalledTimes(1);
 
-    api.createBoardCall.mockRejectedValueOnce(
-      new AppError('Limit rozmów w tym miesiącu wyczerpany', 'VOICE_LIMIT_REACHED', 503)
-    );
-    clickCall();
-    await waitFor(() =>
-      expect(screen.getByTestId('call-notice')).toHaveTextContent(
-        'Limit rozmów w tym miesiącu wyczerpany'
-      )
-    );
-  });
+        // 30 minut, powrót do karty, powrót sieci - nic nie woła endpointu samo.
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(15 * 60_000);
+          window.dispatchEvent(new Event('focus'));
+          window.dispatchEvent(new Event('online'));
+          document.dispatchEvent(new Event('visibilitychange'));
+          await vi.advanceTimersByTimeAsync(15 * 60_000);
+        });
+        expect(api.createBoardCall).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount()).toBe(0);
+
+        fireEvent.click(screen.getByText(RETRY));
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(0);
+        });
+        expect(api.createBoardCall).toHaveBeenCalledTimes(2);
+        expect(daily.createFrame).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('brak navigator.mediaDevices -> komunikat, bez wywołania API', async () => {
     Object.defineProperty(window.navigator, 'mediaDevices', {
@@ -289,6 +418,94 @@ describe('DailyCallProvider - błędy', () => {
     expect(await screen.findByTestId('call-notice')).toHaveTextContent('Rozmowa została przerwana');
     await waitFor(() => expect(call.destroy).toHaveBeenCalledTimes(1));
     expect(panel()).not.toBeVisible();
+  });
+});
+
+describe('DailyCallProvider - token i koniec pokoju', () => {
+  const sessionWith = (token: string) => ({ ...session(), token });
+
+  it('każde dołączenie pobiera świeży token z endpointu (bez pamiętania poprzedniego)', async () => {
+    const tokens = [crypto.randomUUID(), crypto.randomUUID(), crypto.randomUUID()];
+    tokens.forEach((token) => api.createBoardCall.mockResolvedValueOnce(sessionWith(token)));
+    renderCall();
+
+    const first = await startCall();
+    expect(first.join).toHaveBeenCalledWith({ url: roomUrl, token: tokens[0] });
+
+    // Rozłączenie przyciskiem i ponowne dołączenie.
+    fireEvent.click(screen.getByTestId('call-leave'));
+    await waitFor(() => expect(first.destroy).toHaveBeenCalledTimes(1));
+    clickCall();
+    await waitFor(() => expect(daily.createFrame).toHaveBeenCalledTimes(2));
+    expect(api.createBoardCall).toHaveBeenCalledTimes(2);
+    expect(fakeCalls()[1].join).toHaveBeenCalledWith({ url: roomUrl, token: tokens[1] });
+
+    // Wyjście kliknięte w oknie Daily i kolejne dołączenie.
+    act(() => fakeCalls()[1].emit('left-meeting'));
+    await waitFor(() => expect(fakeCalls()[1].destroy).toHaveBeenCalledTimes(1));
+    clickCall();
+    await waitFor(() => expect(daily.createFrame).toHaveBeenCalledTimes(3));
+    expect(api.createBoardCall).toHaveBeenCalledTimes(3);
+    expect(fakeCalls()[2].join).toHaveBeenCalledWith({ url: roomUrl, token: tokens[2] });
+  });
+
+  it.each([['exp-room'], ['ejected']])(
+    'wyrzucenie przy końcu pokoju (%s) -> czytelny komunikat, panel w stanie początkowym, bez błędu',
+    async (type) => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+      renderCall();
+      const call = await startCall();
+      act(() => call.emit('joined-meeting'));
+
+      act(() => call.emit('error', { error: { type }, errorMsg: 'Meeting has ended' }));
+      // Daily po błędzie krytycznym potrafi dosłać jeszcze left-meeting - nie może nic zepsuć.
+      act(() => call.emit('left-meeting'));
+
+      const notice = await screen.findByTestId('call-notice');
+      expect(notice).toHaveAttribute('data-kind', 'info');
+      expect(screen.getByTestId('call-notice-message').textContent).toBe(
+        'Rozmowa została zakończona (limit czasu pokoju). Nauczyciel może rozpocząć nową.'
+      );
+      expect(screen.queryByText('Spróbuj ponownie')).not.toBeInTheDocument();
+      await waitFor(() => expect(call.destroy).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(frames()).toHaveLength(0));
+      expect(panel()).not.toBeVisible();
+      const button = screen.getByTestId('call-button');
+      expect(button).toBeEnabled();
+      expect(button).toHaveTextContent('Rozmowa');
+      expect(button).toHaveAttribute('aria-pressed', 'false');
+      expect(warn).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
+      // Po wyrzuceniu nic nie dołącza samo - nowa rozmowa dopiero po kliknięciu, ze świeżym tokenem.
+      expect(api.createBoardCall).toHaveBeenCalledTimes(1);
+
+      clickCall();
+      await waitFor(() => expect(daily.createFrame).toHaveBeenCalledTimes(2));
+      expect(api.createBoardCall).toHaveBeenCalledTimes(2);
+      expect(screen.queryByTestId('call-notice')).not.toBeInTheDocument();
+    }
+  );
+
+  it.each([
+    ['exp-token', 'Czas na dołączenie do rozmowy minął. Spróbuj ponownie.', 'info'],
+    ['meeting-full', 'W rozmowie jest już komplet uczestników.', 'info'],
+    ['no-room', 'Rozmowa została zakończona. Nauczyciel może rozpocząć nową.', 'info'],
+    ['connection-error', 'Rozmowa została przerwana. Dołącz ponownie.', 'error'],
+    [undefined, 'Rozmowa została przerwana. Dołącz ponownie.', 'error'],
+  ])('błąd Daily %s -> "%s" z ręcznym ponowieniem', async (type, text, kind) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    renderCall();
+    const call = await startCall();
+    act(() => call.emit('error', type ? { error: { type } } : {}));
+
+    const notice = await screen.findByTestId('call-notice');
+    expect(notice).toHaveAttribute('data-kind', kind);
+    expect(screen.getByTestId('call-notice-message').textContent).toBe(text);
+    expect(screen.getByText('Spróbuj ponownie')).toBeInTheDocument();
+    await waitFor(() => expect(call.destroy).toHaveBeenCalledTimes(1));
+    expect(panel()).not.toBeVisible();
+    expect(api.createBoardCall).toHaveBeenCalledTimes(1);
   });
 });
 

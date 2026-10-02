@@ -1,6 +1,9 @@
 'use client';
 
-/** Komunikat rozmowy pokazywany w stronie (rozmowy wyłączone, brak wsparcia, błąd połączenia). */
+/**
+ * Komunikat rozmowy pokazywany w stronie (rozmowy wyłączone, rozmowa jeszcze się nie zaczęła,
+ * limit, koniec czasu pokoju, brak wsparcia, błąd połączenia).
+ */
 
 import { AlertCircle } from 'lucide-react';
 import type { CallNotice } from '../call-context';
@@ -15,6 +18,7 @@ const buttonBase =
   'min-h-11 min-w-11 cursor-pointer rounded-lg px-3 text-sm font-semibold transition-colors';
 
 export function CallNoticeToast({ notice, onRetry, onDismiss }: CallNoticeToastProps) {
+  const isNeutral = notice.kind === 'disabled' || notice.kind === 'info';
   return (
     <div
       role="status"
@@ -24,12 +28,14 @@ export function CallNoticeToast({ notice, onRetry, onDismiss }: CallNoticeToastP
     >
       <div className="flex gap-2">
         <AlertCircle
-          className={`mt-0.5 h-5 w-5 shrink-0 ${notice.kind === 'disabled' ? 'text-gray-500' : 'text-red-500'}`}
+          className={`mt-0.5 h-5 w-5 shrink-0 ${isNeutral ? 'text-gray-500' : 'text-red-500'}`}
         />
-        <p className="text-sm text-gray-800">{notice.message}</p>
+        <p data-testid="call-notice-message" className="text-sm text-gray-800">
+          {notice.message}
+        </p>
       </div>
       <div className="mt-2 flex justify-end gap-2">
-        {notice.kind === 'error' && (
+        {notice.retry && (
           <button
             type="button"
             onClick={onRetry}

@@ -13,7 +13,13 @@
  *    głównego bundla tablicy),
  *  - token rozmowy żyje tylko w zmiennej lokalnej `start()` - nie trafia do stanu Reacta,
  *    logów ani adresu naszej strony (daily-js sam dokleja go do adresu ramki na domenie
- *    Daily jako `?t=` - tak działa Prebuilt),
+ *    Daily jako `?t=` - tak działa Prebuilt). Token jest ważny 5 min i służy tylko do wejścia,
+ *    więc KAŻDE dołączenie (także ponowne po rozłączeniu) pobiera nowy z endpointu,
+ *  - serwera nic nie odpytuje samo: kolejna próba to zawsze kliknięcie (limit żądań backendu),
+ *  - pokój ma limit czasu i wyrzuca uczestników po jego upływie - to zwykły koniec rozmowy
+ *    (komunikat, panel wraca do stanu początkowego), nie błąd,
+ *  - nikt nie jest prowadzącym spotkania Daily (backend nie nadaje `is_owner` ani `canAdmin`),
+ *    więc UI nie ma funkcji prowadzącego; nauczyciel i uczeń widzą ten sam przycisk "Rozmowa",
  *  - ramka Daily siedzi w kontenerze, który jest w DOM przez cały czas życia providera;
  *    zwinięcie okna tylko go chowa (odmontowanie albo `display: none` zrywa rozmowę),
  *  - każda ścieżka błędu kończy się komunikatem w stronie, nigdy wyjątkiem.
@@ -31,7 +37,12 @@ import { getVoiceSupportIssue } from '@/_new/features/voice-chat/mediaSupport';
 import { createBoardCall } from './api/callApi';
 import { DailyCallContext } from './call-context';
 import type { CallNotice, CallStatus, DailyCallContextValue } from './call-context';
-import { CALL_MESSAGES, describeError, noticeFromStartError } from './call-errors';
+import {
+  CALL_MESSAGES,
+  describeError,
+  noticeFromDailyError,
+  noticeFromStartError,
+} from './call-errors';
 import { CallPanel } from './components/call-panel';
 import { CallNoticeToast } from './components/call-notice';
 
@@ -149,7 +160,7 @@ export function DailyCallProvider({ boardId, children }: DailyCallProviderProps)
     setNotice(null);
     const issue = getVoiceSupportIssue();
     if (issue) {
-      setNotice({ kind: 'unsupported', message: issue.message });
+      setNotice({ kind: 'unsupported', message: issue.message, retry: false });
       return;
     }
 
@@ -199,10 +210,15 @@ export function DailyCallProvider({ boardId, children }: DailyCallProviderProps)
       call.on('left-meeting', () => {
         if (isCurrent()) teardown();
       });
+      // Błąd krytyczny Daily, m.in. wyrzucenie przy wygaśnięciu pokoju (`exp-room`, `ejected`).
       call.on('error', (event) => {
         if (!isCurrent()) return;
-        log.warn('Daily zgłosił błąd rozmowy', { type: event.error?.type ?? 'unknown' });
-        setNotice({ kind: 'error', message: CALL_MESSAGES.interrupted });
+        const type = event.error?.type;
+        const ended = noticeFromDailyError(type);
+        if (ended.kind === 'error')
+          log.warn('Daily zgłosił błąd rozmowy', { type: type ?? 'unknown' });
+        else log.info('Rozmowa zakończona przez Daily', { type });
+        setNotice(ended);
         teardown();
       });
 
@@ -214,14 +230,17 @@ export function DailyCallProvider({ boardId, children }: DailyCallProviderProps)
       call.join({ url: session.room_url, token: session.token }).catch((err: unknown) => {
         if (!isCurrent()) return;
         log.warn('Nie udało się dołączyć do rozmowy', describeError(err));
-        setNotice({ kind: 'error', message: CALL_MESSAGES.failed });
+        setNotice({ kind: 'error', message: CALL_MESSAGES.failed, retry: true });
         teardown();
       });
     } catch (err) {
       if (isStale()) return;
-      log.warn('Nie udało się rozpocząć rozmowy', describeError(err));
+      const refusal = noticeFromStartError(err);
+      // Odmowa z kontraktu (wyłączone, rozmowa się nie zaczęła, limit) to nie awaria.
+      if (refusal.kind === 'error') log.warn('Nie udało się rozpocząć rozmowy', describeError(err));
+      else log.info('Rozmowa niedostępna', describeError(err));
       startingRef.current = false;
-      setNotice(noticeFromStartError(err));
+      setNotice(refusal);
       setStatus('idle');
     }
   }, [boardId, teardown]);
