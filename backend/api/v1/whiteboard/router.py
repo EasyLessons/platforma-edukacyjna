@@ -24,8 +24,11 @@ from .schemas import (
 )
 from .service import WhiteboardService
 from .dependencies import DocCaller, get_doc_caller
+from .files import router as files_router
 
 router = APIRouter(tags=["Whiteboard"])
+# POST/GET /{id}/files - obrazy tablicy Excalidraw w prywatnym buckecie (files.py)
+router.include_router(files_router)
 
 
 # Online presence --------------------------------------------------

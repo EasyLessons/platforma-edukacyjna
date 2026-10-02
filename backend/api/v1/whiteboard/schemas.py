@@ -24,6 +24,15 @@ class UploadImageResponse(BaseModel):
     url: str
 
 
+class BoardFileResponse(BaseModel):
+    """Plik tablicy (silnik Excalidraw) w prywatnym buckecie - patrz files.py"""
+    file_name: str
+    mime_type: str
+    size: int
+    width: int
+    height: int
+
+
 class BoardSettings(BaseModel):
     ai_enabled: bool = True
     grid_visible: bool = True

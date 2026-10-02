@@ -115,8 +115,9 @@ class WhiteboardService:
         Sprawdza dostęp do tablicy, uploaduje obraz do Supabase Storage
         (storage.py), zwraca publiczny URL do wpisania w element.src.
         """
-        board = self._get_board_or_404(board_id)
-        require_membership(self.db, board.workspace_id, user_id)
+        _, role = self._get_board_and_role(board_id, user_id)
+        if not can_edit(role):
+            raise AppException("Rola viewer nie może dodawać obrazów do tablicy", status_code=403)
         return await upload_board_image(board_id, file_bytes, content_type)
 
     # Document (Yjs snapshot) --------------------------------------------------
