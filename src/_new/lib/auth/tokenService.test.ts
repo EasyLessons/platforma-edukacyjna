@@ -121,6 +121,16 @@ describe('refreshAccessToken', () => {
     await expect(refreshAccessToken()).rejects.toBeInstanceOf(RefreshUnavailableError);
   });
 
+  it('rzuca RefreshUnavailableError przy 429 (limit żądań nie oznacza wylogowania)', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      json: async () => ({}),
+    } as Response);
+
+    await expect(refreshAccessToken()).rejects.toBeInstanceOf(RefreshUnavailableError);
+  });
+
   it('rzuca błąd gdy brak access_token w odpowiedzi', async () => {
     vi.mocked(fetch).mockResolvedValueOnce({
       ok: true,
