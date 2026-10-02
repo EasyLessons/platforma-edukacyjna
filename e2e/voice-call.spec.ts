@@ -3,8 +3,11 @@
  *
  * Backend w e2e nie ma DAILY_API_KEY, więc `POST /api/v1/whiteboard/{id}/call` odpowiada
  * 503 VOICE_NOT_CONFIGURED - sprawdzamy "grzeczne wyłączenie": komunikat, brak ramki, brak
- * wyjątku na stronie. Test z atrapą odpowiedzi (page.route) sprawdza okno rozmowy i zwijanie;
- * z prawdziwym Daily nic się tu nie łączy.
+ * wyjątku na stronie. Brak klucza jest sprawdzany po członkostwie tablicy, a PRZED podziałem
+ * na tworzącego i dołączających (oraz przed limitem żądań), więc owner, editor i viewer dostają
+ * ten sam kod - tak samo w backendzie bez zabezpieczeń kosztów i z nimi.
+ * Test z atrapą odpowiedzi (page.route) sprawdza okno rozmowy i zwijanie; z prawdziwym Daily
+ * nic się tu nie łączy.
  */
 
 import { randomUUID } from 'crypto';
@@ -24,39 +27,60 @@ function collectPageErrors(page: Page): string[] {
   return errors;
 }
 
+const DISABLED_MESSAGE = 'Rozmowa chwilowo niedostępna.';
+
+/** Klik "Rozmowa" na backendzie bez klucza: 503 VOICE_NOT_CONFIGURED -> komunikat, bez ramki. */
+async function expectCallDisabled(page: Page) {
+  const pending = page.waitForResponse((r) => isCallRequest(r.url(), r.request().method()));
+  await callButton(page).click();
+  const response = await pending;
+  expect(response.status()).toBe(503);
+  expect(((await response.json()) as { code?: string }).code).toBe('VOICE_NOT_CONFIGURED');
+
+  const notice = page.getByTestId('call-notice');
+  await expect(notice).toBeVisible();
+  await expect(notice).toHaveAttribute('data-kind', 'disabled');
+  await expect(page.getByTestId('call-notice-message')).toHaveText(DISABLED_MESSAGE);
+  // Stan "wyłączone" nie proponuje ponowienia.
+  await expect(notice.getByRole('button', { name: 'Spróbuj ponownie' })).toHaveCount(0);
+  await expect(page.getByTestId('call-panel')).toBeHidden();
+  await expect(callFrames(page)).toHaveCount(0);
+  return notice;
+}
+
 test('rozmowa bez klucza Daily: komunikat, brak ramki, tablica działa dalej', async ({
   browser,
 }) => {
   const page = await openBoardAs(browser, E2E_USERS.owner);
   const errors = collectPageErrors(page);
+  let callRequests = 0;
+  page.on('request', (request) => {
+    if (isCallRequest(request.url(), request.method())) callRequests += 1;
+  });
 
-  const response = page.waitForResponse((r) => isCallRequest(r.url(), r.request().method()));
-  await callButton(page).click();
-  const status = (await response).status();
-  // 503 = backend bez klucza; 404/405 = backend sprzed endpointu rozmowy (kolejność deployów).
-  expect([503, 404, 405]).toContain(status);
-
-  const notice = page.getByTestId('call-notice');
-  await expect(notice).toBeVisible();
-  await expect(notice).toHaveText(
-    status === 503 ? /Rozmowy głosowe są chwilowo wyłączone/ : /Nie udało się połączyć z rozmową/
-  );
-  await expect(page.getByTestId('call-panel')).toBeHidden();
-  await expect(callFrames(page)).toHaveCount(0);
+  const notice = await expectCallDisabled(page);
 
   await notice.getByRole('button', { name: 'Zamknij' }).click();
   await expect(notice).toHaveCount(0);
   await expect(callButton(page)).toBeEnabled();
   await expect(page.getByTestId('excalidraw-board')).toBeVisible();
+  // Jedno kliknięcie = jedno żądanie; nic nie odpytuje endpointu samo.
+  expect(callRequests).toBe(1);
   expect(errors).toEqual([]);
 
   await closeBoard(page);
 });
 
-test('viewer widzi przycisk Rozmowa (bez panelu f(x))', async ({ browser }) => {
+test('viewer widzi przycisk Rozmowa (bez panelu f(x)) i dostaje ten sam komunikat', async ({
+  browser,
+}) => {
   const page = await openBoardAs(browser, E2E_USERS.viewer);
+  const errors = collectPageErrors(page);
   await expect(callButton(page)).toBeVisible();
   await expect(page.getByTestId('function-panel-toggle')).toHaveCount(0);
+
+  await expectCallDisabled(page);
+  expect(errors).toEqual([]);
   await closeBoard(page);
 });
 

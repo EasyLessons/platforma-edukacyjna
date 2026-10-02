@@ -20,6 +20,7 @@ test('telefon: przycisk Rozmowa widoczny, bez klucza Daily komunikat zamiast ram
   await button.click();
 
   await expect(page.getByTestId('call-notice')).toBeVisible();
+  await expect(page.getByTestId('call-notice-message')).toHaveText('Rozmowa chwilowo niedostępna.');
   await expect(page.getByTestId('call-panel')).toBeHidden();
   await expect(page.getByTestId('call-frame').locator('iframe')).toHaveCount(0);
   expect(errors).toEqual([]);
