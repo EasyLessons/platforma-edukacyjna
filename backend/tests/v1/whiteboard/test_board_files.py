@@ -17,6 +17,8 @@ from fastapi.testclient import TestClient
 from httpx import AsyncClient as RealAsyncClient  # fixture `fake_storage` podmienia httpx.AsyncClient
 from PIL import Image
 from redis.exceptions import ConnectionError as RedisConnectionError
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import core.storage as storage
 from api.v1.auth.utils import create_access_token
@@ -24,7 +26,7 @@ from api.v1.boards.service import BoardService
 from api.v1.whiteboard import files as files_module
 from core.config import get_settings
 from core.database import get_db
-from core.models import Board, WorkspaceMember
+from core.models import Base, Board, WorkspaceMember
 from main import app
 
 settings = get_settings()
@@ -480,69 +482,6 @@ class TestUploadSlots:
         assert calls["n"] == 0
         assert fake_storage.requests == []
 
-    @pytest.mark.asyncio
-    async def test_rownolegle_uploady_czytaja_cialo_najwyzej_dla_limitu_w_toku(
-        self, db_session, test_user, test_user2, shared_workspace, fake_storage, monkeypatch
-    ):
-        """12 uploadow naraz z dwoch kont: cialo czytane tylko dla tych, ktore dostaly miejsce."""
-        import api.v1.auth.avatar as avatar_module
-
-        monkeypatch.setattr(avatar_module, "_decode_slots", asyncio.Semaphore(1))
-        monkeypatch.setattr(files_module, "MAX_UPLOADS_IN_FLIGHT", 3)
-        board = make_board(db_session, shared_workspace, test_user)
-        release = asyncio.Event()
-        reading = {"now": 0, "max": 0, "total": 0}
-        original = files_module.read_image_upload
-
-        async def slow_read(request):
-            reading["now"] += 1
-            reading["total"] += 1
-            reading["max"] = max(reading["max"], reading["now"])
-            try:
-                await release.wait()
-                return await original(request)
-            finally:
-                reading["now"] -= 1
-
-        monkeypatch.setattr(files_module, "read_image_upload", slow_read)
-
-        def override_get_db():
-            yield db_session
-
-        app.dependency_overrides[get_db] = override_get_db
-        try:
-            async with RealAsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
-                tasks = [
-                    asyncio.ensure_future(
-                        ac.post(
-                            files_url(board.id),
-                            headers=auth_headers(user.id),
-                            files={"file": ("a.png", image_bytes(), "image/png")},
-                        )
-                    )
-                    for user in (test_user, test_user2)
-                    for _ in range(6)
-                ]
-                for _ in range(500):
-                    await asyncio.sleep(0.01)
-                    if sum(task.done() for task in tasks) >= 9:
-                        break
-                rejected_early = [task.result().status_code for task in tasks if task.done()]
-                release.set()
-                responses = await asyncio.gather(*tasks)
-        finally:
-            app.dependency_overrides.clear()
-
-        statuses = [r.status_code for r in responses]
-        # Odrzucone dostaly odpowiedz, ZANIM ktorykolwiek przyjety upload sie skonczyl.
-        assert len(rejected_early) == 9
-        assert set(rejected_early) <= {429, 503}
-        assert statuses.count(200) == 3
-        assert reading["max"] == 3
-        assert reading["total"] == 3
-        assert len(fake_storage.keys()) == 3
-        assert files_module._uploads_in_flight == 0
-
     @pytest.mark.parametrize("data,expected", [(None, 200), (b"to nie obraz", 400)])
     def test_miejsce_zwolnione_po_zakonczeniu_zadania(self, client, test_user, test_board, fake_storage, data, expected):
         r = post_file(client, test_board.id, test_user, data or image_bytes())
@@ -575,6 +514,123 @@ class TestUploadSlots:
 
         assert r.status_code == 200, r.text
         assert len(fake.keys("avatars")) == 1
+
+
+class TestUploadSlotsConcurrent:
+    """
+    M1 pod prawdziwa rownolegloscia: wiele zadan naraz w jednej petli asyncio.
+
+    Osobna klasa, bo potrzebuje INNEJ bazy niz reszta testow. Wspolny `db_session` z
+    conftest.py to jedna sesja na jednym polaczeniu SQLite (StaticPool) - wystarcza, gdy
+    zadania ida po kolei (TestClient). Tutaj 12 zadan leci naraz, a synchroniczne zaleznosci
+    FastAPI (`get_db`, `get_current_user`) wykonuja sie w watkach puli: ta sama sesja i to
+    samo polaczenie uzywane z kilku watkow jednoczesnie dawaly losowo
+    `sqlite3.InterfaceError: bad parameter or other API misuse` (albo bledny odczyt
+    uzytkownika). W produkcji `get_db` tworzy sesje na zadanie, wiec to byl blad testu.
+
+    Dlatego baza jest tu plikiem SQLite (kazde polaczenie z puli jest osobne), a `get_db`
+    jest nadpisane fabryka: kazde zadanie dostaje wlasna sesje - tak jak w produkcji.
+    """
+
+    @pytest.fixture
+    def concurrent_session_factory(self, tmp_path):
+        engine = create_engine(
+            f"sqlite:///{(tmp_path / 'concurrent.db').as_posix()}",
+            # Sesja zadania powstaje w watku puli, a handler uzywa jej w watku petli asyncio.
+            connect_args={"check_same_thread": False},
+        )
+        Base.metadata.create_all(bind=engine)
+        try:
+            yield sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        finally:
+            engine.dispose()
+
+    @pytest.fixture
+    def db_session(self, concurrent_session_factory):
+        """Nadpisuje `db_session` z conftest.py: fixture'y uzytkownikow/workspace pisza do bazy plikowej."""
+        session = concurrent_session_factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    @pytest.fixture(autouse=True)
+    def clean_slots(self, monkeypatch):
+        monkeypatch.setattr(files_module, "_uploads_in_flight", 0)
+        monkeypatch.setattr(files_module, "_uploads_in_flight_by_user", {})
+
+    @pytest.mark.asyncio
+    async def test_rownolegle_uploady_czytaja_cialo_najwyzej_dla_limitu_w_toku(
+        self, db_session, concurrent_session_factory, test_user, test_user2, shared_workspace, fake_storage, monkeypatch
+    ):
+        """12 uploadow naraz z dwoch kont: cialo czytane tylko dla tych, ktore dostaly miejsce."""
+        import api.v1.auth.avatar as avatar_module
+
+        monkeypatch.setattr(avatar_module, "_decode_slots", asyncio.Semaphore(1))
+        monkeypatch.setattr(files_module, "MAX_UPLOADS_IN_FLIGHT", 3)
+        board = make_board(db_session, shared_workspace, test_user)
+        user_ids = (test_user.id, test_user2.id)
+        board_id = board.id
+        # Sesja fixture'a konczy transakcje, zanim rusza zadania (nie trzyma polaczenia).
+        db_session.rollback()
+        release = asyncio.Event()
+        reading = {"now": 0, "max": 0, "total": 0}
+        original = files_module.read_image_upload
+
+        async def slow_read(request):
+            reading["now"] += 1
+            reading["total"] += 1
+            reading["max"] = max(reading["max"], reading["now"])
+            try:
+                await release.wait()
+                return await original(request)
+            finally:
+                reading["now"] -= 1
+
+        monkeypatch.setattr(files_module, "read_image_upload", slow_read)
+
+        def override_get_db():
+            # Jak produkcyjne get_db: kazde zadanie ma WLASNA sesje i wlasne polaczenie.
+            db = concurrent_session_factory()
+            try:
+                yield db
+            finally:
+                db.close()
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            async with RealAsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+                tasks = [
+                    asyncio.ensure_future(
+                        ac.post(
+                            files_url(board_id),
+                            headers=auth_headers(user_id),
+                            files={"file": ("a.png", image_bytes(), "image/png")},
+                        )
+                    )
+                    for user_id in user_ids
+                    for _ in range(6)
+                ]
+                for _ in range(500):
+                    await asyncio.sleep(0.01)
+                    if sum(task.done() for task in tasks) >= 9:
+                        break
+                rejected_early = [task.result().status_code for task in tasks if task.done()]
+                release.set()
+                responses = await asyncio.gather(*tasks)
+        finally:
+            app.dependency_overrides.clear()
+
+        statuses = [r.status_code for r in responses]
+        # Odrzucone dostaly odpowiedz, ZANIM ktorykolwiek przyjety upload sie skonczyl.
+        assert len(rejected_early) == 9
+        assert set(rejected_early) <= {429, 503}
+        assert statuses.count(200) == 3
+        assert reading["max"] == 3
+        assert reading["total"] == 3
+        assert len(fake_storage.keys()) == 3
+        assert files_module._uploads_in_flight == 0
+        assert files_module._uploads_in_flight_by_user == {}
 
 
 class TestBoardQuota:
