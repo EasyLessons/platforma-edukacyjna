@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppError } from '@/_new/lib/errors';
-import { createBoardCall } from './callApi';
+import { createBoardCall, isDailyRoomUrl } from './callApi';
 
 const post = vi.hoisted(() => vi.fn());
 vi.mock('@/_new/lib/api', () => ({ apiClient: { post } }));
@@ -31,4 +31,33 @@ describe('createBoardCall', () => {
       await expect(createBoardCall(1)).rejects.toBeInstanceOf(AppError);
     }
   );
+
+  it.each([
+    ['http://example.daily.co/r'],
+    ['javascript:alert(1)'],
+    ['data:text/html,<p>x</p>'],
+    ['https://evil.example/r'],
+    ['https://daily.co.evil.example/r'],
+    ['https://evildaily.co/r'],
+    ['https://example.daily.co.evil.example/r'],
+    ['https://example.daily.co@evil.example/r'],
+    ['https://user@example.daily.co/r'],
+    ['https://example.daily.co:8443/r'],
+    ['//example.daily.co/r'],
+    ['/r'],
+    [''],
+  ])(
+    'adres pokoju spoza https://*.daily.co (%s) -> AppError, bez zwracania tokenu',
+    async (room_url) => {
+      post.mockResolvedValueOnce({
+        data: { room_url, token: crypto.randomUUID(), expires_at: '2026-10-05T10:00:00Z' },
+      });
+      await expect(createBoardCall(1)).rejects.toBeInstanceOf(AppError);
+    }
+  );
+
+  it('isDailyRoomUrl przepuszcza adres konta Daily (także wielkimi literami w hoście)', () => {
+    expect(isDailyRoomUrl('https://easylesson.daily.co/easylesson-board-42')).toBe(true);
+    expect(isDailyRoomUrl('https://EasyLesson.Daily.co/r')).toBe(true);
+  });
 });

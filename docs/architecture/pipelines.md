@@ -134,6 +134,7 @@ Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider 
   → klik → test wsparcia przeglądarki (voice-chat/mediaSupport: https, mediaDevices, przeglądarka w aplikacji)
   → POST /api/v1/whiteboard/{id}/call (apiClient) → { room_url, token, expires_at }
       backend: członkostwo tablicy → pokój Daily (prywatny) + meeting token; DAILY_API_KEY tylko na Renderze
+      front: room_url musi być https://<konto>.daily.co/... (callApi.isDailyRoomUrl) - inny adres = błąd, bez ramki
   → await import('@daily-co/daily-js') (dopiero po kliknięciu - poza głównym bundlem tablicy)
   → DailyIframe.createFrame(kontener panelu, { startVideoOff: true, lang: 'pl', ... }) → call.join({ url, token })
   → Daily Prebuilt w iframe: ekran wejścia (test mikrofonu), audio, kamera na życzenie, TURN/reconnect po stronie Daily
