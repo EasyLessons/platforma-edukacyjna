@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from .health.router import router as health_router
 from .auth.router import router as auth_router
+from .auth.avatar import router as avatar_router
 from .notifications.router import router as notifications_router
 from .workspaces.router import router as workspaces_router
 from .workspaces.members.router import router as members_router
@@ -22,6 +23,8 @@ def get_v1_router():
     # /health i /health/live - stan API i zależności (api/v1/health/router.py)
     router.include_router(health_router, prefix="/health")
     router.include_router(auth_router, prefix="/auth")
+    # POST /auth/users/me/avatar - upload awatara przez backend (api/v1/auth/avatar.py)
+    router.include_router(avatar_router, prefix="/auth")
     router.include_router(notifications_router, prefix="/notifications")
     router.include_router(workspaces_router, prefix="/workspaces")
     router.include_router(members_router, prefix="/workspaces")
