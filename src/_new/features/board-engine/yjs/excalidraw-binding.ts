@@ -7,7 +7,11 @@
  *
  * Model danych w Y.Doc:
  *   Y.Map<ELEMENTS_KEY>: id -> element Excalidraw jako zwykły JSON
- *   Y.Map<FILES_KEY>:    fileId -> BinaryFileData (obrazy, w tym SVG wykresów)
+ *   Y.Map<FILES_KEY>:    fileId -> wpis pliku w jednym z dwóch formatów:
+ *     - inline `{ id, mimeType, dataURL, created }` - SVG wykresów, tablice bez serwera
+ *       (demo) i wpisy sprzed przeniesienia obrazów do Storage,
+ *     - odwołanie `{ id, mimeType, created, ref: { v: 1, name } }` - plik leży w Storage
+ *       (bucket `board-files`), w dokumencie NIE MA dataURL (files/board-file-sync.ts).
  *
  * Każdy element to JEDEN wpis (nie Y.Map per pole). Excalidraw i tak traktuje
  * element jako niemutowalną całość z `version`/`versionNonce`, a rozwiązywanie
@@ -37,12 +41,32 @@ export interface StoredElement {
   [key: string]: unknown;
 }
 
-export interface StoredFile {
+interface StoredFileBase {
   id: string;
   mimeType: string;
-  dataURL: string;
   created: number;
   [key: string]: unknown;
+}
+
+/** Plik w całości w dokumencie (dataURL). */
+export interface StoredInlineFile extends StoredFileBase {
+  dataURL: string;
+}
+
+/** Odwołanie do pliku w Storage; `name` to nazwa nadana przez backend (`<32 hex>.webp`). */
+export interface StoredFileRef extends StoredFileBase {
+  ref: { v: 1; name: string };
+}
+
+export type StoredFile = StoredInlineFile | StoredFileRef;
+
+export function isInlineFile(file: StoredFile): file is StoredInlineFile {
+  return typeof file.dataURL === 'string';
+}
+
+/** Wpis-odwołanie (bez dataURL). Kształtu `ref` NIE sprawdza - to robi odbiorca. */
+export function isFileRef(file: StoredFile): file is StoredFileRef {
+  return !isInlineFile(file) && typeof file.ref === 'object' && file.ref !== null;
 }
 
 export type RemoteListener = (elements: StoredElement[]) => void;
@@ -98,6 +122,29 @@ export class ExcalidrawYjsBinding {
   /** Podmienia plik (np. po edycji wzoru wykresu regenerujemy SVG pod nowym id, stary zostaje). */
   setFile(file: StoredFile): void {
     this.doc.transact(() => this.files.set(file.id, toPlainJson(file)), this.origin);
+  }
+
+  /** Zapisuje odwołanie do pliku w Storage (bez dataURL). */
+  setFileRef(file: { id: string; mimeType: string; created: number; name: string }): void {
+    const entry: StoredFileRef = {
+      id: file.id,
+      mimeType: file.mimeType,
+      created: file.created,
+      ref: { v: 1, name: file.name },
+    };
+    this.doc.transact(() => this.files.set(file.id, entry), this.origin);
+  }
+
+  hasFile(id: string): boolean {
+    return this.files.has(id);
+  }
+
+  getFile(id: string): StoredFile | undefined {
+    return this.files.get(id);
+  }
+
+  hasElement(id: string): boolean {
+    return this.elements.has(id);
   }
 
   /** Wszystkie elementy z dokumentu (łącznie z isDeleted - reconcile ich potrzebuje). */

@@ -89,6 +89,7 @@ function BoardSession({ boardId, userRole, guest, gridVisible }: ExcalidrawWhite
         user={me}
         viewMode={userRole === 'viewer'}
         gridVisible={gridVisible}
+        storageBoardId={connection.isRemote ? boardId : null}
       />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
