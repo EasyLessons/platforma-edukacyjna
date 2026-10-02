@@ -76,6 +76,48 @@ Wejście na tablicę
 - **Obrazy offline**: upload do Storage wymaga sieci → `ImageUploadOfflineError` i toast; reszta tablicy działa.
 - **`CACHE_VERSION`** (`board-cache.ts`) to wyłącznik awaryjny: podbicie + deploy = klienci usuwają stare kopie (patrz `known-issues.md` #7).
 
+### 2c. Obrazy tablicy — silnik Excalidraw (za flagą `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`)
+
+Obraz wklejony lub wrzucony na tablicę Excalidraw **nie trafia do `Y.Doc` jako dataURL** (snapshot `board_documents` puchł) — plik leży w Supabase Storage, w dokumencie jest samo odwołanie. Stary silnik (`upload-image`, publiczny bucket `board-images`) działa jak dotąd.
+
+```
+User A wkleja / wrzuca obraz (Excalidraw sam zmniejsza do 1440 px, odrzuca > 4 MB)
+  → obraz widać lokalnie od razu; element-obraz NIE idzie do Y.Doc (files/board-file-sync.ts: shareable)
+  → POST /api/v1/whiteboard/{id}/files (multipart, pole `file`)             backend: whiteboard/files.py
+      · can_edit (viewer 403, nie-członek 404), limit 5 MB czytany strumieniowo (413)
+      · typ po TREŚCI, przekodowanie do WEBP max 1600 px (core/image_sanitizer.py; GIF → pierwsza klatka)
+      · zapis kluczem service_role do PRYWATNEGO bucketu `board-files` pod `{board_id}/{uuid hex}.webp`
+        (nazwa z serwera; bucket tworzony przy pierwszym uploadzie - core/storage.py: ensure_bucket)
+  → wpis w Y.Map `excalidraw-files`: { id, mimeType, created, ref: { v: 1, name: "<32 hex>.webp" } }
+  → dopiero teraz element-obraz trafia do Y.Doc (whiteboard-sync rozsyła go jak każdy inny)
+User B (także viewer) dostaje wpis z `ref`
+  → GET /api/v1/whiteboard/{id}/files/{name} przez apiClient (token; backend sprawdza członkostwo
+    i wydaje plik z prywatnego bucketu: image/webp, nosniff, Cache-Control: private)
+  → blob → dataURL tylko w pamięci karty → api.addFiles
+```
+
+- **Format wpisu pliku** (`yjs/excalidraw-binding.ts`): odwołanie `{ id, mimeType, created, ref: { v: 1, name } }` albo inline `{ id, mimeType, dataURL, created }`. Czytane są **oba** — inline zostaje dla SVG wykresów f(x), tablic bez serwera (demo, gość) i wpisów sprzed tej zmiany.
+- **`ref.name` pochodzi od innych edytorów**, więc przed wstawieniem do adresu jest sprawdzane wzorcem `^[0-9a-f]{32}\.webp$` (front: `files/board-file-api.ts`, backend: `files.py`). Ścieżkę w buckecie backend składa z `board_id` z URL-a, dla którego sprawdził dostęp — nie da się sięgnąć po plik innej tablicy.
+- **Błędy wysyłki**: sieć/5xx/429 → 3 ponowienia (1 s, 3 s, 8 s); potem (albo od razu przy 400/403/409/413) element jest usuwany lokalnie i pojawia się komunikat. Bez sieci plik czeka na zdarzenie `online`. Pliki z odbioru nie są wysyłane ponownie.
+- **Storage niedostępny**: brak `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` albo bucketu nie da się utworzyć → `503 STORAGE_NOT_CONFIGURED`; front zapisuje wtedy obraz po staremu (dataURL w `Y.Doc`) i loguje błąd. Backend **nigdy** nie przełącza się na bucket publiczny. Wtedy trzeba ręcznie utworzyć prywatny bucket `board-files` (Supabase → Storage).
+- **Bucket istnieje, ale jest publiczny** (np. utworzony ręcznie): przed pierwszym uploadem w procesie backend pyta `GET /storage/v1/bucket/board-files` (`core/storage.py: _bucket_is_public`). `public: true` → log ERROR + ten sam `503 STORAGE_NOT_CONFIGURED` (ponowne sprawdzenie najwcześniej po 60 s, więc po przestawieniu bucketu na prywatny upload wraca bez restartu). `public: false` jest pamiętane do końca procesu. Gdy samego sprawdzenia nie da się wykonać (sieć, 5xx), upload **nie** jest blokowany, a sprawdzenie powtarza się przy następnym.
+- **Limity uploadu** (`whiteboard/files.py`, wszystko PRZED czytaniem ciała): 60/min na IP i 30/min na konto (`429 RATE_LIMITED`); najwyżej 4 uploady w toku w procesie (`503 UPLOAD_BUSY`) i 2 na konto (`429 TOO_MANY_UPLOADS`), oba z `Retry-After` — to ogranicza z góry szczyt pamięci (ok. 4 × 15 MB + jedno dekodowanie ~145 MB) i kolejkę przed semaforem dekodowania wspólnym z awatarami. Front wysyła najwyżej 2 obrazy naraz i traktuje 429/503 jako błąd przejściowy (ponowienia). Pobieranie: 600/min na konto. Limity w Redis są fail-open.
+- **Quota tablicy (miękka)**: 300 plików / 100 MB na tablicę → `409 BOARD_FILE_QUOTA_EXCEEDED` (komunikat na froncie, bez ponowień). Licznik siedzi w Redis (`board_files:{id}:count|bytes`), rośnie po udanym zapisie i znika przy usunięciu tablicy.
+- **SVG**: inline zostają tylko SVG wykresów f(x) (id pliku `fn-<hash>`). SVG wklejony przez użytkownika na tablicy z serwerem jest odrzucany z komunikatem (backend przyjmuje wyłącznie rastry); na tablicy demo/gościa zostaje inline jak dotąd.
+- **Usunięcie tablicy** kasuje folder `{board_id}/` w `board-files` (`boards/service.py` → `files.delete_board_files`, listowanie stronami po 1000).
+
+Znane ograniczenia:
+
+- **Sieroty**: plik skasowanego elementu zostaje w Storage do usunięcia tablicy (cofnięcie / tombstone mogą przywrócić element, więc plików nie kasujemy pojedynczo).
+- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` (ani `delete_board_folder` starego silnika) — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia ręcznie albo osobnym zadaniem (lista `board_id` przed kaskadą + `delete_board_files` dla każdej).
+- **Quota tablicy nie jest rozliczeniem**: po utracie danych Redis licznik startuje od zera, równoległe uploady mogą przekroczyć limit o kilka plików, a awaria Redis wyłącza limit. Nie ma limitu łącznego na konto ani workspace.
+- **Limit uploadów w toku jest na proces**: zakłada jeden proces backendu (to samo założenie co semafor dekodowania w `auth/avatar.py`); przy wielu workerach każdy miałby własny licznik.
+- **Flaga `public` bucketu jest sprawdzana raz na proces**: przestawienie działającego bucketu na publiczny zostanie wykryte dopiero po restarcie backendu.
+- **Zamknięcie karty przed końcem wysyłki** = obraz przepada (istniał tylko lokalnie, nie było go jeszcze w `Y.Doc`).
+- **Brak leniwej migracji**: stare wpisy z dataURL zostają w dokumencie; nowe obrazy idą już do Storage.
+- **Brak limitu rozmiaru snapshotu** po stronie `/doc` i `whiteboard-sync`; front tylko loguje ostrzeżenie, gdy plik inline > 200 KB.
+- Ruch obrazów idzie przez backend (proxy), nie bezpośrednio ze Storage; przeglądarka trzyma plik w prywatnym cache.
+
 ## 3. Powiadomienia (np. zaproszenie do workspace'u)
 
 To jest inny pipeline niż tablica: tu event **inicjuje backend**, nie frontend drugiego usera.
@@ -158,6 +200,32 @@ Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider 
   SEC-16 trzeba dopuścić Daily — wymagane wartości są w `docs/security/AUDYT-2026-09.md`, sekcja 3d.
 
 ### 5b. Stary voice chat (`features/voice-chat`, tylko `NEXT_PUBLIC_VOICE_PROVIDER=legacy`)
+
+Dwie ścieżki: **Daily** (decyzja 02.10.2026, docelowa — backend opisany w 5a; frontend w osobnym PR) i dotychczasowy własny WebRTC + Xirsys (opis niżej, zostaje do czasu usunięcia).
+
+### 5a. Rozmowa przez Daily — backend
+
+```
+Przeglądarka → POST /api/v1/whiteboard/{board_id}/call (JWT usera, bez body)
+  → rate limit per użytkownik (30/min, po autoryzacji, fail-open przy awarii Redis)
+  → WhiteboardService.create_call: członkostwo w workspace tablicy (każda rola, także viewer); brak = 404, zero wywołań Daily
+  → backend/api/v1/whiteboard/call.py (klucz DAILY_API_KEY tylko tutaj; pusty = 503 VOICE_NOT_CONFIGURED, zero wywołań HTTP):
+      1. POST api.daily.co/v1/rooms/<prefix>-board-<id>  {properties:{exp}}      — przesunięcie wygasania pokoju
+         brak pokoju (404 albo 400 "not found") → sprzątanie wygasłych pokoi innych tablic z naszym prefiksem
+           (GET /rooms, a przed każdym DELETE ponowny GET /rooms/<nazwa> — kasujemy tylko, gdy pokój NADAL jest wygasły)
+         → POST /rooms {name, privacy:"private", properties:{exp, eject_at_room_exp, start_video_off, ...}}
+         → 400 przy tworzeniu (wyścig dwóch osób) → GET /rooms/<nazwa>
+         → pokój istnieje, ale wygasł i nie dał się odświeżyć → DELETE własnego pokoju + ponowne POST /rooms (raz)
+      2. POST /meeting-tokens {properties:{room_name, user_name, user_id, exp, is_owner, start_video_off, eject_at_token_exp:false}}
+  → 200 { room_url, token, expires_at }   (Cache-Control: no-store)
+```
+
+- **Pokój**: prywatny (wejście tylko z tokenem, bez knockingu), nazwa deterministyczna `<DAILY_ROOM_PREFIX>-board-<id>`, wygasa `DAILY_ROOM_TTL_MINUTES` (domyślnie 180) po OSTATNIM wywołaniu endpointu i wtedy rozłącza uczestników (`eject_at_room_exp`) — bezpiecznik kosztów i limitu pokoi konta (50), wymaganie twarde zlecenia 02.10. Skutek: rozmowa, w której przez 3 h nikt nie dołączył ponownie, zostaje zakończona; niepotwierdzone, czy przesunięcie `exp` dociera do osób już będących w rozmowie (jeśli nie — każdy jest rozłączany najpóźniej 3 h po własnym wejściu i musi kliknąć „Rozmowa” ponownie). Adres pokoju bierzemy z odpowiedzi Daily, ale tylko w postaci `https://<subdomena>.daily.co/<nazwa pokoju>` (inny host, port, userinfo albo ścieżka = 502); pokój, który nie jest prywatny, nie dostaje tokenu (502).
+- **Token**: zawsze z `room_name` (token bez niego otwiera każdy pokój domeny), `user_name` = nazwa z EasyLesson (bez znaków sterujących/niewidocznych, do 64 znaków), `user_id`, `is_owner` tylko dla roli `owner`, ważny 1 h. `exp` tokenu ogranicza tylko moment wejścia — trwającej rozmowy nie przerywa (`eject_at_token_exp: false`). Domyślnie samo audio (`start_video_off: true`).
+- **Błędy** (format `ApiResponse`, `code`): `VOICE_NOT_CONFIGURED` 503, `VOICE_PROVIDER_ERROR` 502 (błąd sieci, 5xx, 401/403 = zły klucz, nieoczekiwane 4xx, 429 po jednym ponowieniu), `VOICE_PROVIDER_TIMEOUT` 504 (timeout 8 s na wywołanie), `RATE_LIMITED` 429, `NOT_FOUND` 404. Treść błędu Daily zostaje w logu serwera (przycięta, bez klucza); klucz i token nigdy nie trafiają do logów ani odpowiedzi błędu.
+- **Jeszcze nie ma**: licznika minut w miesiącu z limitem `DAILY_MONTHLY_MINUTES_CAP` (zlecenie 02.10) — osobny PR.
+
+### 5b. Własny WebRTC + Xirsys (legacy)
 
 ```
 User dołącza do tablicy → VoiceChatProvider (src/_new/features/voice-chat/VoiceChatContext.tsx + hooki obok:

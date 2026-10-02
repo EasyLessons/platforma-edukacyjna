@@ -7,8 +7,9 @@ PUT    /{id}/settings               — aktualizacja ustawień tablicy
 POST   /{id}/doc                    — zapisz snapshot Y.Doc
 GET    /{id}/doc                    — wczytaj snapshot Y.Doc
 GET    /{id}/access                 — sprawdź dostęp do tablicy
+POST   /{id}/call                   — pokój + token rozmowy głosowej (Daily)
 """
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -21,11 +22,16 @@ from .schemas import (
     BoardSettings, BoardSettingsPatch,
     SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
     AccessCheckResponse,
+    CallResponse,
 )
+from .call import call_rate_limit
 from .service import WhiteboardService
 from .dependencies import DocCaller, get_doc_caller
+from .files import router as files_router
 
 router = APIRouter(tags=["Whiteboard"])
+# POST/GET /{id}/files - obrazy tablicy Excalidraw w prywatnym buckecie (files.py)
+router.include_router(files_router)
 
 
 # Online presence --------------------------------------------------
@@ -129,4 +135,22 @@ def check_access(
     service = WhiteboardService(db)
     result = service.check_access(board_id, current_user)
     return ApiResponse(success=True, data=result)
-    
+
+# Voice call (Daily) --------------------------------------------------
+
+@router.post(
+    "/{board_id}/call",
+    response_model=ApiResponse[CallResponse],
+)
+async def create_call(
+    board_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(call_rate_limit),
+):
+    """Pokój + token rozmowy głosowej tablicy (Daily) dla członka tablicy — patrz call.py."""
+    service = WhiteboardService(db)
+    result = await service.create_call(board_id, current_user)
+    response.headers["Cache-Control"] = "no-store"
+    return ApiResponse(success=True, data=result)

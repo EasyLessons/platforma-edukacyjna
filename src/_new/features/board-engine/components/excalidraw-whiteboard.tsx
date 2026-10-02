@@ -98,6 +98,7 @@ function BoardSession({
         viewMode={userRole === 'viewer'}
         gridVisible={gridVisible}
         topRightExtra={topRightExtra}
+        storageBoardId={connection.isRemote ? boardId : null}
       />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">

@@ -6,7 +6,8 @@
  *   npm --prefix whiteboard-sync ci                     # raz
  *   npm run test:e2e
  *
- * Backend (z seedem), whiteboard-sync i frontend startuje sam Playwright (webServer).
+ * Backend (z seedem), whiteboard-sync, frontend i atrapę Supabase Storage
+ * (e2e/fake-storage.mjs - obrazy tablicy) startuje sam Playwright (webServer).
  * Wszystkie sekrety ponizej to ZASLEPKI - te same, ktorych uzywa ci.yml.
  * Frontend lokalnie to osobny `next dev` (flaga silnika jest wklejana w czasie builda).
  */
@@ -23,8 +24,11 @@ const reuse = !isCI && process.env.E2E_REUSE === '1';
 const FRONTEND_PORT = Number(process.env.E2E_FRONTEND_PORT ?? 3000);
 const BACKEND_PORT = Number(process.env.E2E_BACKEND_PORT ?? 8210);
 const SYNC_PORT = Number(process.env.E2E_SYNC_PORT ?? 1294);
+const STORAGE_PORT = Number(process.env.E2E_STORAGE_PORT ?? 8211);
 const baseURL = `http://localhost:${FRONTEND_PORT}`;
 const apiURL = `http://localhost:${BACKEND_PORT}`;
+// Atrapa Supabase Storage (e2e/fake-storage.mjs): backend wysyła tam pliki tablicy.
+const storageURL = `http://127.0.0.1:${STORAGE_PORT}`;
 // Gdy 3000 jest zajety lokalnie (E2E_FRONTEND_PORT=...), CORS backendu odrzuca origin -
 // wtedy i tylko wtedy Chromium bez sprawdzania CORS. W CI zawsze 3000 i pelny CORS.
 const corsBypass = FRONTEND_PORT !== 3000 ? ['--disable-web-security'] : [];
@@ -37,7 +41,7 @@ const E2E_STATE_FILE = path.resolve('e2e/.state/seed.json');
 const backendEnv = {
   DATABASE_URL: process.env.E2E_DATABASE_URL ?? 'postgresql://e2e:e2e@localhost:55432/e2e',
   REDIS_URL: process.env.E2E_REDIS_URL ?? 'redis://localhost:56379/0',
-  SUPABASE_URL: 'https://test.supabase.co',
+  SUPABASE_URL: storageURL,
   SUPABASE_SERVICE_ROLE_KEY: 'test-service-role-key-not-real',
   SECRET_KEY: 'test-secret-key-not-real',
   // "SKIP" = AuthService nie wysyla maili.
@@ -87,6 +91,15 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 7'] }, testMatch: /.*mobile.*\.spec\.ts/ },
   ],
   webServer: [
+    {
+      command: 'node e2e/fake-storage.mjs',
+      url: `${storageURL}/health`,
+      env: { PORT: String(STORAGE_PORT) },
+      timeout: 30_000,
+      reuseExistingServer: reuse,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
     {
       command: `"${python}" scripts/seed_e2e.py && "${python}" -m uvicorn main:app --host 127.0.0.1 --port ${BACKEND_PORT}`,
       cwd: './backend',
