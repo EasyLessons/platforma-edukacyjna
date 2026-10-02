@@ -17,7 +17,9 @@ from core.models import Board, BoardDocument, BoardUsers, User, WorkspaceMember
 from .schemas import (
     BoardSettings, BoardSettingsPatch,
     DocumentResponse, AccessCheckResponse,
+    CallResponse,
 )
+from .call import create_board_call
 from .storage import upload_board_image
 from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_board_owner
@@ -182,4 +184,16 @@ class WhiteboardService:
             username=user.username,
             role=role,
             can_edit=can_edit(role),
+        )
+
+    # Voice call (Daily) --------------------------------------------------
+
+    async def create_call(self, board_id: int, user: User) -> CallResponse:
+        """Pokój + token rozmowy (call.py). Dołączyć może każdy członek, także viewer."""
+        _, role = self._get_board_and_role(board_id, user.id)
+        user_id, username = user.id, user.username
+        # Połączenie z bazą wraca do puli na czas wywołań Daily (do kilkunastu sekund).
+        self.db.rollback()
+        return await create_board_call(
+            board_id, user_id=user_id, username=username, is_owner=role == "owner"
         )
