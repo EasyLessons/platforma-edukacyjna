@@ -74,9 +74,9 @@ class Settings(BaseSettings):
     # Prefiks nazw pokoi (<prefix>-board-<id>). Inna wartosc dla dev/stagingu na tym samym
     # koncie Daily, zeby srodowiska nie dzielily pokoi. Tylko male litery, cyfry i myslnik.
     daily_room_prefix: str = "easylesson"
-    # Po ilu minutach od OSTATNIEGO dolaczenia pokoj wygasa (uczestnicy sa wtedy rozlaczani).
-    # Krotki czas = pokoje nie zajmuja limitu konta i zapomniana karta nie nabija minut.
-    daily_room_ttl_minutes: int = 180
+    # Po ilu minutach od OSTATNIEGO dolaczenia pokoj wygasa (domyslnie 24 h). Wygasniecie
+    # blokuje tylko nowe wejscia - trwajaca rozmowa NIE jest przerywana (eject_at_room_exp: false).
+    daily_room_ttl_minutes: int = 1440
 
     # === CORS (SEC-04) ===
     # Jawna lista originow rozdzielona przecinkami (env ALLOWED_ORIGINS). Credentials

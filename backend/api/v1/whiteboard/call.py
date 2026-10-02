@@ -6,7 +6,7 @@ POST /api/v1/whiteboard/{board_id}/call (router.py -> WhiteboardService.create_c
 
   1. przesuwa wygasanie pokoju tablicy albo tworzy go, gdy nie istnieje (pokoj PRYWATNY,
      nazwa `<prefix>-board-<id>`; pokoje maja `exp`, wiec nie zajmuja limitu pokoi konta
-     na stale - przy tworzeniu nowego sprzatamy tez wygasle pokoje z naszym prefiksem),
+     na stale - wygasle usuwa samo Daily; wygasniecie NIE rozlacza trwajacej rozmowy),
   2. wydaje meeting token dla tego uzytkownika i TEGO pokoju,
   3. zwraca adres pokoju + token. Klucz API zostaje na serwerze.
 
@@ -25,6 +25,7 @@ import re
 import time
 import unicodedata
 from datetime import datetime, timezone
+from urllib.parse import urlsplit
 
 import httpx
 from fastapi import Depends
@@ -54,10 +55,9 @@ TOKEN_TTL_SECONDS = 60 * 60
 USER_NAME_MAX_LENGTH = 64
 USER_NAME_FALLBACK = "Uczestnik"
 
-# Sprzatanie wygaslych pokoi (limit pokoi na koncie Daily) - tylko przy tworzeniu nowego.
-CLEANUP_LIST_LIMIT = 100
-CLEANUP_MAX_DELETES = 10
-CLEANUP_GRACE_SECONDS = 60
+# Adres pokoju z odpowiedzi Daily trafia do iframe z mikrofonem/kamera razem z tokenem,
+# wiec przyjmujemy tylko https://<subdomena>.daily.co/<nazwa pokoju>.
+DAILY_ROOM_HOST_SUFFIX = ".daily.co"
 
 # Limit per UZYTKOWNIK, liczony po autoryzacji: klasa siedzi za jednym NAT-em, wiec limit
 # per IP odcinalby wszystkich naraz (ten sam powod co przy /api/turn - docs pipelines.md).
@@ -185,10 +185,31 @@ def _room_exp(room: dict) -> float | None:
     return exp if isinstance(exp, (int, float)) and not isinstance(exp, bool) else None
 
 
+def _is_daily_room_url(url, name: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError:
+        return False
+    host = parts.hostname or ""
+    return (
+        parts.scheme == "https"
+        and host.endswith(DAILY_ROOM_HOST_SUFFIX)
+        and len(host) > len(DAILY_ROOM_HOST_SUFFIX)
+        and parts.netloc.lower() == host  # bez userinfo i portu
+        and port is None
+        and parts.path == f"/{name}"
+        and not parts.query
+        and not parts.fragment
+    )
+
+
 def _checked_room_url(room: dict, name: str) -> str:
-    """Adres pokoju z odpowiedzi Daily; pokoj musi byc nasz i PRYWATNY."""
+    """Adres pokoju z odpowiedzi Daily; pokoj musi byc nasz, PRYWATNY i w domenie daily.co."""
     url = room.get("url")
-    if room.get("name") != name or not isinstance(url, str) or not url.startswith("https://"):
+    if room.get("name") != name or not _is_daily_room_url(url, name):
         logger.error("Daily - odpowiedź z pokojem ma nieoczekiwany kształt (name/url)")
         raise _provider_unavailable()
     if room.get("privacy") != "private":
@@ -198,39 +219,27 @@ def _checked_room_url(room: dict, name: str) -> str:
     return url
 
 
-async def _delete_expired_rooms(client: httpx.AsyncClient, prefix: str, now: int, api_key: str) -> None:
-    """
-    Best-effort: kasuje wygasle pokoje tablic z NASZYM prefiksem, zeby nie zajmowaly limitu
-    pokoi konta. Nigdy nie rzuca - blad sprzatania nie moze zablokowac rozmowy.
-    """
-    ours = re.compile(rf"^{re.escape(prefix)}\d+$")
-    try:
-        response = await _request(client, "GET", "/rooms", params={"limit": CLEANUP_LIST_LIMIT})
-        if response.status_code != 200:
-            logger.warning(f"Daily - lista pokoi do sprzątania: HTTP {response.status_code}")
-            return
-        rooms = _body(response).get("data")
-        deleted = 0
-        for room in rooms if isinstance(rooms, list) else []:
-            if deleted >= CLEANUP_MAX_DELETES:
-                break
-            name = room.get("name") if isinstance(room, dict) else None
-            if not isinstance(name, str) or not ours.fullmatch(name):
-                continue
-            exp = _room_exp(room)
-            if exp is None or exp > now - CLEANUP_GRACE_SECONDS:
-                continue
-            result = await _request(client, "DELETE", f"/rooms/{name}")
-            if result.status_code == 200:
-                deleted += 1
-            else:
-                logger.warning(f"Daily - kasowanie wygasłego pokoju {name}: HTTP {result.status_code}")
-        if deleted:
-            logger.info(f"Daily - skasowano wygasłe pokoje: {deleted}")
-    except AppException:
-        logger.warning("Daily - sprzątanie wygasłych pokoi nieudane (pomijam)")
-    except Exception as e:  # nieoczekiwany ksztalt odpowiedzi itp.
-        logger.warning(f"Daily - sprzątanie wygasłych pokoi nieudane: {_log_text(type(e).__name__, api_key)}")
+async def _create_room(client: httpx.AsyncClient, name: str, exp: int) -> httpx.Response:
+    return await _request(
+        client,
+        "POST",
+        "/rooms",
+        json={
+            "name": name,
+            "privacy": "private",
+            "properties": {
+                "exp": exp,
+                # Wygasniecie pokoju blokuje tylko NOWE wejscia - trwajaca lekcja nie moze
+                # zostac przerwana przez backend (zlecenie 02.10.2026).
+                "eject_at_room_exp": False,
+                "start_video_off": True,
+                "start_audio_off": False,
+                "enable_prejoin_ui": True,
+                "enable_chat": False,
+                "max_participants": ROOM_MAX_PARTICIPANTS,
+            },
+        },
+    )
 
 
 async def _ensure_room(client: httpx.AsyncClient, name: str, now: int, api_key: str) -> str:
@@ -248,29 +257,7 @@ async def _ensure_room(client: httpx.AsyncClient, name: str, now: int, api_key: 
             f"info={_log_text(_body(updated).get('info'), api_key)} - próbuję utworzyć"
         )
 
-    await _delete_expired_rooms(client, name[: name.rindex("-") + 1], now, api_key)
-
-    created = await _request(
-        client,
-        "POST",
-        "/rooms",
-        json={
-            "name": name,
-            "privacy": "private",
-            "properties": {
-                "exp": exp,
-                # Bezpiecznik kosztow: zapomniana karta nie nabija minut po wygasnieciu
-                # pokoju. Kazde dolaczenie przesuwa `exp`, wiec trwajaca lekcja nie jest
-                # przerywana, dopoki ktos dolaczyl w ciagu ostatnich DAILY_ROOM_TTL_MINUTES.
-                "eject_at_room_exp": True,
-                "start_video_off": True,
-                "start_audio_off": False,
-                "enable_prejoin_ui": True,
-                "enable_chat": False,
-                "max_participants": ROOM_MAX_PARTICIPANTS,
-            },
-        },
-    )
+    created = await _create_room(client, name, exp)
     if created.status_code == 200:
         return _checked_room_url(_body(created), name)
     if created.status_code != 400:
@@ -282,10 +269,19 @@ async def _ensure_room(client: httpx.AsyncClient, name: str, now: int, api_key: 
         raise _provider_error(created, "tworzenie pokoju", api_key)
     room = _body(existing)
     room_exp = _room_exp(room)
-    if room_exp is not None and room_exp <= now:
-        logger.error(f"Daily - pokój {name} istnieje, ale wygasł i nie dał się odświeżyć")
-        raise _provider_unavailable()
-    return _checked_room_url(room, name)
+    if room_exp is None or room_exp > now:
+        return _checked_room_url(room, name)
+
+    # Pokoj istnieje, ale wygasl i Daily nie pozwolil przesunac `exp` (zachowanie
+    # niepotwierdzone w dokumentacji): kasujemy WLASNY wygasly pokoj i tworzymy go raz jeszcze.
+    logger.warning(f"Daily - pokój {name} wygasł i nie dał się odświeżyć, tworzę od nowa")
+    deleted = await _request(client, "DELETE", f"/rooms/{name}")
+    if deleted.status_code != 200 and not _is_room_missing(deleted):
+        raise _provider_error(deleted, "kasowanie wygasłego pokoju", api_key)
+    recreated = await _create_room(client, name, exp)
+    if recreated.status_code != 200:
+        raise _provider_error(recreated, "ponowne tworzenie pokoju", api_key)
+    return _checked_room_url(_body(recreated), name)
 
 
 async def _create_token(
