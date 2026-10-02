@@ -12,7 +12,7 @@ FastAPI, moduł per domenę pod `backend/api/v1/`. Każdy moduł ma ten sam kszt
 - **assets/** — zapisane szablony/assety użytkownika (`saved_assets`).
 - **onboarding/** — `OnboardingService.setup_new_user()`: startowy workspace + domyślna tablica dla nowo zarejestrowanego usera (bez własnego routera, wołany z `auth`).
 
-Poza `api/v1/`: **backend/core/** — `config.py` (Settings z `.env`), `database.py` (połączenie z Postgresem), `models.py` (wszystkie modele SQLAlchemy w jednym pliku), `exceptions.py`, `logging.py`, `responses.py` (wspólny format `ApiResponse[T]`), `presence.py` (kto jest na tablicy — sorted set w Redisie z TTL), `redis_client.py`, `rate_limit.py` (limit prób logowania/rejestracji), `email/` (klient Resend + szablony `auth`/`workspace`).
+Poza `api/v1/`: **backend/core/** — `config.py` (Settings z `.env`), `database.py` (połączenie z Postgresem), `models.py` (wszystkie modele SQLAlchemy w jednym pliku), `exceptions.py`, `logging.py`, `responses.py` (wspólny format `ApiResponse[T]`), `presence.py` (kto jest na tablicy — sorted set w Redisie z TTL), `redis_client.py`, `rate_limit.py` (limit prób logowania/rejestracji, IP klienta zza proxy), `cors.py` (polityka CORS: jawna lista originów z `ALLOWED_ORIGINS`, zawężone metody/nagłówki — opis w `auth.md`), `email/` (klient Resend + szablony `auth`/`workspace`; teksty wstawiane do szablonów są escapowane w `templates/base.py`).
 
 Nie istnieją (mimo starszych wzmianek w docs): `backend/auth/`, `backend/dashboard/`. Dashboard nie ma osobnej warstwy agregacji — frontend składa go z `workspaces` i `boards`.
 

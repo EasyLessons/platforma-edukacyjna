@@ -2,16 +2,17 @@
 MAIN.PY - Entry point aplikacji
 """
 import os
-import re
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import logging
 
 from core.logging import setup_logging
 from core.config import get_settings
+from core.cors import CorsPolicy
 from core.exceptions import AppException, ValidationError, AuthenticationError, NotFoundError
 from core.responses import ApiResponse
 from core.request_context import REQUEST_ID_HEADER, get_request_id
@@ -42,29 +43,21 @@ app = FastAPI(
     redoc_url="/api/v1/redoc"
 )
 
-# CORS
+# CORS (SEC-04): jawna lista originow z env, zawezone metody/naglowki - patrz core/cors.py
 settings = get_settings()
-ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "https://platforma-edukacyjna-five.vercel.app",
-    "https://platforma-edukacyjna-one.vercel.app",
-    "https://easylesson.app",
-    "https://www.easylesson.app",
-]
-ALLOWED_ORIGIN_REGEX = r"^https://((www\.)?easylesson\.app|[a-z0-9-]+\.vercel\.app)$"
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+cors_policy = CorsPolicy(settings)
+app.add_middleware(CORSMiddleware, **cors_policy.middleware_kwargs())
 
 # X-Request-ID: czyta/generuje id zadania, oddaje w naglowku, loguje http.request
 app.add_middleware(RequestIdMiddleware)
+
+# Schemat (X-Forwarded-Proto) i adres klienta w logach zza proxy (SEC-06). Render terminuje
+# TLS przed uvicornem. Middleware jest w kodzie (a nie tylko we flagach uvicorna w Procfile),
+# zeby dzialalo niezaleznie od komendy startowej ustawionej w panelu Render. Dodane jako
+# ostatnie = najbardziej zewnetrzne. UWAGA: przy "*" bierze PIERWSZY wpis X-Forwarded-For,
+# ktory klient moze podrobic - dlatego rate limit NIE uzywa request.client.host, tylko
+# core.rate_limit.get_client_ip (naglowek brzegu / wpis X-Forwarded-For liczony od prawej).
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxy_hosts)
 
 
 # Exception handlers
@@ -161,7 +154,7 @@ async def global_exception_handler(request, exc: Exception):
     if get_request_id():
         response.headers[REQUEST_ID_HEADER] = get_request_id()
     origin = request.headers.get("origin")
-    if origin and (origin in ALLOWED_ORIGINS or re.match(ALLOWED_ORIGIN_REGEX, origin)):
+    if cors_policy.is_allowed_origin(origin):
         response.headers["Access-Control-Allow-Origin"] = origin
         response.headers["Access-Control-Allow-Credentials"] = "true"
         response.headers["Vary"] = "Origin"
