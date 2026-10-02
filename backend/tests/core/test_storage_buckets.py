@@ -212,6 +212,167 @@ class TestUploadObjectWithBucketCreation:
         assert len(requests) == 1
 
 
+class TestPublicBucketCheck:
+    """Bucket, ktory ma byc prywatny, a istnieje jako publiczny - upload jest odmawiany."""
+
+    BUCKET_PATH = "/storage/v1/bucket/board-files"
+    OBJECT_PATH = "/storage/v1/object/board-files/1/a.webp"
+
+    @pytest.fixture(autouse=True)
+    def unchecked(self):
+        storage._private_buckets.clear()
+        storage._public_buckets.clear()
+
+    def storage_with(self, bucket_response):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "GET" and request.url.path == self.BUCKET_PATH:
+                return bucket_response()
+            return httpx.Response(200, json={"Key": "board-files/1/a.webp"})
+
+        return handler
+
+    async def upload(self):
+        await storage.upload_object("board-files", "1/a.webp", b"DATA", "image/webp", create_bucket=SPEC)
+
+    @pytest.mark.asyncio
+    async def test_publiczny_bucket_503_i_nic_nie_jest_zapisywane(self, configured, monkeypatch, caplog):
+        requests = mock_http(
+            monkeypatch,
+            self.storage_with(lambda: httpx.Response(200, json={"id": "board-files", "public": True})),
+        )
+
+        with caplog.at_level("ERROR"), pytest.raises(AppException) as exc:
+            await self.upload()
+
+        assert exc.value.status_code == 503
+        assert exc.value.code == "STORAGE_NOT_CONFIGURED"
+        assert [(r.method, r.url.path) for r in requests] == [("GET", self.BUCKET_PATH)]
+        assert requests[0].headers["authorization"] == f"Bearer {SERVICE_KEY}"
+        assert any("PUBLICZNY" in record.message for record in caplog.records)
+
+    @pytest.mark.asyncio
+    async def test_prywatny_bucket_jest_sprawdzany_raz_na_proces(self, configured, monkeypatch):
+        requests = mock_http(
+            monkeypatch,
+            self.storage_with(lambda: httpx.Response(200, json={"id": "board-files", "public": False})),
+        )
+
+        await self.upload()
+        await self.upload()
+
+        assert [(r.method, r.url.path) for r in requests] == [
+            ("GET", self.BUCKET_PATH),
+            ("POST", self.OBJECT_PATH),
+            ("POST", self.OBJECT_PATH),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_publiczny_bucket_nie_jest_odpytywany_przy_kazdym_uploadzie(self, configured, monkeypatch):
+        requests = mock_http(
+            monkeypatch,
+            self.storage_with(lambda: httpx.Response(200, json={"id": "board-files", "public": True})),
+        )
+
+        for _ in range(3):
+            with pytest.raises(AppException):
+                await self.upload()
+
+        assert len(requests) == 1
+
+    @pytest.mark.asyncio
+    async def test_po_naprawie_bucketu_upload_wraca_bez_restartu(self, configured, monkeypatch):
+        state = {"public": True}
+        clock = {"now": 1000.0}
+        monkeypatch.setattr(storage, "_monotonic", lambda: clock["now"])
+        requests = mock_http(
+            monkeypatch,
+            self.storage_with(lambda: httpx.Response(200, json={"id": "board-files", "public": state["public"]})),
+        )
+
+        with pytest.raises(AppException):
+            await self.upload()
+        state["public"] = False
+        clock["now"] += storage.PUBLIC_BUCKET_RECHECK_SECONDS + 1
+        await self.upload()
+
+        assert [(r.method, r.url.path) for r in requests][-2:] == [
+            ("GET", self.BUCKET_PATH),
+            ("POST", self.OBJECT_PATH),
+        ]
+
+    @pytest.mark.parametrize(
+        "bucket_response",
+        [
+            pytest.param(lambda: httpx.Response(500), id="http500"),
+            pytest.param(lambda: httpx.Response(200, text="<html>"), id="nie-json"),
+            pytest.param(lambda: httpx.Response(200, json={"id": "board-files"}), id="bez-pola-public"),
+            pytest.param(lambda: httpx.Response(200, json={"public": "true"}), id="public-nie-bool"),
+        ],
+    )
+    @pytest.mark.asyncio
+    async def test_blad_sprawdzenia_nie_blokuje_uploadu_i_jest_ponawiany(self, configured, monkeypatch, bucket_response):
+        requests = mock_http(monkeypatch, self.storage_with(bucket_response))
+
+        await self.upload()
+        await self.upload()
+
+        # Nic nie zapamietane: sprawdzenie przed KAZDYM uploadem, dopoki sie nie uda.
+        assert [(r.method, r.url.path) for r in requests] == [
+            ("GET", self.BUCKET_PATH),
+            ("POST", self.OBJECT_PATH),
+            ("GET", self.BUCKET_PATH),
+            ("POST", self.OBJECT_PATH),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_blad_sieci_przy_sprawdzeniu_nie_blokuje_uploadu(self, configured, monkeypatch):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "GET":
+                raise httpx.ConnectError("refused", request=request)
+            return httpx.Response(200, json={"Key": "board-files/1/a.webp"})
+
+        requests = mock_http(monkeypatch, handler)
+
+        await self.upload()
+
+        assert requests[-1].method == "POST"
+        assert storage._private_buckets == set()
+
+    @pytest.mark.asyncio
+    async def test_brak_bucketu_tworzy_prywatny_i_juz_nie_sprawdza(self, configured, monkeypatch):
+        state = {"bucket": False}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path == "/storage/v1/bucket":
+                state["bucket"] = True
+                return httpx.Response(200, json={"name": "board-files"})
+            if not state["bucket"]:
+                return httpx.Response(400, json={"statusCode": "404", "error": "Bucket not found", "message": "Bucket not found"})
+            return httpx.Response(200, json={"Key": "board-files/1/a.webp"})
+
+        requests = mock_http(monkeypatch, handler)
+
+        await self.upload()
+        await self.upload()
+
+        assert [(r.method, r.url.path) for r in requests] == [
+            ("GET", self.BUCKET_PATH),
+            ("POST", self.OBJECT_PATH),
+            ("POST", "/storage/v1/bucket"),
+            ("POST", self.OBJECT_PATH),
+            ("POST", self.OBJECT_PATH),
+        ]
+
+    @pytest.mark.asyncio
+    async def test_bucket_publiczny_z_zalozenia_nie_jest_sprawdzany(self, configured, monkeypatch):
+        """Awatary: `upload_public_object` bez `create_bucket` - zadnego GET /bucket."""
+        requests = mock_http(monkeypatch, lambda r: httpx.Response(200, json={"Key": "avatars/a.webp"}))
+
+        await storage.upload_public_object("avatars", "a.webp", b"DATA", "image/webp")
+
+        assert [(r.method, r.url.path) for r in requests] == [("POST", "/storage/v1/object/avatars/a.webp")]
+
+
 class TestDownload:
 
     @pytest.mark.asyncio

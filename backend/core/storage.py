@@ -14,8 +14,11 @@ Zasady:
 Buckety PRYWATNE (np. `board-files`, api/v1/whiteboard/files.py): `upload_object` z
 `create_bucket=BucketSpec(...)` sam tworzy brakujacy bucket (zawsze `public: false`),
 a plik wydaje wylacznie backend przez `download_object` - po sprawdzeniu uprawnien.
+Bucket, ktory juz istnieje, mogl zostac utworzony recznie jako publiczny - dlatego przed
+pierwszym uploadem w procesie sprawdzamy jego flage `public` (`_bucket_is_public`).
 """
 import re
+import time
 from dataclasses import dataclass
 
 import httpx
@@ -30,6 +33,14 @@ UPLOAD_TIMEOUT_SECONDS = 15.0
 DELETE_TIMEOUT_SECONDS = 10.0
 DOWNLOAD_TIMEOUT_SECONDS = 15.0
 BUCKET_TIMEOUT_SECONDS = 10.0
+BUCKET_CHECK_TIMEOUT_SECONDS = 5.0
+# Po wykryciu publicznego bucketu: jak dlugo odmawiamy uploadu bez ponownego pytania Storage.
+PUBLIC_BUCKET_RECHECK_SECONDS = 60.0
+
+# Stan sprawdzenia flagi `public` (na proces) - patrz `_bucket_is_public`.
+_private_buckets: set[str] = set()
+_public_buckets: dict[str, float] = {}
+_monotonic = time.monotonic  # podmieniane w testach
 # Storage zwraca domyslnie 100 pozycji listy - prosimy o strony po 1000 i kasujemy strona
 # po stronie; limit stron chroni przed petla, gdyby kasowanie po cichu nie dzialalo.
 LIST_PAGE_SIZE = 1000
@@ -175,12 +186,67 @@ async def ensure_bucket(bucket: str, spec: BucketSpec) -> bool:
 
     if response.status_code < 300:
         logger.info(f"Utworzono prywatny bucket Storage: {bucket}")
+        # Sami utworzylismy go jako prywatny - nie trzeba pytac o flage `public`.
+        _private_buckets.add(bucket)
         return True
     if _is_already_exists(response):
         return True
     logger.error(
         f"Tworzenie bucketu {bucket} nieudane: HTTP {response.status_code}: {response.text[:300]}"
     )
+    return False
+
+
+async def _bucket_is_public(config: tuple[str, str], bucket: str) -> bool:
+    """
+    Czy bucket, ktory ma byc PRYWATNY, jest w Storage oznaczony jako publiczny
+    (GET /storage/v1/bucket/{id} -> pole `public`).
+
+    Wynik jest pamietany w procesie:
+      * `public: false` - na stale (jedno zapytanie na proces; pozniejsza reczna zmiana
+        bucketu na publiczny zostanie wykryta dopiero po restarcie backendu),
+      * `public: true` - na PUBLIC_BUCKET_RECHECK_SECONDS, potem pytamy ponownie, zeby po
+        naprawie bucketu w panelu Supabase upload wrocil bez restartu.
+    Gdy samego sprawdzenia nie da sie wykonac (siec, 5xx, nieczytelna odpowiedz, brak
+    bucketu), zwracamy False i NIC nie zapamietujemy: upload idzie dalej, a sprawdzenie
+    powtorzy sie przy nastepnym. Wybor swiadomy - awaria endpointu `bucket` nie moze
+    wylaczyc obrazow na stale, a pliki maja losowe nazwy i nie sa nigdzie listowane, wiec
+    pojedynczy upload przy nieznanym stanie flagi to male ryzyko.
+    """
+    if bucket in _private_buckets:
+        return False
+    found_at = _public_buckets.get(bucket)
+    if found_at is not None and _monotonic() - found_at < PUBLIC_BUCKET_RECHECK_SECONDS:
+        return True
+
+    supabase_url, service_role_key = config
+    try:
+        async with httpx.AsyncClient(timeout=BUCKET_CHECK_TIMEOUT_SECONDS) as client:
+            response = await client.get(
+                f"{supabase_url}/storage/v1/bucket/{bucket}",
+                headers=_auth_headers(service_role_key),
+            )
+        body = response.json() if response.status_code == 200 else None
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning(f"Sprawdzenie flagi public bucketu {bucket} nieudane: {type(e).__name__}")
+        return False
+
+    is_public = body.get("public") if isinstance(body, dict) else None
+    if is_public is True:
+        _public_buckets[bucket] = _monotonic()
+        logger.error(
+            f"Bucket {bucket} jest PUBLICZNY, a ma byc prywatny - upload zablokowany. "
+            "Ustaw go jako prywatny w Supabase -> Storage."
+        )
+        return True
+    if is_public is False:
+        _public_buckets.pop(bucket, None)
+        _private_buckets.add(bucket)
+        return False
+    if not is_bucket_not_found(response):
+        logger.warning(
+            f"Sprawdzenie flagi public bucketu {bucket} nieudane: HTTP {response.status_code}"
+        )
     return False
 
 
@@ -215,11 +281,15 @@ async def upload_object(
 
     `create_bucket`: gdy Storage odpowie "Bucket not found", bucket jest tworzony jako
     PRYWATNY i upload ponawiany jeden raz; jesli utworzyc sie nie da - 503
-    STORAGE_NOT_CONFIGURED (klient ma wtedy wlasna sciezke awaryjna).
+    STORAGE_NOT_CONFIGURED (klient ma wtedy wlasna sciezke awaryjna). Podanie
+    `create_bucket` oznacza tez "ten bucket MA byc prywatny": gdy istnieje jako publiczny,
+    nic nie zapisujemy - rowniez 503 STORAGE_NOT_CONFIGURED.
 
     Rzuca AppException: 503 (brak konfiguracji / bucketu), 502 (blad Storage), 504 (timeout).
     """
     config = _require_config()
+    if create_bucket is not None and await _bucket_is_public(config, bucket):
+        raise _not_configured()
 
     try:
         response = await _post_object(config, bucket, path, data, content_type)

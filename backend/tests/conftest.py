@@ -75,6 +75,23 @@ def event_loop():
     loop.close()
 
 
+@pytest.fixture(autouse=True)
+def storage_bucket_check_state():
+    """
+    core/storage.py pamieta na proces, czy bucket prywatny ma `public: false`. Kazdy test
+    zaczyna od stanu "board-files juz sprawdzony" (bez dodatkowego GET /bucket w atrapach);
+    testy samego sprawdzenia czyszcza ten stan (tests/core/test_storage_buckets.py).
+    """
+    import core.storage as storage
+
+    storage._private_buckets.clear()
+    storage._private_buckets.add("board-files")
+    storage._public_buckets.clear()
+    yield
+    storage._private_buckets.clear()
+    storage._public_buckets.clear()
+
+
 @pytest.fixture
 def fake_redis_server():
     """Współdzielony in-memory serwer Redis (fake) dla jednego testu."""
