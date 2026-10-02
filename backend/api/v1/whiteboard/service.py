@@ -119,7 +119,7 @@ class WhiteboardService:
         """
         _, role = self._get_board_and_role(board_id, user_id)
         if not can_edit(role):
-            raise AppException("Rola viewer nie może dodawać obrazów do tablicy", status_code=403)
+            raise AppException("Rola viewer nie może dodawać obrazów do tablicy", code="FORBIDDEN", status_code=403)
         return await upload_board_image(board_id, file_bytes, content_type)
 
     # Document (Yjs snapshot) --------------------------------------------------

@@ -5,6 +5,7 @@ POST /api/v1/whiteboard/{id}/files, GET /api/v1/whiteboard/{id}/files/{file_name
 Supabase Storage jest atrapa w pamieci podpieta przez httpx.MockTransport (core/storage.py
 i stary whiteboard/storage.py uzywaja httpx.AsyncClient) - zaden test nie wychodzi do sieci.
 """
+import asyncio
 import io
 import json
 import re
@@ -13,6 +14,7 @@ from datetime import datetime
 import httpx
 import pytest
 from fastapi.testclient import TestClient
+from httpx import AsyncClient as RealAsyncClient  # fixture `fake_storage` podmienia httpx.AsyncClient
 from PIL import Image
 from redis.exceptions import ConnectionError as RedisConnectionError
 
@@ -58,6 +60,7 @@ class FakeStorage:
 
     def __init__(self, buckets=("board-files",), not_found_status: int = 404, can_create_bucket: bool = True):
         self.buckets: set[str] = set(buckets)
+        self.public_buckets: set[str] = set()
         self.objects: dict[str, bytes] = {}  # "bucket/sciezka" -> bajty
         self.content_types: dict[str, str] = {}
         self.created_buckets: list[dict] = []
@@ -87,6 +90,12 @@ class FakeStorage:
                 return httpx.Response(409, json={"statusCode": "409", "error": "Duplicate"})
             self.buckets.add(body["id"])
             return httpx.Response(200, json={"name": body["id"]})
+
+        if rest.startswith("bucket/") and request.method == "GET":
+            bucket = rest[len("bucket/"):]
+            if bucket not in self.buckets:
+                return self._bucket_not_found()
+            return httpx.Response(200, json={"id": bucket, "name": bucket, "public": bucket in self.public_buckets})
 
         if rest.startswith("object/list/") and request.method == "POST":
             bucket = rest[len("object/list/"):]
@@ -343,23 +352,309 @@ class TestUpload:
 
         assert r.status_code == 200, r.text
 
-    def test_rate_limit_429(self, client, test_user, test_board, fake_storage, monkeypatch):
-        calls = {"n": 0}
-        original = files_module.read_image_upload
-
-        async def counting(request):
-            calls["n"] += 1
-            return await original(request)
-
-        monkeypatch.setattr(files_module, "read_image_upload", counting)
-        statuses = [
-            post_file(client, test_board.id, test_user, b"x").status_code
-            for _ in range(files_module.UPLOAD_RATE_LIMIT + 1)
+    def test_rate_limit_per_uzytkownik_429(self, client, test_user, test_board, fake_storage, monkeypatch):
+        calls = count_body_reads(monkeypatch)
+        responses = [
+            post_file(client, test_board.id, test_user, b"x")
+            for _ in range(files_module.UPLOAD_USER_RATE_LIMIT + 1)
         ]
+        statuses = [r.status_code for r in responses]
+
+        assert statuses[-1] == 429
+        assert responses[-1].json()["code"] == "RATE_LIMITED"
+        assert responses[-1].headers["retry-after"] == str(files_module.UPLOAD_RATE_WINDOW_SECONDS)
+        assert 429 not in statuses[:-1]
+        assert calls["n"] == files_module.UPLOAD_USER_RATE_LIMIT
+
+    def test_rate_limit_uzytkownika_nie_dotyczy_innego_konta(
+        self, client, db_session, test_user, test_user2, shared_workspace, fake_storage, sync_redis_client
+    ):
+        board = make_board(db_session, shared_workspace, test_user)
+        sync_redis_client.setex(
+            f"ratelimit:board_file_upload:user:{test_user.id}", 60, files_module.UPLOAD_USER_RATE_LIMIT
+        )
+
+        assert post_file(client, board.id, test_user, image_bytes()).status_code == 429
+        assert post_file(client, board.id, test_user2, image_bytes()).status_code == 200
+
+    def test_rate_limit_per_ip_429(self, client, test_user, test_board, fake_storage, monkeypatch, sync_redis_client):
+        """Limit IP (60/min) jest luzniejszy niz limit konta - tu licznik konta jest zerowany."""
+        calls = count_body_reads(monkeypatch)
+        statuses = []
+        for _ in range(files_module.UPLOAD_RATE_LIMIT + 1):
+            sync_redis_client.delete(f"ratelimit:board_file_upload:user:{test_user.id}")
+            statuses.append(post_file(client, test_board.id, test_user, b"x").status_code)
 
         assert statuses[-1] == 429
         assert 429 not in statuses[:-1]
         assert calls["n"] == files_module.UPLOAD_RATE_LIMIT
+
+
+def count_body_reads(monkeypatch) -> dict:
+    """Liczy wywolania czytania ciala uploadu (dowod, ze odrzucone zadanie nie trafilo do RAM)."""
+    calls = {"n": 0}
+    original = files_module.read_image_upload
+
+    async def counting(request):
+        calls["n"] += 1
+        return await original(request)
+
+    monkeypatch.setattr(files_module, "read_image_upload", counting)
+    return calls
+
+
+class TestUploadSlots:
+    """M1: liczba uploadow w toku jest ograniczona PRZED czytaniem ciala."""
+
+    @pytest.fixture(autouse=True)
+    def clean_slots(self, monkeypatch):
+        monkeypatch.setattr(files_module, "_uploads_in_flight", 0)
+        monkeypatch.setattr(files_module, "_uploads_in_flight_by_user", {})
+
+    def test_limit_na_konto_potem_limit_procesu(self):
+        per_user = files_module.MAX_UPLOADS_IN_FLIGHT_PER_USER
+        total = files_module.MAX_UPLOADS_IN_FLIGHT
+        slots = []
+        user = 0
+        while len(slots) < total:
+            user += 1
+            for _ in range(min(per_user, total - len(slots))):
+                slot = files_module.upload_slot(user)
+                slot.__enter__()
+                slots.append(slot)
+
+        with pytest.raises(files_module.AppException) as own:
+            with files_module.upload_slot(1):
+                pass
+        with pytest.raises(files_module.AppException) as other:
+            with files_module.upload_slot(999):
+                pass
+
+        assert (own.value.status_code, own.value.code) == (429, "TOO_MANY_UPLOADS")
+        assert (other.value.status_code, other.value.code) == (503, "UPLOAD_BUSY")
+        assert own.value.headers["Retry-After"] == other.value.headers["Retry-After"] == "2"
+        assert files_module._uploads_in_flight == total
+
+        for slot in slots:
+            slot.__exit__(None, None, None)
+        assert files_module._uploads_in_flight == 0
+        assert files_module._uploads_in_flight_by_user == {}
+        with files_module.upload_slot(999):
+            assert files_module._uploads_in_flight == 1
+
+    def test_miejsce_wraca_takze_po_wyjatku(self):
+        with pytest.raises(RuntimeError):
+            with files_module.upload_slot(1):
+                raise RuntimeError("boom")
+
+        assert files_module._uploads_in_flight == 0
+        assert files_module._uploads_in_flight_by_user == {}
+
+    def test_serwer_zajety_503_bez_czytania_ciala(self, client, test_user, test_board, fake_storage, monkeypatch):
+        calls = count_body_reads(monkeypatch)
+        monkeypatch.setattr(files_module, "_uploads_in_flight", files_module.MAX_UPLOADS_IN_FLIGHT)
+
+        r = post_file(client, test_board.id, test_user, image_bytes())
+
+        assert r.status_code == 503
+        # Inny kod niz STORAGE_NOT_CONFIGURED: front ma ponowic, a nie zapisac dataURL.
+        assert r.json()["code"] == "UPLOAD_BUSY"
+        assert r.headers["retry-after"] == "2"
+        assert calls["n"] == 0
+        assert fake_storage.requests == []
+        assert files_module._uploads_in_flight == files_module.MAX_UPLOADS_IN_FLIGHT
+
+    def test_konto_z_uploadami_w_toku_429_bez_czytania_ciala(self, client, test_user, test_board, fake_storage, monkeypatch):
+        calls = count_body_reads(monkeypatch)
+        monkeypatch.setattr(
+            files_module,
+            "_uploads_in_flight_by_user",
+            {test_user.id: files_module.MAX_UPLOADS_IN_FLIGHT_PER_USER},
+        )
+
+        r = post_file(client, test_board.id, test_user, image_bytes())
+
+        assert r.status_code == 429
+        assert r.json()["code"] == "TOO_MANY_UPLOADS"
+        assert r.headers["retry-after"] == "2"
+        assert calls["n"] == 0
+        assert fake_storage.requests == []
+
+    @pytest.mark.asyncio
+    async def test_rownolegle_uploady_czytaja_cialo_najwyzej_dla_limitu_w_toku(
+        self, db_session, test_user, test_user2, shared_workspace, fake_storage, monkeypatch
+    ):
+        """12 uploadow naraz z dwoch kont: cialo czytane tylko dla tych, ktore dostaly miejsce."""
+        import api.v1.auth.avatar as avatar_module
+
+        monkeypatch.setattr(avatar_module, "_decode_slots", asyncio.Semaphore(1))
+        monkeypatch.setattr(files_module, "MAX_UPLOADS_IN_FLIGHT", 3)
+        board = make_board(db_session, shared_workspace, test_user)
+        release = asyncio.Event()
+        reading = {"now": 0, "max": 0, "total": 0}
+        original = files_module.read_image_upload
+
+        async def slow_read(request):
+            reading["now"] += 1
+            reading["total"] += 1
+            reading["max"] = max(reading["max"], reading["now"])
+            try:
+                await release.wait()
+                return await original(request)
+            finally:
+                reading["now"] -= 1
+
+        monkeypatch.setattr(files_module, "read_image_upload", slow_read)
+
+        def override_get_db():
+            yield db_session
+
+        app.dependency_overrides[get_db] = override_get_db
+        try:
+            async with RealAsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as ac:
+                tasks = [
+                    asyncio.ensure_future(
+                        ac.post(
+                            files_url(board.id),
+                            headers=auth_headers(user.id),
+                            files={"file": ("a.png", image_bytes(), "image/png")},
+                        )
+                    )
+                    for user in (test_user, test_user2)
+                    for _ in range(6)
+                ]
+                for _ in range(500):
+                    await asyncio.sleep(0.01)
+                    if sum(task.done() for task in tasks) >= 9:
+                        break
+                rejected_early = [task.result().status_code for task in tasks if task.done()]
+                release.set()
+                responses = await asyncio.gather(*tasks)
+        finally:
+            app.dependency_overrides.clear()
+
+        statuses = [r.status_code for r in responses]
+        # Odrzucone dostaly odpowiedz, ZANIM ktorykolwiek przyjety upload sie skonczyl.
+        assert len(rejected_early) == 9
+        assert set(rejected_early) <= {429, 503}
+        assert statuses.count(200) == 3
+        assert reading["max"] == 3
+        assert reading["total"] == 3
+        assert len(fake_storage.keys()) == 3
+        assert files_module._uploads_in_flight == 0
+
+    @pytest.mark.parametrize("data,expected", [(None, 200), (b"to nie obraz", 400)])
+    def test_miejsce_zwolnione_po_zakonczeniu_zadania(self, client, test_user, test_board, fake_storage, data, expected):
+        r = post_file(client, test_board.id, test_user, data or image_bytes())
+
+        assert r.status_code == expected
+        assert files_module._uploads_in_flight == 0
+        assert files_module._uploads_in_flight_by_user == {}
+
+    def test_miejsce_zwolnione_po_bledzie_storage(self, client, test_user, test_board, monkeypatch):
+        real_client = httpx.AsyncClient
+        monkeypatch.setattr(
+            storage.httpx,
+            "AsyncClient",
+            lambda **kwargs: real_client(transport=httpx.MockTransport(lambda r: httpx.Response(500)), **kwargs),
+        )
+
+        assert post_file(client, test_board.id, test_user, image_bytes()).status_code == 502
+        assert files_module._uploads_in_flight == 0
+
+    def test_awatar_nie_jest_blokowany_przez_zajete_miejsca_tablicy(self, client, test_user, monkeypatch):
+        """Limit dotyczy tylko plikow tablicy - upload awatara dziala jak dotad."""
+        fake = install_storage(monkeypatch, FakeStorage(buckets=("avatars",)))
+        monkeypatch.setattr(files_module, "_uploads_in_flight", files_module.MAX_UPLOADS_IN_FLIGHT)
+
+        r = client.post(
+            "/api/v1/auth/users/me/avatar",
+            headers=auth_headers(test_user.id),
+            files={"file": ("a.png", image_bytes(), "image/png")},
+        )
+
+        assert r.status_code == 200, r.text
+        assert len(fake.keys("avatars")) == 1
+
+
+class TestBoardQuota:
+    """M1: miekka quota tablicy (licznik w Redis)."""
+
+    def usage(self, redis, board_id: int) -> tuple[int, int]:
+        count_key, bytes_key = files_module._usage_keys(board_id)
+        return int(redis.get(count_key) or 0), int(redis.get(bytes_key) or 0)
+
+    def test_upload_zwieksza_licznik_tablicy(self, client, test_user, test_board, fake_storage, sync_redis_client):
+        upload_ok(client, test_board.id, test_user)
+        upload_ok(client, test_board.id, test_user)
+
+        count, size = self.usage(sync_redis_client, test_board.id)
+        assert count == 2
+        assert size == sum(len(v) for v in fake_storage.objects.values())
+
+    def test_nieudany_upload_nie_zwieksza_licznika(self, client, test_user, test_board, fake_storage, sync_redis_client):
+        assert post_file(client, test_board.id, test_user, b"to nie obraz").status_code == 400
+
+        assert self.usage(sync_redis_client, test_board.id) == (0, 0)
+
+    @pytest.mark.parametrize("which", ["count", "bytes"])
+    def test_po_przekroczeniu_limitu_409_bez_czytania_ciala(
+        self, client, test_user, test_board, fake_storage, sync_redis_client, monkeypatch, which
+    ):
+        calls = count_body_reads(monkeypatch)
+        count_key, bytes_key = files_module._usage_keys(test_board.id)
+        if which == "count":
+            sync_redis_client.set(count_key, files_module.BOARD_MAX_FILES)
+        else:
+            sync_redis_client.set(bytes_key, files_module.BOARD_MAX_BYTES)
+
+        r = post_file(client, test_board.id, test_user, image_bytes())
+
+        assert r.status_code == 409
+        assert r.json()["code"] == "BOARD_FILE_QUOTA_EXCEEDED"
+        assert calls["n"] == 0
+        assert fake_storage.requests == []
+
+    def test_quota_jest_osobna_dla_kazdej_tablicy(
+        self, client, db_session, test_user, test_workspace, test_board, fake_storage, sync_redis_client
+    ):
+        other = make_board(db_session, test_workspace, test_user, name="Inna")
+        sync_redis_client.set(files_module._usage_keys(test_board.id)[0], files_module.BOARD_MAX_FILES)
+
+        assert post_file(client, test_board.id, test_user, image_bytes()).status_code == 409
+        assert post_file(client, other.id, test_user, image_bytes()).status_code == 200
+
+    def test_pobieranie_dziala_mimo_pelnej_quoty(self, client, test_user, test_board, fake_storage, sync_redis_client):
+        name = upload_ok(client, test_board.id, test_user)
+        sync_redis_client.set(files_module._usage_keys(test_board.id)[0], files_module.BOARD_MAX_FILES)
+
+        r = client.get(f"{files_url(test_board.id)}/{name}", headers=auth_headers(test_user.id))
+
+        assert r.status_code == 200
+
+    def test_awaria_redis_przy_quocie_nie_blokuje_uploadu(self, client, test_user, test_board, fake_storage, monkeypatch, redis_client):
+        async def broken(*args, **kwargs):
+            raise RedisConnectionError("down")
+
+        for name in ("mget", "incr", "incrby"):
+            monkeypatch.setattr(redis_client, name, broken)
+
+        r = post_file(client, test_board.id, test_user, image_bytes())
+
+        assert r.status_code == 200, r.text
+        assert len(fake_storage.keys()) == 1
+
+    @pytest.mark.asyncio
+    async def test_usuniecie_tablicy_zeruje_licznik(
+        self, client, db_session, test_user, test_board, fake_storage, sync_redis_client
+    ):
+        upload_ok(client, test_board.id, test_user)
+        board_id = test_board.id
+        assert self.usage(sync_redis_client, board_id)[0] == 1
+
+        await BoardService(db_session).delete_board(board_id, test_user.id)
+
+        assert sync_redis_client.exists(*files_module._usage_keys(board_id)) == 0
 
 
 class TestBucketCreation:
@@ -388,6 +683,26 @@ class TestBucketCreation:
         # Nic nie trafilo do zadnego bucketu - w szczegolnosci do publicznego board-images.
         assert fake.objects == {}
         assert all("board-images" not in req.url.path for req in fake.requests)
+
+    def test_istniejacy_bucket_publiczny_503_i_nic_nie_jest_zapisywane(self, client, test_user, test_board, fake_storage):
+        """L1: bucket utworzony recznie jako publiczny - nie zapisujemy do niego obrazow tablicy."""
+        storage._private_buckets.clear()
+        fake_storage.public_buckets.add("board-files")
+
+        r = post_file(client, test_board.id, test_user, image_bytes())
+
+        assert r.status_code == 503
+        assert r.json()["code"] == "STORAGE_NOT_CONFIGURED"
+        assert fake_storage.objects == {}
+
+    def test_istniejacy_bucket_prywatny_przechodzi_sprawdzenie(self, client, test_user, test_board, fake_storage):
+        storage._private_buckets.clear()
+
+        upload_ok(client, test_board.id, test_user)
+        upload_ok(client, test_board.id, test_user)
+
+        bucket_checks = [r for r in fake_storage.requests if r.method == "GET" and r.url.path.endswith("/bucket/board-files")]
+        assert len(bucket_checks) == 1
 
     def test_storage_nieskonfigurowany_503(self, client, test_user, test_board, fake_storage, monkeypatch):
         monkeypatch.setattr(storage, "_storage_config", lambda: None)
@@ -507,6 +822,36 @@ class TestDownload:
 
         assert r.status_code == 502
 
+    def test_rate_limit_pobran_per_uzytkownik_429(
+        self, client, db_session, test_user, test_user2, shared_workspace, fake_storage, sync_redis_client
+    ):
+        board = make_board(db_session, shared_workspace, test_user)
+        name = upload_ok(client, board.id, test_user)
+        before = len(fake_storage.requests)
+        sync_redis_client.setex(
+            f"ratelimit:board_file_download:user:{test_user.id}", 60, files_module.DOWNLOAD_USER_RATE_LIMIT
+        )
+
+        limited = client.get(f"{files_url(board.id)}/{name}", headers=auth_headers(test_user.id))
+        other = client.get(f"{files_url(board.id)}/{name}", headers=auth_headers(test_user2.id))
+
+        assert limited.status_code == 429
+        assert limited.json()["code"] == "RATE_LIMITED"
+        assert other.status_code == 200
+        assert len(fake_storage.requests) == before + 1  # tylko pobranie drugiego konta
+
+    def test_awaria_redis_nie_blokuje_pobierania(self, client, test_user, test_board, fake_storage, monkeypatch, redis_client):
+        name = upload_ok(client, test_board.id, test_user)
+
+        async def broken(*args, **kwargs):
+            raise RedisConnectionError("down")
+
+        monkeypatch.setattr(redis_client, "incr", broken)
+
+        r = client.get(f"{files_url(test_board.id)}/{name}", headers=auth_headers(test_user.id))
+
+        assert r.status_code == 200
+
 
 class TestDeleteWithBoard:
 
@@ -556,6 +901,7 @@ class TestLegacyUploadImage:
         )
 
         assert r.status_code == 403
+        assert r.json()["code"] == "FORBIDDEN"
         assert fake_storage.requests == []
 
     def test_nie_czlonek_nadal_404(self, client, test_board, test_user2, fake_storage):
