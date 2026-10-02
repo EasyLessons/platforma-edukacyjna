@@ -67,3 +67,11 @@ class AccessCheckResponse(BaseModel):
     # Rola w workspace tablicy; whiteboard-sync ustawia viewerowi połączenie tylko do odczytu.
     role: str
     can_edit: bool
+
+
+class CallResponse(BaseModel):
+    """Dane do dołączenia do rozmowy głosowej tablicy (Daily) — patrz call.py"""
+    room_url: str
+    token: str
+    # Wygaśnięcie tokenu (UTC): do kiedy można nim WEJŚĆ; trwającej rozmowy nie przerywa.
+    expires_at: datetime
