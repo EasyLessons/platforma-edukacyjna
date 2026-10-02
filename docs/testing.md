@@ -67,7 +67,7 @@ src/
 | Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze, model Y.Doc |
 | Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
 | Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo |
-| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN |
+| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage |
 
 ---
 
@@ -152,6 +152,10 @@ docker compose -f docker-compose.e2e.yml down -v   # sprzątanie
   np. `E2E_FRONTEND_PORT=3210` - Chromium dostaje wtedy `--disable-web-security` (tylko lokalnie).
 - Backend (8210) i whiteboard-sync (1294) są na nietypowych portach, a `reuseExistingServer` jest domyślnie wyłączone,
   żeby Playwright nie "pożyczył" cudzego serwera bez seeda. Ponowne użycie działających serwerów: `E2E_REUSE=1`.
+- Supabase Storage w E2E to atrapa w pamięci `e2e/fake-storage.mjs` (port 8211, `E2E_STORAGE_PORT`), startowana jako
+  osobny `webServer`; backend dostaje `SUPABASE_URL` wskazujący na nią i rozmawia z nią jak z prawdziwym Storage
+  (w kodzie backendu nie ma trybu testowego). Test obrazów: `e2e/board-engine-images.spec.ts`; stan atrapy: `GET /__state`.
+  Broadcast powiadomień z backendu trafia w atrapę i dostaje 404 (best-effort, testy tego nie sprawdzają).
 - Backend limituje logowanie (10 prób / 5 min na login) - helpery logują każdego użytkownika raz na przebieg.
   Przy częstych lokalnych powtórkach: `docker compose -f docker-compose.e2e.yml exec redis redis-cli FLUSHALL`.
 

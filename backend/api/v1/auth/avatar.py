@@ -66,14 +66,19 @@ def _release_decode_slot(task: "asyncio.Task[SanitizedImage]") -> None:
         task.exception()  # odebrane tutaj, gdy zadanie HTTP juz nie czeka na wynik
 
 
-async def _sanitize_one_at_a_time(raw: bytes) -> SanitizedImage:
+async def _sanitize_one_at_a_time(raw: bytes, **options) -> SanitizedImage:
     """
     Dekoduje obraz w watku, najwyzej jeden naraz. Slot zwalnia WATEK po zakonczeniu pracy,
     a nie korutyna: przy anulowaniu zadania (zerwane polaczenie) `async with` oddalby slot
     od razu, a dekodowanie w watku trwaloby dalej - i nakladalo sie z nastepnym.
+
+    `options` (parametry `sanitize_image`: max_side, formats, max_decode_bytes) sa dla innych
+    uploadow obrazow (pliki tablicy, whiteboard/files.py), ktore musza dzielic TEN SAM
+    semafor. Bez nich - zachowanie awatara.
     """
+    options.setdefault("max_side", AVATAR_MAX_SIDE)
     await _decode_slots.acquire()
-    task = asyncio.ensure_future(run_in_threadpool(sanitize_image, raw, max_side=AVATAR_MAX_SIDE))
+    task = asyncio.ensure_future(run_in_threadpool(sanitize_image, raw, **options))
     task.add_done_callback(_release_decode_slot)
     return await asyncio.shield(task)
 

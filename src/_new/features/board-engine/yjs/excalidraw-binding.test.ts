@@ -1,6 +1,15 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as Y from 'yjs';
-import { ExcalidrawYjsBinding, isNewerVersion, type StoredElement } from './excalidraw-binding';
+import {
+  ExcalidrawYjsBinding,
+  FILES_KEY,
+  isFileRef,
+  isInlineFile,
+  isNewerVersion,
+  isStoredFile,
+  type StoredElement,
+  type StoredFile,
+} from './excalidraw-binding';
 
 const el = (id: string, version: number, extra: Partial<StoredElement> = {}): StoredElement => ({
   id,
@@ -117,6 +126,47 @@ describe('ExcalidrawYjsBinding', () => {
     expect(b.getFiles()).toHaveLength(1);
   });
 
+  it('pliki: odwołanie do Storage (ref) bez dataURL, stary format (dataURL) czytany obok', () => {
+    const { a, b } = connectedPair();
+    const onFilesB = vi.fn();
+    b.observeRemoteFiles(onFilesB);
+    const inline = {
+      id: 'stary',
+      mimeType: 'image/png',
+      dataURL: 'data:image/png;base64,AAAA',
+      created: 1,
+    };
+    const name = `${'a1'.repeat(16)}.webp`;
+
+    a.pushFiles([inline]);
+    a.setFileRef({ id: 'nowy', mimeType: 'image/webp', created: 2, name });
+
+    expect(a.hasFile('nowy')).toBe(true);
+    expect(a.hasFile('brak')).toBe(false);
+    const ref = b.getFile('nowy') as StoredFile;
+    expect(ref).toEqual({ id: 'nowy', mimeType: 'image/webp', created: 2, ref: { v: 1, name } });
+    expect(isFileRef(ref)).toBe(true);
+    expect(isInlineFile(ref)).toBe(false);
+    const old = b.getFile('stary') as StoredFile;
+    expect(isInlineFile(old)).toBe(true);
+    expect(isFileRef(old)).toBe(false);
+    // obserwator zdalny dostaje oba wpisy (każdy w swoim formacie)
+    expect(onFilesB.mock.calls.flatMap((c) => c[0].map((f: StoredFile) => f.id))).toEqual([
+      'stary',
+      'nowy',
+    ]);
+    // pushFiles nie nadpisuje odwołania wersją inline o tym samym id
+    expect(a.pushFiles([{ ...inline, id: 'nowy' }])).toBe(0);
+    expect(isFileRef(a.getFile('nowy') as StoredFile)).toBe(true);
+  });
+
+  it('hasElement: tylko elementy zapisane w dokumencie', () => {
+    const a = new ExcalidrawYjsBinding(new Y.Doc(), 'A');
+    a.pushLocal([el('r1', 1)]);
+    expect(a.hasElement('r1')).toBe(true);
+    expect(a.hasElement('r2')).toBe(false);
+  });
+
   it('gcDeleted usuwa stare tombstone`y, zostawia żywe i świeżo skasowane', () => {
     const a = new ExcalidrawYjsBinding(new Y.Doc(), 'A');
     a.pushLocal([
@@ -150,5 +200,52 @@ describe('ExcalidrawYjsBinding', () => {
       [0, 0],
       [1, 1],
     ]);
+  });
+});
+
+describe('ExcalidrawYjsBinding - śmieciowe wpisy w mapie plików', () => {
+  const GARBAGE: unknown[] = [null, undefined, 0, 'tekst', [], {}, { id: 1 }];
+  const good = {
+    id: 'dobry',
+    mimeType: 'image/png',
+    dataURL: 'data:image/png;base64,AA==',
+    created: 1,
+  };
+
+  it('isInlineFile / isFileRef / isStoredFile nie rzucają dla null i nie-obiektów', () => {
+    for (const value of GARBAGE) {
+      expect(isStoredFile(value)).toBe(false);
+      expect(isInlineFile(value)).toBe(false);
+      expect(isFileRef(value)).toBe(false);
+    }
+  });
+
+  it('getFiles i obserwator zdalny pomijają wpis null zapisany przez innego klienta', () => {
+    const docA = new Y.Doc();
+    const docB = new Y.Doc();
+    docA.on('update', (u: Uint8Array) => Y.applyUpdate(docB, u, 'net'));
+    const b = new ExcalidrawYjsBinding(docB, 'B');
+    const onFiles = vi.fn();
+    b.observeRemoteFiles(onFiles);
+
+    const rawFiles = docA.getMap<unknown>(FILES_KEY);
+    docA.transact(() => {
+      rawFiles.set('zly', null);
+      rawFiles.set('liczba', 5);
+      rawFiles.set('dobry', good);
+    });
+
+    expect(b.getFiles()).toEqual([good]);
+    expect(onFiles.mock.calls.flatMap((c) => c[0])).toEqual([good]);
+  });
+
+  it('pushFiles pomija null i nie-obiekty', () => {
+    const a = new ExcalidrawYjsBinding(new Y.Doc(), 'A');
+
+    expect(a.pushFiles([null, 3, good] as unknown as StoredFile[])).toBe(1);
+    expect(a.pushFiles({ zly: null, dobry: good } as unknown as Record<string, StoredFile>)).toBe(
+      0
+    );
+    expect(a.getFiles()).toEqual([good]);
   });
 });

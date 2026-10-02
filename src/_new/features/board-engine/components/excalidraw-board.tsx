@@ -13,6 +13,7 @@
  *
  * Przepływ danych:
  *   Excalidraw.onChange -> (throttle 50 ms) -> binding.pushLocal (tylko zmienione wersje)
+ *   obrazy              -> files/board-file-sync.ts (Storage zamiast dataURL w Y.Doc)
  *   Y.Doc (zdalne)      -> binding.observeRemote -> reconcileElements -> updateScene(NEVER)
  *   onPointerUpdate     -> awareness.pointer   ; awareness.change -> updateScene({collaborators})
  */
@@ -32,7 +33,6 @@ import type {
   ExcalidrawProps,
   AppState,
   BinaryFiles,
-  BinaryFileData,
 } from '@excalidraw/excalidraw/types';
 import type {
   ExcalidrawElement,
@@ -59,6 +59,8 @@ import {
 import type { FunctionSpec } from '../math/function-plot';
 import { FunctionPanel } from './function-panel';
 import { backgroundForTool } from '../config/default-fill';
+import { createExcalidrawFileSync } from '../files/excalidraw-file-sync';
+import type { BoardFileSync } from '../files/board-file-sync';
 
 const PUSH_THROTTLE_MS = 50;
 const POINTER_THROTTLE_MS = 40;
@@ -72,6 +74,8 @@ declare global {
       exportPng: () => Promise<number>;
       /** Nazwy użytkowników w awareness (łącznie z własną); null bez połączenia. */
       awarenessUsers: () => (string | null)[] | null;
+      /** Wpis pliku w Y.Doc (odwołanie do Storage albo dataURL); null, gdy go nie ma. */
+      storedFile: (fileId: string) => StoredFile | null;
     };
   }
 }
@@ -106,6 +110,8 @@ export interface ExcalidrawBoardProps {
   viewMode?: boolean;
   /** Siatka na płótnie (ustawienie tablicy `grid_visible`). */
   gridVisible?: boolean;
+  /** Id tablicy na serwerze - obrazy idą do Storage. null (demo, gość) = dataURL w Y.Doc. */
+  storageBoardId?: string | null;
 }
 
 export function ExcalidrawBoard({
@@ -114,11 +120,13 @@ export function ExcalidrawBoard({
   user,
   viewMode = false,
   gridVisible = true,
+  storageBoardId = null,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [editingSpec, setEditingSpec] = useState<FunctionSpec | null>(null);
 
   const bindingRef = useRef<ExcalidrawYjsBinding | null>(null);
+  const fileSyncRef = useRef<BoardFileSync | null>(null);
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<{
     elements: readonly OrderedExcalidrawElement[];
@@ -145,10 +153,13 @@ export function ExcalidrawBoard({
     pushTimerRef.current = null;
     const pending = pendingRef.current;
     const binding = bindingRef.current;
-    if (!pending || !binding) return;
+    const fileSync = fileSyncRef.current;
+    if (!pending || !binding || !fileSync) return;
     pendingRef.current = null;
-    binding.pushLocal(pending.elements as unknown as StoredElement[]);
-    binding.pushFiles(pending.files as unknown as Record<string, StoredFile>);
+    // Najpierw pliki: element-obraz trafia do Y.Doc dopiero, gdy jego plik ma tam wpis.
+    const elements = pending.elements as unknown as StoredElement[];
+    fileSync.syncLocal(pending.files as unknown as Record<string, StoredFile>, elements);
+    binding.pushLocal(fileSync.shareable(elements));
   }, []);
 
   const handleChange = useCallback(
@@ -191,6 +202,8 @@ export function ExcalidrawBoard({
 
     const binding = new ExcalidrawYjsBinding(doc, `excalidraw-local:${doc.clientID}`);
     bindingRef.current = binding;
+    const fileSync = createExcalidrawFileSync({ api, binding, boardId: storageBoardId });
+    fileSyncRef.current = fileSync;
 
     const applyRemote = (remote: StoredElement[]) => {
       const reconciled = reconcileElements(
@@ -202,23 +215,22 @@ export function ExcalidrawBoard({
     };
 
     // Stan początkowy (to, co już jest w dokumencie) + kolejne zmiany spoza tej karty
-    const files = binding.getFiles();
-    if (files.length) api.addFiles(files as unknown as BinaryFileData[]);
+    fileSync.receive(binding.getFiles());
     applyRemote(binding.getElements());
 
     const unobserve = binding.observeRemote(applyRemote);
-    const unobserveFiles = binding.observeRemoteFiles((added) =>
-      api.addFiles(added as unknown as BinaryFileData[])
-    );
+    const unobserveFiles = binding.observeRemoteFiles((added) => fileSync.receive(added));
 
     return () => {
       if (pushTimerRef.current) clearTimeout(pushTimerRef.current);
       flushPending();
       unobserve();
       unobserveFiles();
+      fileSync.dispose();
+      fileSyncRef.current = null;
       bindingRef.current = null;
     };
-  }, [api, sceneReady, doc, flushPending]);
+  }, [api, sceneReady, doc, flushPending, storageBoardId]);
 
   useEffect(() => {
     if (!api || !EXPOSE_E2E_HOOK) return;
@@ -239,6 +251,7 @@ export function ExcalidrawBoard({
               (st) => (st as Partial<LocalAwarenessState>).user?.name ?? null
             )
           : null,
+      storedFile: (fileId) => bindingRef.current?.getFile(fileId) ?? null,
     };
     return () => {
       if (window.__boardEngine?.api === api) delete window.__boardEngine;
