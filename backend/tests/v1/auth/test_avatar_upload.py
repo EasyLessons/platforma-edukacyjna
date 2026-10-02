@@ -2,6 +2,7 @@
 Testy uploadu awatara przez backend (SEC-03)
 POST /api/v1/auth/users/me/avatar
 """
+import asyncio
 import io
 import re
 
@@ -14,7 +15,9 @@ from api.v1.auth.utils import create_access_token
 from core.config import get_settings
 from core.database import get_db
 from core.exceptions import AppException
+from core.models import User
 from main import app
+from tests.conftest import TestingSessionLocal
 
 settings = get_settings()
 
@@ -165,6 +168,22 @@ class TestRejectedContent:
         assert r.json()["code"] == "IMAGE_TOO_LARGE"
         assert fake_storage["uploads"] == []
 
+    def test_odrzuca_bombe_ponizej_25_mpx(self, client, test_user, fake_storage):
+        """WEBP 5000x5000 w jednym kolorze: plik ~1 KB, dekodowanie zajmowalo ponad 400 MB."""
+        buf = io.BytesIO()
+        Image.new("RGBA", (5000, 5000), (1, 2, 3, 128)).save(buf, format="WEBP", lossless=True)
+        assert len(buf.getvalue()) < 5_000
+
+        r = post_file(client, test_user, buf.getvalue(), filename="a.webp", content_type="image/webp")
+
+        assert r.status_code == 400
+        assert r.json()["code"] == "IMAGE_TOO_LARGE"
+        assert fake_storage["uploads"] == []
+
+    def test_tylko_jedno_dekodowanie_naraz(self):
+        """Jedno dekodowanie to do ~100 MB RAM (budzet sanitizera) - nie rownolegle."""
+        assert avatar_module._decode_slots._value == 1
+
 
 class TestSizeLimit:
 
@@ -234,6 +253,70 @@ class TestBadRequest:
         r = post_file(client, test_user, b"")
         assert r.status_code == 400
 
+    @pytest.mark.parametrize(
+        "content_type",
+        ["multipart/form-data; boundary=", "multipart/form-data"],
+        ids=["pusty-boundary", "brak-boundary"],
+    )
+    def test_400_gdy_naglowek_multipart_jest_zepsuty(self, client, test_user, fake_storage, content_type):
+        """Regresja: pusty boundary wywracal parser wyjatkiem spoza MultiPartException -> 500."""
+        body = b'--x\r\nContent-Disposition: form-data; name="file"; filename="a"\r\n\r\nabc\r\n--x--\r\n'
+
+        r = client.post(URL, headers={**auth_headers(test_user.id), "Content-Type": content_type}, content=body)
+
+        assert r.status_code == 400
+        assert r.json()["code"] == "INVALID_UPLOAD"
+        assert fake_storage["uploads"] == []
+
+    def test_408_gdy_cialo_przychodzi_za_wolno(self, client, test_user, fake_storage, monkeypatch):
+        """Saczenie ciala po bajcie nie moze trzymac zadania bez konca."""
+        async def never_ending_body(request, max_bytes):
+            await asyncio.sleep(30)
+
+        monkeypatch.setattr(avatar_module, "_read_body_limited", never_ending_body)
+        monkeypatch.setattr(avatar_module, "AVATAR_BODY_TIMEOUT_SECONDS", 0.05)
+
+        r = post_file(client, test_user, image_bytes())
+
+        assert r.status_code == 408
+        assert r.json()["code"] == "UPLOAD_TIMEOUT"
+        assert fake_storage["uploads"] == []
+
+
+class TestDatabaseConnection:
+    """
+    Zaleznosc get_current_user otwiera transakcje, a ten endpoint czyta cialo DOPIERO
+    w handlerze. Polaczenie z puli (5+10) nie moze byc trzymane przez wolne czesci:
+    czytanie ciala, kolejke do dekodowania, upload do Storage i kasowanie starego pliku.
+    """
+
+    def test_polaczenie_zwolnione_na_czas_wolnych_operacji(self, client, db_session, test_user, monkeypatch):
+        seen = {}
+        original_read = avatar_module._read_body_limited
+
+        async def spy_read(request, max_bytes):
+            seen["body"] = db_session.in_transaction()
+            return await original_read(request, max_bytes)
+
+        async def spy_upload(bucket, path, data, content_type):
+            seen["upload"] = db_session.in_transaction()
+            return BUCKET_PREFIX + path
+
+        async def spy_delete(bucket, path):
+            seen["delete"] = db_session.in_transaction()
+
+        monkeypatch.setattr(avatar_module, "_read_body_limited", spy_read)
+        monkeypatch.setattr(avatar_module, "upload_public_object", spy_upload)
+        monkeypatch.setattr(avatar_module, "delete_public_object", spy_delete)
+        test_user.avatar_url = BUCKET_PREFIX + "stary.webp"
+        db_session.commit()
+
+        r = post_file(client, test_user, image_bytes())
+
+        assert r.status_code == 200, r.text
+        assert seen == {"body": False, "upload": False, "delete": False}
+        assert r.json()["data"]["avatar_url"].startswith(BUCKET_PREFIX)
+
 
 class TestPreviousAvatarCleanup:
 
@@ -268,6 +351,63 @@ class TestPreviousAvatarCleanup:
         assert fake_storage["deletes"] == []
         db_session.refresh(test_user2)
         assert test_user2.avatar_url == shared
+
+    def test_kasuje_plik_ktory_byl_w_bazie_w_chwili_zapisu(self, client, db_session, test_user, monkeypatch):
+        """
+        Wyscig dwoch uploadow tego samego konta: gdy nasze zadanie wgrywalo plik, inne
+        zdazylo zapisac awatar B. Kasujemy B (to, co faktycznie zastepujemy), a nie
+        wartosc sprzed zadania - inaczej B zostalby w buckecie jako sierota.
+        """
+        test_user.avatar_url = BUCKET_PREFIX + "a.webp"
+        db_session.commit()
+        user_id = test_user.id
+        deletes = []
+
+        async def upload_while_other_request_wins(bucket, path, data, content_type):
+            other = TestingSessionLocal()
+            try:
+                other.query(User).filter(User.id == user_id).update({"avatar_url": BUCKET_PREFIX + "b.webp"})
+                other.commit()
+            finally:
+                other.close()
+            return BUCKET_PREFIX + path
+
+        async def fake_delete(bucket, path):
+            deletes.append((bucket, path))
+
+        monkeypatch.setattr(avatar_module, "upload_public_object", upload_while_other_request_wins)
+        monkeypatch.setattr(avatar_module, "delete_public_object", fake_delete)
+
+        r = post_file(client, test_user, image_bytes())
+
+        assert r.status_code == 200, r.text
+        assert deletes == [("avatars", "b.webp")]
+
+    def test_404_i_brak_sieroty_gdy_konto_zniknelo_w_trakcie(self, client, db_session, test_user, monkeypatch):
+        user_id = test_user.id
+        uploaded = []
+        deletes = []
+
+        async def upload_while_account_is_deleted(bucket, path, data, content_type):
+            other = TestingSessionLocal()
+            try:
+                other.query(User).filter(User.id == user_id).delete()
+                other.commit()
+            finally:
+                other.close()
+            uploaded.append(path)
+            return BUCKET_PREFIX + path
+
+        async def fake_delete(bucket, path):
+            deletes.append((bucket, path))
+
+        monkeypatch.setattr(avatar_module, "upload_public_object", upload_while_account_is_deleted)
+        monkeypatch.setattr(avatar_module, "delete_public_object", fake_delete)
+
+        r = post_file(client, test_user, image_bytes())
+
+        assert r.status_code == 404
+        assert deletes == [("avatars", uploaded[0])]
 
     def test_nie_zmienia_awatara_innego_uzytkownika(self, client, db_session, test_user, test_user2, fake_storage):
         r = post_file(client, test_user, image_bytes())
@@ -325,3 +465,28 @@ class TestRateLimit:
             last = post_file(client, test_user, b"nie obraz")
         assert last.status_code == 429
         assert last.json()["code"] == "RATE_LIMITED"
+
+    @pytest.mark.asyncio
+    async def test_licznik_bez_ttl_dostaje_ttl(self, redis_client, test_user):
+        """
+        Regresja: gdy `expire` nie doszlo po pierwszym `incr` (zerwane polaczenie),
+        klucz zostawal bez wygasniecia i po 10 probach blokowal uzytkownika na stale.
+        """
+        key = f"ratelimit:avatar_upload:user:{test_user.id}"
+        await redis_client.set(key, 3)
+        assert await redis_client.ttl(key) == -1
+
+        await avatar_module.avatar_rate_limit(current_user=test_user)
+
+        assert await redis_client.get(key) == "4"
+        assert 0 < await redis_client.ttl(key) <= avatar_module.AVATAR_RATE_WINDOW_SECONDS
+
+    @pytest.mark.asyncio
+    async def test_kolejne_zadania_nie_przedluzaja_okna(self, redis_client, test_user):
+        key = f"ratelimit:avatar_upload:user:{test_user.id}"
+        await avatar_module.avatar_rate_limit(current_user=test_user)
+        await redis_client.expire(key, 100)
+
+        await avatar_module.avatar_rate_limit(current_user=test_user)
+
+        assert await redis_client.ttl(key) <= 100
