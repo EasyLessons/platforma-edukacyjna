@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { Youtube, Instagram, Facebook, Mail, Phone } from 'lucide-react';
-import { plusJakartaSans as jakartaSans } from '@new/shared/fonts';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 import NewsletterSection from './mega-menus/NewsletterSectionProps';
 
 const Footer = () => {

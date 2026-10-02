@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { plusJakartaSans as jakartaSans } from '@new/shared/fonts';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 import DemoCtaButton from '@/_new/features/demo/demo-cta-button';
 
 export default function HeroSection() {

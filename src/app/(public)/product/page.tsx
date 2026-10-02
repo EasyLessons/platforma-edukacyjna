@@ -1,5 +1,5 @@
 import { ProductHero, DashboardSection, TutoringBoardSection } from '@/_new/features/landing';
-import { plusJakartaSans as jakartaSans } from '@new/shared/fonts';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 
 export default function ProduktPage() {
   return (

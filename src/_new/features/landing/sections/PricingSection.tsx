@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { plusJakartaSans as jakartaSans } from '@new/shared/fonts';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 
 type Feature = {
   text: string;
