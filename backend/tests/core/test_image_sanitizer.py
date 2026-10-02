@@ -2,6 +2,7 @@
 Testy core/image_sanitizer.py - walidacja po tresci i przekodowanie obrazu (SEC-03).
 """
 import io
+import struct
 import subprocess
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ import pytest
 from PIL import Image
 
 from core.exceptions import AppException
-from core.image_sanitizer import DEFAULT_MAX_DECODE_BYTES, sanitize_image
+from core.image_sanitizer import DEFAULT_MAX_DECODE_BYTES, _jpeg_decodes_scaled, sanitize_image
 
 
 def make_image(fmt: str, size=(64, 48), mode="RGB", color=(200, 30, 30), **save_kwargs) -> bytes:
@@ -27,6 +28,39 @@ def make_png_with_text(size, megabytes: int, **image_kwargs) -> bytes:
     for i in range(megabytes):
         info.add_text(f"k{i}", "A" * (1024 * 1024 - 1), zip=True)
     return make_image("PNG", size=size, pnginfo=info, **image_kwargs)
+
+
+def jpeg_segment(marker: int, payload: bytes) -> bytes:
+    return bytes((0xFF, marker)) + struct.pack(">H", len(payload) + 2) + payload
+
+
+def make_crafted_jpeg(width: int, height: int, components: int, *, scans: str = "single", sof: int = 0xC0) -> bytes:
+    """
+    Poprawny JPEG zbudowany recznie (Pillow nie umie zapisac baseline w kilku skanach).
+    Tablice Huffmana maja po jednym, 1-bitowym kodzie (DC: roznica 0, AC: EOB), wiec dane
+    skanu to same zera: 2 bity na blok 8x8 - plik 25 Mpx wazy kilkaset KB.
+
+    scans="single" - jeden skan ze wszystkimi komponentami (jak zdjecie z telefonu),
+    scans="per-component" - kazdy komponent w osobnym SOS (plik wieloskanowy).
+    """
+    blocks = ((width + 7) // 8) * ((height + 7) // 8)
+    out = bytes((0xFF, 0xD8))
+    out += jpeg_segment(0xDB, bytes(1) + bytes([1]) * 64)
+    frame = struct.pack(">BHHB", 8, height, width, components)
+    out += jpeg_segment(sof, frame + b"".join(bytes((i + 1, 0x11, 0)) for i in range(components)))
+    one_code_table = bytes([1] + [0] * 15) + bytes(1)
+    out += jpeg_segment(0xC4, bytes([0x00]) + one_code_table)  # DC
+    out += jpeg_segment(0xC4, bytes([0x10]) + one_code_table)  # AC
+    spectral = bytes((0, 63, 0))
+    if scans == "single":
+        selectors = b"".join(bytes((i + 1, 0)) for i in range(components))
+        out += jpeg_segment(0xDA, bytes([components]) + selectors + spectral)
+        out += bytes((blocks * 2 * components + 7) // 8)
+    else:
+        for i in range(components):
+            out += jpeg_segment(0xDA, bytes((1, i + 1, 0)) + spectral)
+            out += bytes((blocks * 2 + 7) // 8)
+    return out + bytes((0xFF, 0xD9))
 
 
 def decode(data: bytes) -> Image.Image:
@@ -207,6 +241,28 @@ class TestRejected:
 
         assert exc.value.code == "IMAGE_TOO_LARGE"
 
+    @pytest.mark.parametrize("components", [3, 4], ids=["ycbcr", "cmyk"])
+    def test_odrzuca_duzy_jpeg_baseline_wieloskanowy(self, components):
+        """
+        Regresja: JPEG baseline (NIE progresywny) z kazdym komponentem w osobnym skanie
+        libjpeg dekoduje przez pelne bufory wspolczynnikow, `draft` nic tu nie daje -
+        5000x5000 CMYK (plik 391 KB) podnosil szczyt o ok. 207 MB przy budzecie 100 MB.
+        """
+        data = make_crafted_jpeg(5000, 5000, components, scans="per-component")
+        assert len(data) < 500_000
+        assert not Image.open(io.BytesIO(data)).info.get("progressive")  # flaga Pillow tego nie widzi
+
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data, max_side=512)
+
+        assert exc.value.status_code == 400
+        assert exc.value.code == "IMAGE_TOO_LARGE"
+
+    def test_maly_jpeg_wieloskanowy_przechodzi(self):
+        data = make_crafted_jpeg(800, 600, 3, scans="per-component")
+        result = sanitize_image(data, max_side=512)
+        assert (result.width, result.height) == (512, 384)
+
     def test_odrzuca_obraz_o_skrajnych_proporcjach(self):
         """1 x 9 000 000 px: malo pikseli, ale bufory filtra skalujacego szly w setki MB."""
         data = make_image("PNG", size=(1, 9_000_000), mode="L", color=0)
@@ -251,6 +307,139 @@ class TestRejected:
     def test_panoramiczny_jpeg_jest_zmniejszany(self):
         result = sanitize_image(make_image("JPEG", size=(10_000, 600)), max_side=512)
         assert (result.width, result.height) == (512, 31)
+
+
+class TestJpegScanParser:
+    """
+    `_jpeg_decodes_scaled`: True tylko dla SOF0/SOF1 z jednym skanem wszystkich
+    komponentow; kazda watpliwosc i kazdy uszkodzony plik = False (ostrzejszy limit).
+    """
+
+    @pytest.mark.parametrize(
+        "mode,save_kwargs",
+        [
+            ("RGB", {}),
+            ("RGB", {"optimize": True, "quality": 95, "subsampling": 0}),
+            ("L", {}),
+            ("CMYK", {}),
+            ("RGB", {"restart_marker_blocks": 4}),
+        ],
+        ids=["rgb", "rgb-optimize-444", "szary", "cmyk", "znaczniki-restartu"],
+    )
+    def test_jpeg_baseline_z_pillow_jest_skalowalny(self, mode, save_kwargs):
+        color = {"RGB": (200, 30, 30), "L": 99, "CMYK": (1, 2, 3, 4)}[mode]
+        data = make_image("JPEG", size=(320, 240), mode=mode, color=color, **save_kwargs)
+        assert _jpeg_decodes_scaled(data) is True
+
+    def test_jpeg_z_miniatura_w_app1_jest_skalowalny(self):
+        """Miniatura EXIF to zagniezdzony JPEG (wlasne SOI/SOS/EOI) - lezy w segmencie APP1."""
+        thumbnail = make_image("JPEG", size=(16, 16), progressive=True)
+        data = make_image("JPEG")
+        data = data[:2] + jpeg_segment(0xE1, b"Exif" + bytes(2) + thumbnail) + data[2:]
+
+        assert _jpeg_decodes_scaled(data) is True
+
+    def test_mpo_i_dane_za_eoi_nie_przeszkadzaja(self):
+        second = Image.new("RGB", (64, 48), (9, 9, 9))
+        mpo = make_image("MPO", save_all=True, append_images=[second])
+        assert _jpeg_decodes_scaled(mpo) is True
+        # Za EOI pierwszej klatki moze lezec cokolwiek, takze progresywny JPEG.
+        assert _jpeg_decodes_scaled(make_image("JPEG") + make_image("JPEG", progressive=True)) is True
+
+    def test_bajty_wypelnienia_przed_markerem_sa_dozwolone(self):
+        data = make_crafted_jpeg(64, 48, 3)
+        padded = data[:2] + bytes([0xFF]) * 5 + data[2:]
+        assert _jpeg_decodes_scaled(padded) is True
+
+    def test_jpeg_progresywny_nie_jest_skalowalny(self):
+        assert _jpeg_decodes_scaled(make_image("JPEG", progressive=True)) is False
+
+    @pytest.mark.parametrize("components", [2, 3, 4])
+    def test_jpeg_wieloskanowy_nie_jest_skalowalny(self, components):
+        assert _jpeg_decodes_scaled(make_crafted_jpeg(64, 48, components)) is True  # sanity generatora
+        assert _jpeg_decodes_scaled(make_crafted_jpeg(64, 48, components, scans="per-component")) is False
+
+    @pytest.mark.parametrize(
+        "sof",
+        [0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF],
+        ids=lambda sof: f"sof{sof - 0xC0}",
+    )
+    def test_inne_sof_niz_baseline_i_extended_nie_sa_skalowalne(self, sof):
+        """Progresywny, bezstratny, hierarchiczny i arytmetyczny (SOF9-SOF15)."""
+        assert _jpeg_decodes_scaled(make_crafted_jpeg(64, 48, 3, sof=sof)) is False
+
+    def test_sof1_extended_sequential_jest_skalowalny(self):
+        assert _jpeg_decodes_scaled(make_crafted_jpeg(64, 48, 3, sof=0xC1)) is True
+
+    def test_drugi_skan_po_pelnym_skanie_nie_jest_skalowalny(self):
+        data = make_crafted_jpeg(64, 48, 3)
+        extra_scan = jpeg_segment(0xDA, bytes((1, 1, 0, 0, 63, 0))) + bytes(12)
+        assert _jpeg_decodes_scaled(data[:-2] + extra_scan + data[-2:]) is False
+
+    def test_precyzja_12_bitow_i_podwojny_sof_nie_sa_skalowalne(self):
+        data = make_crafted_jpeg(64, 48, 3)
+        sof_at = data.index(bytes((0xFF, 0xC0)))
+        twelve_bit = data[: sof_at + 4] + bytes([12]) + data[sof_at + 5:]
+        assert _jpeg_decodes_scaled(twelve_bit) is False
+
+        sof = data[sof_at: sof_at + 2 + 8 + 9]
+        assert _jpeg_decodes_scaled(data[:sof_at] + sof + data[sof_at:]) is False
+
+    def test_zla_dlugosc_sof_wzgledem_liczby_komponentow(self):
+        data = bytearray(make_crafted_jpeg(64, 48, 3))
+        sof_at = data.index(bytes((0xFF, 0xC0)))
+        data[sof_at + 9] = 4  # Nf=4 przy dlugosci segmentu dla 3 komponentow
+        assert _jpeg_decodes_scaled(bytes(data)) is False
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            b"",
+            bytes([0xFF]),
+            bytes((0xFF, 0xD8)),
+            bytes((0xFF, 0xD8, 0xFF)),
+            bytes((0xFF, 0xD8, 0xFF, 0xD9)),  # EOI bez skanu
+            bytes((0xFF, 0xD8, 0xFF, 0xD8)),  # podwojny SOI
+            bytes((0xFF, 0xD8, 0xFF, 0xE0)),  # marker bez pola dlugosci
+            bytes((0xFF, 0xD8, 0xFF, 0xE0, 0x00)),  # pol pola dlugosci
+            bytes((0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x00)),  # dlugosc 0 (< 2) - bez zapetlenia
+            bytes((0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x01)),
+            bytes((0xFF, 0xD8, 0xFF, 0xE0, 0xFF, 0xFF, 1, 2, 3)),  # dlugosc poza plik
+            bytes((0xFF, 0xD8, 0xFF, 0xDA, 0x00, 0x02)),  # SOS przed SOF, bez Ns
+            bytes((0xFF, 0xD8, 0xFF, 0xC0, 0x00, 0x02)),  # SOF bez tresci
+            bytes((0xFF, 0xD8, 0x00, 0xFF, 0xC0)),  # smieci miedzy segmentami
+            bytes((0xFF, 0xD8)) + bytes([0xFF]) * 4096,  # same bajty wypelnienia
+            b"to nie jest jpeg",
+            make_image("PNG"),
+        ],
+        ids=[
+            "pusty", "jeden-bajt", "sam-soi", "soi-ff", "eoi-bez-skanu", "podwojny-soi", "brak-dlugosci",
+            "pol-dlugosci", "dlugosc-0", "dlugosc-1", "dlugosc-poza-plik", "sos-przed-sof", "sof-pusty",
+            "smieci", "samo-wypelnienie", "tekst", "png",
+        ],
+    )
+    def test_uszkodzone_dane_daja_false_bez_wyjatku(self, data):
+        assert _jpeg_decodes_scaled(data) is False
+
+    def test_kazdy_prefiks_pliku_jest_bezpieczny(self):
+        """Uciecie w dowolnym miejscu: zadnego wyjatku ani czytania poza bufor."""
+        data = make_crafted_jpeg(64, 48, 4)
+        scan_data_at = len(data) - 2 - (8 * 6 * 2 * 4 + 7) // 8
+
+        for cut in range(len(data) + 1):
+            # Do konca naglowka SOS zawsze False; uciete dane skanu zostawiamy dekoderowi.
+            assert _jpeg_decodes_scaled(data[:cut]) is (cut >= scan_data_at), cut
+
+    def test_tysiace_segmentow_nie_sa_przetwarzane_bez_konca(self):
+        data = make_crafted_jpeg(64, 48, 3)
+        comments = jpeg_segment(0xFE, b"x") * 5000
+        assert _jpeg_decodes_scaled(data[:2] + comments + data[2:]) is False
+
+    def test_uciety_jpeg_baseline_jest_odrzucany_jako_niepoprawny(self):
+        data = make_image("JPEG", size=(300, 300))
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data[: len(data) // 2], max_side=512)
+        assert exc.value.code == "INVALID_FILE_TYPE"
 
 
 # Skrypt uruchamiany w OSOBNYM procesie: szczyt RSS da sie wiarygodnie zmierzyc tylko
@@ -328,6 +517,24 @@ class TestMemoryBudget:
         self.assert_peak_within_budget(
             tmp_path, make_image("MPO", size=(5000, 5000), save_all=True, append_images=[second])
         )
+
+    @pytest.mark.parametrize(
+        "size,components,scans",
+        [
+            ((2840, 2840), 4, "per-component"),
+            ((2840, 2840), 3, "per-component"),
+            ((10_000, 806), 4, "per-component"),
+            ((5000, 5000), 4, "single"),
+        ],
+        ids=["wieloskanowy-cmyk", "wieloskanowy-ycbcr", "wieloskanowy-cmyk-panorama", "jednoskanowy-cmyk-25mpx"],
+    )
+    def test_recznie_zbudowany_jpeg_miesci_sie_w_budzecie(self, tmp_path, size, components, scans):
+        """
+        JPEG baseline wieloskanowy na granicy limitu pelnego dekodowania (ok. 8 Mpx) oraz
+        jednoskanowy CMYK 25 Mpx (sciezka `draft`). Wiekszy wieloskanowy jest odrzucany -
+        TestRejected.test_odrzuca_duzy_jpeg_baseline_wieloskanowy.
+        """
+        self.assert_peak_within_budget(tmp_path, make_crafted_jpeg(*size, components, scans=scans))
 
     def test_tekst_png_w_limicie_miesci_sie_w_budzecie(self, tmp_path):
         """Najwiekszy PNG + maksymalna dozwolona ilosc tekstu (7 z 8 MB) nadal w budzecie."""
