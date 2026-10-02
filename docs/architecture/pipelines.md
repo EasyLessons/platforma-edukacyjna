@@ -124,25 +124,79 @@ Dwie ścieżki: **Daily** (decyzja 02.10.2026, docelowa — backend opisany w 5a
 
 ### 5a. Rozmowa przez Daily — backend
 
+Wymaganie twarde (Patryk, 02.10.2026): **żadnych rachunków — nikt nie może przepalić darmowej puli Daily** (10 000 minut uczestnika / mies., potem płatne bez twardego limitu po stronie Daily). Kod: `backend/api/v1/whiteboard/` — `call.py` (przepływ, pokój, token), `call_guard.py` (limity lokalne w Redis), `call_usage.py` (zużycie z Daily, endpoint admina), `daily_client.py` (transport HTTP).
+
 ```
 Przeglądarka → POST /api/v1/whiteboard/{board_id}/call (JWT usera, bez body)
-  → rate limit per użytkownik (30/min, po autoryzacji, fail-open przy awarii Redis)
-  → WhiteboardService.create_call: członkostwo w workspace tablicy (każda rola, także viewer); brak = 404, zero wywołań Daily
-  → backend/api/v1/whiteboard/call.py (klucz DAILY_API_KEY tylko tutaj; pusty = 503 VOICE_NOT_CONFIGURED, zero wywołań HTTP):
-      1. POST api.daily.co/v1/rooms/<prefix>-board-<id>  {properties:{exp}}      — przesunięcie wygasania pokoju
-         brak pokoju (404 albo 400 "not found") → sprzątanie wygasłych pokoi innych tablic z naszym prefiksem
-           (GET /rooms, a przed każdym DELETE ponowny GET /rooms/<nazwa> — kasujemy tylko, gdy pokój NADAL jest wygasły)
-         → POST /rooms {name, privacy:"private", properties:{exp, eject_at_room_exp, start_video_off, ...}}
-         → 400 przy tworzeniu (wyścig dwóch osób) → GET /rooms/<nazwa>
-         → pokój istnieje, ale wygasł i nie dał się odświeżyć → DELETE własnego pokoju + ponowne POST /rooms (raz)
-      2. POST /meeting-tokens {properties:{room_name, user_name, user_id, exp, is_owner, start_video_off, eject_at_token_exp:false}}
-  → 200 { room_url, token, expires_at }   (Cache-Control: no-store)
+  1. JWT + zweryfikowany e-mail (get_current_user; niezweryfikowany = 403)
+  2. członkostwo w workspace tablicy (zapytania SQL w threadpoolu, sesja oddana do puli) — brak = 404, zero wywołań Daily
+  3. CALL_ENABLED=false → 503 VOICE_DISABLED;  pusty DAILY_API_KEY → 503 VOICE_NOT_CONFIGURED   (zero wywołań HTTP)
+  4. rate limit w Redis: 10/min na użytkownika, 30/h na IP → 429 RATE_LIMITED;  awaria Redis → 503 VOICE_GUARD_UNAVAILABLE
+  5. zużycie miesiąca: GET api.daily.co/v1/meetings (cache 5 min) + rezerwacje trwających pokoi
+       ≥ DAILY_MONTHLY_MINUTES_CAP → 429 VOICE_MONTHLY_LIMIT;  nie da się ustalić → 503 VOICE_USAGE_UNAVAILABLE
+  6. GET /rooms/<prefix>-board-<id>
+       dołączający (editor/viewer, właściciel spoza CALL_ALLOWED_USER_IDS): pokój aktywny i zgodny z wymogami
+         → token;  inaczej 409 VOICE_CALL_NOT_STARTED (403 VOICE_CREATE_NOT_ALLOWED dla właściciela spoza listy) — zero zapisów w Daily
+       tworzący (twórca workspace'u z rolą owner): brak pokoju / wygasa / niezgodny → budżet dzienny (429 VOICE_USER_LIMIT)
+         → próg miesięczny z nowym pokojem → sprzątanie wygasłych pokoi → POST /rooms;  pokój kończy się za < 15 min → przedłużenie
+  7. POST /meeting-tokens → 200 { room_url, token, expires_at }   (Cache-Control: no-store)
+
+GET /api/v1/whiteboard/call/usage — tylko id z CALL_ADMIN_USER_IDS (domyślnie nikt, 403): stan, zużycie, próg, liczba pokoi.
 ```
 
-- **Pokój**: prywatny (wejście tylko z tokenem, bez knockingu), nazwa deterministyczna `<DAILY_ROOM_PREFIX>-board-<id>`, wygasa `DAILY_ROOM_TTL_MINUTES` (domyślnie 180) po OSTATNIM wywołaniu endpointu i wtedy rozłącza uczestników (`eject_at_room_exp`) — bezpiecznik kosztów i limitu pokoi konta (50), wymaganie twarde zlecenia 02.10. Skutek: rozmowa, w której przez 3 h nikt nie dołączył ponownie, zostaje zakończona; niepotwierdzone, czy przesunięcie `exp` dociera do osób już będących w rozmowie (jeśli nie — każdy jest rozłączany najpóźniej 3 h po własnym wejściu i musi kliknąć „Rozmowa” ponownie). Adres pokoju bierzemy z odpowiedzi Daily, ale tylko w postaci `https://<subdomena>.daily.co/<nazwa pokoju>` (inny host, port, userinfo albo ścieżka = 502); pokój, który nie jest prywatny, nie dostaje tokenu (502).
-- **Token**: zawsze z `room_name` (token bez niego otwiera każdy pokój domeny), `user_name` = nazwa z EasyLesson (bez znaków sterujących/niewidocznych, do 64 znaków), `user_id`, `is_owner` tylko dla roli `owner`, ważny 1 h. `exp` tokenu ogranicza tylko moment wejścia — trwającej rozmowy nie przerywa (`eject_at_token_exp: false`). Domyślnie samo audio (`start_video_off: true`).
-- **Błędy** (format `ApiResponse`, `code`): `VOICE_NOT_CONFIGURED` 503, `VOICE_PROVIDER_ERROR` 502 (błąd sieci, 5xx, 401/403 = zły klucz, nieoczekiwane 4xx, 429 po jednym ponowieniu), `VOICE_PROVIDER_TIMEOUT` 504 (timeout 8 s na wywołanie), `RATE_LIMITED` 429, `NOT_FOUND` 404. Treść błędu Daily zostaje w logu serwera (przycięta, bez klucza); klucz i token nigdy nie trafiają do logów ani odpowiedzi błędu.
-- **Jeszcze nie ma**: licznika minut w miesiącu z limitem `DAILY_MONTHLY_MINUTES_CAP` (zlecenie 02.10) — osobny PR.
+**Model zagrożeń i co na niego odpowiada**
+
+| Zagrożenie | Zabezpieczenia |
+| --- | --- |
+| (a) ktoś zakłada konta / przejmuje konto i odpala rozmowy | pokój tworzy tylko twórca workspace'u ze zweryfikowanym e-mailem, opcjonalnie tylko id z `CALL_ALLOWED_USER_IDS`; dzienny budżet tworzącego `CALL_USER_DAILY_MINUTES_CAP` (jeden aktywny pokój na tworzącego, rezerwacja PRZED wywołaniem Daily); próg miesięczny; rate limit; `CALL_ENABLED=false` wyłącza wszystko natychmiast |
+| (b) ktoś wielokrotnie używa / rozdaje tokeny | token ważny 5 min i tylko na wejście, przypięty do jednego pokoju (`room_name`), pokój prywatny z `max_participants` (domyślnie 4) — rozdany token nie wpuści więcej osób naraz niż limit pokoju; `eject_after_elapsed` kończy pobyt najpóźniej z `exp` pokoju |
+| (c) zapomniane lub celowo wiszące pokoje | `exp` ≤ 3 h (sufit w kodzie) + `eject_at_room_exp`; dołączający nie przesuwa `exp`; przedłużenie tylko przez tworzącego i tylko z budżetu; wygasłe pokoje kasowane przy tworzeniu nowego; trwające pokoje liczone do progu miesięcznego w najgorszym przypadku (pełny pokój do `exp`) |
+| (d) wyciek `DAILY_API_KEY` | **omija backend — żaden z powyższych bezpieczników wtedy nie działa.** Klucz jest tylko w env backendu, nie trafia do odpowiedzi ani logów (test przeszukuje wszystkie odpowiedzi i logi). Jedyna obrona po wycieku: rotacja klucza (niżej) i ustawienia konta Daily |
+
+**Punkty zlecenia 1–10**
+
+1. **Kto zaczyna**: zalogowany, zweryfikowany e-mail, członek tablicy. Tworzy tylko właściciel przestrzeni (`Workspace.created_by` + rola `owner`). `CALL_ALLOWED_USER_IDS` (id po przecinku): niepusta = tworzą tylko wymienieni; wartość nie do sparsowania = nikt (fail closed, log ERROR, start backendu bez zmian). Pozostali tylko dołączają do istniejącego, niewygasłego pokoju.
+2. **Wyłącznik**: `CALL_ENABLED` (domyślnie `true`; wartość nierozpoznana = wyłączone).
+3. **Próg miesięczny z prawdziwego zużycia**: `GET /meetings` z `timeframe_start` = początek miesiąca (UTC), wszystkie strony (`starting_after`), suma `participants[].duration` (każdy uczestnik zaokrąglony w górę do minuty). Do tego szacunek trwających rozmów: nasze pokoje z rejestru w Redis × `max_participants` × czas do `exp`, a trwające spotkania w pokojach spoza rejestru × szczyt uczestników × 3 h. Cache 5 min w Redis (gdy Redis nie działa — w pamięci procesu). Próg `DAILY_MONTHLY_MINUTES_CAP` (domyślnie 8000, sufit w kodzie 9500). Brak odpowiedzi, błąd HTTP, nieoczekiwany kształt, niepełna albo stojąca paginacja = brak tokenu; nieudane pobranie pamiętane 30 s.
+4. **Budżet dzienny tworzącego**: `CALL_USER_DAILY_MINUTES_CAP` (domyślnie 240 min czasu pokoju na dobę UTC, sufit 1440). Licznik w Redis na użytkownika, nie na tablicę: nowy pokój na innej tablicy kasuje poprzedni; niewykorzystany czas wraca do budżetu tylko, gdy Daily potwierdzi (`GET /rooms/<nazwa>/presence`), że skasowany pokój był pusty. Skasowanie pokoju poza nami i przedłużanie nie zerują licznika. Awaria Redis albo uszkodzony licznik = odmowa.
+5. **Pokój**: `privacy: private`, `max_participants` z `CALL_MAX_PARTICIPANTS` (domyślnie 4, sufit 20), `exp` = teraz + `DAILY_ROOM_TTL_MINUTES` (sufit 3 h), `eject_at_room_exp: true`, `enable_knocking: false`, `enable_dialout: false`, `enable_transcription_storage: false`, `permissions.canAdmin: false`. Nagrywanie, live streaming i SIP/dial-in nie mają w API wartości „off” — są wyłączone, dopóki nie ustawi się `enable_recording` / `streaming_endpoints` / `sip`, a pokój z którąkolwiek z tych właściwości (także `auto_transcription_settings`, `auto_start_transcription`, `dialin`) nie dostaje tokenu. Gdy Daily odrzuci właściwość albo utworzy pokój bez wymaganych ustawień — pokój jest kasowany, 502, żadnej próby z uboższym zestawem. Istniejący pokój niespełniający wymogów: tworzący zastępuje go nowym, dołączający dostaje odmowę. Limit 50 pokoi konta: pokoje na żądanie, przy tworzeniu kasowane do 5 wygasłych (liczone próby; przed `DELETE` ponowny `GET`, odświeżony pokój zostaje); limit pokoi / 402 = 503 `VOICE_PROVIDER_LIMIT` + log ERROR.
+6. **Token**: `room_name` zawsze, `user_id` / `user_name` z konta, `exp` = 5 min (nie później niż `exp` pokoju), `eject_after_elapsed` = czas do `exp` pokoju minus 5 min (≤ 3 h) — nikt nie zostaje po `exp` pokoju. **`is_owner: false` dla wszystkich** (decyzja ostrzejsza niż zlecenie: właściciel spotkania może uruchomić płatny streaming i transkrypcję); tworzący dostaje tylko `permissions.canAdmin: ["participants"]` (wyciszanie, wypraszanie). `enable_recording` nieustawione, `enable_recording_ui: false`. Token i klucz nigdy w logach.
+7. **Rate limit**: `core/rate_limit.enforce_rate_limit`, 10/min na użytkownika i 30/h na IP, liczony po sprawdzeniu członkostwa. **Awaria Redis = odmowa (503)** — inaczej niż w reszcie aplikacji (fail-open): bez Redis nie działają też budżet dzienny i rejestr pokoi, więc nie umiemy ograniczyć kosztów; brak rozmowy jest tańszy niż rachunek, a tablica działa dalej. Ryzyko: klasa za jednym NAT-em (szkoła, akademik) dzieli limit 30 wywołań/h na IP — każde kliknięcie „Rozmowa” i każde ponowne dołączenie to jedno wywołanie; przy ~4 osobach wystarcza z zapasem, przy problemach z łączem i wielu ponownych wejściach limit może się skończyć (429, znika po godzinie).
+8. **Tylko audio domyślnie**: `start_video_off: true` w pokoju i tokenie; kamera na życzenie, liczy się do tych samych minut.
+9. **Klucz**: test `TestKeyNeverLeaks` szuka klucza w odpowiedziach obu endpointów (sukces, każdy błąd, admin) i w logach; fragmenty odpowiedzi Daily trafiają do logu przycięte, bez klucza i bez długich ciągów bez spacji. Adres pokoju z odpowiedzi Daily przechodzi tylko jako dokładnie `https://<subdomena>.daily.co/<nazwa pokoju>` (allowlista znaków, bez parsera URL).
+10. **Widoczność**: `GET /api/v1/whiteboard/call/usage` dla id z `CALL_ADMIN_USER_IDS` (projekt nie ma roli admina; pusta = nikt): `state` (`enabled` / `disabled` / `not_configured` / `limit` / `unknown`), `used_minutes`, `reserved_minutes`, `planned_minutes`, `cap_minutes`, `rooms_count`, `active_rooms`. Każde wydanie tokenu zostawia log INFO z aktualnym zużyciem (bez tokenu).
+
+**Kody błędów `POST /{id}/call`** (format `ApiResponse`, pole `code`)
+
+| HTTP | `code` | Kiedy | Ponowić? |
+| --- | --- | --- | --- |
+| 401 | `AUTH_ERROR` | brak / zły JWT | po zalogowaniu |
+| 403 | `AUTH_ERROR` | konto bez zweryfikowanego e-maila (`VOICE_EMAIL_NOT_VERIFIED` z samego serwisu) | nie |
+| 404 | `NOT_FOUND` | brak tablicy albo brak członkostwa | nie |
+| 403 | `VOICE_CREATE_NOT_ALLOWED` | właściciel spoza `CALL_ALLOWED_USER_IDS`, a rozmowa nie trwa | nie |
+| 409 | `VOICE_CALL_NOT_STARTED` | dołączający, a nauczyciel nie zaczął rozmowy (albo pokój wygasa / nie spełnia wymogów) | tak, gdy nauczyciel zacznie |
+| 429 | `RATE_LIMITED` | 10/min na użytkownika albo 30/h na IP | tak, po chwili |
+| 429 | `VOICE_USER_LIMIT` | dzienny budżet tworzącego wyczerpany | jutro (UTC) |
+| 429 | `VOICE_MONTHLY_LIMIT` | „Limit rozmów w tym miesiącu wyczerpany” | w następnym miesiącu |
+| 502 | `VOICE_PROVIDER_ERROR` | Daily: sieć, 5xx, 401/403 (zły klucz), odrzucona właściwość, 429 po jednym ponowieniu | tak |
+| 503 | `VOICE_DISABLED` | `CALL_ENABLED=false` | nie |
+| 503 | `VOICE_NOT_CONFIGURED` | pusty `DAILY_API_KEY` | nie |
+| 503 | `VOICE_GUARD_UNAVAILABLE` | Redis niedostępny albo uszkodzony licznik | tak, po chwili |
+| 503 | `VOICE_USAGE_UNAVAILABLE` | nie udało się wiarygodnie odczytać zużycia z Daily | tak, po ~30 s |
+| 503 | `VOICE_PROVIDER_LIMIT` | limit pokoi konta Daily albo 402 (płatność) | nie — sprawdzić panel Daily |
+| 504 | `VOICE_PROVIDER_TIMEOUT` | timeout 8 s na wywołanie Daily | tak |
+
+`GET /call/usage`: 401, 403 `FORBIDDEN`, 429 `RATE_LIMITED`, 503 `VOICE_GUARD_UNAVAILABLE`; niedostępne Daily nie jest błędem — `state: "unknown"`.
+
+**Rotacja `DAILY_API_KEY`** (po każdym podejrzeniu wycieku): panel Daily → Developers → wygeneruj nowy klucz (potrafi to tylko właściciel domeny) → wklej w Render jako `DAILY_API_KEY` → redeploy backendu → kliknij „Rozmowa” na tablicy i sprawdź `GET /call/usage`. W razie wątpliwości najpierw `CALL_ENABLED=false`. Dokumentacja Daily nie mówi, co dzieje się ze starym kluczem po wygenerowaniu nowego — po rotacji sprawdź, że stary nie działa. Po wycieku przejrzyj też listę pokoi i nagrań w panelu (pokoje założone cudzym kluczem nie mają naszego prefiksu).
+
+**Panel Daily — co ustawić** (stan dokumentacji i cennika z 02.10.2026)
+
+- Potwierdzone: 10 000 darmowych minut / mies., konto zakłada się bez karty; po przekroczeniu puli rozliczenie pay-as-you-go ($0,004 / min wideo, $0,00099 / min audio); **Daily Video nie ma twardego limitu wydatków** (limit wydatków istnieje tylko dla Pipecat Cloud).
+- Niepotwierdzone: czy konto bez podpiętej karty po wyczerpaniu puli blokuje rozmowy, czy nalicza dług; czy panel ma alert billingowy. **Zalecenie: nie podpinać karty do konta Daily** i sprawdzić w panelu (Billing), czy jest alert / limit — jeśli jest, ustawić alert na $1.
+- Jedyną twardą granicą kosztów po naszej stronie jest próg z pkt 3; przy wycieku klucza (d) nie działa.
+
+**Znane ograniczenia**: (1) kody i kształty odpowiedzi Daily, których dokumentacja nie potwierdza (brak pokoju 404 / 400, duplikat nazwy, limit pokoi, maksymalny `limit` w `/meetings`, czy `DELETE` pokoju rozłącza trwającą rozmowę, czy przesunięcie `exp` dociera do osób w rozmowie), obsługujemy w obu wariantach albo fail closed. (2) Uczestnik jest rozłączany najpóźniej z `exp` pokoju z chwili swojego wejścia — po przedłużeniu pokoju klika „Rozmowa” ponownie. (3) Utrata danych Redis zeruje budżety dzienne i rejestr pokoi; próg miesięczny dalej liczy się z Daily. (4) Budżet dzienny liczy czas pokoju, nie minuty uczestników (240 min pokoju × 4 osoby = do 960 minut uczestnika). (5) Zużycie z Daily może być opóźnione do 5 min (cache) — stąd rezerwacje i zapas 2000 minut do darmowej puli.
 
 ### 5b. Własny WebRTC + Xirsys (legacy)
 
