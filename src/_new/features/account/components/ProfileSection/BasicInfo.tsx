@@ -4,17 +4,33 @@ import { useState, useRef } from 'react';
 import { Edit2, User, Mail, Upload, Calendar } from 'lucide-react';
 import type { User as UserType } from '@/_new/shared/types/user';
 import { useAuth } from '@/_new/lib/auth';
-import { supabase } from '@/_new/lib/supabase/client';
-import { apiClient } from '@/_new/lib/api';
+import { AppError } from '@/_new/lib/errors';
+import { createLogger } from '@/_new/lib/logger';
+import { AVATAR_ACCEPTED_TYPES, uploadAvatar, validateAvatarFile } from '../../api/avatarApi';
+
+const log = createLogger('account/BasicInfo');
 
 interface BasicInfoProps {
   user: UserType | null;
+}
+
+/** Komunikat dla użytkownika na podstawie błędu z backendu. */
+function avatarErrorMessage(error: unknown): string {
+  if (error instanceof AppError) {
+    if (error.status === 413) return 'Zdjęcie jest za duże (maksymalnie 5 MB).';
+    if (error.status === 429) return 'Zbyt wiele prób. Spróbuj ponownie za kilka minut.';
+    if (error.isNetworkError()) return 'Brak połączenia z serwerem. Spróbuj ponownie.';
+    // 400 z backendu niesie gotowy komunikat po polsku (zły format, za duże wymiary).
+    if (error.status === 400 && error.message) return error.message;
+  }
+  return 'Nie udało się zapisać awatara. Spróbuj ponownie.';
 }
 
 export default function BasicInfo({ user }: BasicInfoProps) {
   const { updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -39,43 +55,37 @@ export default function BasicInfo({ user }: BasicInfoProps) {
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    const resetInput = () => {
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    };
+    if (!file || !user || uploading) return;
+
+    const validationError = validateAvatarFile(file);
+    if (validationError) {
+      setAvatarError(validationError);
+      resetInput();
+      return;
+    }
 
     try {
       setUploading(true);
+      setAvatarError(null);
 
-      // Usunięto podwójne /avatars/, ładujemy bezpośrednio do bucketu "avatars"
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      // Pobieranie publicznego URLa
-      const { data: publicUrlData } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(uploadData.path);
-
-      const avatarUrl = publicUrlData.publicUrl;
-
-      // Aktualizacja na backendzie FastAPI
-      await apiClient.put('/api/v1/auth/users/me', {
-        avatar_url: avatarUrl,
-      });
+      // Plik idzie do backendu (walidacja + przekodowanie + zapis w Storage);
+      // backend sam ustawia avatar_url i zwraca zaktualizowanego użytkownika.
+      const updated = await uploadAvatar(file);
 
       // Błyskawiczna zmiana w aplikacji (bez przeładowania)
-      updateUser({ avatar_url: avatarUrl });
+      updateUser({ avatar_url: updated.avatar_url });
     } catch (error) {
-      console.error('Błąd podczas zapisywania awatara:', error);
-      alert('Nie udało się zapisać awatara');
+      log.error(
+        'Zapis awatara nieudany',
+        error instanceof AppError ? { code: error.code, status: error.status } : 'nieznany błąd'
+      );
+      setAvatarError(avatarErrorMessage(error));
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+      resetInput();
     }
   };
 
@@ -110,20 +120,31 @@ export default function BasicInfo({ user }: BasicInfoProps) {
         <div>
           <input
             type="file"
-            accept="image/*"
+            accept={AVATAR_ACCEPTED_TYPES.join(',')}
             ref={fileInputRef}
             onChange={handleAvatarUpload}
+            disabled={uploading}
             className="hidden"
             id="avatar-upload"
           />
           <label
             htmlFor="avatar-upload"
-            className="cursor-pointer px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+            aria-busy={uploading}
+            className={`px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 flex items-center justify-center gap-2 transition-colors ${
+              uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'
+            }`}
           >
             <Upload size={16} />
             {uploading ? 'Wgrywam...' : 'Zmień zdjęcie'}
           </label>
-          <p className="text-xs text-gray-500 mt-2">Zalecane wymiary: 1:1, max. 2MB</p>
+          <p className="text-xs text-gray-500 mt-2">
+            JPG, PNG lub WEBP, zalecane proporcje 1:1, max. 5 MB
+          </p>
+          {avatarError && (
+            <p role="alert" className="text-xs text-red-600 mt-1">
+              {avatarError}
+            </p>
+          )}
         </div>
       </div>
 
