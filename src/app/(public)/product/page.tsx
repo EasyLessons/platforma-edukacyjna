@@ -1,11 +1,5 @@
 import { ProductHero, DashboardSection, TutoringBoardSection } from '@/_new/features/landing';
-import { Plus_Jakarta_Sans } from 'next/font/google';
-
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '600', '700', '800'],
-  display: 'swap',
-});
+import { plusJakartaSans as jakartaSans } from '@new/shared/fonts';
 
 export default function ProduktPage() {
   return (
