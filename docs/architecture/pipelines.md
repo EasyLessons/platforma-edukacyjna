@@ -120,6 +120,30 @@ UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Author
 
 ## 5. Voice chat (WebRTC)
 
+Dwie ścieżki: **Daily** (decyzja 02.10.2026, docelowa — backend opisany w 5a; frontend w osobnym PR) i dotychczasowy własny WebRTC + Xirsys (opis niżej, zostaje do czasu usunięcia).
+
+### 5a. Rozmowa przez Daily — backend
+
+```
+Przeglądarka → POST /api/v1/whiteboard/{board_id}/call (JWT usera, bez body)
+  → rate limit per użytkownik (30/min, po autoryzacji, fail-open przy awarii Redis)
+  → WhiteboardService.create_call: członkostwo w workspace tablicy (każda rola, także viewer); brak = 404, zero wywołań Daily
+  → backend/api/v1/whiteboard/call.py (klucz DAILY_API_KEY tylko tutaj; pusty = 503 VOICE_NOT_CONFIGURED, zero wywołań HTTP):
+      1. POST api.daily.co/v1/rooms/<prefix>-board-<id>  {properties:{exp}}      — przesunięcie wygasania pokoju
+         brak pokoju (404 albo 400 "not found") → sprzątanie wygasłych pokoi z naszym prefiksem (GET /rooms + DELETE)
+         → POST /rooms {name, privacy:"private", properties:{exp, eject_at_room_exp, start_video_off, ...}}
+         → 400 przy tworzeniu (wyścig dwóch osób) → GET /rooms/<nazwa>
+      2. POST /meeting-tokens {properties:{room_name, user_name, user_id, exp, is_owner, start_video_off, eject_at_token_exp:false}}
+  → 200 { room_url, token, expires_at }   (Cache-Control: no-store)
+```
+
+- **Pokój**: prywatny (wejście tylko z tokenem, bez knockingu), nazwa deterministyczna `<DAILY_ROOM_PREFIX>-board-<id>`, wygasa `DAILY_ROOM_TTL_MINUTES` (domyślnie 180) po OSTATNIM wywołaniu endpointu i wtedy rozłącza uczestników (`eject_at_room_exp`) — bezpiecznik kosztów i limitu pokoi konta (50). Adres pokoju bierzemy z odpowiedzi Daily; pokój, który nie jest prywatny, nie dostaje tokenu (502).
+- **Token**: zawsze z `room_name` (token bez niego otwiera każdy pokój domeny), `user_name` = nazwa z EasyLesson (bez znaków sterujących/niewidocznych, do 64 znaków), `user_id`, `is_owner` tylko dla roli `owner`, ważny 1 h. `exp` tokenu ogranicza tylko moment wejścia — trwającej rozmowy nie przerywa (`eject_at_token_exp: false`). Domyślnie samo audio (`start_video_off: true`).
+- **Błędy** (format `ApiResponse`, `code`): `VOICE_NOT_CONFIGURED` 503, `VOICE_PROVIDER_ERROR` 502 (błąd sieci, 5xx, 401/403 = zły klucz, nieoczekiwane 4xx, 429 po jednym ponowieniu), `VOICE_PROVIDER_TIMEOUT` 504 (timeout 8 s na wywołanie), `RATE_LIMITED` 429, `NOT_FOUND` 404. Treść błędu Daily zostaje w logu serwera (przycięta, bez klucza); klucz i token nigdy nie trafiają do logów ani odpowiedzi błędu.
+- **Jeszcze nie ma**: licznika minut w miesiącu z limitem `DAILY_MONTHLY_MINUTES_CAP` (zlecenie 02.10) — osobny PR.
+
+### 5b. Własny WebRTC + Xirsys (legacy)
+
 ```
 User dołącza do tablicy → VoiceChatProvider (src/_new/features/voice-chat/VoiceChatContext.tsx + hooki obok:
   useVoiceSignaling — kanał i zdarzenia voice-*, useWebRTCConnections — RTCPeerConnection per user,
