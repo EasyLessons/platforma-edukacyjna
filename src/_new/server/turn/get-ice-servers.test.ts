@@ -19,6 +19,7 @@ const XIRSYS_ENV_NAMES = [
   'NEXT_PUBLIC_XIRSYS_IDENT',
   'NEXT_PUBLIC_XIRSYS_SECRET',
   'NEXT_PUBLIC_XIRSYS_CHANNEL',
+  'XIRSYS_API_HOST',
 ];
 
 function stubXirsysEnv() {
@@ -198,6 +199,39 @@ describe('parseXirsysResponse', () => {
     'smieci -> pusta lista (%o)',
     (body) => {
       expect(parseXirsysResponse(body)).toEqual([]);
+    }
+  );
+});
+
+describe('getIceServers - XIRSYS_API_HOST (region TURN)', () => {
+  it('regionalny host Xirsys z env zastepuje globalny', async () => {
+    stubXirsysEnv();
+    vi.stubEnv('XIRSYS_API_HOST', ' FR.xirsys.com ');
+    const fetchImpl = vi.fn().mockResolvedValue(xirsysOk());
+
+    const result = await getIceServers(fetchImpl);
+
+    expect(fetchImpl.mock.calls[0][0]).toBe('https://fr.xirsys.com/_turn/easylesson');
+    expect(result.source).toBe('xirsys');
+  });
+
+  it.each([
+    'evil.example.com',
+    'xirsys.net.evil.example',
+    'https://fr.xirsys.com',
+    'fr.xirsys.com/x',
+    'a.b@fr.xirsys.com',
+  ])(
+    'host spoza Xirsys (%s) jest ignorowany - sekret idzie tylko na host globalny',
+    async (host) => {
+      stubXirsysEnv();
+      vi.stubEnv('XIRSYS_API_HOST', host);
+      const fetchImpl = vi.fn().mockResolvedValue(xirsysOk());
+
+      await getIceServers(fetchImpl);
+
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(fetchImpl.mock.calls[0][0]).toBe('https://global.xirsys.net/_turn/easylesson');
     }
   );
 });

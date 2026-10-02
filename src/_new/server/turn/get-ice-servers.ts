@@ -24,7 +24,23 @@ export const STUN_FALLBACK_SERVERS: readonly RTCIceServer[] = [
 ];
 
 const XIRSYS_TIMEOUT_MS = 5_000;
-const XIRSYS_API_BASE = 'https://global.xirsys.net/_turn';
+const XIRSYS_DEFAULT_HOST = 'global.xirsys.net';
+// Tylko hosty Xirsys - literowka w env nie moze wyslac sekretu (Basic auth) gdzie indziej.
+const XIRSYS_HOST_PATTERN = /^[a-z0-9-]+\.xirsys\.(net|com)$/;
+
+/**
+ * Host API Xirsys. `global.xirsys.net` dobiera region TURN wg polozenia WOLAJACEGO -
+ * a wolajacym jest teraz funkcja serwerowa, nie przegladarka ucznia. Jesli funkcje
+ * Vercel dzialaja poza Europa, TURN moze byc przydzielany daleko od uczniow; wtedy
+ * ustaw `XIRSYS_API_HOST` na regionalny host z panelu Xirsys (albo przenies region
+ * funkcji). Niepoprawna wartosc jest ignorowana - zostaje host globalny.
+ */
+function getXirsysApiBase(): string {
+  const host = process.env.XIRSYS_API_HOST?.trim().toLowerCase();
+  if (host && XIRSYS_HOST_PATTERN.test(host)) return `https://${host}/_turn`;
+  if (host) console.warn('[turn] XIRSYS_API_HOST nie jest hostem Xirsys - uzywam globalnego');
+  return `https://${XIRSYS_DEFAULT_HOST}/_turn`;
+}
 
 export interface IceServersResult {
   iceServers: RTCIceServer[];
@@ -110,7 +126,7 @@ async function fetchXirsysIceServers(
   fetchImpl: typeof fetch
 ): Promise<RTCIceServer[]> {
   const auth = Buffer.from(`${config.ident}:${config.secret}`).toString('base64');
-  const response = await fetchImpl(`${XIRSYS_API_BASE}/${encodeURIComponent(config.channel)}`, {
+  const response = await fetchImpl(`${getXirsysApiBase()}/${encodeURIComponent(config.channel)}`, {
     method: 'PUT',
     headers: {
       Authorization: `Basic ${auth}`,
