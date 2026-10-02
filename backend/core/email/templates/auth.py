@@ -1,5 +1,5 @@
 """Szablony maili modułu auth."""
-from .base import _base_email_html
+from .base import _base_email_html, _text
 
 def _code_box_html(code: str) -> str:
     """Wspólny szkielet HTML dla maili z kodem."""
@@ -7,7 +7,7 @@ def _code_box_html(code: str) -> str:
     <div style="background: white; border: 2px dashed #10b981;
                 padding: 20px; text-align: center; font-size: 32px;
                 font-weight: bold; color: #10b981;">
-        {code}
+        {_text(code)}
     </div>
     <p><strong>Kod ważny przez 15 minut.</strong></p>
     """
