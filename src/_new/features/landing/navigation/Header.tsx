@@ -5,7 +5,7 @@ import { Menu, X, ChevronDown, ChevronRight, Globe } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { plusJakartaSans as plusJakarta } from '@new/shared/fonts';
 import { useAuth } from '@/_new/lib/auth';
 
 import ProductMegaMenu from './mega-menus/ProductMegaMenu';
@@ -15,8 +15,6 @@ import NewsMegaMenu from './mega-menus/NewsMegaMenu';
 
 import { Button } from '@/_new/shared/ui/button';
 import { LanguageSwitcher } from '@/_new/shared/ui/language-switcher';
-
-const plusJakarta = Plus_Jakarta_Sans({ subsets: ['latin'] });
 
 export default function Header() {
   const router = useRouter();
