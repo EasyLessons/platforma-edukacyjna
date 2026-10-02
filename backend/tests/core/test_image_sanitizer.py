@@ -2,12 +2,15 @@
 Testy core/image_sanitizer.py - walidacja po tresci i przekodowanie obrazu (SEC-03).
 """
 import io
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from PIL import Image
 
 from core.exceptions import AppException
-from core.image_sanitizer import sanitize_image
+from core.image_sanitizer import DEFAULT_MAX_DECODE_BYTES, sanitize_image
 
 
 def make_image(fmt: str, size=(64, 48), mode="RGB", color=(200, 30, 30), **save_kwargs) -> bytes:
@@ -151,3 +154,137 @@ class TestRejected:
         with pytest.raises(AppException) as exc:
             sanitize_image(data, max_side=512, max_pixels=9_999)
         assert exc.value.code == "IMAGE_TOO_LARGE"
+
+    @pytest.mark.parametrize(
+        "fmt,mode,size,save_kwargs",
+        [
+            ("PNG", "RGBA", (5000, 5000), {}),
+            ("WEBP", "RGBA", (5000, 5000), {"lossless": True}),
+            ("WEBP", "RGBA", (3000, 3000), {"lossless": True}),
+            ("JPEG", "RGB", (5000, 5000), {"progressive": True}),
+        ],
+        ids=["png-25mpx", "webp-25mpx", "webp-9mpx", "jpeg-progresywny-25mpx"],
+    )
+    def test_odrzuca_duzy_obraz_w_formacie_bez_skalowania_przy_dekodowaniu(self, fmt, mode, size, save_kwargs):
+        """
+        Regresja: te pliki (1-300 KB) miescily sie w limicie 25 Mpx, a ich dekodowanie
+        w pelnej rozdzielczosci zajmowalo 250-770 MB RAM. Limit 25 Mpx zostaje tylko
+        dla JPEG baseline, ktory jest zmniejszany juz przy dekodowaniu.
+        """
+        data = make_image(fmt, size=size, mode=mode, color=(1, 2, 3, 128)[: len(mode)], **save_kwargs)
+        assert len(data) < 500_000
+
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data, max_side=512)
+
+        assert exc.value.code == "IMAGE_TOO_LARGE"
+
+    def test_odrzuca_obraz_o_skrajnych_proporcjach(self):
+        """1 x 9 000 000 px: malo pikseli, ale bufory filtra skalujacego szly w setki MB."""
+        data = make_image("PNG", size=(1, 9_000_000), mode="L", color=0)
+
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data, max_side=512)
+
+        assert exc.value.code == "IMAGE_TOO_LARGE"
+
+    def test_budzet_pamieci_jest_konfigurowalny(self):
+        data = make_image("PNG", size=(1000, 1000))
+        with pytest.raises(AppException) as exc:
+            sanitize_image(data, max_side=512, max_decode_bytes=1_000_000)
+        assert exc.value.code == "IMAGE_TOO_LARGE"
+
+    def test_jpeg_baseline_25_mpx_nadal_przechodzi(self):
+        """Zdjecie z telefonu: dekoder JPEG zmniejsza je juz przy dekodowaniu."""
+        result = sanitize_image(make_image("JPEG", size=(5000, 5000)), max_side=512)
+        assert (result.width, result.height) == (512, 512)
+
+    def test_zrzut_ekranu_4k_png_przechodzi(self):
+        result = sanitize_image(make_image("PNG", size=(3840, 2160)), max_side=512)
+        assert (result.width, result.height) == (512, 288)
+
+    def test_panoramiczny_jpeg_jest_zmniejszany(self):
+        result = sanitize_image(make_image("JPEG", size=(10_000, 600)), max_side=512)
+        assert (result.width, result.height) == (512, 31)
+
+
+# Skrypt uruchamiany w OSOBNYM procesie: szczyt RSS da sie wiarygodnie zmierzyc tylko
+# dla calego procesu (Pillow alokuje piksele poza Pythonem - tracemalloc ich nie widzi).
+_MEASURE_PEAK_SCRIPT = """
+import sys
+
+def peak_rss() -> int:
+    if sys.platform == "win32":
+        import ctypes
+        from ctypes import wintypes
+
+        class Counters(ctypes.Structure):
+            _fields_ = [("cb", wintypes.DWORD), ("PageFaultCount", wintypes.DWORD)] + [
+                (name, ctypes.c_size_t)
+                for name in ("PeakWorkingSetSize", "WorkingSetSize", "a", "b", "c", "d", "e", "f")
+            ]
+
+        counters = Counters()
+        counters.cb = ctypes.sizeof(counters)
+        ctypes.windll.kernel32.GetCurrentProcess.restype = wintypes.HANDLE
+        ctypes.windll.psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.c_void_p, wintypes.DWORD]
+        ctypes.windll.psapi.GetProcessMemoryInfo(
+            ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(counters), counters.cb
+        )
+        return counters.PeakWorkingSetSize
+    import resource
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak if sys.platform == "darwin" else peak * 1024
+
+from core.image_sanitizer import sanitize_image
+
+with open(sys.argv[1], "rb") as f:
+    data = f.read()
+before = peak_rss()
+result = sanitize_image(data, max_side=512)
+print(peak_rss() - before, result.width, result.height)
+"""
+
+
+class TestMemoryBudget:
+    """
+    Najwieksze obrazy, jakie sanitizer PRZYJMUJE, nie moga zuzyc wiecej RAM niz budzet -
+    backend to jeden proces uvicorn na malej instancji, OOM zrywa wszystkie zadania.
+    """
+
+    # Zapas na roznice miedzy systemami i alokatorami; przed poprawka bylo 400-770 MB.
+    ALLOWED_PEAK_BYTES = int(DEFAULT_MAX_DECODE_BYTES * 1.4)
+
+    @pytest.mark.parametrize(
+        "fmt,mode,size,color,save_kwargs",
+        [
+            ("PNG", "RGBA", (3238, 3238), (1, 2, 3, 128), {}),
+            ("PNG", "P", (3238, 3238), 3, {"transparency": 3}),
+            ("WEBP", "RGBA", (2483, 2483), (1, 2, 3, 128), {"lossless": True}),
+            ("WEBP", "RGB", (2483, 2483), (1, 2, 3), {}),
+            ("JPEG", "RGB", (2840, 2840), (1, 2, 3), {"progressive": True, "subsampling": 0}),
+            ("JPEG", "CMYK", (2840, 2840), (1, 2, 3, 4), {"progressive": True}),
+            ("JPEG", "RGB", (5000, 5000), (1, 2, 3), {}),
+            ("JPEG", "RGB", (10_000, 2500), (1, 2, 3), {}),
+        ],
+        ids=[
+            "png-rgba", "png-paleta-alfa", "webp-lossless", "webp-lossy",
+            "jpeg-progresywny", "jpeg-progresywny-cmyk", "jpeg-25mpx", "jpeg-panorama",
+        ],
+    )
+    def test_szczyt_pamieci_miesci_sie_w_budzecie(self, tmp_path, fmt, mode, size, color, save_kwargs):
+        source = tmp_path / "input.bin"
+        source.write_bytes(make_image(fmt, size=size, mode=mode, color=color, **save_kwargs))
+
+        proc = subprocess.run(
+            [sys.executable, "-c", _MEASURE_PEAK_SCRIPT, str(source)],
+            cwd=Path(__file__).resolve().parents[2],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        assert proc.returncode == 0, proc.stderr
+        peak_growth, width, height = (int(v) for v in proc.stdout.split())
+        assert max(width, height) == 512
+        assert peak_growth < self.ALLOWED_PEAK_BYTES, f"szczyt +{peak_growth / 1e6:.0f} MB"
