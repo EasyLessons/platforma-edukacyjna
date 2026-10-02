@@ -61,9 +61,6 @@ const frontendEnv = {
   NEXT_PUBLIC_SUPABASE_URL: 'https://test.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon-key-not-real',
   NEXT_PUBLIC_GOOGLE_CLIENT_ID: 'test-google-client-id',
-  NEXT_PUBLIC_XIRSYS_IDENT: 'test-xirsys-ident',
-  NEXT_PUBLIC_XIRSYS_SECRET: 'test-xirsys-secret',
-  NEXT_PUBLIC_XIRSYS_CHANNEL: 'test-channel',
   GEMINI_API_KEY: 'test-gemini-key-not-real',
 };
 

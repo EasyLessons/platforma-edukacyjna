@@ -1,5 +1,9 @@
 import { VoiceSettings } from './types';
 import { createLogger } from '@/_new/lib/logger';
+// Glebokie importy zamiast barrela `@/_new/lib/auth`: ten modul nie potrzebuje
+// AuthContext (React), tylko odczytu i odswiezenia tokenu.
+import { getAccessToken } from '@/_new/lib/auth/tokenStore';
+import { refreshAccessToken } from '@/_new/lib/auth/tokenService';
 
 const log = createLogger('voice-chat/constants');
 
@@ -16,146 +20,118 @@ export const DEFAULT_SETTINGS: VoiceSettings = {
 // 🌐 WEBRTC ICE SERVERS CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════
 //
-// WAŻNE: Dla produkcji potrzebujesz WŁASNEGO TURN servera!
-// Darmowe opcje:
-// 1. Metered.ca (500MB/mies free) - https://www.metered.ca/stun-turn
-// 2. Twilio (płatne ale niezawodne)
-// 3. Self-hosted coturn
-//
-// Ustaw credentials w env variables:
-// NEXT_PUBLIC_TURN_URL, NEXT_PUBLIC_TURN_USERNAME, NEXT_PUBLIC_TURN_CREDENTIAL
+// Poswiadczenia TURN (Xirsys) wydaje SERWER: GET /api/turn z access tokenem
+// (src/app/api/turn/route.ts, logika w src/_new/server/turn). Sekret konta
+// Xirsys nie moze trafic do bundla przegladarki (audyt SEC-05) - w tym pliku
+// nie ma i nie moze byc zadnej zmiennej z sekretem ani wywolania API Xirsys.
 
-export const getIceServers = async (): Promise<RTCIceServer[]> => {
-  const servers: RTCIceServer[] = [
-    // STUN servers (darmowe, do odkrywania publicznego IP)
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-  ];
+const STUN_SERVERS: RTCIceServer[] = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+];
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // XIRSYS TURN - pobierz aktualne serwery z API
-  // ═══════════════════════════════════════════════════════════════════════════
-  const xirsysIdent = process.env.NEXT_PUBLIC_XIRSYS_IDENT;
-  const xirsysSecret = process.env.NEXT_PUBLIC_XIRSYS_SECRET;
-  const xirsysChannel = process.env.NEXT_PUBLIC_XIRSYS_CHANNEL;
+/**
+ * Lista awaryjna: STUN + publiczny OpenRelay (mniej niezawodny). Uzywana, gdy
+ * /api/turn nie oddal serwerow Xirsys (brak tokenu, blad, limit, brak konfiguracji).
+ * numb.viagenie.ca usuniety 17.09.2026: domena nie ma juz rekordu DNS, a martwy
+ * serwer TURN tylko wydluzal zbieranie kandydatow ICE.
+ */
+const getFallbackIceServers = (): RTCIceServer[] => [
+  ...STUN_SERVERS,
+  {
+    urls: 'turn:openrelay.metered.ca:80',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+  {
+    urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+    username: 'openrelayproject',
+    credential: 'openrelayproject',
+  },
+];
 
-  if (xirsysIdent && xirsysSecret && xirsysChannel) {
-    try {
-      log.info('🔍 Pobieram serwery TURN z Xirsys API...');
+const TURN_ENDPOINT = '/api/turn';
+const TURN_REQUEST_TIMEOUT_MS = 8_000;
+/**
+ * Dolaczenie do rozmowy tworzy po jednym RTCPeerConnection na uczestnika niemal
+ * jednoczesnie - jedno zadanie do /api/turn obsluguje cala te serie. TTL jest
+ * wyraznie krotszy niz zywotnosc poswiadczen Xirsys (60 s).
+ */
+const ICE_CACHE_TTL_MS = 20_000;
 
-      const auth = btoa(`${xirsysIdent}:${xirsysSecret}`);
+let iceCache: { servers: RTCIceServer[]; expiresAt: number } | null = null;
+let iceInFlight: Promise<RTCIceServer[] | null> | null = null;
 
-      const response = await fetch(`https://global.xirsys.net/_turn/${xirsysChannel}`, {
-        method: 'PUT',
-        headers: {
-          Authorization: `Basic ${auth}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ format: 'urls' }),
-      });
+/** Tylko dla testow - czysci cache listy ICE. */
+export function resetIceServersCache(): void {
+  iceCache = null;
+  iceInFlight = null;
+}
 
-      if (response.ok) {
-        const data = await response.json();
-        // Nie logujemy calej odpowiedzi ani data.v - zawieraja login/haslo TURN.
-        log.debug('Xirsys API status:', data.s, '| typ data.v:', typeof data.v);
+function isIceServerList(value: unknown): value is RTCIceServer[] {
+  return (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((s) => {
+      const urls = (s as { urls?: unknown } | null)?.urls;
+      return typeof urls === 'string' || Array.isArray(urls);
+    })
+  );
+}
 
-        if (data.s === 'ok' && data.v) {
-          // Xirsys API może zwracać różne formaty
-          let xirsysServers = [];
+/** Serwery z /api/turn albo null, gdy nie ma z nich pozytku (wtedy lista awaryjna). */
+async function fetchTurnIceServers(): Promise<RTCIceServer[] | null> {
+  const token = getAccessToken();
+  // Bez tokenu serwer i tak odmowi (401) - nie wysylamy zadania.
+  if (!token) return null;
 
-          if (data.v.iceServers && Array.isArray(data.v.iceServers)) {
-            // Format 1: { v: { iceServers: [...] } }
-            log.debug('Format: v.iceServers array');
-            xirsysServers = data.v.iceServers;
-          } else if (Array.isArray(data.v)) {
-            // Format 2: { v: [...] } - bezpośrednio array
-            log.debug('Format: v jest array');
-            xirsysServers = data.v;
-          } else if (typeof data.v === 'object') {
-            // Format 3: może być { v: { stun: [...], turn: [...] } }
-            log.debug('Format: v jest object, sprawdzam właściwości');
-            const vKeys = Object.keys(data.v);
-            log.debug('Klucze w data.v:', vKeys);
+  const send = (accessToken: string) =>
+    fetch(TURN_ENDPOINT, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(TURN_REQUEST_TIMEOUT_MS),
+    });
 
-            // Spróbuj różnych kluczy
-            if (data.v.stun && data.v.turn) {
-              xirsysServers = [...data.v.stun, ...data.v.turn];
-            } else if (data.v.urls && Array.isArray(data.v.urls)) {
-              xirsysServers = data.v.urls;
-            } else if (data.v.iceServers) {
-              // 🎯 XIRSYS SPECIFIC FORMAT: { iceServers: { username, urls[], credential } }
-              const xirsysData = data.v.iceServers;
-              if (
-                xirsysData.urls &&
-                Array.isArray(xirsysData.urls) &&
-                xirsysData.username &&
-                xirsysData.credential
-              ) {
-                log.info('🎯 Konwertuję format Xirsys na RTCIceServer');
-
-                // Przekształć format Xirsys: { username, urls[], credential }
-                // Na standardowy: [{ urls: url1, username, credential }, { urls: url2, username, credential }]
-                xirsysServers = xirsysData.urls.map((url: string) => ({
-                  urls: url,
-                  username: xirsysData.username,
-                  credential: xirsysData.credential,
-                }));
-
-                log.info('✅ Przekształcono Xirsys serwery:', xirsysServers.length);
-              }
-            } else {
-              // Ostatnia próba - może to są bezpośrednio serwery ICE
-              const firstValue = Object.values(data.v)[0];
-              if (Array.isArray(firstValue)) {
-                xirsysServers = firstValue;
-              }
-            }
-          }
-
-          // Tylko liczba - wpisy zawieraja credential TURN.
-          const xirsysCount = Array.isArray(xirsysServers) ? xirsysServers.length : -1;
-          log.debug('Xirsys serwery do dodania:', xirsysCount);
-
-          if (Array.isArray(xirsysServers) && xirsysServers.length > 0) {
-            log.info('✅ Dodaję serwery Xirsys:', xirsysServers.length);
-            servers.push(...xirsysServers);
-            return servers;
-          } else {
-            log.error('❌ Nie mogę sparsować Xirsys serwerów (typ:', typeof xirsysServers, ')');
-          }
-        } else {
-          log.error('❌ Xirsys API error, status:', data?.s);
-        }
-      } else {
-        log.error('❌ Xirsys API HTTP error:', response.status, response.statusText);
-      }
-    } catch (error) {
-      log.error('❌ Xirsys API fetch error:', error);
-    }
+  let response = await send(token);
+  if (response.status === 401) {
+    // Access token wygasl w trakcie lekcji - odswiez raz i ponow (jak czat AI).
+    response = await send(await refreshAccessToken());
+  }
+  if (!response.ok) {
+    log.warn('/api/turn odpowiedzial statusem', response.status);
+    return null;
   }
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // FALLBACK: Publiczne darmowe TURN serwery (mniej niezawodne)
-  // ═══════════════════════════════════════════════════════════════════════════
-  log.info('⚠️ Używam fallback TURN serwerów');
-  // numb.viagenie.ca usuniety 17.09.2026: domena nie ma juz rekordu DNS, a martwy
-  // serwer TURN tylko wydluzal zbieranie kandydatow ICE.
-  servers.push(
-    // OpenRelay (metered.ca) - backup
-    {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    }
-  );
+  // Nie logujemy tresci odpowiedzi - zawiera login/haslo TURN.
+  const data: unknown = await response.json();
+  const { iceServers, source } = (data ?? {}) as { iceServers?: unknown; source?: unknown };
+  if (source !== 'xirsys' || !isIceServerList(iceServers)) return null;
+  return iceServers;
+}
 
-  return servers;
+export const getIceServers = async (): Promise<RTCIceServer[]> => {
+  if (iceCache && iceCache.expiresAt > Date.now()) {
+    return iceCache.servers;
+  }
+
+  try {
+    iceInFlight ??= fetchTurnIceServers().finally(() => {
+      iceInFlight = null;
+    });
+    const servers = await iceInFlight;
+    if (servers) {
+      log.info('✅ Serwery ICE z /api/turn:', servers.length);
+      iceCache = { servers, expiresAt: Date.now() + ICE_CACHE_TTL_MS };
+      return servers;
+    }
+  } catch (error) {
+    log.error('❌ /api/turn niedostepny:', error instanceof Error ? error.message : 'blad');
+  }
+
+  log.info('⚠️ Używam fallback TURN serwerów');
+  return getFallbackIceServers();
 };
 
 // Tymczasowy sync fallback dla inicjalizacji
