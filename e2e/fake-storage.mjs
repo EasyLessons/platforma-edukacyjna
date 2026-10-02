@@ -10,6 +10,7 @@
  * tworzenie bucketu ("Bucket not found" -> POST /bucket -> ponowny upload).
  * Obsługiwane (podzbiór API Storage używany przez backend/core/storage.py):
  *   POST   /storage/v1/bucket
+ *   GET    /storage/v1/bucket/{bucket}
  *   POST   /storage/v1/object/list/{bucket}
  *   POST   /storage/v1/object/{bucket}/{ścieżka}
  *   GET    /storage/v1/object/{bucket}/{ścieżka}
@@ -94,6 +95,13 @@ async function handle(req, res) {
       file_size_limit: spec.file_size_limit ?? null,
     });
     return sendJson(res, 200, { name: spec.id });
+  }
+
+  // Backend sprawdza tu flagę `public` przed pierwszym uploadem (core/storage.py).
+  if (rest.startsWith('bucket/') && req.method === 'GET') {
+    const id = rest.slice('bucket/'.length);
+    if (!buckets.has(id)) return bucketNotFound(res);
+    return sendJson(res, 200, { id, name: id, ...buckets.get(id) });
   }
 
   if (rest.startsWith('object/list/') && req.method === 'POST') {
