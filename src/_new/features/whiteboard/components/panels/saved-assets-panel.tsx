@@ -2,6 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { Trash2, X } from 'lucide-react';
 import { fetchUserAssets, deleteUserAsset } from '../../api/assets-api';
 import { SavedAsset } from '../../types/assets';
+import { thumbnailToDataUri } from '../../utils/asset-helpers';
+
+/** Miniatura zasobu jako statyczny obrazek; treść inna niż SVG nie jest renderowana wcale. */
+const AssetThumbnail = ({ thumbnail }: { thumbnail: string | null }) => {
+  const src = thumbnailToDataUri(thumbnail);
+  if (!src) return null;
+  // Zwykły <img>, nie next/image: źródłem jest data URI, nie ma czego optymalizować.
+  return <img src={src} alt="" draggable={false} className="w-full h-full object-contain" />;
+};
 
 interface SavedAssetsPanelProps {
   onClose: () => void;
@@ -47,11 +56,11 @@ export const SavedAssetsPanel = ({ onClose, refreshKey }: SavedAssetsPanelProps)
             }}
             className="group relative border rounded shadow-sm hover:shadow-md transition-shadow cursor-grab active:cursor-grabbing pb-1 overflow-hidden"
           >
-            {/* Renderer SVG miniatury (niebezpieczne html pozwala użyć surowego kodu w zgenerowanej wersji powłoki) */}
-            <div
-              className="w-full h-32 bg-gray-50 flex items-center justify-center p-2 mb-2"
-              dangerouslySetInnerHTML={{ __html: asset.thumbnail || '' }}
-            />
+            {/* SEC-07: miniatura z serwera to niezaufany string - renderujemy ją wyłącznie jako
+                <img> z data URI (SVG w <img> nie wykonuje skryptów), nigdy jako HTML. */}
+            <div className="w-full h-32 bg-gray-50 flex items-center justify-center p-2 mb-2">
+              <AssetThumbnail thumbnail={asset.thumbnail} />
+            </div>
 
             <p className="px-2 text-sm font-semibold text-gray-800 line-clamp-1 truncate">
               {asset.name}
