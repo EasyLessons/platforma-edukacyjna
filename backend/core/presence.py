@@ -19,6 +19,7 @@ from core.redis_client import get_redis_client
 from core.logging import get_logger
 from core.models import User
 
+from api.v1.auth.avatar_url import safe_avatar_url
 from api.v1.whiteboard.schemas import OnlineUserInfo
 
 logger = get_logger(__name__)
@@ -79,6 +80,6 @@ class PresenceService:
             result[board_id] = [OnlineUserInfo(
                 user_id=uid,
                 username=users_by_id[uid].username,
-                avatar_url=users_by_id[uid].avatar_url
+                avatar_url=safe_avatar_url(users_by_id[uid].avatar_url)
                 ) for uid in uids if uid in users_by_id]
         return result

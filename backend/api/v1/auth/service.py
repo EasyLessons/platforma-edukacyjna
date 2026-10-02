@@ -12,8 +12,9 @@ from core.exceptions import (
     NotFoundError, AppException
 )
 import hashlib
+import secrets
 import redis.asyncio as redis
-from redis.exceptions import ConnectionError, TimeoutError
+from redis.exceptions import ConnectionError, RedisError, TimeoutError
 from sqlalchemy.exc import OperationalError, IntegrityError
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
@@ -34,6 +35,8 @@ from core.email import send_email
 from core.email.templates.auth import verification_email, password_reset_email
 
 logger = get_logger(__name__)
+
+MAX_CODE_ATTEMPTS = 5  # prób kodu weryfikacji/resetu na okno ważności kodu
 
 
 class AuthService:
@@ -71,13 +74,53 @@ class AuthService:
             logger.exception(f"Błąd zapisu kodu w Redis (key={key})")
             raise AppException("Serwis weryfikacji chwilowo niedostępny", code="REDIS_ERROR", status_code=503)
 
-    async def _read_verification_code(self, key: str) -> str | None:
-        """Odczytuje kod z Redis; przy błędzie połączenia rzuca 503."""
+    async def _check_code(self, key: str, provided: str) -> None:
+        """
+        Porównuje kod z Redis z podanym; zły/wygasły -> ValidationError, błąd Redis -> 503.
+
+        Liczy próby per klucz kodu (czyli per user.id z bazy) - niezależnie od IP i od
+        kształtu body, którymi da się obejść limit z core/rate_limit. Po MAX_CODE_ATTEMPTS
+        próbach w oknie ważności kodu kod jest kasowany, a kolejne próby dostają 429 do
+        wygaśnięcia licznika. Nowy kod NIE zeruje licznika - inaczej każde "wyślij ponownie"
+        dawałoby atakującemu nową pulę prób. Licznik rośnie PRZED porównaniem, więc
+        równoległe żądania nie dostaną więcej prób niż limit.
+        """
+        attempts_key = f"{key}:attempts"
+        ttl_seconds = self.settings.verification_code_expire_minutes * 60
         try:
-            return await self.redis.get(key)
-        except (ConnectionError, TimeoutError):
-            logger.exception(f"Błąd odczytu kodu w Redis (key={key})")
+            async with self.redis.pipeline(transaction=True) as pipe:
+                pipe.set(attempts_key, 0, ex=ttl_seconds, nx=True)
+                pipe.incr(attempts_key)
+                _, attempts = await pipe.execute()
+            if attempts > MAX_CODE_ATTEMPTS:
+                await self.redis.delete(key)
+                stored_code = None
+            else:
+                stored_code = await self.redis.get(key)
+        except RedisError:
+            logger.exception(f"Błąd Redis przy sprawdzaniu kodu (key={key})")
             raise AppException("Serwis weryfikacji chwilowo niedostępny", code="REDIS_ERROR", status_code=503)
+
+        if attempts > MAX_CODE_ATTEMPTS:
+            logger.warning(f"Przekroczono limit prób kodu (key={key})")
+            raise AppException(
+                "Zbyt wiele błędnych prób. Poproś o nowy kod i spróbuj ponownie później.",
+                code="RATE_LIMITED",
+                status_code=429,
+            )
+        if stored_code is None:
+            logger.warning(f"Kod wygasł (key={key})")
+            raise ValidationError("Kod wygasł")
+        if not secrets.compare_digest(stored_code.encode(), provided.encode()):
+            logger.warning(f"Zły kod (key={key})")
+            raise ValidationError("Nieprawidłowy kod")
+
+    async def _clear_code_attempts(self, key: str) -> None:
+        """Po poprawnym kodzie zeruje licznik prób (błąd Redis nie psuje udanej operacji)."""
+        try:
+            await self.redis.delete(f"{key}:attempts")
+        except RedisError:
+            logger.warning(f"Nie udało się wyzerować licznika prób (key={key})")
 
     def _create_session(self, user: User) -> tuple[AuthResponse, str]:
         """
@@ -176,18 +219,14 @@ class AuthService:
         if user.is_active:
             raise ValidationError("Już zweryfikowane")
         
-        stored_code = await self._read_verification_code(self._email_verify_key(user.id))
-        
-        if stored_code is None:
-            raise ValidationError("Kod wygasł")
-        if stored_code != verify_data.code:
-            raise ValidationError("Nieprawidłowy kod")
-        
+        await self._check_code(self._email_verify_key(user.id), verify_data.code)
+
         user.is_active = True
         self.db.commit()
         self.db.refresh(user)
 
         await self.redis.delete(self._email_verify_key(user.id))
+        await self._clear_code_attempts(self._email_verify_key(user.id))
 
         logger.info(f"User zweryfikowany (user_id={user.id})")
 
@@ -268,15 +307,9 @@ class AuthService:
         if not user.is_active:
             raise AppException("Konto nieaktywne", code="AUTH_ERROR", status_code=403)
         
-        stored_code = await self._read_verification_code(self._password_reset_key(user.id))
+        await self._check_code(self._password_reset_key(user.id), verify_data.code)
+        await self._clear_code_attempts(self._password_reset_key(user.id))
 
-        if stored_code is None:
-            logger.warning(f"Kod resetu wygasł (user_id={user.id})")
-            raise ValidationError("Kod wygasł")
-        if stored_code != verify_data.code:
-            logger.warning(f"Zły kod resetu (user_id={user.id})")
-            raise ValidationError("Nieprawidłowy kod")
-        
         logger.info(f"Kod resetu zweryfikowany (user_id={user.id})")
 
         return VerifyResetCodeResponse(message="Kod poprawny", valid=True)
@@ -291,18 +324,13 @@ class AuthService:
         if not user.is_active:
             raise AppException("Konto nieaktywne", code="AUTH_ERROR", status_code=403)
     
-        stored_code = await self._read_verification_code(self._password_reset_key(user.id))
-        if stored_code is None:
-            logger.warning(f"Kod resetu wygasł (user_id={user.id})")
-            raise ValidationError("Kod wygasł")
-        if stored_code != reset_data.code:
-            logger.warning(f"Zły kod resetu (user_id={user.id})")
-            raise ValidationError("Nieprawidłowy kod")
+        await self._check_code(self._password_reset_key(user.id), reset_data.code)
 
         user.hashed_password = hash_password(reset_data.password)
         self.db.commit()
 
         await self.redis.delete(self._password_reset_key(user.id))
+        await self._clear_code_attempts(self._password_reset_key(user.id))
 
         logger.info(f"Hasło zresetowane (user_id={user.id})")
 

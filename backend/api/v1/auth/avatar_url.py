@@ -45,3 +45,17 @@ def validate_avatar_url(value: str) -> str:
     if host and host == _supabase_host() and parts.path.startswith(SUPABASE_PUBLIC_OBJECT_PREFIX):
         return value
     raise ValueError(_ERROR)
+
+
+def safe_avatar_url(value: str | None) -> str | None:
+    """
+    Do ODCZYTU: wartość z bazy albo None, gdy nie przechodzi walidacji. Wiersze zapisane
+    przed wprowadzeniem allowlisty mogą wskazywać obcy host - nie oddajemy ich klientom
+    (front pokazuje wtedy inicjały). Danych w bazie nie ruszamy.
+    """
+    if not value:
+        return None
+    try:
+        return validate_avatar_url(value)
+    except ValueError:
+        return None

@@ -51,11 +51,12 @@ app.add_middleware(CORSMiddleware, **cors_policy.middleware_kwargs())
 # X-Request-ID: czyta/generuje id zadania, oddaje w naglowku, loguje http.request
 app.add_middleware(RequestIdMiddleware)
 
-# IP klienta i schemat zza proxy (SEC-06). Render terminuje TLS przed uvicornem, wiec bez
-# tego request.client.host to adres proxy i rate limit ma jeden kubelek na wszystkich.
-# Middleware jest w kodzie (a nie tylko we flagach uvicorna w Procfile), zeby dzialalo
-# niezaleznie od komendy startowej ustawionej w panelu Render. Dodane jako ostatnie =
-# najbardziej zewnetrzne, czyli logi i rate limit widza juz poprawione IP.
+# Schemat (X-Forwarded-Proto) i adres klienta w logach zza proxy (SEC-06). Render terminuje
+# TLS przed uvicornem. Middleware jest w kodzie (a nie tylko we flagach uvicorna w Procfile),
+# zeby dzialalo niezaleznie od komendy startowej ustawionej w panelu Render. Dodane jako
+# ostatnie = najbardziej zewnetrzne. UWAGA: przy "*" bierze PIERWSZY wpis X-Forwarded-For,
+# ktory klient moze podrobic - dlatego rate limit NIE uzywa request.client.host, tylko
+# core.rate_limit.get_client_ip (naglowek brzegu / wpis X-Forwarded-For liczony od prawej).
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts=settings.trusted_proxy_hosts)
 
 

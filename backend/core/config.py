@@ -84,10 +84,15 @@ class Settings(BaseSettings):
     # (Render ustawia env RENDER=true, a serwis jest osiagalny wylacznie przez proxy Render),
     # w pozostalych srodowiskach "127.0.0.1".
     forwarded_allow_ips: str = ""
-    # Opcjonalnie: naglowek z IP klienta ustawiany (NADPISYWANY) przez brzeg sieci, np.
-    # "CF-Connecting-IP". Gdy ustawiony i obecny w zadaniu, rate limit bierze IP z niego
-    # zamiast z X-Forwarded-For (ktorego pierwszy wpis klient moze sfalszowac). Pusty = wylaczone.
+    # Naglowek z IP klienta ustawiany (NADPISYWANY) przez brzeg sieci - rate limit bierze IP
+    # z niego w pierwszej kolejnosci. Pusty = automatycznie: "CF-Connecting-IP" na Render
+    # (caly ruch do Render przechodzi przez Cloudflare, ktory ten naglowek nadpisuje), poza
+    # Render wylaczone. "none" = wylaczone takze na Render.
     client_ip_header: str = ""
+    # Ktory wpis X-Forwarded-For LICZAC OD PRAWEJ jest adresem klienta, gdy naglowka powyzej
+    # nie ma w zadaniu (1 = ostatni, dopisany przez proxy bezposrednio przed aplikacja).
+    # Lewych wpisow nie uzywamy - wysyla je klient. Zla wartosc = grubsze kubelki, nie obejscie.
+    trusted_proxy_hops: int = 1
 
     @property
     def allowed_origins_list(self) -> list[str]:
@@ -101,6 +106,14 @@ class Settings(BaseSettings):
         if self.forwarded_allow_ips.strip():
             return self.forwarded_allow_ips.strip()
         return "*" if os.getenv("RENDER") else "127.0.0.1"
+
+    @property
+    def effective_client_ip_header(self) -> str:
+        """Nazwa naglowka z IP klienta albo "" (patrz client_ip_header)."""
+        explicit = self.client_ip_header.strip()
+        if explicit:
+            return "" if explicit.lower() == "none" else explicit
+        return "CF-Connecting-IP" if os.getenv("RENDER") else ""
 
     # === KONFIGURACJA PYDANTIC ===
     # .env czytany w developmencie; w produkcji (Render) zmienne ida z systemu.

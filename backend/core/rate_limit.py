@@ -1,8 +1,10 @@
+import ipaddress
+
 from fastapi import Request
 
 from core.config import get_settings
 from core.exceptions import AppException
-from redis.exceptions import ConnectionError, TimeoutError
+from redis.exceptions import RedisError
 from core.redis_client import get_redis_client
 
 from core.logging import get_logger
@@ -10,26 +12,85 @@ from core.logging import get_logger
 logger = get_logger(__name__)
 
 
+def _valid_ip(value: str | None) -> str | None:
+    """Kanoniczny zapis adresu IP albo None (śmieci, nazwy hostów, za długie wartości)."""
+    if not value or len(value) > 64:
+        return None
+    try:
+        return str(ipaddress.ip_address(value.strip()))
+    except ValueError:
+        return None
+
+
 def get_client_ip(request: Request) -> str:
     """
-    IP klienta do kluczy rate limitu.
+    IP klienta do kluczy rate limitu. Wynik to zawsze poprawny adres IP albo "unknown"
+    (wspólny kubełek) - nigdy surowy tekst z nagłówka, więc nie da się nim mnożyć kluczy.
 
-    Domyślnie `request.client.host` - za proxy poprawia go ProxyHeadersMiddleware
-    (main.py) na podstawie X-Forwarded-For. Gdy ustawiono CLIENT_IP_HEADER (np.
-    CF-Connecting-IP, nadpisywany przez brzeg sieci) i nagłówek jest w żądaniu,
-    ma on pierwszeństwo - pierwszy wpis X-Forwarded-For klient może sfałszować.
+    Kolejność:
+    1. Nagłówek NADPISYWANY przez brzeg sieci (`effective_client_ip_header`, na Render
+       domyślnie CF-Connecting-IP) - klient nie może go podrobić.
+    2. Za zaufanym proxy ("*"): wpis X-Forwarded-For liczony OD PRAWEJ (`TRUSTED_PROXY_HOPS`,
+       domyślnie ostatni = dopisany przez nasze proxy). Lewe wpisy wysyła klient, więc ich
+       nie używamy - a właśnie pierwszy z lewej bierze ProxyHeadersMiddleware uvicorna.
+    3. Bez zaufanego proxy: adres połączenia (`request.client.host`).
     """
-    header_name = get_settings().client_ip_header.strip()
+    settings = get_settings()
+
+    header_name = settings.effective_client_ip_header
     if header_name:
-        value = (request.headers.get(header_name) or "").strip()
-        if value:
-            return value[:64]
-    return request.client.host if request.client else "unknown"
+        ip = _valid_ip(request.headers.get(header_name))
+        if ip:
+            return ip
+
+    if settings.trusted_proxy_hosts == "*":
+        forwarded = ",".join(request.headers.getlist("x-forwarded-for"))
+        if forwarded.strip():
+            entries = [entry.strip() for entry in forwarded.split(",")]
+            hops = max(1, settings.trusted_proxy_hops)
+            return _valid_ip(entries[max(0, len(entries) - hops)]) or "unknown"
+
+    return _valid_ip(request.client.host if request.client else None) or "unknown"
+
+
+def normalize_identifier(value) -> str | None:
+    """
+    Sprowadza wartość z body do postaci, w jakiej zobaczy ją serwis po walidacji Pydantic,
+    żeby warianty zapisu tej samej wartości (" a@b.pl ", "01", 1.0, true) trafiały do
+    JEDNEGO kubełka. Wartości nie-skalarne i puste -> None (422 zwróci walidacja).
+    """
+    if isinstance(value, bool):
+        value = int(value)
+    if isinstance(value, float):
+        if not value.is_integer():
+            return None
+        value = int(value)
+    if isinstance(value, int):
+        return str(value)[:256]
+    if not isinstance(value, str):
+        return None
+
+    text = value.strip().lower()
+    if not text:
+        return None
+    if len(text) <= 32:
+        # Pydantic przyjmuje dla pól int także "01", "+1", " 1" i "1.0".
+        try:
+            return str(int(text))
+        except ValueError:
+            pass
+        try:
+            number = float(text)
+            if number.is_integer():
+                return str(int(number))
+        except (ValueError, OverflowError):
+            pass
+    return text[:256]
 
 
 async def _identifier_from_body(request: Request, field: str) -> str | None:
     """
-    Wartość pola `field` z JSON body albo None.
+    Znormalizowana wartość pola `field` z JSON body albo None.
 
     Niepoprawny JSON, body nie-obiekt lub wartość nie-skalarna -> None (SEC-21):
     limit per-identyfikator jest pomijany, a 422 zwraca walidacja FastAPI/Pydantic,
@@ -41,10 +102,7 @@ async def _identifier_from_body(request: Request, field: str) -> str | None:
         return None
     if not isinstance(body, dict):
         return None
-    value = body.get(field)
-    if isinstance(value, bool) or not isinstance(value, (str, int)) or value == "":
-        return None
-    return str(value).lower()[:256]
+    return normalize_identifier(body.get(field))
 
 
 def rate_limit(
@@ -83,7 +141,7 @@ def rate_limit(
                         code="RATE_LIMITED",
                         status_code=429,
                     )
-        except (ConnectionError, TimeoutError):
+        except RedisError:  # także ResponseError (OOM, READONLY, AUTH), nie tylko brak połączenia
             logger.exception(f"Błąd Redis przy rate limitingu (scope={scope})")
             if fail_open:
                 return

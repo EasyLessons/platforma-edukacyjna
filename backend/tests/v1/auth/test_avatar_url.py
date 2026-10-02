@@ -6,8 +6,8 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from api.v1.auth.avatar_url import AVATAR_URL_MAX_LENGTH
-from api.v1.auth.schemas import AvatarUpdate
+from api.v1.auth.avatar_url import AVATAR_URL_MAX_LENGTH, safe_avatar_url
+from api.v1.auth.schemas import AvatarUpdate, UserResponse
 from api.v1.auth.utils import create_access_token
 from core.config import get_settings
 from core.database import get_db
@@ -109,3 +109,43 @@ class TestUpdateProfileEndpoint:
                 headers=auth_headers(test_user.id),
             )
         assert last.status_code == 429
+
+
+class TestLegacyAvatarOnRead:
+    """Wartości zapisane przed allowlistą (obcy host) nie są oddawane klientom."""
+
+    LEGACY = "https://attacker.example/pixel.png"
+
+    def test_safe_avatar_url(self):
+        assert safe_avatar_url(self.LEGACY) is None
+        assert safe_avatar_url(None) is None
+        assert safe_avatar_url("") is None
+        assert safe_avatar_url(FRONTEND_AVATAR_URL) == FRONTEND_AVATAR_URL
+        assert safe_avatar_url(GOOGLE_AVATAR_URL) == GOOGLE_AVATAR_URL
+
+    def test_user_response_hides_legacy_value(self, db_session, test_user):
+        test_user.avatar_url = self.LEGACY
+        db_session.commit()
+        assert UserResponse.model_validate(test_user).avatar_url is None
+        test_user.avatar_url = FRONTEND_AVATAR_URL
+        db_session.commit()
+        assert UserResponse.model_validate(test_user).avatar_url == FRONTEND_AVATAR_URL
+
+    def test_workspace_members_hide_legacy_value(self, db_session, test_user, test_workspace):
+        from api.v1.workspaces.members.service import MemberService
+
+        test_user.avatar_url = self.LEGACY
+        db_session.commit()
+        members = MemberService(db_session).get_workspace_members(test_workspace.id, test_user.id).members
+        assert [m.avatar_url for m in members if m.user_id == test_user.id] == [None]
+
+    @pytest.mark.asyncio
+    async def test_presence_hides_legacy_value(self, db_session, redis_client, test_user):
+        from core.presence import PresenceService
+
+        test_user.avatar_url = self.LEGACY
+        db_session.commit()
+        service = PresenceService(db_session, redis_client)
+        await service.mark_online(1, test_user.id)
+        online = await service.get_online_users([1])
+        assert [u.avatar_url for u in online[1]] == [None]

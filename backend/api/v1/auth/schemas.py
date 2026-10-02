@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator, model_validato
 from datetime import datetime
 from typing import Optional
 
-from .avatar_url import validate_avatar_url
+from .avatar_url import safe_avatar_url, validate_avatar_url
 
 class RegisterUser(BaseModel):
     """Schema do rejestracji użytkownika"""
@@ -43,6 +43,11 @@ class UserResponse(BaseModel):
     created_at: datetime
     
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("avatar_url")
+    @classmethod
+    def hide_disallowed_avatar(cls, value: Optional[str]) -> Optional[str]:
+        return safe_avatar_url(value)
 
 class AuthResponse(BaseModel):
     """Schema odpowiedzi z tokenem JWT"""

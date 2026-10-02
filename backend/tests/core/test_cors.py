@@ -198,21 +198,76 @@ class TestClientIpBehindProxy:
 
 class TestGetClientIp:
     @staticmethod
-    def _request(headers: dict, host: str = "10.0.0.5"):
+    def _request(headers: dict | list, host: str = "10.0.0.5"):
         from starlette.requests import Request
 
-        raw = [(k.lower().encode(), v.encode()) for k, v in headers.items()]
+        items = headers.items() if isinstance(headers, dict) else headers
+        raw = [(k.lower().encode(), v.encode()) for k, v in items]
         return Request({"type": "http", "client": (host, 0), "headers": raw})
 
-    def test_defaults_to_connection_address(self):
-        request = self._request({"CF-Connecting-IP": "203.0.113.7"})
+    @pytest.fixture
+    def on_render(self, monkeypatch):
+        monkeypatch.setenv("RENDER", "true")
+
+    # --- poza Render: brak zaufanego proxy, liczy się adres połączenia ---
+
+    def test_defaults_to_connection_address(self, monkeypatch):
+        monkeypatch.delenv("RENDER", raising=False)
+        request = self._request({"CF-Connecting-IP": "203.0.113.7", "X-Forwarded-For": "198.51.100.1"})
         assert get_client_ip(request) == "10.0.0.5"
 
+    def test_non_ip_connection_address_goes_to_shared_bucket(self, monkeypatch):
+        monkeypatch.delenv("RENDER", raising=False)
+        assert get_client_ip(self._request({}, host="A" * 30000)) == "unknown"
+
     def test_configured_header_takes_precedence(self, monkeypatch):
-        monkeypatch.setattr(get_settings(), "client_ip_header", "CF-Connecting-IP")
-        request = self._request({"CF-Connecting-IP": "203.0.113.7"})
-        assert get_client_ip(request) == "203.0.113.7"
+        monkeypatch.delenv("RENDER", raising=False)
+        monkeypatch.setattr(get_settings(), "client_ip_header", "True-Client-IP")
+        assert get_client_ip(self._request({"True-Client-IP": "203.0.113.7"})) == "203.0.113.7"
 
     def test_configured_header_missing_falls_back(self, monkeypatch):
-        monkeypatch.setattr(get_settings(), "client_ip_header", "CF-Connecting-IP")
+        monkeypatch.delenv("RENDER", raising=False)
+        monkeypatch.setattr(get_settings(), "client_ip_header", "True-Client-IP")
+        assert get_client_ip(self._request({})) == "10.0.0.5"
+
+    # --- na Render: nagłówek brzegu, potem X-Forwarded-For OD PRAWEJ ---
+
+    def test_render_uses_cf_connecting_ip_by_default(self, on_render):
+        request = self._request({"CF-Connecting-IP": "203.0.113.7", "X-Forwarded-For": "6.6.6.6, 203.0.113.7"})
+        assert get_client_ip(request) == "203.0.113.7"
+
+    def test_render_header_can_be_disabled(self, on_render, monkeypatch):
+        monkeypatch.setattr(get_settings(), "client_ip_header", "none")
+        request = self._request({"CF-Connecting-IP": "203.0.113.7", "X-Forwarded-For": "198.51.100.9"})
+        assert get_client_ip(request) == "198.51.100.9"
+
+    def test_spoofed_left_xff_entry_is_ignored(self, on_render):
+        """Regresja: uvicorn przy '*' bierze xff[0], które wysyła klient."""
+        seen = {
+            get_client_ip(self._request({"X-Forwarded-For": f"10.8.{i}.1, 198.51.100.9"}))
+            for i in range(40)
+        }
+        assert seen == {"198.51.100.9"}
+
+    def test_spoofed_xff_in_separate_header_line_is_ignored(self, on_render):
+        request = self._request([("X-Forwarded-For", "6.6.6.6"), ("X-Forwarded-For", "198.51.100.9")])
+        assert get_client_ip(request) == "198.51.100.9"
+
+    def test_trusted_proxy_hops_counts_from_the_right(self, on_render, monkeypatch):
+        monkeypatch.setattr(get_settings(), "trusted_proxy_hops", 2)
+        request = self._request({"X-Forwarded-For": "6.6.6.6, 203.0.113.7, 172.70.0.1"})
+        assert get_client_ip(request) == "203.0.113.7"
+        # mniej wpisów niż hopów: bierzemy skrajny lewy, nie wychodzimy poza listę
+        assert get_client_ip(self._request({"X-Forwarded-For": "203.0.113.7"})) == "203.0.113.7"
+
+    @pytest.mark.parametrize("garbage", ["A" * 30000, "not-an-ip", "1.2.3.4:80", "<script>"])
+    def test_garbage_never_becomes_a_key(self, on_render, garbage):
+        assert get_client_ip(self._request({"X-Forwarded-For": garbage})) == "unknown"
+        assert get_client_ip(self._request({"CF-Connecting-IP": garbage}, host="198.51.100.9")) == "198.51.100.9"
+
+    def test_ipv6_is_canonicalized(self, on_render):
+        request = self._request({"CF-Connecting-IP": "2001:DB8:0:0:0:0:0:1"})
+        assert get_client_ip(request) == "2001:db8::1"
+
+    def test_render_without_forwarding_headers_uses_connection_address(self, on_render):
         assert get_client_ip(self._request({})) == "10.0.0.5"
