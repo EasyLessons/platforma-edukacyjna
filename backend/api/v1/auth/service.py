@@ -200,7 +200,9 @@ class AuthService:
             (User.username == login_data.login) | (User.email == login_data.login)
         ).first()
 
-        if not user or not verify_password(login_data.password, user.hashed_password):
+        # Konto założone przez Google nie ma hasła (hashed_password=None) - passlib rzuciłby
+        # wyjątek (500). Traktujemy to jak błędne hasło: 401, bez ujawniania typu konta.
+        if not user or not user.hashed_password or not verify_password(login_data.password, user.hashed_password):
             if user:
                 logger.warning(f"Nieudane logowanie (user_id={user.id})")
             else:

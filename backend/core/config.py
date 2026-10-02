@@ -10,6 +10,18 @@ Cel:
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
+import os
+
+# Produkcja (Vercel) + lokalny dev. platforma-edukacyjna-five.vercel.app to domena
+# przypisana do projektu Vercel (serwuje aplikacje); usunieto "-one" - zwracala 404,
+# czyli byla wolna i kazdy mogl ja sobie przypisac.
+DEFAULT_ALLOWED_ORIGINS = ",".join([
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "https://easylesson.app",
+    "https://www.easylesson.app",
+    "https://platforma-edukacyjna-five.vercel.app",
+])
 
 class Settings(BaseSettings):
     # === BAZA DANYCH ===
@@ -54,7 +66,42 @@ class Settings(BaseSettings):
     # Ta sama wartosc musi byc w env whiteboard-sync. Pusty = klucz serwisu wylaczony
     # (dziala tylko token usera). Wygeneruj: python -c "import secrets; print(secrets.token_urlsafe(32))"
     sync_service_token: str = ""
-    
+
+    # === CORS (SEC-04) ===
+    # Jawna lista originow rozdzielona przecinkami (env ALLOWED_ORIGINS). Credentials
+    # (refresh cookie) sa wlaczone, wiec kazdy origin wpisujemy osobno - zadnych wildcardow.
+    # Domyslna wartosc = produkcja + lokalny dev, zeby deploy dzialal bez ustawiania env.
+    allowed_origins: str = DEFAULT_ALLOWED_ORIGINS
+    # Opcjonalny regex (env ALLOWED_ORIGIN_REGEX, dopasowanie fullmatch) np. dla preview
+    # Vercela. Domyslnie PUSTY = wylaczony: sufiksu "-easylessons-projects.vercel.app" nie da
+    # sie uznac za niepodrabialny (wolna subdomene *.vercel.app moze przypisac sobie dowolne
+    # konto), a kazdy dopuszczony origin moze wolac /auth/refresh z cookie. Patrz docs/architecture/auth.md.
+    allowed_origin_regex: str = ""
+
+    # === PROXY / IP KLIENTA (SEC-06) ===
+    # Od ktorych adresow ufamy X-Forwarded-For / X-Forwarded-Proto (jak --forwarded-allow-ips
+    # uvicorna; ta sama nazwa env FORWARDED_ALLOW_IPS). Pusty = automatycznie: "*" na Render
+    # (Render ustawia env RENDER=true, a serwis jest osiagalny wylacznie przez proxy Render),
+    # w pozostalych srodowiskach "127.0.0.1".
+    forwarded_allow_ips: str = ""
+    # Opcjonalnie: naglowek z IP klienta ustawiany (NADPISYWANY) przez brzeg sieci, np.
+    # "CF-Connecting-IP". Gdy ustawiony i obecny w zadaniu, rate limit bierze IP z niego
+    # zamiast z X-Forwarded-For (ktorego pierwszy wpis klient moze sfalszowac). Pusty = wylaczone.
+    client_ip_header: str = ""
+
+    @property
+    def allowed_origins_list(self) -> list[str]:
+        """ALLOWED_ORIGINS -> lista originow (bez spacji, koncowego "/" i wildcardow)."""
+        origins = [o.strip().rstrip("/") for o in self.allowed_origins.split(",")]
+        return [o for o in origins if o and "*" not in o]
+
+    @property
+    def trusted_proxy_hosts(self) -> str:
+        """Wartosc dla ProxyHeadersMiddleware (patrz forwarded_allow_ips)."""
+        if self.forwarded_allow_ips.strip():
+            return self.forwarded_allow_ips.strip()
+        return "*" if os.getenv("RENDER") else "127.0.0.1"
+
     # === KONFIGURACJA PYDANTIC ===
     # .env czytany w developmencie; w produkcji (Render) zmienne ida z systemu.
     # case_sensitive=False: DATABASE_URL w .env == database_url w kodzie.
