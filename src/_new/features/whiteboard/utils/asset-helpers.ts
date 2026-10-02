@@ -1,5 +1,59 @@
 import { DrawingElement } from '../types';
 
+/**
+ * SEC-07: wartości pól elementów pochodzą z tablicy współdzielonej (inni użytkownicy, realtime,
+ * import), więc przed wstawieniem do SVG każda przechodzi przez `num` albo `safeColor`.
+ * Do znaczników trafiają wyłącznie liczby skończone i kolory z allowlisty formatu.
+ */
+const DEFAULT_COLOR = '#333';
+const SAFE_COLOR_RE = /^(#[0-9a-f]{3,8}|[a-z]{1,32}|(rgb|hsl)a?\([0-9.,%\s/-]{1,64}\))$/i;
+
+/** Kolor w formacie hex / nazwa / rgb(a) / hsl(a); wszystko inne -> kolor domyślny. */
+export function safeColor(value: unknown, fallback: string = DEFAULT_COLOR): string {
+  if (typeof value !== 'string') return fallback;
+  const trimmed = value.trim();
+  return SAFE_COLOR_RE.test(trimmed) ? trimmed : fallback;
+}
+
+/** Liczba skończona albo wartość zastępcza - nigdy string, NaN ani Infinity. */
+function num(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/** Punkty ścieżki z poprawnymi współrzędnymi (pozostałe są pomijane). */
+function finitePoints(points: unknown): { x: number; y: number }[] {
+  if (!Array.isArray(points)) return [];
+  return points.filter(
+    (p): p is { x: number; y: number } =>
+      !!p && Number.isFinite((p as { x: unknown }).x) && Number.isFinite((p as { y: unknown }).y)
+  );
+}
+
+/** Miniatury większe niż ten limit nie są renderowane (ochrona przed zapchaniem panelu). */
+const MAX_THUMBNAIL_LENGTH = 512 * 1024;
+
+/**
+ * Zamienia miniaturę z serwera na `data:` URI dla `<img>`.
+ *
+ * SEC-07: miniatura to dowolny string zapisany w bazie (także stare rekordy), więc NIE wolno
+ * wstawiać jej jako HTML. SVG załadowane przez `<img>` działa w trybie statycznym: przeglądarka
+ * nie wykonuje skryptów ani handlerów zdarzeń i nie pobiera zasobów zewnętrznych.
+ * Zwraca null, gdy treść nie jest SVG albo nie da się jej zakodować - wtedy panel pokazuje
+ * pustą ramkę. Nigdy nie rzuca.
+ */
+export function thumbnailToDataUri(thumbnail: string | null | undefined): string | null {
+  if (typeof thumbnail !== 'string') return null;
+  if (thumbnail.length > MAX_THUMBNAIL_LENGTH) return null;
+  if (!/^\s*<svg[\s>]/i.test(thumbnail)) return null;
+  try {
+    return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(thumbnail)}`;
+  } catch {
+    // encodeURIComponent rzuca URIError dla niesparowanego surogatu UTF-16. Funkcja jest wołana
+    // w renderze, więc wyjątek wywróciłby cały panel - uszkodzona miniatura = pusta ramka.
+    return null;
+  }
+}
+
 /** Zwraca bounding box grupy elementów (w układzie tablicy). */
 function getBoundingBox(elements: DrawingElement[]) {
   let minX = Infinity,
@@ -8,6 +62,8 @@ function getBoundingBox(elements: DrawingElement[]) {
     maxY = -Infinity;
 
   const expand = (x: number, y: number) => {
+    // Współrzędne spoza liczb skończonych nie mogą trafić do viewBox (SEC-07).
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
     if (x < minX) minX = x;
     if (y < minY) minY = y;
     if (x > maxX) maxX = x;
@@ -17,7 +73,7 @@ function getBoundingBox(elements: DrawingElement[]) {
   elements.forEach((el) => {
     switch (el.type) {
       case 'path':
-        el.points.forEach((p) => expand(p.x, p.y));
+        finitePoints(el.points).forEach((p) => expand(p.x, p.y));
         break;
       case 'shape':
         expand(el.startX, el.startY);
@@ -117,22 +173,28 @@ export function generateElementsSvgThumbnail(elements: DrawingElement[]): string
 
   const svgInner = elements
     .map((el) => {
-      const color = (el as any).color || '#333';
+      const raw = el as { color?: unknown; strokeWidth?: unknown };
+      const color = safeColor(raw.color);
       // Skalujemy oryginalny strokeWidth elementu proporcjonalnie, ale z górnym limitem 2px ekranowe
-      const originalSw = (el as any).strokeWidth || 2;
+      const originalSw = num(raw.strokeWidth) || 2;
       const sw = Math.min(originalSw * unitPerPx, unitPerPx * 2);
 
       switch (el.type) {
         case 'path': {
-          if (el.points.length < 2) return '';
-          const d = 'M ' + el.points.map((p) => `${p.x},${p.y}`).join(' L ');
+          const points = finitePoints(el.points);
+          if (points.length < 2) return '';
+          const d = 'M ' + points.map((p) => `${p.x},${p.y}`).join(' L ');
           return `<path d="${d}" fill="none" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" stroke-linejoin="round" />`;
         }
         case 'shape': {
-          const x1 = Math.min(el.startX, el.endX);
-          const y1 = Math.min(el.startY, el.endY);
-          const w = Math.abs(el.endX - el.startX);
-          const h = Math.abs(el.endY - el.startY);
+          const startX = num(el.startX);
+          const startY = num(el.startY);
+          const endX = num(el.endX);
+          const endY = num(el.endY);
+          const x1 = Math.min(startX, endX);
+          const y1 = Math.min(startY, endY);
+          const w = Math.abs(endX - startX);
+          const h = Math.abs(endY - startY);
           const fillAttr = el.fill ? color : 'none';
           switch (el.shapeType) {
             case 'rectangle':
@@ -144,37 +206,36 @@ export function generateElementsSvgThumbnail(elements: DrawingElement[]): string
               return `<polygon points="${pts}" fill="${fillAttr}" stroke="${color}" stroke-width="${sw}" />`;
             }
             case 'line':
-              return `<line x1="${el.startX}" y1="${el.startY}" x2="${el.endX}" y2="${el.endY}" stroke="${color}" stroke-width="${sw}" />`;
+              return `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="${color}" stroke-width="${sw}" />`;
             case 'arrow': {
-              const dx = el.endX - el.startX;
-              const dy = el.endY - el.startY;
+              const dx = endX - startX;
+              const dy = endY - startY;
               const len = Math.sqrt(dx * dx + dy * dy) || 1;
               const ux = dx / len,
                 uy = dy / len;
               const ah = sw * 4;
-              const p1x = el.endX - ux * ah - uy * ah * 0.5;
-              const p1y = el.endY - uy * ah + ux * ah * 0.5;
-              const p2x = el.endX - ux * ah + uy * ah * 0.5;
-              const p2y = el.endY - uy * ah - ux * ah * 0.5;
-              return `<line x1="${el.startX}" y1="${el.startY}" x2="${el.endX}" y2="${el.endY}" stroke="${color}" stroke-width="${sw}" /><polygon points="${el.endX},${el.endY} ${p1x},${p1y} ${p2x},${p2y}" fill="${color}" />`;
+              const p1x = endX - ux * ah - uy * ah * 0.5;
+              const p1y = endY - uy * ah + ux * ah * 0.5;
+              const p2x = endX - ux * ah + uy * ah * 0.5;
+              const p2y = endY - uy * ah - ux * ah * 0.5;
+              return `<line x1="${startX}" y1="${startY}" x2="${endX}" y2="${endY}" stroke="${color}" stroke-width="${sw}" /><polygon points="${endX},${endY} ${p1x},${p1y} ${p2x},${p2y}" fill="${color}" />`;
             }
             default:
               return `<rect x="${x1}" y="${y1}" width="${w}" height="${h}" fill="${fillAttr}" stroke="${color}" stroke-width="${sw}" />`;
           }
         }
-        case 'arrow': {
-          const lineSw = Math.min(((el as any).strokeWidth || 2) * unitPerPx, unitPerPx * 2);
-          return `<line x1="${el.startX}" y1="${el.startY}" x2="${el.endX}" y2="${el.endY}" stroke="${color}" stroke-width="${lineSw}" stroke-linecap="round" />`;
-        }
+        case 'arrow':
+          return `<line x1="${num(el.startX)}" y1="${num(el.startY)}" x2="${num(el.endX)}" y2="${num(el.endY)}" stroke="${color}" stroke-width="${sw}" stroke-linecap="round" />`;
         case 'text':
-          return `<rect x="${el.x}" y="${el.y}" width="${el.width || 80}" height="${el.height || el.fontSize * 1.5}" fill="#f8f8f8" stroke="#ccc" stroke-width="${baseSw * 0.5}" rx="2" />`;
+          // Treść tekstu celowo NIE trafia do miniatury - tylko ramka o wymiarach elementu.
+          return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.width) || 80}" height="${num(el.height) || num(el.fontSize, 16) * 1.5}" fill="#f8f8f8" stroke="#ccc" stroke-width="${baseSw * 0.5}" rx="2" />`;
         case 'image':
         case 'pdf':
-          return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${baseSw * 0.5}" rx="4" />`;
+          return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.width)}" height="${num(el.height)}" fill="#e2e8f0" stroke="#94a3b8" stroke-width="${baseSw * 0.5}" rx="4" />`;
         case 'markdown':
-          return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="#fffbeb" stroke="#fcd34d" stroke-width="${baseSw * 0.5}" rx="4" />`;
+          return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.width)}" height="${num(el.height)}" fill="#fffbeb" stroke="#fcd34d" stroke-width="${baseSw * 0.5}" rx="4" />`;
         case 'table':
-          return `<rect x="${el.x}" y="${el.y}" width="${el.width}" height="${el.height}" fill="#f0fdf4" stroke="#86efac" stroke-width="${baseSw * 0.5}" rx="4" />`;
+          return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.width)}" height="${num(el.height)}" fill="#f0fdf4" stroke="#86efac" stroke-width="${baseSw * 0.5}" rx="4" />`;
         default:
           return '';
       }
