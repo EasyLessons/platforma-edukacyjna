@@ -45,6 +45,8 @@ Odpala się na każdym PR do `main` i na każdym pushu do `main`. Wymagane do me
 | `backend-audit` | `pip-audit -r requirements.txt --strict` w `backend/`; podatności bez poprawki w obrębie naszego majora są wpisane z powodem w `backend/pip-audit-ignore.txt` (każdy wpis ma warunek usunięcia). Każda nowa podatność spoza listy = czerwony job | `pip install pip-audit`, potem komenda z joba |
 | `gitleaks` | binarka `gitleaks` (bez licencji, w przeciwieństwie do `gitleaks-action` dla organizacji): commity z PR skanowane z twardym failem; cała historia tylko informacyjnie (`continue-on-error`) do czasu rotacji 4 starych wpisów i allowlisty w `.gitleaks.toml` | `gitleaks git --redact .` |
 
+**Fonty a build.** `next build` (joby `frontend-build` i `e2e-board-engine`) nie pobiera niczego z Google Fonts: Plus Jakarta Sans i Playfair Display leżą w repo jako woff2 (`src/_new/shared/fonts/`, licencja OFL obok) i są ładowane przez `next/font/local`. Wcześniej `next/font/google` ściągał je w trakcie builda i przy chwilowej niedostępności `fonts.googleapis.com` job padał losowo. Nowy font = plik woff2 + wpis w `src/_new/shared/fonts/index.ts`; import `next/font/google` blokuje ESLint (`no-restricted-imports`).
+
 **Przed pushem warto odpalić to lokalnie**, żeby nie czekać na czerwone CI:
 ```
 # backend (z venv aktywnym w backend/)
