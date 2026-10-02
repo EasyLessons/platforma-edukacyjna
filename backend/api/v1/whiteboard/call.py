@@ -2,16 +2,19 @@
 Rozmowa glosowa tablicy przez Daily (https://docs.daily.co/reference/rest-api).
 
 POST /api/v1/whiteboard/{board_id}/call (router.py -> WhiteboardService.create_call) wola
-`create_board_call`. Kolejnosc: najpierw tanie i lokalne (wylacznik, klucz, rate limit),
+`create_board_call`. Kolejnosc: najpierw tanie i lokalne (wylacznik, klucz, rate limit, rejestr),
 potem zuzycie miesiaca, na koncu pokoj i token w Daily. Pelny opis i model zagrozen:
 docs/architecture/pipelines.md pkt 5a.
 
   * TWORZY (i przedluza) pokoj tylko wlasciciel przestrzeni dopuszczony przez
-    CALL_ALLOWED_USER_IDS; pozostali czlonkowie tylko DOLACZAJA do aktywnego pokoju
-    (zero zapisow w Daily) albo dostaja 409 VOICE_CALL_NOT_STARTED,
+    CALL_ALLOWED_USER_IDS - pod blokada na tworzacego (jedna operacja naraz, najwyzej jeden
+    zywy pokoj). Pozostali czlonkowie tylko DOLACZAJA do pokoju z rejestru (zero zapisow
+    w Daily); bez pokoju odmowa jest lokalna: 409 VOICE_CALL_NOT_STARTED / VOICE_CALL_ENDING,
+  * kazdy pokoj jest wpisywany do rejestru i budzetu PRZED wywolaniem Daily (rezerwacja
+    pelnego czasu zycia x max_participants); nieudane tworzenie cofa wpis,
   * token dostaje tylko pokoj spelniajacy wymogi (`_room_problem`): prywatny, z `exp` <= 3 h,
-    `eject_at_room_exp`, `max_participants` <= limit, bez platnych funkcji. Inny pokoj
-    wlasciciel kasuje i tworzy od nowa, dolaczajacy dostaje odmowe,
+    `eject_at_room_exp`, `max_participants` <= limit, bez platnych funkcji i bez adminow.
+    Inny pokoj wlasciciel kasuje i tworzy od nowa, dolaczajacy dostaje odmowe,
   * token ZAWSZE ma `room_name` (bez niego otwiera kazdy pokoj domeny), krotki `exp`
     (tylko na wejscie) i `eject_after_elapsed` liczone tak, by nikt nie zostal po `exp` pokoju,
   * klucz API i token nigdy nie trafiaja do logow ani do tresci bledow.
@@ -19,6 +22,8 @@ docs/architecture/pipelines.md pkt 5a.
 Kody statusow Daily, ktorych dokumentacja nie potwierdza (brak pokoju: 404 albo 400
 "not found"; duplikat nazwy przy tworzeniu; limit pokoi), obslugujemy w obu wariantach.
 """
+import asyncio
+import math
 import re
 import time
 import unicodedata
@@ -38,7 +43,6 @@ from .schemas import CallResponse
 
 logger = get_logger(__name__)
 
-DEFAULT_ROOM_PREFIX = "easylesson"
 USER_NAME_MAX_LENGTH = 64
 USER_NAME_FALLBACK = "Uczestnik"
 
@@ -48,10 +52,14 @@ USER_NAME_FALLBACK = "Uczestnik"
 TOKEN_ENTRY_SECONDS = 5 * 60
 # Ponizej tego czasu do `exp` pokoj traktujemy jak nieaktywny (nie warto do niego wpuszczac).
 MIN_JOIN_REMAINING_SECONDS = TOKEN_ENTRY_SECONDS + 60
-# Wlasciciel przedluza pokoj dopiero, gdy do `exp` zostalo mniej niz tyle - odswiezenie strony
-# w trakcie lekcji nie zuzywa dziennego budzetu.
+# Wlasciciel przedluza pokoj dopiero, gdy do `exp` zostalo mniej niz tyle.
 EXTEND_THRESHOLD_SECONDS = 15 * 60
+# Wlasciciel klika "Rozmowa", a jego pokoj (starszy niz tyle) jest PUSTY: stary pokoj jest
+# rozliczany do tej chwili i zastepowany nowym z pelnym czasem (kolejna lekcja na tej samej tablicy).
+RECYCLE_MIN_AGE_SECONDS = 10 * 60
 EXP_SKEW_SECONDS = 60
+# Ile zakonczonych pokoi tworzacego rozliczamy wg spotkan z Daily przy jednym zadaniu.
+SETTLE_MAX_PER_REQUEST = 3
 
 # Platne / ryzykowne wlasciwosci pokoju - pokoj z ktorakolwiek wlaczona nie dostaje tokenu.
 # Nazwy potwierdzone w docs Daily (rooms/create-room, 02.10.2026). `enable_recording` nie ma
@@ -70,10 +78,9 @@ FORBIDDEN_ROOM_PROPERTIES = (
 )
 
 # Sprzatanie wygaslych pokoi (limit 50 pokoi na koncie Daily) - tylko przy tworzeniu nowego.
-# Limit dotyczy PROB (kazda to do 2 wywolan Daily), nie udanych kasowan.
-CLEANUP_LIST_LIMIT = 100
+# Limit dotyczy PROB (kazda to do 2 wywolan Daily), nie udanych kasowan. Kasujemy dopiero po
+# okresie karencji rezerwacji (`guard.RESERVATION_GRACE_SECONDS`).
 CLEANUP_MAX_ATTEMPTS = 5
-CLEANUP_GRACE_SECONDS = 300
 
 _BLANKS = "\t\n\r\x0b\x0c"
 _ROOM_URL = re.compile(r"https://[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\.daily\.co/([a-z0-9-]+)")
@@ -86,10 +93,22 @@ class CallUser:
     email_verified: bool
 
 
+@dataclass
+class _Owner:
+    """Kontekst jednej operacji tworzacego (pod blokada `guard.creator_lock`)."""
+
+    client: httpx.AsyncClient
+    api_key: str
+    user_id: int
+    state: guard.OwnerState
+    usage: call_usage.MonthUsage
+    now: int
+    planned: int = 0
+
+
 def room_name_for_board(board_id: int) -> str:
     """Deterministyczna nazwa pokoju: tylko male litery, cyfry i myslnik."""
-    prefix = re.sub(r"[^a-z0-9-]", "", (get_settings().daily_room_prefix or "").lower()).strip("-")
-    return f"{prefix or DEFAULT_ROOM_PREFIX}-board-{int(board_id)}"
+    return f"{guard.room_prefix()}-board-{int(board_id)}"
 
 
 def clean_user_name(username: str | None) -> str:
@@ -132,7 +151,9 @@ def _is_room_missing(response: httpx.Response) -> bool:
 def _room_exp(room: dict) -> float | None:
     config = room.get("config")
     exp = config.get("exp") if isinstance(config, dict) else None
-    return exp if isinstance(exp, (int, float)) and not isinstance(exp, bool) else None
+    if isinstance(exp, bool) or not isinstance(exp, (int, float)) or not math.isfinite(exp):
+        return None
+    return exp
 
 
 def _room_problem(room: dict, name: str, now: int) -> str | None:
@@ -157,10 +178,27 @@ def _room_problem(room: dict, name: str, now: int) -> str | None:
     for key in FORBIDDEN_ROOM_PROPERTIES:
         if config.get(key):
             return f"włączone {key}"
+    # Nikt nie jest adminem spotkania: admin moglby nadac innym uprawnienia do platnych funkcji.
+    # Dopuszczalne: brak pola, false albo pusta lista (zadnego rodzaju uprawnien admina).
+    permissions = config.get("permissions")
+    if permissions is not None:
+        admin = permissions.get("canAdmin") if isinstance(permissions, dict) else True
+        if admin is not None and admin is not False and admin != []:
+            return "permissions.canAdmin"
     return None
 
 
-def _call_not_started() -> AppException:
+def _join_refusal(is_workspace_owner: bool, ending: bool) -> AppException:
+    if is_workspace_owner:
+        return AppException(
+            "To konto nie może jeszcze rozpoczynać rozmów", code="VOICE_CREATE_NOT_ALLOWED", status_code=403
+        )
+    if ending:
+        return AppException(
+            "Rozmowa właśnie się kończy - poproś nauczyciela o rozpoczęcie nowej",
+            code="VOICE_CALL_ENDING",
+            status_code=409,
+        )
     return AppException(
         "Rozmowa jeszcze się nie zaczęła - poczekaj na nauczyciela",
         code="VOICE_CALL_NOT_STARTED",
@@ -174,6 +212,17 @@ def _monthly_limit() -> AppException:
         code="VOICE_MONTHLY_LIMIT",
         status_code=429,
     )
+
+
+async def _planned_minutes(usage: call_usage.MonthUsage, now: int) -> int:
+    """Zuzycie z Daily + rezerwacje (rejestr czytany na swiezo). Ponad prog -> 429."""
+    records = await guard.reserved_rooms(now)
+    planned = usage.minutes + call_usage.reserved_total(usage, records, now)
+    cap = guard.monthly_cap_minutes()
+    if planned > cap or usage.minutes >= cap:
+        logger.warning(f"Rozmowa: miesięczny próg minut osiągnięty ({planned}/{cap} min) - odmawiam")
+        raise _monthly_limit()
+    return planned
 
 
 async def _get_room(client: httpx.AsyncClient, name: str, api_key: str) -> dict | None:
@@ -195,65 +244,60 @@ async def _room_is_empty(client: httpx.AsyncClient, name: str) -> bool:
     return response.status_code == 200 and data.get("data") == [] and data.get("total_count") in (0, None)
 
 
-async def _delete_room(client: httpx.AsyncClient, name: str, api_key: str) -> bool:
+async def _delete_room(client: httpx.AsyncClient, name: str, api_key: str, empty: bool | None = None) -> bool:
     """
     Kasuje pokoj; brak pokoju = OK. Inny blad -> wyjatek (nie tworzymy nic na niepewnym stanie).
-    Zwraca True, gdy tuz przed skasowaniem pokoj byl na pewno pusty - tylko wtedy wolno zwrocic
-    tworzacemu niewykorzystany budzet (dokumentacja Daily nie potwierdza, ze DELETE rozlacza
+    Zwraca True, gdy tuz przed skasowaniem pokoj byl na pewno pusty - tylko wtedy wolno skrocic
+    jego rezerwacje i rozliczenie (dokumentacja Daily nie potwierdza, ze DELETE rozlacza
     trwajaca rozmowe; uczestnikow i tak konczy `eject_after_elapsed` z ich tokenow).
+    `empty` = wynik sprawdzenia obecnosci zrobionego juz przez wolajacego.
     """
-    was_empty = await _room_is_empty(client, name)
+    was_empty = await _room_is_empty(client, name) if empty is None else empty
     response = await daily.request(client, "DELETE", f"/rooms/{name}")
     if response.status_code != 200 and not _is_room_missing(response):
         raise daily.provider_error(response, "kasowanie pokoju", api_key)
-    await guard.unregister_room(name)
     return was_empty
 
 
-async def _cleanup_expired_rooms(client: httpx.AsyncClient, own_name: str, now: int) -> None:
+async def _cleanup_expired_rooms(owner: _Owner, own_name: str) -> None:
     """
-    Best-effort: kasuje wygasle pokoje INNYCH tablic z naszym prefiksem (limit 50 pokoi konta).
-    Kandydaci: nasz rejestr w Redis (lista Daily moze nie zwracac pokoi po `exp`) + lista Daily.
+    Best-effort: kasuje dawno wygasle pokoje INNYCH tablic z naszym prefiksem (limit 50 pokoi konta).
+    Kandydaci: wpisy rejestru po okresie karencji + wygasle pokoje z listy Daily (z odczytu zuzycia).
     Przed kazdym DELETE pokoj jest pobierany ponownie - odswiezonego w miedzyczasie nie kasujemy.
     Nigdy nie rzuca: blad sprzatania nie moze zablokowac rozmowy.
     """
-    ours = re.compile(rf"^{re.escape(own_name[: own_name.rindex('-') + 1])}\d+$")
+    client, now = owner.client, owner.now
     try:
-        candidates = await guard.expired_rooms(now, CLEANUP_GRACE_SECONDS, CLEANUP_MAX_ATTEMPTS)
-        if len(candidates) < CLEANUP_MAX_ATTEMPTS:
-            listed = await daily.request(client, "GET", "/rooms", params={"limit": CLEANUP_LIST_LIMIT})
-            rooms = daily.body(listed).get("data") if listed.status_code == 200 else None
-            for room in rooms if isinstance(rooms, list) else []:
-                exp = _room_exp(room) if isinstance(room, dict) else None
-                if exp is not None and exp <= now - CLEANUP_GRACE_SECONDS and isinstance(room.get("name"), str):
-                    candidates.append(room["name"])
-
+        stale = await guard.stale_rooms(now, CLEANUP_MAX_ATTEMPTS)
         attempts = 0
-        for name in dict.fromkeys(candidates):
+        for name in dict.fromkeys([record.name for record in stale] + list(owner.usage.expired)):
             if attempts >= CLEANUP_MAX_ATTEMPTS:
                 break
-            if name == own_name or not ours.fullmatch(name):
-                continue
-            attempts += 1
-            fresh = await daily.request(client, "GET", f"/rooms/{name}")
-            if _is_room_missing(fresh):
-                await guard.unregister_room(name)
-                continue
-            exp = _room_exp(daily.body(fresh)) if fresh.status_code == 200 else None
-            if exp is None or exp > int(time.time()) - CLEANUP_GRACE_SECONDS:
-                continue  # odswiezony albo nieczytelny - zostaje
-            result = await daily.request(client, "DELETE", f"/rooms/{name}")
-            if result.status_code == 200 or _is_room_missing(result):
-                await guard.unregister_room(name)
-            else:
-                logger.warning(f"Daily - kasowanie wygasłego pokoju {name}: HTTP {result.status_code}")
+            members = [record.member for record in stale if record.name == name]
+            if name != own_name and guard.is_board_room(name):
+                attempts += 1
+                fresh = await daily.request(client, "GET", f"/rooms/{name}")
+                if not _is_room_missing(fresh):
+                    if fresh.status_code != 200:
+                        continue  # nieczytelny - zostaje
+                    exp = _room_exp(daily.body(fresh))
+                    if exp is None:
+                        continue
+                    if exp <= int(time.time()) - guard.RESERVATION_GRACE_SECONDS:
+                        result = await daily.request(client, "DELETE", f"/rooms/{name}")
+                        if result.status_code != 200 and not _is_room_missing(result):
+                            logger.warning(f"Daily - kasowanie wygasłego pokoju {name}: HTTP {result.status_code}")
+                            continue
+                    # else: pod ta nazwa zyje juz nowszy pokoj - stary wpis rejestru jest zbedny
+            for member in members:
+                await guard.forget_room(member)
         if attempts:
             logger.info(f"Daily - sprzątanie wygasłych pokoi: {attempts} prób")
     except Exception as e:  # AppException, Redis, nieoczekiwany ksztalt odpowiedzi
         logger.warning(f"Daily - sprzątanie wygasłych pokoi nieudane ({type(e).__name__}), pomijam")
 
 
-def _room_payload(name: str, exp: int) -> dict:
+def _room_payload(name: str, exp: int, participants: int) -> dict:
     return {
         "name": name,
         "privacy": "private",
@@ -261,7 +305,7 @@ def _room_payload(name: str, exp: int) -> dict:
             "exp": exp,
             # Bezpiecznik kosztow: po `exp` Daily konczy spotkanie, zapomniana karta nie nabija minut.
             "eject_at_room_exp": True,
-            "max_participants": guard.max_participants(),
+            "max_participants": participants,
             "start_video_off": True,
             "start_audio_off": False,
             "enable_prejoin_ui": True,
@@ -279,49 +323,118 @@ def _room_payload(name: str, exp: int) -> dict:
     }
 
 
-async def _create_room(
-    client: httpx.AsyncClient,
-    name: str,
-    user_id: int,
-    now: int,
-    planned_minutes: int,
-    api_key: str,
-    replaced_was_empty: bool,
-) -> dict:
-    """Tworzy pokoj wlasciciela: budzet dzienny -> prog miesieczny -> Daily. Zwraca pokoj."""
-    # Jeden aktywny pokoj na tworzacego: poprzedni (inna tablica) kasujemy. Niewykorzystany czas
-    # wraca do budzetu TYLKO, gdy Daily potwierdzil, ze skasowany pokoj byl pusty.
-    previous = await guard.get_owner_room(user_id)
-    if previous is not None and previous.exp > now:
-        was_empty = replaced_was_empty
-        if previous.room != name:
-            was_empty = await _delete_room(client, previous.room, api_key)
-        if was_empty:
-            await guard.refund_budget(user_id, previous.exp - now, previous.day)
-    if previous is not None:
-        await guard.clear_owner_room(user_id)
+async def _save(owner: _Owner) -> None:
+    await guard.save_owner(owner.user_id, owner.state)
 
-    ttl = await guard.reserve_budget(user_id, guard.room_ttl_seconds(), guard.ROOM_MIN_TTL_SECONDS, now)
-    day = guard.day_of(now)
+
+async def _settle_closed_rooms(owner: _Owner) -> None:
+    """
+    Zakonczone pokoje tworzacego, po okresie karencji: budzet dzienny obciaza REALNY czas rozmowy
+    wg spotkan z Daily (nie pelna rezerwacja) - uczciwy nauczyciel nie placi za czas, gdy pokoj
+    stal pusty. Rozliczenie moze obciazenie tylko ZMNIEJSZYC; kazda watpliwosc = bez zmian.
+    """
+    now = owner.now
+    changed = False
+    done = 0
+    for entry in owner.state.rooms:
+        if entry.settled or (entry.open and entry.end > now):
+            continue
+        if entry.end > now - guard.RESERVATION_GRACE_SECONDS or done >= SETTLE_MAX_PER_REQUEST:
+            continue
+        done += 1
+        if entry.charged > guard.MIN_CHARGE_SECONDS:
+            try:
+                seconds = await call_usage.room_meeting_seconds(
+                    owner.client, entry.room, entry.created, entry.end, now
+                )
+            except call_usage.UNREADABLE as e:
+                logger.warning(f"Rozmowa: nie udało się rozliczyć pokoju {entry.room} ({type(e).__name__})")
+                continue
+            if seconds is None:
+                continue
+            entry.charged = min(entry.charged, max(guard.MIN_CHARGE_SECONDS, seconds))
+        entry.settled = True
+        changed = True
+    if changed:
+        await _save(owner)
+
+
+async def _close_room(owner: _Owner, entry: guard.OwnerRoom, *, exists: bool, empty: bool | None = None) -> None:
+    """
+    Konczy pokoj tworzacego (zastapienie nowym). Niewykorzystany czas wraca do budzetu TYLKO, gdy
+    Daily potwierdzil, ze pokoj byl pusty (albo pokoju juz nie ma) - rozliczenie = czas od
+    utworzenia do teraz. Wpis jest zamykany raz (pod blokada), wiec zwrotu nie da sie powtorzyc.
+    """
+    now = owner.now
+    was_empty = False
+    if exists:
+        was_empty = await _delete_room(owner.client, entry.room, owner.api_key, empty)
+    entry.open = False
+    if was_empty or not exists:
+        entry.charged = min(entry.charged, max(guard.MIN_CHARGE_SECONDS, now - entry.created))
+    if was_empty:
+        # Pusty i skasowany: rezerwacja miesieczna konczy sie teraz (+ okres karencji).
+        entry.end = max(entry.created, now)
+        await guard.register_room(entry.member, entry.end)
+    await _save(owner)
+
+
+async def _rollback(owner: _Owner, entry: guard.OwnerRoom) -> None:
+    """Cofa wpis pokoju, ktory na pewno nie powstal. Blad Redis = wpis zostaje (zawyzenie)."""
     try:
-        if planned_minutes + -(-ttl * guard.max_participants() // 60) > guard.monthly_cap_minutes():
-            logger.warning("Rozmowa: nowy pokój przekroczyłby miesięczny próg minut - odmawiam")
-            raise _monthly_limit()
+        if entry in owner.state.rooms:
+            owner.state.rooms.remove(entry)
+        await _save(owner)
+        await guard.forget_room(entry.member)
+    except AppException:
+        logger.warning("Rozmowa: nie udało się cofnąć rezerwacji pokoju (zostaje zarezerwowana)")
 
-        await _cleanup_expired_rooms(client, name, now)
-        exp = now + ttl
-        created = await daily.request(client, "POST", "/rooms", json=_room_payload(name, exp))
-        raced = False
+
+async def _room_is_gone(owner: _Owner, name: str) -> bool:
+    """Best-effort DELETE po nieudanym tworzeniu. True = pokoju na pewno nie ma w Daily."""
+    try:
+        response = await daily.request(owner.client, "DELETE", f"/rooms/{name}")
+    except AppException:
+        return False
+    return response.status_code == 200 or _is_room_missing(response)
+
+
+async def _create_room(owner: _Owner, name: str) -> dict:
+    """
+    Tworzy pokoj wlasciciela. Budzet dzienny i rejestr (rezerwacja miesieczna) sa zapisywane
+    PRZED wywolaniem Daily; gdy pokoj na pewno nie powstal - wpisy sa cofane.
+    """
+    now, state = owner.now, owner.state
+    day = guard.day_of(now)
+    ttl = min(guard.room_ttl_seconds(), guard.budget_left(state, day))
+    if ttl < guard.ROOM_MIN_TTL_SECONDS or state.count(day) >= guard.MAX_ROOMS_PER_DAY:
+        raise guard.user_limit_reached()
+    exp = now + ttl
+    participants = guard.max_participants()
+    entry = guard.OwnerRoom(
+        room=name, member=guard.room_member(name, now, participants), created=now, end=exp, charged=ttl, day=day
+    )
+    state.rooms.append(entry)
+    await _save(owner)
+
+    sent = False  # czy zadanie utworzenia poszlo do Daily (pokoj MOZE istniec)
+    try:
+        await guard.register_room(entry.member, exp)
+        owner.planned = await _planned_minutes(owner.usage, now)
+        await _cleanup_expired_rooms(owner, name)
+        sent = True
+        created = await daily.request(
+            owner.client, "POST", "/rooms", json=_room_payload(name, exp, participants)
+        )
         if created.status_code == 200:
             room = daily.body(created)
         elif created.status_code == 400 and not daily.looks_like_account_limit(created):
-            # Najpewniej wyscig (dwa klikniecia wlasciciela): pokoj juz jest.
-            room = await _get_room(client, name, api_key)
+            # Pokoj o tej nazwie juz jest (utworzony poza nami) - przejmujemy go, jesli spelnia wymogi.
+            room = await _get_room(owner.client, name, owner.api_key)
             if room is None:
-                raise daily.provider_error(created, "tworzenie pokoju", api_key)
-            raced = True
+                raise daily.provider_error(created, "tworzenie pokoju", owner.api_key)
         else:
-            raise daily.provider_error(created, "tworzenie pokoju", api_key)
+            raise daily.provider_error(created, "tworzenie pokoju", owner.api_key)
 
         problem = _room_problem(room, name, now)
         if problem is None and (_room_exp(room) or 0) < now + MIN_JOIN_REMAINING_SECONDS:
@@ -329,58 +442,104 @@ async def _create_room(
         if problem is not None:
             # Daily nie zastosowal wymaganych ustawien - pokoju "luzniejszego" nie zostawiamy.
             logger.error(f"Daily - utworzony pokój {name} nie spełnia wymogów ({problem}), kasuję")
-            await _delete_room(client, name, api_key)
             raise daily.provider_unavailable()
+
+        room_exp = int(_room_exp(room))
+        if room_exp != exp:
+            entry.end = room_exp
+            entry.charged = max(guard.MIN_CHARGE_SECONDS, room_exp - now)
+            await _save(owner)
+            await guard.register_room(entry.member, room_exp)
+        return room
     except BaseException:
-        await guard.refund_budget(user_id, ttl, day)
+        # Pokoj mogl powstac, a my nie umiemy go obsluzyc (blad Daily, Redis padl w polowie):
+        # probujemy go skasowac. Wpisy cofamy tylko, gdy pokoju NA PEWNO nie ma.
+        if not sent or await _room_is_gone(owner, name):
+            await _rollback(owner, entry)
         raise
 
-    room_exp = int(_room_exp(room))
-    if raced:
-        # Pokoj utworzylo rownolegle zadanie tego samego wlasciciela i ono za niego zaplacilo -
-        # podwojne klikniecie nie zjada budzetu drugi raz.
-        await guard.refund_budget(user_id, ttl, day)
-    else:
-        await guard.set_owner_room(user_id, name, room_exp, day, now)
-    await guard.register_room(name, room_exp)
-    return room
 
-
-async def _extend_room(
-    client: httpx.AsyncClient, room: dict, name: str, user_id: int, now: int, planned_minutes: int, api_key: str
-) -> dict:
-    """Przedluza konczacy sie pokoj wlasciciela o tyle, na ile pozwala budzet. Bez budzetu - bez zmian."""
-    old_exp = int(_room_exp(room))
-    wanted = now + guard.room_ttl_seconds() - old_exp
-    extra_minutes = -(-wanted * guard.max_participants() // 60)
-    if wanted < 60 or planned_minutes + extra_minutes > guard.monthly_cap_minutes():
-        return room
-    try:
-        added = await guard.reserve_budget(user_id, wanted, 60, now)
-    except AppException as e:
-        if e.code != "VOICE_USER_LIMIT":
-            raise
-        return room
+async def _adopt_room(owner: _Owner, room: dict, name: str) -> guard.OwnerRoom:
+    """
+    Zgodny pokoj tablicy istnieje w Daily, ale tworzacy nie ma go w swoich wpisach (utrata danych
+    Redis, pokoj utworzony poza nami): przejmujemy go - pozostaly czas obciaza budzet, a pokoj
+    wraca do rejestru z czasem zycia liczonym od utworzenia wg Daily (albo 3 h).
+    """
+    now, state = owner.now, owner.state
+    exp = int(_room_exp(room))
     day = guard.day_of(now)
+    cost = max(guard.MIN_CHARGE_SECONDS, exp - now)
+    if cost > guard.budget_left(state, day) or state.count(day) >= guard.MAX_ROOMS_PER_DAY:
+        raise guard.user_limit_reached()
+    born = call_usage.room_created(room)
+    if not 0 < born <= now:
+        born = exp - guard.ROOM_MAX_TTL_SECONDS
+    limit = room["config"]["max_participants"]
+    records = await guard.reserved_rooms(now)
+    known = guard.live_record(records, name, now)
+    member = known.member if known is not None else guard.room_member(name, born, limit)
+    entry = guard.OwnerRoom(room=name, member=member, created=now, end=exp, charged=cost, day=day)
+    state.rooms.append(entry)
+    await _save(owner)
+    await guard.register_room(member, exp)
+    owner.planned = await _planned_minutes(owner.usage, now)
+    return entry
+
+
+async def _extend_room(owner: _Owner, room: dict, entry: guard.OwnerRoom, name: str) -> dict:
+    """Przedluza konczacy sie pokoj wlasciciela o tyle, na ile pozwala budzet. Bez budzetu - bez zmian."""
+    now, state = owner.now, owner.state
+    old_exp = int(_room_exp(room))
+    added = min(now + guard.room_ttl_seconds() - old_exp, guard.budget_left(state, entry.day))
+    if added < 60:
+        return room
+    before = (entry.end, entry.charged)
+    entry.end, entry.charged = old_exp + added, entry.charged + added
+    await _save(owner)
+    await guard.register_room(entry.member, entry.end)
+
+    async def restore(end: int) -> None:
+        entry.end, entry.charged = end, before[1] + max(0, end - old_exp)
+        try:
+            await _save(owner)
+            await guard.register_room(entry.member, end)
+        except AppException:
+            logger.warning("Rozmowa: nie udało się cofnąć przedłużenia (zostaje zarezerwowane)")
+
     try:
-        updated = await daily.request(client, "POST", f"/rooms/{name}", json={"properties": {"exp": old_exp + added}})
+        owner.planned = await _planned_minutes(owner.usage, now)
+    except AppException as e:
+        await restore(before[0])
+        if e.code != "VOICE_MONTHLY_LIMIT":
+            raise
+        return room  # bez miejsca w puli miesiecznej pokoj zostaje, jaki byl
+
+    try:
+        updated = await daily.request(
+            owner.client, "POST", f"/rooms/{name}", json={"properties": {"exp": entry.end}}
+        )
         if updated.status_code != 200:
-            raise daily.provider_error(updated, "przedłużenie pokoju", api_key)
+            raise daily.provider_error(updated, "przedłużenie pokoju", owner.api_key)
         fresh = daily.body(updated)
         if _room_problem(fresh, name, now) is not None or int(_room_exp(fresh) or 0) < old_exp:
             logger.error(f"Daily - pokój {name} po przedłużeniu nie spełnia wymogów")
             raise daily.provider_unavailable()
     except BaseException:
-        await guard.refund_budget(user_id, added, day)
+        # Nie wiemy, czy Daily przesunal `exp`: pytamy o stan faktyczny; bez odpowiedzi
+        # zostaje dluzsza rezerwacja (zawyzenie).
+        try:
+            actual = await _get_room(owner.client, name, owner.api_key)
+            actual_exp = _room_exp(actual) if actual is not None else None
+            if actual_exp is not None:
+                await restore(max(old_exp, min(int(actual_exp), entry.end)))
+        except AppException:
+            pass
         raise
-    new_exp = int(_room_exp(fresh))
-    await guard.set_owner_room(user_id, name, new_exp, day, now)
-    await guard.register_room(name, new_exp)
     return fresh
 
 
 async def _create_token(
-    client: httpx.AsyncClient, *, room_name: str, user: CallUser, is_creator: bool, room_exp: int, now: int, api_key: str
+    client: httpx.AsyncClient, *, room_name: str, user: CallUser, room_exp: int, now: int, api_key: str
 ) -> tuple[str, int]:
     token_exp = min(now + TOKEN_ENTRY_SECONDS, room_exp)
     stay = min(guard.ROOM_MAX_TTL_SECONDS, room_exp - now - TOKEN_ENTRY_SECONDS)
@@ -396,10 +555,10 @@ async def _create_token(
                 "exp": token_exp,
                 "eject_at_token_exp": False,
                 "eject_after_elapsed": max(1, stay),
-                # `is_owner` daje tez prawo uruchamiania platnych funkcji (streaming, transkrypcja),
-                # wiec nikt go nie dostaje; tworzacy moze tylko zarzadzac uczestnikami.
+                # `is_owner` i `canAdmin` daja prawo uruchamiania platnych funkcji (streaming,
+                # transkrypcja) albo nadawania uprawnien innym - nikt ich nie dostaje, takze tworzacy.
                 "is_owner": False,
-                "permissions": {"canAdmin": ["participants"] if is_creator else False},
+                "permissions": {"canAdmin": False},
                 "enable_recording_ui": False,
                 "start_video_off": True,
                 "start_audio_off": False,
@@ -420,13 +579,104 @@ def call_api_key() -> str:
     settings = get_settings()
     if not settings.call_enabled:
         raise AppException("Rozmowy głosowe są chwilowo wyłączone", code="VOICE_DISABLED", status_code=503)
-    api_key = (settings.daily_api_key or "").strip()
+    api_key = guard.daily_api_key()
     if not api_key:
         logger.warning("Rozmowa głosowa wyłączona: brak DAILY_API_KEY")
         raise AppException(
             "Rozmowy głosowe są chwilowo wyłączone", code="VOICE_NOT_CONFIGURED", status_code=503
         )
     return api_key
+
+
+async def _join_room(
+    board_id: int, name: str, user: CallUser, is_workspace_owner: bool, client_ip: str, api_key: str
+) -> CallResponse:
+    """Dolaczajacy: tylko pokoj z rejestru, zero zapisow w Daily. Bez pokoju - odmowa lokalna."""
+    now = int(time.time())
+    record = guard.live_record(await guard.reserved_rooms(now), name, now)
+    if record is None or record.end - now < MIN_JOIN_REMAINING_SECONDS:
+        raise _join_refusal(is_workspace_owner, ending=record is not None)
+
+    async with daily.daily_http_client(api_key) as client:
+        usage = await call_usage.get_month_usage(client, api_key, now)
+        planned = await _planned_minutes(usage, now)
+        room = await _get_room(client, name, api_key)
+        problem = _room_problem(room, name, now) if room is not None else "brak pokoju"
+        remaining = int(_room_exp(room)) - now if problem is None else 0
+        if problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS:
+            if room is not None and problem is not None:
+                logger.error(f"Daily - pokój {name} nie spełnia wymogów ({problem}) - odmawiam tokenu")
+            raise _join_refusal(is_workspace_owner, ending=problem is None)
+        await guard.count_ip_attempt(client_ip)
+        token, token_exp = await _create_token(
+            client, room_name=name, user=user, room_exp=now + remaining, now=now, api_key=api_key
+        )
+    _log_issued(board_id, False, usage, planned)
+    return CallResponse(
+        room_url=room["url"], token=token, expires_at=datetime.fromtimestamp(token_exp, tz=timezone.utc)
+    )
+
+
+async def _owner_room(board_id: int, name: str, user: CallUser, api_key: str) -> CallResponse:
+    """Tworzacy (pod blokada): rozliczenie poprzednich pokoi, pokoj tej tablicy, token."""
+    now = int(time.time())
+    async with daily.daily_http_client(api_key) as client:
+        usage = await call_usage.get_month_usage(client, api_key, now)
+        planned = await _planned_minutes(usage, now)
+        state = await guard.load_owner(user.id, now)
+        owner = _Owner(client=client, api_key=api_key, user_id=user.id, state=state, usage=usage, now=now, planned=planned)
+        await _settle_closed_rooms(owner)
+
+        # Jeden zywy pokoj na tworzacego: pokoj z innej tablicy konczymy.
+        live = state.live(now)
+        if live is not None and live.room != name:
+            # Najpierw sprawdzamy, czy po zamknieciu starczy budzetu na nowy pokoj - inaczej
+            # tworzacy stracilby trwajaca rozmowe i nie dostal nowej.
+            empty = await _room_is_empty(client, live.room)
+            day = guard.day_of(now)
+            refund = live.charged - max(guard.MIN_CHARGE_SECONDS, now - live.created)
+            left = guard.budget_left(state, day) + (max(0, refund) if empty and live.day == day else 0)
+            if left < guard.ROOM_MIN_TTL_SECONDS:
+                raise guard.user_limit_reached()
+            await _close_room(owner, live, exists=True, empty=empty)
+            live = None
+
+        room = await _get_room(client, name, api_key)
+        problem = _room_problem(room, name, now) if room is not None else "brak pokoju"
+        remaining = int(_room_exp(room)) - now if problem is None else 0
+
+        if problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS:
+            if room is not None and (_room_exp(room) is None or _room_exp(room) > now):
+                logger.warning(f"Daily - pokój {name} zastępuję nowym ({problem or 'wygasa'})")
+            if live is not None:
+                await _close_room(owner, live, exists=room is not None)
+            elif room is not None:
+                await _delete_room(client, name, api_key)
+            room = await _create_room(owner, name)
+        else:
+            if live is None:
+                live = await _adopt_room(owner, room, name)
+            if now - live.created >= RECYCLE_MIN_AGE_SECONDS and await _room_is_empty(client, name):
+                await _close_room(owner, live, exists=True, empty=True)
+                room = await _create_room(owner, name)
+            elif remaining < EXTEND_THRESHOLD_SECONDS:
+                room = await _extend_room(owner, room, live, name)
+
+        room_exp = int(_room_exp(room))
+        token, token_exp = await _create_token(
+            client, room_name=name, user=user, room_exp=room_exp, now=now, api_key=api_key
+        )
+    _log_issued(board_id, True, usage, owner.planned)
+    return CallResponse(
+        room_url=room["url"], token=token, expires_at=datetime.fromtimestamp(token_exp, tz=timezone.utc)
+    )
+
+
+def _log_issued(board_id: int, creator: bool, usage: call_usage.MonthUsage, planned: int) -> None:
+    logger.info(
+        f"Rozmowa: wydano token (board_id={board_id}, tworzący={creator}, "
+        f"zużycie miesiąca={usage.minutes} min, z rezerwacjami={planned}/{guard.monthly_cap_minutes()} min)"
+    )
 
 
 async def create_board_call(
@@ -436,65 +686,21 @@ async def create_board_call(
     if not user.email_verified:
         raise AppException("Potwierdź adres e-mail, aby korzystać z rozmów", code="VOICE_EMAIL_NOT_VERIFIED", status_code=403)
     api_key = call_api_key()
-    await guard.enforce_rate_limits(user.id, client_ip)
+    await guard.enforce_user_rate_limit(user.id)
 
     name = room_name_for_board(board_id)
-    now = int(time.time())
-    can_create = bool(is_workspace_owner) and guard.creator_allowed(user.id)
+    if not (bool(is_workspace_owner) and guard.creator_allowed(user.id)):
+        return await _join_room(board_id, name, user, bool(is_workspace_owner), client_ip, api_key)
 
-    async with daily.daily_http_client(api_key) as client:
-        usage = await call_usage.get_month_usage(client, api_key, now)
-        known = await guard.active_rooms(now)
-        planned = (
-            usage.minutes
-            + guard.reserved_minutes(known, now)
-            + call_usage.unknown_ongoing_minutes(usage, known, guard.ROOM_MAX_TTL_SECONDS)
-        )
-        cap = guard.monthly_cap_minutes()
-        if planned > cap or usage.minutes >= cap:
-            logger.warning(f"Rozmowa: miesięczny próg minut osiągnięty ({planned}/{cap} min) - odmawiam")
-            raise _monthly_limit()
-
-        room = await _get_room(client, name, api_key)
-        problem = _room_problem(room, name, now) if room is not None else "brak pokoju"
-        remaining = int(_room_exp(room) or 0) - now if problem is None else 0
-
-        if not can_create:
-            if problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS:
-                if room is not None and problem is not None:
-                    logger.error(f"Daily - pokój {name} nie spełnia wymogów ({problem}) - odmawiam tokenu")
-                if is_workspace_owner:
-                    raise AppException(
-                        "To konto nie może jeszcze rozpoczynać rozmów", code="VOICE_CREATE_NOT_ALLOWED", status_code=403
-                    )
-                raise _call_not_started()
-            # Rejestr mogl zniknac (restart Redis) - trwajacy pokoj wraca do rezerwacji progu.
-            await guard.register_room(name, now + remaining)
-        elif problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS:
-            was_empty = False
-            if room is not None:
-                if _room_exp(room) is None or _room_exp(room) > now:
-                    logger.warning(f"Daily - pokój {name} zastępuję nowym ({problem or 'wygasa'})")
-                was_empty = await _delete_room(client, name, api_key)
-            # Rezerwacja kasowanego pokoju nie liczy sie juz do progu.
-            planned -= guard.reserved_minutes({name: known[name]} if name in known else {}, now)
-            room = await _create_room(client, name, user.id, now, planned, api_key, was_empty)
-        else:
-            await guard.register_room(name, now + remaining)
-            if remaining < EXTEND_THRESHOLD_SECONDS:
-                room = await _extend_room(client, room, name, user.id, now, planned, api_key)
-
-        room_exp = int(_room_exp(room))
-        token, token_exp = await _create_token(
-            client, room_name=name, user=user, is_creator=can_create, room_exp=room_exp, now=now, api_key=api_key
-        )
-
-    logger.info(
-        f"Rozmowa: wydano token (board_id={board_id}, tworzący={can_create}, "
-        f"zużycie miesiąca={usage.minutes} min, z rezerwacjami={planned}/{cap} min)"
-    )
-    return CallResponse(
-        room_url=room["url"],
-        token=token,
-        expires_at=datetime.fromtimestamp(token_exp, tz=timezone.utc),
-    )
+    await guard.count_ip_attempt(client_ip)
+    async with guard.creator_lock(user.id):
+        try:
+            async with asyncio.timeout(guard.CREATOR_TIMEOUT_SECONDS):
+                return await _owner_room(board_id, name, user, api_key)
+        except TimeoutError:
+            logger.error("Rozmowa: operacja tworzącego przekroczyła limit czasu")
+            raise AppException(
+                "Połączenie z usługą rozmów przekroczyło limit czasu, spróbuj ponownie",
+                code="VOICE_PROVIDER_TIMEOUT",
+                status_code=504,
+            )

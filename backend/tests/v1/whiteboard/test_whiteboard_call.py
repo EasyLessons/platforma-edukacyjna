@@ -11,14 +11,15 @@ import httpx
 import pytest
 
 import api.v1.whiteboard.call as call
-import api.v1.whiteboard.call_guard as guard
 from core.config import get_settings
 
 from .daily_fake import (
-    API_KEY, DAILY_DOMAIN, DAILY_TOKEN, add_board, add_member, daily_error, post_call, room_of,
+    API_KEY, DAILY_DOMAIN, DAILY_TOKEN, add_board, add_member, budget_of, daily_error, post_call, registry,
+    room_of,
 )
 
 HOUR = 3600
+TTL = 90 * 60  # domyslny czas pokoju (DAILY_ROOM_TTL_MINUTES)
 
 
 def assert_no_secrets(response, caplog) -> None:
@@ -164,7 +165,13 @@ class TestAllowedCreators:
         monkeypatch.setattr(get_settings(), "call_allowed_user_ids", f" 999999 , {test_user.id} ")
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-    @pytest.mark.parametrize("value", ["abc", "1;2", "1,,2", "1 2", "-1", "1.5", ",", "１"])
+    @pytest.mark.parametrize("value", ["1,", ",1", "1,,999", " 1 , "])
+    def test_puste_segmenty_listy_sa_pomijane(self, client, daily, monkeypatch, test_user, test_board, value):
+        assert test_user.id == 1
+        monkeypatch.setattr(get_settings(), "call_allowed_user_ids", value)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+    @pytest.mark.parametrize("value", ["abc", "1;2", "1,,x", "1 2", "-1", "1.5", ",", ",,", "１", "1,abc,"])
     def test_smieciowa_lista_zamyka_tworzenie(self, client, daily, monkeypatch, test_user, test_board, value):
         monkeypatch.setattr(get_settings(), "call_allowed_user_ids", value)
 
@@ -196,7 +203,7 @@ class TestRoom:
         assert created["name"] == name
         assert created["privacy"] == "private"
         props = created["properties"]
-        assert before + 3 * HOUR <= props["exp"] <= int(time.time()) + 3 * HOUR
+        assert before + TTL <= props["exp"] <= int(time.time()) + TTL
         assert props["eject_at_room_exp"] is True
         assert props["max_participants"] == 4
         assert props["start_video_off"] is True
@@ -239,11 +246,11 @@ class TestRoom:
 
         assert len(daily.writes()) == writes  # odswiezenie strony: zero zapisow w Daily
 
-    def test_wyscig_przy_tworzeniu_konczy_sie_ponownym_get(self, client, daily, test_user, test_board):
+    def test_wyscig_przy_tworzeniu_konczy_sie_ponownym_get(self, client, daily, sync_redis_client, test_user, test_board):
         name = room_of(test_board)
 
         def lost_race(request):
-            daily.add_room(name, exp=int(time.time()) + HOUR)
+            daily.add_room(name, exp=int(time.time()) + HOUR, register=False)
             return daily_error(400, "invalid-request-error", f"a room named {name} already exists")
 
         daily.override("POST", "/rooms", lost_race)
@@ -252,6 +259,9 @@ class TestRoom:
 
         assert r.status_code == 200
         assert r.json()["data"]["room_url"] == f"{DAILY_DOMAIN}/{name}"
+        # rejestr i budzet ida za prawdziwym `exp` przejetego pokoju
+        assert registry(sync_redis_client)[name] == daily.rooms[name]["config"]["exp"]
+        assert HOUR - 5 <= budget_of(sync_redis_client, test_user.id) <= HOUR
 
     def test_daily_odrzuca_wlasciwosc_nie_tworzymy_luzniejszego_pokoju(self, client, daily, caplog, test_user, test_board):
         daily.override("POST", "/rooms", daily_error(400, "invalid-request-error", "unknown property enable_dialout"))
@@ -318,6 +328,10 @@ NONCOMPLIANT = [
     {"enable_transcription_storage": True},
     {"auto_transcription_settings": {"language": "pl"}},
     {"enable_knocking": True},
+    {"permissions": {"canAdmin": True}},
+    {"permissions": {"canAdmin": ["participants"]}},
+    {"permissions": {"canAdmin": ["streaming", "transcription"]}},
+    {"permissions": "admin"},
     {"exp": "far"},
     {"exp": None},
 ]
@@ -435,29 +449,55 @@ class TestExtend:
 
         assert r.status_code == 200
         new_exp = daily.body("POST", f"/rooms/{name}")["properties"]["exp"]
-        assert int(time.time()) + 3 * HOUR - 5 <= new_exp <= int(time.time()) + 3 * HOUR
-        reserved = int(sync_redis_client.get(f"call:budget:{test_user.id}:{guard.day_of(int(time.time()))}"))
-        assert reserved == new_exp - old_exp  # budzet obciaza tylko przyrost
+        assert int(time.time()) + TTL - 5 <= new_exp <= int(time.time()) + TTL
+        # budzet: pozostaly czas przejetego pokoju + przyrost; rejestr idzie za nowym exp
+        assert new_exp - int(time.time()) <= budget_of(sync_redis_client, test_user.id) <= new_exp - int(time.time()) + 5
+        assert registry(sync_redis_client)[name] == new_exp
 
-    def test_bez_budzetu_pokoj_nie_jest_przedluzany_ale_token_jest(self, client, daily, monkeypatch, test_user, test_board):
-        monkeypatch.setattr(get_settings(), "call_user_daily_minutes_cap", 0)
+    def test_bez_budzetu_pokoj_nie_jest_przedluzany_ale_token_jest(
+        self, client, daily, clock, monkeypatch, sync_redis_client, test_user, test_board
+    ):
+        monkeypatch.setattr(get_settings(), "call_user_daily_minutes_cap", 90)
         name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) + 10 * 60)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200  # caly budzet: 90 min
+        exp = daily.rooms[name]["config"]["exp"]
+        daily.presence[name] = [{"id": "p1"}]
+        clock.advance(80 * 60)
+        writes = len(daily.writes())
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 200
-        assert daily.writes() == []
+        assert len(daily.writes()) == writes
+        assert daily.rooms[name]["config"]["exp"] == exp
+        assert budget_of(sync_redis_client, test_user.id) == TTL
 
     def test_nieudane_przedluzenie_zwraca_rezerwacje(self, client, daily, sync_redis_client, test_user, test_board):
         name = room_of(test_board)
-        daily.add_room(name, exp=int(time.time()) + 10 * 60)
+        old_exp = int(time.time()) + 10 * 60
+        daily.add_room(name, exp=old_exp)
         daily.override("POST", f"/rooms/{name}", daily_error(500, "server-error"))
 
         r = post_call(client, test_board.id, test_user.id)
 
         assert r.status_code == 502
-        assert int(sync_redis_client.get(f"call:budget:{test_user.id}:{guard.day_of(int(time.time()))}")) == 0
+        # Daily nie przesunal exp (potwierdzone ponownym GET): zostaje tylko czas przejetego pokoju
+        assert 10 * 60 - 5 <= budget_of(sync_redis_client, test_user.id) <= 10 * 60
+        assert registry(sync_redis_client)[name] == old_exp
+
+    def test_przedluzenie_o_nieznanym_wyniku_zostawia_dluzsza_rezerwacje(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
+        name = room_of(test_board)
+        daily.add_room(name, exp=int(time.time()) + 10 * 60)
+        daily.override("POST", f"/rooms/{name}", httpx.ReadTimeout("timeout"))
+        daily.override("GET", f"/rooms/{name}", httpx.Response(200, json=daily.rooms[name]), httpx.ReadTimeout("t"))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert r.status_code == 504
+        assert registry(sync_redis_client)[name] >= int(time.time()) + TTL - 5  # zawyzenie, nie zanizenie
+        assert budget_of(sync_redis_client, test_user.id) >= TTL - 5
 
 
 class TestCleanup:
@@ -515,8 +555,22 @@ class TestCleanup:
         "failure", [daily_error(500, "server-error"), httpx.ConnectError("down"), httpx.Response(200, json=[1, 2])]
     )
     def test_blad_sprzatania_nie_blokuje_rozmowy(self, client, daily, test_user, test_board, failure):
-        daily.override("GET", "/rooms", failure)
+        self.old_rooms(daily, 2)
+        daily.override("GET", "/rooms/easylesson-board-900", failure)
+        daily.override("DELETE", "/rooms/easylesson-board-901", failure)
         assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+    def test_stary_wpis_rejestru_nie_kasuje_nowego_pokoju_o_tej_samej_nazwie(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
+        daily.add_room("easylesson-board-900", exp=int(time.time()) + HOUR)
+        sync_redis_client.zadd("call:rooms", {"easylesson-board-900|1|4": int(time.time()) - 2 * HOUR})
+
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        assert "easylesson-board-900" in daily.rooms
+        assert sync_redis_client.zscore("call:rooms", "easylesson-board-900|1|4") is None
+        assert registry(sync_redis_client)["easylesson-board-900"] > int(time.time())
 
 
 class TestToken:
@@ -538,7 +592,8 @@ class TestToken:
         assert props["exp"] + props["eject_after_elapsed"] <= room_exp
         assert 0 < props["eject_after_elapsed"] <= 3 * HOUR
         assert props["is_owner"] is False
-        assert props["permissions"] == {"canAdmin": ["participants"]}
+        # nikt nie jest adminem spotkania - takze tworzacy (admin moglby nadac innym platne funkcje)
+        assert props["permissions"] == {"canAdmin": False}
         assert props["enable_recording_ui"] is False
         assert "enable_recording" not in props and "start_cloud_recording" not in props
         assert props["start_video_off"] is True
@@ -572,8 +627,12 @@ class TestToken:
         add_member(db_session, test_board, test_user2, "viewer")
         daily.add_room(room_of(test_board), exp=int(time.time()) + 200)
 
-        assert post_call(client, test_board.id, test_user2.id).status_code == 409
-        assert daily.calls("POST", "/meeting-tokens") == []
+        r = post_call(client, test_board.id, test_user2.id)
+
+        assert r.status_code == 409
+        assert r.json()["code"] == "VOICE_CALL_ENDING"
+        assert "kończy" in r.json()["error"] and "nie zaczęła" not in r.json()["error"]
+        assert daily.requests == []  # odmowa lokalna, zero wywolan Daily
 
     def test_user_name_ze_znakami_specjalnymi(self, client, daily, db_session, test_user, test_board):
         test_user.username = 'Zażółć "gęślą" <jaźń> & 日本'
@@ -696,7 +755,7 @@ class TestProviderErrors:
 
         assert post_call(client, test_board.id, test_user.id).status_code == 502
 
-        assert int(sync_redis_client.get(f"call:budget:{test_user.id}:{guard.day_of(int(time.time()))}")) == 0
+        assert budget_of(sync_redis_client, test_user.id) == 0
         assert sync_redis_client.zcard("call:rooms") == 0
 
 
@@ -712,7 +771,8 @@ class TestOneRoomPerCreator:
 
         assert room_of(test_board) not in daily.rooms
         assert room_of(second) in daily.rooms
-        # budzet: poprzedni pokoj oddal niewykorzystany czas, liczy sie jeden pelny pokoj
-        used = int(sync_redis_client.get(f"call:budget:{test_user.id}:{guard.day_of(int(time.time()))}"))
-        assert 3 * HOUR <= used <= 3 * HOUR + 10
-        assert sync_redis_client.zrange("call:rooms", 0, -1) == [room_of(second)]
+        # budzet: poprzedni (pusty) pokoj rozliczony do chwili skasowania (minimum 1 min) + nowy pokoj
+        assert TTL + 60 <= budget_of(sync_redis_client, test_user.id) <= TTL + 70
+        rooms = registry(sync_redis_client)
+        assert rooms[room_of(test_board)] <= int(time.time())  # rezerwacja skonczona, zostaje okres karencji
+        assert rooms[room_of(second)] > int(time.time())

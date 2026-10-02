@@ -18,15 +18,17 @@ import api.v1.whiteboard.daily_client as daily_client
 from core import redis_client as redis_client_module
 from core.config import Settings, get_settings
 
+from . import daily_fake
 from .daily_fake import (
-    API_KEY, DAILY_TOKEN, add_board, add_member, daily_error, get_usage, meeting, post_call, room_of,
+    API_KEY, DAILY_TOKEN, add_board, add_member, daily_error, get_usage, meeting, post_call, registry, room_of,
 )
 
 HOUR = 3600
+TTL = 90 * 60  # domyslny czas pokoju (DAILY_ROOM_TTL_MINUTES)
 
 
 def budget_of(sync_redis_client, user) -> int:
-    return int(sync_redis_client.get(f"call:budget:{user.id}:{guard.day_of(int(time.time()))}") or 0)
+    return daily_fake.budget_of(sync_redis_client, user.id)
 
 
 def someone_present() -> list[dict]:
@@ -86,8 +88,8 @@ class TestMonthlyUsage:
         assert post_call(client, test_board.id, test_user.id).json()["code"] == "VOICE_MONTHLY_LIMIT"
 
     def test_nowy_pokoj_ktory_przekroczylby_prog_nie_powstaje(self, client, daily, sync_redis_client, test_user, test_board):
-        # 7500 zuzyte + najgorszy przypadek nowego pokoju (4 osoby x 180 min = 720) > 8000
-        daily.meetings = [meeting([7500])]
+        # 7700 zuzyte + najgorszy przypadek nowego pokoju (4 osoby x 90 min = 360) > 8000
+        daily.meetings = [meeting([7700])]
 
         r = post_call(client, test_board.id, test_user.id)
 
@@ -95,11 +97,13 @@ class TestMonthlyUsage:
         assert r.json()["code"] == "VOICE_MONTHLY_LIMIT"
         assert daily.calls("POST", "/rooms") == []
         assert budget_of(sync_redis_client, test_user) == 0  # rezerwacja budzetu zwrocona
+        assert sync_redis_client.zcard("call:rooms") == 0  # i wpis w rejestrze cofniety
 
     def test_trwajace_pokoje_sa_rezerwowane_do_progu(self, client, daily, monkeypatch, sync_redis_client, test_user, test_board):
-        # Prog 1000: trwajacy pokoj innej tablicy rezerwuje 4 x 180 = 720 min, nowy juz sie nie miesci.
+        # Prog 1000: trwajacy pokoj innej tablicy rezerwuje 4 x 180 = 720 min, nowy (360) juz sie nie miesci.
         monkeypatch.setattr(get_settings(), "daily_monthly_minutes_cap", 1000)
-        sync_redis_client.zadd("call:rooms", {"easylesson-board-999": int(time.time()) + 3 * HOUR})
+        now = int(time.time())
+        sync_redis_client.zadd("call:rooms", {f"easylesson-board-999|{now}|4": now + 3 * HOUR})
 
         r = post_call(client, test_board.id, test_user.id)
 
@@ -130,7 +134,7 @@ class TestMonthlyUsage:
         assert r.status_code == 200
         assert "zużycie miesiąca=250 min" in caplog.text
         pages = daily.calls("GET", "/meetings")
-        assert len(pages) == 3
+        assert len(pages) == 4  # 100 + 100 + 50 + pusta strona konczaca
         assert pages[1].url.params["starting_after"] == daily.meetings[99]["id"]
 
     def test_odrzucony_limit_strony_czyta_domyslnymi_stronami(self, client, daily, caplog, test_user, test_board):
@@ -177,7 +181,7 @@ class TestMonthlyUsage:
             second = await call_usage.get_month_usage(http, API_KEY)
 
         assert first.minutes == second.minutes == 5
-        assert len(daily.calls("GET", "/meetings")) == 1
+        assert len(daily.calls("GET", "/meetings")) == 2  # strona + pusta strona konczaca, raz
         call_usage.reset_memory_cache()
 
 
@@ -263,19 +267,24 @@ class TestUserDailyCap:
         third = add_board(db_session, test_workspace, test_user)
         now = int(time.time())
 
-        assert post_call(client, test_board.id, test_user.id).status_code == 200  # 180 z 240 min
-        daily.presence[room_of(test_board)] = someone_present()  # ktos zostal - bez zwrotu budzetu
-        assert post_call(client, second.id, test_user.id).status_code == 200  # zostaje 60 min
-        daily.presence[room_of(second)] = someone_present()
-        r = post_call(client, third.id, test_user.id)
+        fourth = add_board(db_session, test_workspace, test_user)
+        daily.default_presence = someone_present()  # w kazdym pokoju ktos zostaje - bez zwrotu budzetu
+
+        assert post_call(client, test_board.id, test_user.id).status_code == 200  # 90 z 240 min
+        assert post_call(client, second.id, test_user.id).status_code == 200  # 180 z 240 min
+        assert post_call(client, third.id, test_user.id).status_code == 200  # ostatnie 60 min
+        r = post_call(client, fourth.id, test_user.id)
 
         assert r.status_code == 429
         assert r.json()["code"] == "VOICE_USER_LIMIT"
-        assert len(daily.calls("POST", "/rooms")) == 2
-        second_exp = daily.body("POST", "/rooms", 1)["properties"]["exp"]
-        assert now + HOUR - 5 <= second_exp <= int(time.time()) + HOUR
+        assert len(daily.calls("POST", "/rooms")) == 3
+        third_exp = daily.body("POST", "/rooms", 2)["properties"]["exp"]
+        assert now + HOUR - 5 <= third_exp <= int(time.time()) + HOUR  # pokoj przyciety do reszty budzetu
         assert budget_of(sync_redis_client, test_user) == 240 * 60
-        assert room_of(test_board) not in daily.rooms  # jeden aktywny pokoj na tworzacego
+        # jeden zywy pokoj na tworzacego; odmowa nie konczy trwajacej rozmowy
+        assert list(daily.rooms) == [room_of(third)]
+        # rezerwacja miesieczna pokoi skasowanych z ludzmi w srodku trwa do ich pierwotnego exp
+        assert all(end > now + HOUR - 5 for end in registry(sync_redis_client).values())
 
     def test_pusty_poprzedni_pokoj_zwraca_niewykorzystany_czas(self, client, daily, db_session, sync_redis_client, test_user, test_workspace, test_board):
         second = add_board(db_session, test_workspace, test_user)
@@ -284,7 +293,7 @@ class TestUserDailyCap:
         assert post_call(client, second.id, test_user.id).status_code == 200
 
         assert len(daily.calls("GET", f"/rooms/{room_of(test_board)}/presence")) == 1
-        assert 3 * HOUR <= budget_of(sync_redis_client, test_user) <= 3 * HOUR + 10
+        assert TTL + 60 <= budget_of(sync_redis_client, test_user) <= TTL + 70
 
     @pytest.mark.parametrize(
         "presence", [daily_error(500, "server-error"), httpx.ReadTimeout("t"), httpx.Response(200, json={"data": None})]
@@ -296,32 +305,38 @@ class TestUserDailyCap:
 
         assert post_call(client, second.id, test_user.id).status_code == 200
 
-        assert budget_of(sync_redis_client, test_user) == 240 * 60
+        assert budget_of(sync_redis_client, test_user) == 2 * TTL
 
-    def test_skasowanie_i_odtworzenie_pokoju_nie_zeruje_budzetu(self, client, daily, sync_redis_client, test_user, test_board):
+    def test_pokoj_skasowany_poza_nami_jest_rozliczany_do_teraz_a_rezerwacja_miesieczna_zostaje(
+        self, client, daily, clock, sync_redis_client, test_user, test_board
+    ):
         assert post_call(client, test_board.id, test_user.id).status_code == 200
         daily.rooms.clear()  # pokoj zniknal poza nami (panel Daily)
+        clock.advance(120)
+
         assert post_call(client, test_board.id, test_user.id).status_code == 200
-        daily.rooms.clear()
 
-        r = post_call(client, test_board.id, test_user.id)
+        # budzet: stary pokoj zyl najwyzej do teraz + nowy pokoj
+        assert TTL + 120 <= budget_of(sync_redis_client, test_user) <= TTL + 130
+        # prog miesieczny: nie wiemy, czy ktos w nim nie zostal - pelna rezerwacja obu pokoi
+        rows = sync_redis_client.zrange("call:rooms", 0, -1, withscores=True)
+        assert len(rows) == 2 and all(score > time.time() + TTL - 130 for _, score in rows)
 
-        assert r.status_code == 429
-        assert r.json()["code"] == "VOICE_USER_LIMIT"
-        assert budget_of(sync_redis_client, test_user) == 240 * 60
-
-    def test_podwojne_klikniecie_nie_placi_dwa_razy(self, client, daily, sync_redis_client, test_user, test_board):
+    def test_pokoj_zastany_przy_tworzeniu_jest_placony_raz_wg_swojego_exp(
+        self, client, daily, sync_redis_client, test_user, test_board
+    ):
         name = room_of(test_board)
 
         def lost_race(request):
-            daily.add_room(name, exp=int(time.time()) + 3 * HOUR)
+            daily.add_room(name, exp=int(time.time()) + 3 * HOUR, register=False)
             return daily_error(400, "invalid-request-error", f"a room named {name} already exists")
 
         daily.override("POST", "/rooms", lost_race)
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        assert budget_of(sync_redis_client, test_user) == 0  # zaplacilo zadanie, ktore utworzylo pokoj
+        assert 3 * HOUR - 5 <= budget_of(sync_redis_client, test_user) <= 3 * HOUR
+        assert len(daily_fake.owner_rooms(sync_redis_client, test_user.id)) == 1
 
     def test_limit_zero_wylacza_tworzenie(self, client, daily, monkeypatch, test_user, test_board):
         monkeypatch.setattr(get_settings(), "call_user_daily_minutes_cap", 0)
@@ -337,8 +352,14 @@ class TestUserDailyCap:
         daily.add_room(room_of(test_board))
         assert post_call(client, test_board.id, test_user2.id).status_code == 200
 
-    def test_uszkodzony_licznik_w_redis_to_odmowa(self, client, daily, sync_redis_client, test_user, test_board):
-        sync_redis_client.set(f"call:budget:{test_user.id}:{guard.day_of(int(time.time()))}", "abc")
+    @pytest.mark.parametrize(
+        "broken",
+        ["abc", "[]", '{"rooms": [{"room": "x"}]}',
+         '{"rooms": [{"room": "x", "member": "x|1|4", "created": 1, "end": 2, "charged": -99999, "day": "20260101",'
+         ' "open": false, "settled": true}]}'],
+    )
+    def test_uszkodzony_zapis_budzetu_w_redis_to_odmowa(self, client, daily, sync_redis_client, test_user, test_board, broken):
+        sync_redis_client.set(f"call:owner:{test_user.id}", broken)
 
         r = post_call(client, test_board.id, test_user.id)
 
@@ -402,7 +423,7 @@ class TestAdminUsage:
     def admin(self, monkeypatch, user) -> None:
         monkeypatch.setattr(get_settings(), "call_admin_user_ids", f"{user.id}")
 
-    @pytest.mark.parametrize("value", ["", "abc", "1,,", "999999"])
+    @pytest.mark.parametrize("value", ["", "abc", ",,", "1,x", "999999"])
     def test_bez_wpisu_na_liscie_403_i_zero_wywolan_daily(self, client, daily, monkeypatch, test_user, value):
         monkeypatch.setattr(get_settings(), "call_admin_user_ids", value)
 
@@ -432,8 +453,8 @@ class TestAdminUsage:
         assert data["user_daily_cap_minutes"] == 240
         assert data["max_participants"] == 4
         assert data["used_minutes"] == 80
-        # nasz pokoj: 4 x ~180 min; trwajace spotkanie w nieznanym pokoju: 2 x 180 min
-        assert 720 + 360 - 4 <= data["reserved_minutes"] <= 720 + 360
+        # nasz pokoj: 4 x 90 min (pelny czas zycia); trwajace spotkanie w nieznanym pokoju: 2 x 180 min
+        assert data["reserved_minutes"] == 360 + 360
         assert data["planned_minutes"] == data["used_minutes"] + data["reserved_minutes"]
         assert data["meetings"] == 2
         assert data["ongoing_meetings"] == 1
@@ -497,7 +518,7 @@ LEAK_SCENARIOS = {
     "get_room_timeout": (lambda d, s, name: d.override("GET", f"/rooms/{name}", httpx.ReadTimeout(API_KEY)), 504),
     "create_room_blad": (lambda d, s, name: d.override("POST", "/rooms", _echo(400)), 502),
     "create_room_402": (lambda d, s, name: d.override("POST", "/rooms", _echo(402)), 503),
-    "lista_pokoi_blad": (lambda d, s, name: d.override("GET", "/rooms", _echo()), 200),
+    "lista_pokoi_blad": (lambda d, s, name: d.override("GET", "/rooms", _echo()), 503),
     "token_blad": (lambda d, s, name: d.override("POST", "/meeting-tokens", _echo(403)), 502),
     "token_siec": (lambda d, s, name: d.override("POST", "/meeting-tokens", httpx.ConnectError(API_KEY)), 502),
     "delete_blad": (
@@ -567,7 +588,7 @@ class SettingsProxy:
 
 
 INT_FIELDS = {
-    "DAILY_ROOM_TTL_MINUTES": ("daily_room_ttl_minutes", 180),
+    "DAILY_ROOM_TTL_MINUTES": ("daily_room_ttl_minutes", 90),
     "DAILY_MONTHLY_MINUTES_CAP": ("daily_monthly_minutes_cap", 8000),
     "CALL_USER_DAILY_MINUTES_CAP": ("call_user_daily_minutes_cap", 240),
     "CALL_MAX_PARTICIPANTS": ("call_max_participants", 4),
@@ -604,11 +625,11 @@ class TestSettingsNeverBreakStartup:
         settings = Settings(_env_file=None)
         assert settings.call_enabled is True
         assert settings.call_allowed_user_ids == "" and settings.call_admin_user_ids == ""
-        assert settings.daily_api_key == ""
+        assert settings.daily_api_key.get_secret_value() == ""
         assert (settings.daily_monthly_minutes_cap, settings.call_user_daily_minutes_cap) == (8000, 240)
-        assert (settings.call_max_participants, settings.daily_room_ttl_minutes) == (4, 180)
+        assert (settings.call_max_participants, settings.daily_room_ttl_minutes) == (4, 90)
 
-    @pytest.mark.parametrize("value", ["abc", ";;", "1,,2", " , ", "DROP TABLE"])
+    @pytest.mark.parametrize("value", ["abc", ";;", "1,,x", " , ", "DROP TABLE"])
     def test_smieciowe_listy_id_nie_wywracaja_startu_i_zamykaja_dostep(self, monkeypatch, value):
         monkeypatch.setenv("CALL_ALLOWED_USER_IDS", value)
         monkeypatch.setenv("CALL_ADMIN_USER_IDS", value)

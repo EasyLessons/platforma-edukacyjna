@@ -8,7 +8,7 @@ Cel:
     lub z systemu (production - Heroku/Vercel).
 """
 
-from pydantic import field_validator
+from pydantic import SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 import os
@@ -71,14 +71,17 @@ class Settings(BaseSettings):
     # === ROZMOWA GLOSOWA (Daily) ===
     # Klucz API Daily - TYLKO backend (api/v1/whiteboard/call.py), nigdy przegladarka.
     # Pusty = rozmowy wylaczone: POST /whiteboard/{id}/call zwraca 503 VOICE_NOT_CONFIGURED.
-    daily_api_key: str = ""
+    # SecretStr: repr(Settings) i logi nie pokazuja wartosci; czytaj przez call_guard.daily_api_key().
+    # PRZED wpisaniem klucza ustaw CALL_ALLOWED_USER_IDS (pusta lista = tworzy kazdy wlasciciel).
+    daily_api_key: SecretStr = SecretStr("")
     # Prefiks nazw pokoi (<prefix>-board-<id>). Inna wartosc dla dev/stagingu na tym samym
     # koncie Daily, zeby srodowiska nie dzielily pokoi. Tylko male litery, cyfry i myslnik.
     daily_room_prefix: str = "easylesson"
-    # Po ilu minutach od OSTATNIEGO dolaczenia pokoj wygasa (uczestnicy sa wtedy rozlaczani).
-    # Krotki czas = pokoje nie zajmuja limitu konta (50) i zapomniana karta nie nabija minut
-    # (zlecenie 02.10.2026: exp max 3 h + eject_at_room_exp).
-    daily_room_ttl_minutes: int = 180
+    # Na ile minut wlasciciel tworzy pokoj (po tym czasie uczestnicy sa rozlaczani; wlasciciel
+    # moze przedluzyc, klikajac "Rozmowa" w ostatnich 15 min). Sufit w kodzie: 180 (zlecenie
+    # 02.10.2026: exp max 3 h + eject_at_room_exp). Krotszy pokoj = mniejsza rezerwacja w progu
+    # miesiecznym i w dziennym budzecie tworzacego.
+    daily_room_ttl_minutes: int = 90
 
     # --- Bezpieczniki kosztow rozmow (api/v1/whiteboard/call_guard.py, docs pipelines.md 5a) ---
     # Wylacznik awaryjny: false = 503 VOICE_DISABLED, zero wywolan Daily. Smieciowa wartosc = false.
@@ -90,7 +93,8 @@ class Settings(BaseSettings):
     call_admin_user_ids: str = ""
     # Globalny prog minut uczestnikow w miesiacu (zuzycie z Daily /meetings + rezerwacje pokoi).
     daily_monthly_minutes_cap: int = 8000
-    # Ile minut pokoi dziennie (UTC) moze zarezerwowac jeden tworzacy.
+    # Ile minut rozmow dziennie (UTC) ma jeden tworzacy: zywy pokoj liczy sie caly, zakonczony -
+    # wg realnego czasu (potwierdzona pustka albo spotkania z Daily po okresie karencji).
     call_user_daily_minutes_cap: int = 240
     call_max_participants: int = 4
 

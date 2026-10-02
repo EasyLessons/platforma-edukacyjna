@@ -157,11 +157,10 @@ async def create_call(
 
 @router.get("/call/usage", response_model=ApiResponse[CallUsageResponse])
 async def call_usage(
-    request: Request,
     response: Response,
     current_user: User = Depends(get_current_user),
 ):
     """Zużycie minut rozmów i stan bezpieczników — tylko CALL_ADMIN_USER_IDS (call_usage.py)."""
-    result = await usage_report(current_user.id, get_client_ip(request))
+    result = await usage_report(current_user.id)
     response.headers["Cache-Control"] = "no-store"
     return ApiResponse(success=True, data=result)

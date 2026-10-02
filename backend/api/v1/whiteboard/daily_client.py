@@ -101,7 +101,7 @@ def provider_error(response: httpx.Response, action: str, api_key: str) -> AppEx
 
 async def request(client: httpx.AsyncClient, method: str, path: str, **kwargs) -> httpx.Response:
     """
-    Jedno wywolanie Daily. Timeout -> 504, blad sieci -> 502, 429 -> jedno ponowienie.
+    Jedno wywolanie Daily. Timeout -> 504, blad sieci / nieoczekiwany -> 502, 429 -> jedno ponowienie.
     Statusy HTTP interpretuje wolajacy.
     """
     for attempt in (1, 2):
@@ -116,6 +116,10 @@ async def request(client: httpx.AsyncClient, method: str, path: str, **kwargs) -
             )
         except httpx.HTTPError as e:
             logger.error(f"Daily - błąd połączenia ({method} {path}): {type(e).__name__}")
+            raise provider_unavailable()
+        except Exception as e:
+            # Nieoczekiwany blad transportu: tresci wyjatku NIE logujemy (moze zawierac naglowki).
+            logger.error(f"Daily - nieoczekiwany błąd ({method} {path}): {type(e).__name__}")
             raise provider_unavailable()
         if response.status_code != 429 or attempt == 2:
             return response
