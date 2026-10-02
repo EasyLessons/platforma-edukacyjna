@@ -13,4 +13,4 @@ export * from './math/function-plot';
 export * from './yjs/excalidraw-binding';
 export * from './yjs/awareness-collaborators';
 export type { BoardAwareness } from './yjs/types';
-export type { ExcalidrawBoardProps, BoardUser } from './components/excalidraw-board';
+export type { ExcalidrawBoardProps, BoardUser, TopRightExtra } from './components/excalidraw-board';
