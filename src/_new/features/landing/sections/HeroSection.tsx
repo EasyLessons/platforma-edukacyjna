@@ -2,14 +2,8 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 import DemoCtaButton from '@/_new/features/demo/demo-cta-button';
-
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '600', '700', '800'],
-  display: 'swap',
-});
 
 export default function HeroSection() {
   return (

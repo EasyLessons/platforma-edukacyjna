@@ -9,9 +9,13 @@
 --    (backend/api/v1/whiteboard/storage.py) — service_role omija RLS, więc nie
 --    potrzebuje żadnej polityki. Odczyt publiczny przez URL /object/public/…
 --    (bucket `public = true`), nazwy plików to uuid4 — niezgadywalne.
---  * `avatars`: dziś front pisze do bucketu anon key (BasicInfo.tsx:52). Sekcję B
---    wykonać DOPIERO po wdrożeniu PR 3 z planu naprawczego (upload awatara przez
---    backend), inaczej zmiana awatara przestanie działać.
+--  * `avatars`: do PR 3 z planu naprawczego front pisał do bucketu anon key. Od PR 3
+--    (fix/account-avatar-upload-backend) upload idzie przez backend kluczem
+--    service_role (backend/api/v1/auth/avatar.py -> POST /api/v1/auth/users/me/avatar),
+--    który zapisuje przekodowany WEBP 512 px (kilkadziesiąt KB) pod nazwą uuid4.
+--    Sekcję B wykonać PO wdrożeniu PR 3 na produkcję (Render + Vercel) — wcześniej
+--    zmiana awatara ze starego frontu przestałaby działać. Limit 2 MB i lista MIME
+--    z punktu B.3 są zgodne z tym, co zapisuje backend (image/webp).
 --  * RLS na storage.objects jest w Supabase włączone domyślnie; brak polityki = brak
 --    dostępu dla anon/authenticated.
 -- Wykonywać sekcjami, po kolei. Każda sekcja jest idempotentna.

@@ -2,13 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { Plus_Jakarta_Sans } from 'next/font/google';
-
-const jakartaSans = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '600', '700', '800'],
-  display: 'swap',
-});
+import { plusJakartaSansDiscrete as jakartaSans } from '@new/shared/fonts';
 
 type Feature = {
   text: string;
