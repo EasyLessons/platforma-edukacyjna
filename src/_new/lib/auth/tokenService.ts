@@ -90,8 +90,8 @@ export async function refreshAccessToken(): Promise<string> {
         throw new RefreshUnavailableError();
       }
 
-      if (response.status >= 500) {
-        // Błąd po stronie serwera - nie przesądza o sesji.
+      if (response.status >= 500 || response.status === 429) {
+        // Błąd po stronie serwera albo limit żądań (429) - nie przesądza o sesji.
         throw new RefreshUnavailableError(`Refresh: HTTP ${response.status}`);
       }
       if (!response.ok) {

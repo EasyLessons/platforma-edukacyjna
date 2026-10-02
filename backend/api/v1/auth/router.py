@@ -199,7 +199,8 @@ async def google_login(
 async def update_user_profile(
     update_data: AvatarUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    _: None = Depends(rate_limit("update_profile", limit=30, window_seconds=60, fail_open=True)),
 ):
     current_user.avatar_url = update_data.avatar_url
     db.commit()
@@ -215,7 +216,12 @@ async def update_user_profile(
     description="Rotuje refresh token i zwraca nowy access token. Wymaga ważnego refresh tokena w HttpOnly cookie",
     responses={401: {"description": "Invalid or expired refresh token"}}
 )
-async def refresh(request: Request, response: Response, db: Session = Depends(get_db)):
+async def refresh(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("refresh", limit=300, window_seconds=60, fail_open=True)),
+):
     """Odświeżenie sesji - wymaga ważnego refresh cookie"""
     refresh_token = request.cookies.get("refresh_token")
     if not refresh_token:
@@ -250,7 +256,12 @@ async def me(db: Session = Depends(get_db), current_user: User = Depends(get_cur
     summary="Logout user",
     description="Unieważnia refresh token i czyści cookie.",
 )
-async def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+async def logout(
+    request: Request,
+    response: Response,
+    db: Session = Depends(get_db),
+    _: None = Depends(rate_limit("logout", limit=60, window_seconds=60, fail_open=True)),
+):
     """Wylogowanie użytkownika - unieważnia refresh token i czyści cookie"""
     refresh_token = request.cookies.get("refresh_token")
 

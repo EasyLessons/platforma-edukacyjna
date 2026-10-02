@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from core.models import WorkspaceMember
 from core.exceptions import NotFoundError, AppException
 from ..authorization import require_membership, require_owner
+from api.v1.auth.avatar_url import safe_avatar_url
 from api.v1.boards.service import reassign_boards_on_member_removal
 from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
@@ -41,7 +42,7 @@ class MemberService:
                 username=m.user.username,
                 email=m.user.email,
                 full_name=m.user.full_name,
-                avatar_url=m.user.avatar_url,
+                avatar_url=safe_avatar_url(m.user.avatar_url),
                 role="owner" if is_owner else m.role,
                 joined_at=m.joined_at,
                 is_owner=is_owner,
