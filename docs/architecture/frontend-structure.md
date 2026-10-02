@@ -90,7 +90,8 @@ src/_new/
 │   ├── query-provider.tsx (TanStack Query provider)
 │   └── utils.ts        (cn)
 ├── server/             # logika Route Handlerów Next (server-only, bez React)
-│   └── chat/           (rate-limit, response-cache, prompt, gemini, auth dla /api/chat)
+│   ├── chat/           (rate-limit, response-cache, prompt, gemini, auth dla /api/chat)
+│   └── turn/           (get-ice-servers: poświadczenia TURN z Xirsys dla /api/turn)
 └── shared/
     ├── hooks/, types/, ui/ (komponenty reużywalne: przyciski, modale, tooltip, avatar)
 ```
@@ -107,7 +108,7 @@ Chcesz zmienić **jak wygląda/routuje się strona** → szukaj w `src/app`.
 Chcesz zmienić **jak coś działa** (logika, dane, stan) → szukaj w `src/_new/features/<nazwa-funkcji>`.
 Chcesz zmienić **coś współdzielonego między funkcjami** (przycisk, modal, hook) → `src/_new/shared`.
 Trafiłeś na `src/app/context/BoardRealtimeContext.tsx` → to ostatni plik legacy, patrz `REFAKTOR-PLAN.md` (PR-C1) zanim zaczniesz tam grzebać.
-Zmieniasz logikę Route Handlera (`/api/chat`) → `src/_new/server/chat`, nie `src/app/api`.
+Zmieniasz logikę Route Handlera (`/api/chat`, `/api/turn`) → `src/_new/server/{chat,turn}`, nie `src/app/api`.
 Pracujesz nad synchronizacją tablicy → sprawdź najpierw flagę `NEXT_PUBLIC_WHITEBOARD_YJS` (`features/whiteboard/config/feature-flags.ts`): są dwie ścieżki (legacy Supabase Broadcast i Yjs/Hocuspocus), opis w `pipelines.md` §2.
 
 ## Granice importów
