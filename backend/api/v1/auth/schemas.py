@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr, Field, model_validator, ConfigDict
+from pydantic import BaseModel, EmailStr, Field, field_validator, model_validator, ConfigDict
 from datetime import datetime
 from typing import Optional
+
+from .avatar_url import validate_avatar_url
 
 class RegisterUser(BaseModel):
     """Schema do rejestracji użytkownika"""
@@ -104,3 +106,8 @@ class GoogleLoginRequest(BaseModel):
 class AvatarUpdate(BaseModel):
     """Schema dla aktualizacji avatara użytkownika"""
     avatar_url: str
+
+    @field_validator("avatar_url")
+    @classmethod
+    def avatar_url_allowed(cls, value: str) -> str:
+        return validate_avatar_url(value)
