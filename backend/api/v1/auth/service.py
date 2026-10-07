@@ -2,8 +2,6 @@
 AUTH SERVICE - Cała logika autentykacji
 """
 from sqlalchemy.orm import Session
-from datetime import timedelta
-from core.time import utcnow
 from core.logging import get_logger
 from core.config import get_settings
 from core.redis_client import get_redis_client
@@ -19,7 +17,7 @@ from sqlalchemy.exc import OperationalError, IntegrityError
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from core.models import User, RefreshToken
+from core.models import User
 from .schemas import (
     RegisterUser, LoginData, VerifyEmail,
     RequestPasswordReset, VerifyPasswordResetCode, ResetPassword,
@@ -27,9 +25,10 @@ from .schemas import (
     MessageResponse, VerifyResetCodeResponse, MeResponse
 )
 from .utils import (
-    hash_password, verify_password, create_access_token, hash_refresh_token,
-    generate_verification_code, generate_refresh_token,
+    hash_password, verify_password,
+    generate_verification_code,
 )
+from .sessions import SessionService
 from api.v1.onboarding.service import OnboardingService
 from core.email import send_email
 from core.email.templates.auth import verification_email, password_reset_email
@@ -45,6 +44,7 @@ class AuthService:
     def __init__(self, db: Session, redis_client: redis.Redis | None = None):
         self.db = db
         self.settings = get_settings()
+        self.sessions = SessionService(db, self.settings)
         self.redis = redis_client or get_redis_client()
 
     def _email_verify_key(self, user_id: int) -> str:
@@ -122,38 +122,6 @@ class AuthService:
         except RedisError:
             logger.warning(f"Nie udało się wyzerować licznika prób (key={key})")
 
-    def _create_session(self, user: User) -> tuple[AuthResponse, str]:
-        """
-        Tworzy sesję (access + refresh token) dla użytkownika
-        
-        Returns:
-            tuple[AuthResponse, str]: AuthResponse z access tokenem i plaintext refresh token
-        """
-        access_token = create_access_token(
-            data={"sub": str(user.id)},
-            secret_key=self.settings.secret_key,
-            algorithm=self.settings.algorithm,
-            expires_delta=timedelta(minutes=self.settings.access_token_expire_minutes)
-        )
-
-        refresh_token_plain = generate_refresh_token()
-        refresh_token_hash = hash_refresh_token(refresh_token_plain)
-        expires_at = utcnow() + timedelta(days=self.settings.refresh_token_expire_days)
-
-        db_refresh = RefreshToken(
-            user_id=user.id,
-            token_hash=refresh_token_hash,
-            expires_at=expires_at,
-        )
-        self.db.add(db_refresh)
-        self.db.commit()
-
-        return AuthResponse(
-            access_token=access_token,
-            token_type="bearer",
-            user=UserResponse.model_validate(user)
-        ), refresh_token_plain
-
     async def register_user(self, user_data: RegisterUser) -> RegisterResponse:
         """Rejestracja nowego użytkownika"""
 
@@ -230,7 +198,7 @@ class AuthService:
 
         logger.info(f"User zweryfikowany (user_id={user.id})")
 
-        return self._create_session(user)
+        return self.sessions.create(user)
 
     async def login_user(self, login_data: LoginData) -> AuthResponse:
         """Logowanie"""
@@ -254,7 +222,7 @@ class AuthService:
 
         logger.info(f"User zalogowany (user_id={user.id})")
 
-        return self._create_session(user)
+        return self.sessions.create(user)
 
     async def resend_code(self, user_id: int) -> MessageResponse:
         """Ponowne wysłanie kodu"""
@@ -327,58 +295,19 @@ class AuthService:
         await self._check_code(self._password_reset_key(user.id), reset_data.code)
 
         user.hashed_password = hash_password(reset_data.password)
+        revoked = self.sessions.revoke_all(user.id)
         self.db.commit()
 
         await self.redis.delete(self._password_reset_key(user.id))
         await self._clear_code_attempts(self._password_reset_key(user.id))
 
-        logger.info(f"Hasło zresetowane (user_id={user.id})")
+        logger.info(f"Hasło zresetowane (user_id={user.id}), unieważnione sesje: {revoked}")
 
         return MessageResponse(message="Hasło zostało zmienione")
-    
-    # === SESJA / REFRESH ===
-
-    async def refresh_session(self, refresh_token_plain: str) -> tuple[AuthResponse, str]:
-        """Rotuje refresh token i zwraca nową parę tokenów"""
-        token_hash = hash_refresh_token(refresh_token_plain)
-
-        db_token = self.db.query(RefreshToken).filter(
-            RefreshToken.token_hash == token_hash,
-            RefreshToken.revoked == False,    
-        ).first()
-
-        if not db_token:
-            raise AuthenticationError("Nieprawidłowy refresh token")
-        
-        if utcnow() > db_token.expires_at:
-            raise AuthenticationError("Refresh token wygasł")
-        
-        # Unieważnij stary token
-        db_token.revoked = True
-        self.db.commit()
-
-        user = self.db.query(User).filter(User.id == db_token.user_id).first()
-        if not user or not user.is_active:
-            raise AuthenticationError("Użytkownik nieaktywny")
-
-        logger.info(f"Refresh sesji (user_id={user.id})")
-        return self._create_session(user)
     
     def get_me(self, user: User) -> MeResponse:
         """Zwraca dane aktualnie zalogowanego użytkownika"""
         return MeResponse(user=UserResponse.model_validate(user))
-    
-    async def logout_session(self, refresh_token_plain: str) -> None:
-        token_hash = hash_refresh_token(refresh_token_plain)
-
-        db_token = self.db.query(RefreshToken).filter(
-            RefreshToken.token_hash == token_hash,
-            RefreshToken.revoked == False,
-        ).first()
-
-        if db_token:
-            db_token.revoked = True
-            self.db.commit()
 
     # === GOOGLE OAUTH ===
 
@@ -463,4 +392,4 @@ class AuthService:
         google_id, email, name, picture = self._verify_google_credential(credential)
         user = self._find_or_create_google_user(google_id, email, name, picture)
         logger.info(f"Token wygenerowany (user_id={user.id})")
-        return self._create_session(user)
+        return self.sessions.create(user)

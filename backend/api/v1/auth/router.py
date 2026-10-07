@@ -22,6 +22,7 @@ from .schemas import (
     GoogleLoginRequest, AvatarUpdate
 )
 from .service import AuthService
+from .sessions import SessionService
 from core.models import User
 
 router = APIRouter(tags=["Authentication"])
@@ -227,13 +228,13 @@ async def refresh(
     if not refresh_token:
         raise AuthenticationError("Brak refresh tokena")
     
-    service = AuthService(db)
-    result, new_refresh_token = await service.refresh_session(refresh_token)
-    _set_refresh_cookie(response, new_refresh_token, service.settings)
+    sessions = SessionService(db)
+    result, new_refresh_token = await sessions.refresh(refresh_token)
+    _set_refresh_cookie(response, new_refresh_token, sessions.settings)
 
     return ApiResponse(success=True, data=RefreshResponse(
         access_token=result.access_token,
-        expires_in=service.settings.access_token_expire_minutes * 60,
+        expires_in=sessions.settings.access_token_expire_minutes * 60,
     ))
 
 
@@ -265,13 +266,13 @@ async def logout(
     """Wylogowanie użytkownika - unieważnia refresh token i czyści cookie"""
     refresh_token = request.cookies.get("refresh_token")
 
-    service = AuthService(db)
+    sessions = SessionService(db)
     if refresh_token:
-        await service.logout_session(refresh_token)
+        await sessions.logout(refresh_token)
     
     response.delete_cookie(
         "refresh_token",
         path="/",
-        domain=service.settings.cookie_domain or None,
+        domain=sessions.settings.cookie_domain or None,
     )
     return ApiResponse(success=True, data=MessageResponse(message="Wylogowano"))

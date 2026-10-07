@@ -5,7 +5,7 @@ Używane przez wszystkie endpointy które wymagają zalogowania
 from fastapi import Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt
+import jwt
 
 from core.database import get_db
 from core.models import User
@@ -30,20 +30,15 @@ def get_current_user(
 
     token = credentials.credentials
     
-    try:        
+    try:
         payload = jwt.decode(
             token,
             settings.secret_key,
-            algorithms=[settings.algorithm]
+            algorithms=[settings.algorithm],
+            options={"require": ["exp", "sub"]}
         )
-                
-        user_id_str = payload.get("sub")
-        if user_id_str is None:
-            raise AuthenticationError("Nieprawidłowy token autoryzacyjny")
-            
-        user_id = int(user_id_str)
-            
-    except (JWTError, ValueError):
+        user_id = int(payload.get("sub"))
+    except (jwt.PyJWTError, ValueError):
         raise AuthenticationError("Nieprawidłowy token autoryzacyjny")
     
     user = db.query(User).filter(User.id == user_id).first()

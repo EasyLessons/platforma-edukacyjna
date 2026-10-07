@@ -6,6 +6,7 @@ import pytest
 from datetime import datetime, timedelta
 
 from api.v1.auth.service import AuthService
+from api.v1.auth.sessions import SessionService
 from api.v1.auth.schemas import LoginData
 from api.v1.auth.utils import generate_refresh_token, hash_refresh_token
 from core.exceptions import AuthenticationError
@@ -21,7 +22,7 @@ class TestRefreshSuccess:
             LoginData(login=test_user.username, password="testpassword")
         )
 
-        result, new_refresh_token = await AuthService(db_session).refresh_session(refresh_token)
+        result, new_refresh_token = await SessionService(db_session).refresh(refresh_token)
 
         assert result.access_token
         assert len(result.access_token.split(".")) == 3
@@ -33,7 +34,7 @@ class TestRefreshSuccess:
             LoginData(login=test_user.username, password="testpassword")
         )
 
-        _, new_refresh_token = await AuthService(db_session).refresh_session(refresh_token)
+        _, new_refresh_token = await SessionService(db_session).refresh(refresh_token)
 
         assert new_refresh_token != refresh_token
         assert len(new_refresh_token) == 64
@@ -45,7 +46,7 @@ class TestRefreshSuccess:
             LoginData(login=test_user.username, password="testpassword")
         )
 
-        await AuthService(db_session).refresh_session(refresh_token)
+        await SessionService(db_session).refresh(refresh_token)
 
         token_hash = hash_refresh_token(refresh_token)
         db_token = db_session.query(RefreshToken).filter(
@@ -61,7 +62,7 @@ class TestRefreshSuccess:
             LoginData(login=test_user.username, password="testpassword")
         )
 
-        _, new_refresh_token = await AuthService(db_session).refresh_session(refresh_token)
+        _, new_refresh_token = await SessionService(db_session).refresh(refresh_token)
 
         new_hash = hash_refresh_token(new_refresh_token)
         db_token = db_session.query(RefreshToken).filter(
@@ -79,7 +80,7 @@ class TestRefreshErrors:
     async def test_invalid_token_raises_error(self, db_session):
         """Nieistniejący token → AuthenticationError"""
         with pytest.raises(AuthenticationError):
-            await AuthService(db_session).refresh_session("nieistniejacytokenxyz")
+            await SessionService(db_session).refresh("nieistniejacytokenxyz")
 
     @pytest.mark.asyncio
     async def test_revoked_token_raises_error(self, db_session, test_user):
@@ -89,11 +90,11 @@ class TestRefreshErrors:
         )
 
         # Użyj raz
-        await AuthService(db_session).refresh_session(refresh_token)
+        await SessionService(db_session).refresh(refresh_token)
 
         # Próba ponownego użycia
         with pytest.raises(AuthenticationError):
-            await AuthService(db_session).refresh_session(refresh_token)
+            await SessionService(db_session).refresh(refresh_token)
 
     @pytest.mark.asyncio
     async def test_expired_token_raises_error(self, db_session, test_user):
@@ -111,6 +112,6 @@ class TestRefreshErrors:
         db_session.commit()
 
         with pytest.raises(AuthenticationError) as exc:
-            await AuthService(db_session).refresh_session(plain_token)
+            await SessionService(db_session).refresh(plain_token)
 
         assert "wygasł" in exc.value.message.lower()
