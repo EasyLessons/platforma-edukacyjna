@@ -6,7 +6,7 @@ import pytest
 from unittest.mock import patch
 
 from api.v1.auth.service import AuthService
-from api.v1.auth.schemas import AuthResponse
+from api.v1.auth.schemas import AuthResponse, LoginData
 from api.v1.auth.utils import hash_password
 from core.exceptions import AuthenticationError
 from core.models import User, Workspace
@@ -93,6 +93,41 @@ class TestGoogleLoginExistingUser:
 
         db_session.refresh(test_user)
         assert test_user.google_id == "google-123"
+
+    @pytest.mark.asyncio
+    async def test_linking_unverified_account_clears_password(self, db_session, unverified_user):
+        """Pre-hijacking: hasło ustawione na niezweryfikowanym koncie nie przeżywa połączenia z Google"""
+        idinfo = {**GOOGLE_IDINFO, "email": unverified_user.email}
+        with patch(VERIFY_PATH, return_value=idinfo):
+            result, _ = await AuthService(db_session).google_login("fake-credential")
+
+        db_session.refresh(unverified_user)
+        assert result.user.id == unverified_user.id
+        assert unverified_user.is_active is True
+        assert unverified_user.google_id == "google-123"
+        assert unverified_user.hashed_password is None
+
+    @pytest.mark.asyncio
+    async def test_linking_unverified_account_blocks_password_login(self, db_session, unverified_user, redis_client):
+        """Po połączeniu z Google stare hasło nie pozwala się zalogować"""
+        idinfo = {**GOOGLE_IDINFO, "email": unverified_user.email}
+        with patch(VERIFY_PATH, return_value=idinfo):
+            await AuthService(db_session).google_login("fake-credential")
+
+        with pytest.raises(AuthenticationError):
+            await AuthService(db_session, redis_client).login_user(
+                LoginData(login=unverified_user.email, password="testpassword")
+            )
+
+    @pytest.mark.asyncio
+    async def test_linking_verified_account_keeps_password(self, db_session, test_user):
+        """Zweryfikowane konto zachowuje hasło po połączeniu z Google"""
+        idinfo = {**GOOGLE_IDINFO, "email": test_user.email}
+        with patch(VERIFY_PATH, return_value=idinfo):
+            await AuthService(db_session).google_login("fake-credential")
+
+        db_session.refresh(test_user)
+        assert test_user.hashed_password is not None
 
 
 class TestGoogleLoginErrors:
