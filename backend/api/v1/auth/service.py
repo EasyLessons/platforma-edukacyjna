@@ -411,6 +411,10 @@ class AuthService:
 
             if user:
                 if not user.google_id:
+                    if not user.is_active:
+                        # Konto lokalne nigdy nie potwierdziło e-maila, więc hasło mógł ustawić ktoś inny. 
+                        # Google potwierdza właściciela, więc stare hasło musi zniknąć (pre-hijacking).
+                        user.hashed_password = None
                     user.google_id = google_id
                     user.auth_provider = "google"
                     user.profile_picture = picture
