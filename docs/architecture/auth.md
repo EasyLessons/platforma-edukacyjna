@@ -78,4 +78,4 @@ Wynik jest zawsze poprawnym adresem IP (`ipaddress`) albo `unknown` — surowy t
 
 ## Znane do zrobienia
 
-Nic otwartego po stronie architektury auth: `AuthContext` jest już w `src/_new/lib/auth`, backend używa wyłącznie `python-jose`. Rate limit logowania/rejestracji: `backend/core/rate_limit.py` (Redis). Token usera jest też akceptowany przez `whiteboard-sync` (weryfikacja przez `GET /api/v1/whiteboard/{id}/access`) i przez Route Handler `/api/chat` (weryfikacja przez `GET /api/v1/auth/me`) — obie usługi delegują do tego samego `get_current_user`.
+Nic otwartego po stronie architektury auth: `AuthContext` jest już w `src/_new/lib/auth`, backend używa wyłącznie `PyJWT` (HS256, tokeny muszą mieć `exp` i `sub`). Rate limit logowania/rejestracji: `backend/core/rate_limit.py` (Redis). Token usera jest też akceptowany przez `whiteboard-sync` (weryfikacja przez `GET /api/v1/whiteboard/{id}/access`) i przez Route Handler `/api/chat` (weryfikacja przez `GET /api/v1/auth/me`) — obie usługi delegują do tego samego `get_current_user`.

@@ -4,6 +4,8 @@ Weryfikowane przez GET /api/v1/auth/me.
 """
 import pytest
 from fastapi.testclient import TestClient
+from datetime import timedelta, datetime, timezone
+import jwt
 
 from main import app
 from core.database import get_db
@@ -70,3 +72,22 @@ class TestGetCurrentUser:
         r = client.get("/api/v1/auth/me", headers=make_auth_headers(str(test_user.id)))
         assert r.status_code == 200
         assert r.json()["data"]["user"]["id"] == test_user.id
+
+    def test_token_without_exp_returns_401(self, client, test_user):
+        """Token bez daty ważności jest odrzucany"""
+        token = jwt.encode({"sub": str(test_user.id)}, settings.secret_key, algorithm=settings.algorithm)
+        r = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 401
+
+    def test_token_signed_with_other_key_returns_401(self, client, test_user):
+        """Token podpisany innym kluczem jest odrzucany"""
+        token = create_access_token({"sub": str(test_user.id)}, "x" * 43, settings.algorithm)
+        r = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 401
+
+    def test_unsigned_alg_none_token_returns_401(self, client, test_user):
+        """Token bez podpisu (alg=none) jest odrzucany"""
+        exp = datetime.now(timezone.utc) + timedelta(minutes=5)
+        token = jwt.encode({"sub": str(test_user.id), "exp": exp}, None, algorithm="none")
+        r = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 401
