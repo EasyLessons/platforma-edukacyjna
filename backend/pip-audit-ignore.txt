@@ -3,7 +3,7 @@
 # Kazda linia to jeden `--ignore-vuln <ID>`. Komentarze (#) i puste linie sa pomijane.
 # Zasada: wpis tylko dla podatnosci BEZ poprawki w obrebie naszego majora (czyli takiej,
 # ktorej nie da sie zalatwic zwyklym podbiciem wersji w requirements.txt). Kazda NOWA
-# podatnosc spoza tej listy = czerwone CI. Stan listy: 2026-09-22, po PR #67 (requirements).
+# podatnosc spoza tej listy = czerwone CI. Stan listy: 2026-10-07.
 
 # anyio 3.7.1 - poprawka w 4.14.2 (major); fastapi 0.104 / starlette 0.27 pinuja anyio<4.
 # Usunac przy podbiciu fastapi/starlette (osobny PR).
@@ -20,6 +20,12 @@ PYSEC-2026-3554 # cryptography, CVE-2026-69248, fix 49.0.0 (major), usunac po po
 # ecdsa 0.19.2 - Minerva (CVE-2024-23342), side-channel bez poprawki upstream;
 # zaleznosc python-jose. Usunac po zastapieniu python-jose (np. PyJWT) - kandydat do refaktoru.
 PYSEC-2026-1325 # ecdsa, CVE-2024-23342 Minerva, brak fixa upstream, usunac po zastapieniu python-jose
+
+# python-jose 3.5.0 - CVE-2026-85394 (HS256 z kluczem DER bez PEM, niepelna poprawka CVE-2024-33663).
+# Brak poprawki upstream (3.5.0 to najnowsza wersja). Nieeksploatowalne u nas: tokeny HS256
+# z symetrycznym SECRET_KEY i jawnym algorithms=[settings.algorithm] (auth/dependencies.py),
+# brak kluczy asymetrycznych. Usunac po zastapieniu python-jose przez PyJWT.
+CVE-2026-85394 # python-jose, brak fixa upstream, usunac po zastapieniu python-jose
 
 # fastapi 0.104.1 / starlette 0.27.0 - poprawki w fastapi 0.109+ i starlette 0.40-1.3
 # (przed 1.0 kazdy minor = breaking). Podbicie fastapi+starlette to osobny PR; usunac po nim.
