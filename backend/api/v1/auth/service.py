@@ -295,12 +295,13 @@ class AuthService:
         await self._check_code(self._password_reset_key(user.id), reset_data.code)
 
         user.hashed_password = hash_password(reset_data.password)
+        revoked = self.sessions.revoke_all(user.id)
         self.db.commit()
 
         await self.redis.delete(self._password_reset_key(user.id))
         await self._clear_code_attempts(self._password_reset_key(user.id))
 
-        logger.info(f"Hasło zresetowane (user_id={user.id})")
+        logger.info(f"Hasło zresetowane (user_id={user.id}), unieważnione sesje: {revoked}")
 
         return MessageResponse(message="Hasło zostało zmienione")
     

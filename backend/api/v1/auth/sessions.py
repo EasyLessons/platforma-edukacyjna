@@ -89,3 +89,12 @@ class SessionService:
         if db_token:
             db_token.revoked = True
             self.db.commit()
+
+    def revoke_all(self, user_id: int) -> int:
+        """Unieważnia wszystkie aktywne refresh tokeny użytkownika."""
+        return (
+            self.db.query(RefreshToken)
+            .filter(RefreshToken.user_id == user_id, RefreshToken.revoked == False)
+            .update({RefreshToken.revoked: True}, synchronize_session=False)
+        )
+        

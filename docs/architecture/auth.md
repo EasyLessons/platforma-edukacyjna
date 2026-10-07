@@ -27,11 +27,11 @@ PRZEGLĄDARKA
 
 1. `AuthProvider` (`src/_new/lib/auth/AuthContext.tsx`) montuje się i wywołuje `GET /me` z access tokenem z pamięci.
 2. Jeśli 200 — user zalogowany, dane usera w stanie `AuthContext`.
-3. Jeśli 403 (token wygasł/nie istnieje) — próba `POST /refresh` z refresh_token cookie. Backend rotuje token, zwraca nowy access token.
+3. Jeśli 403 (token wygasł/nie istnieje) — próba `POST /refresh` z refresh_token cookie. Backend rotuje token, zwraca nowy access token. Reset hasła unieważnia wszystkie refresh tokeny użytkownika (SessionService.revoke_all); access token wydany wcześniej wygasa sam w ciągu 15 minut.
 4. Jeśli refresh też się nie powiedzie — `isLoggedIn = false`, strony wymagające zalogowania przekierowują na `/login`.
 
 Frontend: `src/_new/lib/auth/AuthContext.tsx` (Provider + `useAuth()`, eksport przez barrel `src/_new/lib/auth`) woła funkcje z `src/_new/lib/auth` (przechowywanie access tokenu) i `src/_new/features/auth/api/authApi.ts` (`getCurrentUser`, `logoutUser`).
-Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google` (POST), `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`.
+Backend: `backend/api/v1/auth/router.py` — endpointy `/register`, `/verify-email`, `/resend-code`, `/login`, `/request-password-reset`, `/verify-reset-code`, `/reset-password`, `/google` (POST), `/users/me` (PUT), `/refresh`, `/me` (GET), `/logout`. Logika sesji (access/refresh token, rotacja, wylogowanie) jest w backend/api/v1/auth/sessions.py, a service.py odpowiada za uwierzytelnienie.
 
 ## Dwa stany aplikacji: zalogowany / niezalogowany
 

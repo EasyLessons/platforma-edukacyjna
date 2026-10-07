@@ -17,7 +17,8 @@ from api.v1.auth.schemas import (
     VerifyResetCodeResponse,
 )
 from api.v1.auth.utils import hash_password, verify_password
-from core.exceptions import ValidationError, AppException
+from api.v1.auth.sessions import SessionService
+from core.exceptions import AuthenticationError, ValidationError, AppException
 from core.models import User
 from pydantic import ValidationError as PydanticValidationError
 
@@ -244,3 +245,61 @@ class TestResetPassword:
 
         db_session.refresh(user)
         assert user.hashed_password == old_hash
+
+    @pytest.mark.asyncio
+    async def test_revokes_all_refresh_tokens(self, db_session, redis_client):
+        """Po resecie hasła żadna wcześniej wydana sesja nie działa (SEC-11)"""
+        user = await make_user_with_reset_code(db_session, redis_client)
+        sessions = SessionService(db_session)
+        _, token1 = sessions.create(user)
+        _, token2 = sessions.create(user)
+
+        await AuthService(db_session, redis_client).reset_password(
+            ResetPassword(
+                email=user.email,
+                code=VALID_CODE,
+                password="NewPassword1",
+                password_confirm="NewPassword1",
+            )
+        )
+
+        for token in (token1, token2):
+            with pytest.raises(AuthenticationError):
+                await sessions.refresh(token)
+
+    @pytest.mark.asyncio
+    async def test_does_not_revoke_other_users_sessions(self, db_session, redis_client, test_user):
+        """Reset hasła jednego użytkownika nie rusza sesji innego"""
+        user = await make_user_with_reset_code(db_session, redis_client)
+        _, other_token = SessionService(db_session).create(test_user)
+
+        await AuthService(db_session, redis_client).reset_password(
+            ResetPassword(
+                email=user.email,
+                code=VALID_CODE,
+                password="NewPassword1",
+                password_confirm="NewPassword1",
+            )
+        )
+
+        result, _ = await SessionService(db_session).refresh(other_token)
+        assert result.user.id == test_user.id
+
+    @pytest.mark.asyncio
+    async def test_wrong_code_keeps_sessions(self, db_session, redis_client):
+        """Zły kod nie unieważnia sesji (nikt obcy nie może wylogować właściciela)"""
+        user = await make_user_with_reset_code(db_session, redis_client)
+        _, token = SessionService(db_session).create(user)
+
+        with pytest.raises(ValidationError):
+            await AuthService(db_session, redis_client).reset_password(
+                ResetPassword(
+                    email=user.email,
+                    code="000000",
+                    password="NewPassword1",
+                    password_confirm="NewPassword1",
+                )
+            )
+
+        result, _ = await SessionService(db_session).refresh(token)
+        assert result.user.id == user.id
