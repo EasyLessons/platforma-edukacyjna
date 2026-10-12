@@ -449,3 +449,9 @@ Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `
   drugie - wejście w grupę). Mini-pasek nad płótnem przy zaznaczonej tabeli: +/- wiersz, +/- kolumna (przy wybranej
   komórce obok niej, inaczej na końcu); zmiana struktury przebudowuje siatkę (teksty i szerokości kolumn zostają,
   stare elementy usunięte jak zwykłe usunięcie - sync i cofanie działają). Limit 20 x 20.
+- **PDF** (`elements/pdf.ts`, `pdf-import.tsx`): przycisk "PDF" -> plik -> strony renderowane w przeglądarce (pdfjs-dist,
+  worker z naszego bundla, nie z CDN) do JPEG -> elementy `image` ułożone pionowo w jednej grupie, widok dopasowany
+  do wstawionych stron. Pliki stron przez `api.addFiles` -> `board-file-sync` -> Storage (jak obrazy z #106).
+  **Limity:** plik do 20 MB (większy = odmowa), najwyżej 20 stron (dłuższy = pierwsze 20 + komunikat), strona
+  renderowana do 1440 px dłuższego boku (backend przyjmuje do 1600 px), JPEG 0.85. Do tego limity tablicy z backendu:
+  300 plików / 100 MB (`files.py`). Uszkodzony lub zabezpieczony hasłem PDF = komunikat, nic nie trafia na tablicę.

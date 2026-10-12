@@ -9,7 +9,7 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
@@ -19,9 +19,11 @@ import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note'
 import {
   ElementButtons,
   NOTE_BUTTON,
+  PDF_BUTTON,
   TABLE_BUTTON,
   type ElementButton,
 } from '../elements/element-buttons';
+import { PdfImport } from '../elements/pdf-import';
 import { insertTable } from '../elements/table';
 import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
 
@@ -87,6 +89,7 @@ function BoardSession({
   );
   const notes = useNoteElements({ api, readOnly });
   const tableSelection = useSelectedTable(api, readOnly);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const { startEditing } = notes;
   // Wstawianie elementów (B2) - tylko z prawem edycji
   const elementButtons = useMemo<ElementButton[]>(
@@ -106,6 +109,7 @@ function BoardSession({
                 if (api) void insertTable(api);
               },
             },
+            { ...PDF_BUTTON, onClick: () => pdfInputRef.current?.click() },
           ],
     [readOnly, api, startEditing]
   );
@@ -169,6 +173,7 @@ function BoardSession({
         demo={!!guest}
       />
       <TableToolbar api={api} selection={tableSelection} />
+      {!readOnly && <PdfImport api={api} inputRef={pdfInputRef} />}
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />
