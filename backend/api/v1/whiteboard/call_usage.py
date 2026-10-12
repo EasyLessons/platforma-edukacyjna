@@ -50,6 +50,7 @@ USAGE_FAILURE_CACHE_SECONDS = 30
 MEETINGS_PAGE_LIMIT = 100
 MEETINGS_MAX_PAGES = 100
 ROOMS_LIST_LIMIT = 100
+ROOMS_MAX_PAGES = 20
 EXPIRED_ROOMS_KEPT = 20
 
 # Bledy, ktore przy czytaniu odpowiedzi Daily oznaczaja "nie wiemy".
@@ -208,20 +209,51 @@ def room_created(room: dict) -> int:
         return 0
 
 
+async def _list_rooms(client: httpx.AsyncClient) -> list[dict]:
+    """
+    WSZYSTKIE pokoje konta (GET /rooms): strony po `ROOMS_LIST_LIMIT`, kolejna przez
+    `starting_after` = id ostatniego pokoju, az do pustej albo niepelnej strony. Mniej pokoi niz
+    `total_count`, powtorzone id, pokoj bez id albo za duzo stron -> ValueError (fail closed).
+    """
+    found: list[dict] = []
+    seen: set[str] = set()
+    total_count = 0
+    params: dict = {"limit": ROOMS_LIST_LIMIT}
+    for _ in range(ROOMS_MAX_PAGES):
+        response = await daily_client.request(client, "GET", "/rooms", params=params)
+        if response.status_code != 200:
+            raise ValueError(f"/rooms HTTP {response.status_code}")
+        page = response.json()
+        data = page.get("data") if isinstance(page, dict) else None
+        if not isinstance(data, list):
+            raise ValueError("/rooms bez data[]")
+        count = page.get("total_count")
+        if isinstance(count, int) and not isinstance(count, bool) and count > total_count:
+            total_count = count
+        for room in data:
+            if not isinstance(room, dict):
+                raise ValueError("/rooms: pokój")
+            found.append(room)
+        if len(data) < ROOMS_LIST_LIMIT:
+            break
+        for room in data:
+            room_id = room.get("id")
+            if not isinstance(room_id, str) or not room_id or room_id in seen:
+                raise ValueError("/rooms: paginacja nie przesuwa się (brak albo powtórzone id pokoju)")
+            seen.add(room_id)
+        params = {"limit": ROOMS_LIST_LIMIT, "starting_after": data[-1]["id"]}
+    else:
+        raise ValueError("za dużo stron /rooms")
+    if len(found) < total_count:
+        raise ValueError("/rooms: paginacja niepełna (mniej pokoi niż total_count)")
+    return found
+
+
 async def _board_rooms(client: httpx.AsyncClient, now: int) -> tuple[list[list], list[str]]:
     """Pokoje tablic istniejace w Daily (zywe / w karencji) i nazwy dawno wygaslych."""
-    response = await daily_client.request(client, "GET", "/rooms", params={"limit": ROOMS_LIST_LIMIT})
-    if response.status_code != 200:
-        raise ValueError(f"/rooms HTTP {response.status_code}")
-    page = response.json()
-    data = page.get("data") if isinstance(page, dict) else None
-    if not isinstance(data, list):
-        raise ValueError("/rooms bez data[]")
     rooms: list[list] = []
     expired: list[str] = []
-    for room in data:
-        if not isinstance(room, dict):
-            raise ValueError("/rooms: pokój")
+    for room in await _list_rooms(client):
         name = room.get("name")
         if not guard.is_board_room(name):
             continue

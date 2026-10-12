@@ -771,8 +771,11 @@ class TestOneRoomPerCreator:
 
         assert room_of(test_board) not in daily.rooms
         assert room_of(second) in daily.rooms
-        # budzet: poprzedni (pusty) pokoj rozliczony do chwili skasowania (minimum 1 min) + nowy pokoj
+        # budzet: poprzedni pokoj (pusty wg obecnosci) tymczasowo rozliczony do chwili skasowania
+        # (minimum 1 min, w ramach kredytu zwrotow) + nowy pokoj
         assert TTL + 60 <= budget_of(sync_redis_client, test_user.id) <= TTL + 70
         rooms = registry(sync_redis_client)
-        assert rooms[room_of(test_board)] <= int(time.time())  # rezerwacja skonczona, zostaje okres karencji
+        # rezerwacja MIESIECZNA skasowanego pokoju zostaje do jego pierwotnego exp: obecnosc bywa
+        # spozniona, a DELETE nie musi rozlaczac trwajacej rozmowy
+        assert rooms[room_of(test_board)] > int(time.time()) + TTL - 10
         assert rooms[room_of(second)] > int(time.time())

@@ -15,7 +15,9 @@ Klucze Redis:
                                      to SUMA ich `charged`, nie osobny licznik - zwrotu nie da
                                      sie wziac dwa razy)
   call:rooms                       - ZSET "<nazwa>|<utworzony>|<max_participants>" -> koniec
-                                     pokoju (exp albo chwila potwierdzonego skasowania)
+                                     pokoju = jego `exp`. Skasowanie pokoju (DELETE) NIE skraca
+                                     wpisu: dokumentacja Daily nie potwierdza, ze DELETE rozlacza
+                                     trwajaca rozmowe, a obecnosc (presence) bywa spozniona do 15 s
 """
 import asyncio
 import json
@@ -59,7 +61,15 @@ RESERVATION_GRACE_SECONDS = 30 * 60
 REGISTRY_PRUNE_SECONDS = 24 * 60 * 60
 # Najmniejsze obciazenie budzetu za utworzony pokoj (nawet od razu skasowany).
 MIN_CHARGE_SECONDS = 60
-MAX_ROOMS_PER_DAY = 40
+# Twardy sufit liczby pokoi tworzacego na dobe - niezalezny od rozliczen i od tego, co raportuje
+# Daily: najwyzej 8 pokoi x czas zycia x limit osob (domyslnie 8 x 90 min x 4 = 2880 minut uczestnika).
+MAX_ROOMS_PER_DAY = 8
+# "Kredyt zaufania": laczny zwrot budzetu dziennego przyznany NA PODSTAWIE OBECNOSCI (pokoj
+# zamkniety jako pusty), ktorego nie potwierdzilo jeszcze rozliczenie wg spotkan z Daily.
+# Obecnosc bywa spozniona do 15 s (docs Daily), wiec taki zwrot moze byc bledny - dlatego naraz
+# niepotwierdzone moze byc najwyzej tyle. Najgorszy przypadek jednego konta na dobe:
+# (budzet dzienny + kredyt) x limit osob = (240 + 90) x 4 = 1320 minut uczestnika.
+UNVERIFIED_REFUND_SECONDS = 90 * 60
 
 LOCK_TTL_SECONDS = 120
 LOCK_WAIT_SECONDS = 10.0
@@ -249,9 +259,10 @@ class OwnerRoom:
     room: str
     member: str  # wpis w rejestrze call:rooms
     created: int
-    end: int  # exp pokoju albo chwila potwierdzonego skasowania pustego pokoju
+    end: int  # exp pokoju - takze po skasowaniu (uczestnicy moga zostac do `eject_after_elapsed`)
     charged: int  # sekundy obciazajace budzet dnia `day`
     day: str
+    reserved: int  # pelna rezerwacja budzetu (do `exp`); sufit rozliczenia wg spotkan
     open: bool = True  # False = pokoj zakonczony (skasowany / zastapiony / zniknal)
     settled: bool = False  # True = rozliczony wg spotkan z Daily, wiecej nie pytamy
 
@@ -275,12 +286,21 @@ def budget_left(state: OwnerState, day: str) -> int:
     return max(0, user_daily_cap_seconds() - state.used(day))
 
 
+def refund_credit_left(state: OwnerState) -> int:
+    """Ile sekund zwrotu "na obecnosc" mozna jeszcze przyznac (UNVERIFIED_REFUND_SECONDS minus niepotwierdzone)."""
+    pending = sum(
+        max(0, room.reserved - room.charged) for room in state.rooms if not room.open and not room.settled
+    )
+    return max(0, UNVERIFIED_REFUND_SECONDS - pending)
+
+
 def _owner_room(data: dict) -> OwnerRoom:
     room = OwnerRoom(
         room=data["room"], member=data["member"], created=data["created"], end=data["end"],
-        charged=data["charged"], day=data["day"], open=data["open"], settled=data["settled"],
+        charged=data["charged"], day=data["day"], reserved=data["reserved"], open=data["open"],
+        settled=data["settled"],
     )
-    numbers = (room.created, room.end, room.charged)
+    numbers = (room.created, room.end, room.charged, room.reserved)
     if any(isinstance(n, bool) or not isinstance(n, int) or n < 0 for n in numbers):
         raise ValueError("pokój tworzącego: liczby")
     if not all(isinstance(text, str) and text for text in (room.room, room.member, room.day)):

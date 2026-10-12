@@ -101,20 +101,28 @@ class TestCreatorRace:
         assert len(async_daily.rooms) == 1  # najwyzej jeden zywy pokoj tworzacego
 
     @pytest.mark.asyncio
-    async def test_rownolegle_tworzenie_gdy_pokoje_sa_puste_zostawia_jeden_pokoj(self, async_daily, sync_redis_client):
+    async def test_rownolegle_tworzenie_gdy_pokoje_wygladaja_na_puste_ogranicza_kredyt_zwrotow(
+        self, async_daily, sync_redis_client
+    ):
         results = [await create(1, 1)]
         for round_no in range(4):
             reset_rate_limits(sync_redis_client)
             boards = [10 + round_no * 3 + i for i in range(3)]
             results += await asyncio.gather(*(create(1, board) for board in boards))
 
-        assert results == [200] * 13
+        # Zwrot "na obecnosc" jest tymczasowy i lacznie nie przekracza kredytu 90 min: pokoje
+        # 90 + 90 + 90 + 60 min = budzet 240 min + kredyt 90 min, potem odmowa.
+        assert results.count(200) == 4
+        assert set(results) == {200, "VOICE_USER_LIMIT"}
         assert len(async_daily.rooms) == 1
-        # 12 pustych pokoi rozliczonych po minimum 1 min + jeden zywy z pelna rezerwacja;
-        # budzet to SUMA wpisow, wiec zwrotu nie da sie wziac dwa razy
         rooms = owner_rooms(sync_redis_client, 1)
         assert [room["open"] for room in rooms].count(True) == 1
-        assert budget_of(sync_redis_client, 1) == sum(room["charged"] for room in rooms) == TTL + 12 * 60
+        assert sum(room["reserved"] for room in rooms) == 240 * 60 + guard.UNVERIFIED_REFUND_SECONDS
+        assert sum(room["reserved"] - room["charged"] for room in rooms) == guard.UNVERIFIED_REFUND_SECONDS
+        # budzet to SUMA wpisow, wiec zwrotu nie da sie wziac dwa razy
+        assert budget_of(sync_redis_client, 1) == sum(room["charged"] for room in rooms) == 240 * 60
+        created_seconds = sum(room["exp"] - room["created"] for room in async_daily.history)
+        assert created_seconds <= 240 * 60 + guard.UNVERIFIED_REFUND_SECONDS
 
     @pytest.mark.asyncio
     async def test_piec_rownoleglych_klikniec_na_tej_samej_tablicy(self, async_daily, sync_redis_client):
@@ -514,26 +522,95 @@ class TestHonestTeacherBudget:
         assert first["charged"] == TTL and first["settled"] is True
         assert len([r for r in daily.calls("GET", "/meetings") if r.url.params.get("room")]) == 2  # strona + pusta
 
-    def test_kolejna_lekcja_na_tej_samej_tablicy_gdy_pokoj_pusty_rozlicza_stary_i_tworzy_nowy(
+    def test_kolejna_lekcja_na_tej_samej_tablicy_gdy_pokoj_pusty_przedluza_go_do_pelnego_czasu(
         self, client, daily, clock, sync_redis_client, test_user, test_board
     ):
         clock.set(mid_month())
         name = room_of(test_board)
         assert post_call(client, test_board.id, test_user.id).status_code == 200
+        self.lesson(daily, name, 60)
         clock.advance(70 * 60)  # lekcja skonczona, pokoj pusty, zostalo mu 20 min
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
         now = int(time.time())
-        assert now + TTL - 5 <= daily.rooms[name]["config"]["exp"] <= now + TTL  # pelny czas na nowa lekcje
-        assert len(daily.calls("DELETE", f"/rooms/{name}")) == 1
-        first, second = owner_rooms(sync_redis_client, test_user.id)
-        # stary pokoj: czas od utworzenia do potwierdzenia pustki
-        assert 70 * 60 <= first["charged"] <= 70 * 60 + 5 and first["open"] is False
-        assert (second["charged"], second["open"]) == (TTL, True)
-        # zwrot jest jednorazowy: kolejne klikniecie niczego juz nie oddaje
+        exp = daily.rooms[name]["config"]["exp"]
+        assert now + TTL - 5 <= exp <= now + TTL  # pelny czas na nowa lekcje
+        # pokoj nie jest kasowany ani zwracany "na obecnosc" - spozniona obecnosc niczego tu nie daje
+        assert daily.calls("DELETE", f"/rooms/{name}") == []
+        (entry,) = owner_rooms(sync_redis_client, test_user.id)
+        assert 160 * 60 - 5 <= entry["charged"] == entry["reserved"] <= 160 * 60 and entry["open"] is True
+        assert registry(sync_redis_client)[name] == exp == entry["end"]
+        # kolejne klikniecie niczego juz nie zmienia
         assert post_call(client, test_board.id, test_user.id).status_code == 200
-        assert budget_of(sync_redis_client, test_user.id) == first["charged"] + TTL
+        assert budget_of(sync_redis_client, test_user.id) == entry["charged"]
+        # po koncu pokoju i karencji budzet obciaza realny czas obu lekcji
+        self.lesson(daily, name, 60)
+        clock.advance(TTL + 31 * 60)
+        reset_rate_limits(sync_redis_client)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        first = owner_rooms(sync_redis_client, test_user.id)[0]
+        assert (first["charged"], first["settled"]) == (120 * 60, True)
+
+    def test_druga_lekcja_po_10_min_i_trzecia_po_godzinie_na_roznych_tablicach_bez_blokady(
+        self, client, daily, clock, db_session, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        clock.set(mid_month())
+        boards = [test_board, add_board(db_session, test_workspace, test_user), add_board(db_session, test_workspace, test_user)]
+        for board, pause in zip(boards, (70 * 60, 120 * 60, 0)):  # lekcja 60 min + 10 min / godzina przerwy
+            reset_rate_limits(sync_redis_client)
+            r = post_call(client, board.id, test_user.id)
+            assert r.status_code == 200, r.json()["code"]
+            assert daily.rooms[room_of(board)]["config"]["exp"] - int(time.time()) >= TTL - 5  # pelny pokoj
+            self.lesson(daily, room_of(board), 60)
+            clock.advance(pause)
+
+        first, second, third = owner_rooms(sync_redis_client, test_user.id)
+        # dwie pierwsze lekcje rozliczone wg spotkan (po 60 min), trzecia trwa (pelna rezerwacja)
+        assert (first["charged"], first["settled"]) == (60 * 60, True)
+        assert (second["charged"], second["settled"]) == (60 * 60, True)
+        assert (third["charged"], third["open"]) == (TTL, True)
+
+    def test_zwrot_na_obecnosc_jest_cofany_gdy_w_pokoju_jednak_ktos_byl(
+        self, client, daily, clock, db_session, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        clock.set(mid_month())
+        second = add_board(db_session, test_workspace, test_user)
+        name = room_of(test_board)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        # obecnosc pusta (spozniona), a ludzie siedza w skasowanym pokoju do konca
+        assert post_call(client, second.id, test_user.id).status_code == 200
+        first = owner_rooms(sync_redis_client, test_user.id)[0]
+        assert first["charged"] <= 65 and first["reserved"] == TTL and first["end"] > int(time.time()) + TTL - 5
+        self.lesson(daily, name, 90, people=4)
+
+        clock.advance(TTL + 31 * 60)
+        reset_rate_limits(sync_redis_client)
+        assert post_call(client, second.id, test_user.id).status_code == 200
+
+        first = owner_rooms(sync_redis_client, test_user.id)[0]
+        assert (first["charged"], first["settled"]) == (TTL, True)
+
+    def test_niepotwierdzony_zwrot_trzyma_kredyt_dopoki_daily_nie_odpowie(
+        self, client, daily, clock, db_session, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        clock.set(mid_month())
+        second = add_board(db_session, test_workspace, test_user)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        assert post_call(client, second.id, test_user.id).status_code == 200  # zwrot ~89 min "na obecnosc"
+        clock.advance(TTL + 31 * 60)
+        daily.override(
+            "GET", "/meetings",
+            lambda request: daily_error(500, "x") if request.url.params.get("room") else daily._meetings(request),
+        )
+        reset_rate_limits(sync_redis_client)
+
+        assert post_call(client, second.id, test_user.id).status_code == 200
+
+        first, second_room = owner_rooms(sync_redis_client, test_user.id)[:2]
+        assert first["settled"] is False and second_room["settled"] is False
+        state = guard.OwnerState(rooms=[guard._owner_room(room) for room in owner_rooms(sync_redis_client, test_user.id)])
+        assert guard.refund_credit_left(state) <= 65  # kredyt nadal zajety pierwszym pokojem
 
     def test_trwajaca_lekcja_nie_jest_przerywana_odswiezeniem_strony(
         self, client, daily, clock, sync_redis_client, test_user, test_board
@@ -595,6 +672,183 @@ class TestHonestTeacherBudget:
         codes = [post_call(client, board.id, test_user.id).json()["code"] for board in boards]
 
         assert codes == [None, None, None, "VOICE_USER_LIMIT"]
+
+
+class TestStalePresence:
+    """
+    Blokada z weryfikacji PR #107: `GET /rooms/:name/presence` bywa spozniona do 15 s (docs Daily),
+    wiec zwraca [] mimo ludzi w pokoju, a `DELETE` pokoju nie musi rozlaczac trwajacej rozmowy.
+    Atak: wlasciciel tworzy pokoj, boty wchodza, od razu klika "Rozmowa" na kolejnej tablicy.
+    W tych testach atrapa ZAWSZE odpowiada "nikogo nie ma", a uczestnicy siedza w kazdym pokoju
+    do `eject_after_elapsed` ze swojego tokenu (+ 5 min okna wejscia), niezaleznie od DELETE.
+    """
+
+    PEOPLE = 4
+
+    def test_skasowanie_pokoju_pustego_wg_obecnosci_nie_skraca_rezerwacji_miesiecznej(
+        self, client, daily, db_session, monkeypatch, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        monkeypatch.setattr(get_settings(), "call_admin_user_ids", str(test_user.id))
+        second = add_board(db_session, test_workspace, test_user)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        first_exp = daily.rooms[room_of(test_board)]["config"]["exp"]
+
+        assert post_call(client, second.id, test_user.id).status_code == 200  # obecnosc: []
+
+        assert room_of(test_board) not in daily.rooms
+        assert registry(sync_redis_client)[room_of(test_board)] == first_exp
+        report = get_usage(client, test_user.id).json()["data"]
+        assert report["reserved_minutes"] == 2 * 90 * self.PEOPLE
+
+    def test_jedno_konto_45_tablic_w_kilka_minut_miesci_sie_w_budzecie_i_kredycie(
+        self, client, daily, clock, db_session, monkeypatch, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        monkeypatch.setattr(get_settings(), "call_admin_user_ids", str(test_user.id))
+        clock.set(mid_month())
+        boards = [test_board] + [add_board(db_session, test_workspace, test_user) for _ in range(44)]
+        stays = []  # sekundy pobytu botow w kazdym utworzonym pokoju
+        codes = []
+        for index, board in enumerate(boards):
+            if index and index % 9 == 0:
+                clock.advance(61)  # limit 10/min na uzytkownika
+            if index and index % 29 == 0:
+                for key in sync_redis_client.keys("ratelimit:voice_call:ip:*"):
+                    sync_redis_client.delete(key)  # atakujacy zmienia adres IP
+            r = post_call(client, board.id, test_user.id)
+            codes.append(r.json()["code"] or 200)
+            if r.status_code == 200:
+                stays.append(daily.token_properties()["eject_after_elapsed"] + call.TOKEN_ENTRY_SECONDS)
+
+        real_minutes = sum(stays) * self.PEOPLE / 60
+        # Najgorszy przypadek jednego konta na dobe: (budzet 240 min + kredyt zwrotow 90 min) x 4 osoby.
+        worst = (240 + guard.UNVERIFIED_REFUND_SECONDS // 60) * self.PEOPLE
+        assert worst == 1320
+        assert len(stays) == 4 and real_minutes <= worst, f"{len(stays)} pokoi, {real_minutes} min"
+        assert set(codes) == {200, "VOICE_USER_LIMIT"}
+        assert budget_of(sync_redis_client, test_user.id) == 240 * 60
+        # wszystkie te minuty sa zarezerwowane w progu miesiecznym, choc pokoje sa juz skasowane
+        report = get_usage(client, test_user.id).json()["data"]
+        assert report["reserved_minutes"] >= real_minutes
+        # Twardy sufit niezalezny od rozliczen (gdyby Daily nie raportowal spotkan): liczba pokoi na dobe.
+        assert guard.MAX_ROOMS_PER_DAY * 90 * self.PEOPLE == 2880 <= 0.36 * guard.monthly_cap_minutes()
+
+    def test_po_rozliczeniu_wg_spotkan_konto_zostaje_zablokowane_do_konca_doby(
+        self, client, daily, clock, db_session, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        clock.set(mid_month())
+        boards = [test_board] + [add_board(db_session, test_workspace, test_user) for _ in range(5)]
+        for board in boards[:5]:
+            r = post_call(client, board.id, test_user.id)
+            if r.status_code == 200:  # boty siedza w kazdym pokoju do jego exp
+                exp = daily.history[-1]["exp"]
+                now = int(time.time())
+                daily.meetings.append({
+                    "id": f"m{len(daily.meetings)}", "room": room_of(board), "start_time": now,
+                    "duration": exp - now, "ongoing": False, "max_participants": self.PEOPLE,
+                    "participants": [
+                        {"participant_id": f"{board.id}-{i}", "join_time": now, "duration": exp - now}
+                        for i in range(self.PEOPLE)
+                    ],
+                })
+        assert len(daily.history) == 4
+
+        clock.advance(TTL + 31 * 60)  # Daily zaraportowal realne czasy, karencja minela
+        reset_rate_limits(sync_redis_client)
+        r = post_call(client, boards[5].id, test_user.id)
+
+        assert (r.status_code, r.json()["code"]) == (429, "VOICE_USER_LIMIT")
+        rooms = owner_rooms(sync_redis_client, test_user.id)
+        assert all(room["charged"] == room["reserved"] for room in rooms)  # zwroty cofniete
+        assert budget_of(sync_redis_client, test_user.id) == 240 * 60 + guard.UNVERIFIED_REFUND_SECONDS
+
+    @pytest.mark.asyncio
+    async def test_wiele_kont_seria_tablic_nie_przekracza_progu_miesiecznego(self, async_daily, clock, sync_redis_client):
+        fake = async_daily
+        fake.delay = 0
+        clock.set(mid_month())
+        refused = set()
+        for owner in range(1, 31):
+            reset_rate_limits(sync_redis_client)
+            for board in range(8):
+                result = await create(owner, owner * 100 + board, ip=f"10.1.{owner}.1")
+                if result != 200:
+                    refused.add(result)
+
+        # uczestnicy (4 na pokoj) siedza w KAZDYM utworzonym pokoju do jego exp, mimo DELETE
+        real_minutes = sum((room["exp"] - room["created"]) * self.PEOPLE for room in fake.history) / 60
+        cap = guard.monthly_cap_minutes()
+        assert cap == 8000
+        assert "VOICE_MONTHLY_LIMIT" in refused and refused <= {"VOICE_MONTHLY_LIMIT", "VOICE_USER_LIMIT"}
+        assert 7000 <= real_minutes <= cap, f"{real_minutes} min"
+        assert sync_redis_client.zcard("call:rooms") == len(fake.history)  # zadna rezerwacja nie zniknela
+
+    def test_prog_miesieczny_przy_przejsciu_na_inna_tablice_nie_zamyka_trwajacej_rozmowy(
+        self, client, daily, db_session, monkeypatch, sync_redis_client, test_user, test_user2, test_workspace, test_board
+    ):
+        monkeypatch.setattr(get_settings(), "daily_monthly_minutes_cap", 700)  # miejsce na jeden pokoj (360)
+        second = add_board(db_session, test_workspace, test_user)
+        add_member(db_session, test_board, test_user2, "editor")
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        r = post_call(client, second.id, test_user.id)
+
+        assert (r.status_code, r.json()["code"]) == (429, "VOICE_MONTHLY_LIMIT")
+        assert daily.calls("DELETE") == [] and list(daily.rooms) == [room_of(test_board)]
+        (entry,) = owner_rooms(sync_redis_client, test_user.id)
+        assert entry["open"] is True and entry["charged"] == TTL
+        # nauczyciel i uczen nadal maja pokoj pierwszej tablicy
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+        assert post_call(client, test_board.id, test_user2.id).status_code == 200
+
+    def test_limit_pokoi_przy_przejsciu_na_inna_tablice_nie_zamyka_trwajacej_rozmowy(
+        self, client, daily, db_session, monkeypatch, sync_redis_client, test_user, test_workspace, test_board
+    ):
+        monkeypatch.setattr(guard, "MAX_ROOMS_PER_DAY", 1)
+        second = add_board(db_session, test_workspace, test_user)
+        assert post_call(client, test_board.id, test_user.id).status_code == 200
+
+        r = post_call(client, second.id, test_user.id)
+
+        assert (r.status_code, r.json()["code"]) == (429, "VOICE_USER_LIMIT")
+        assert daily.calls("DELETE") == [] and list(daily.rooms) == [room_of(test_board)]
+
+
+class TestRoomsListPagination:
+    """Lista pokoi konta (`GET /rooms`) jest czytana w calosci; kazda niespojnosc = brak tokenu."""
+
+    def fill(self, daily, count: int) -> None:
+        for index in range(count):
+            daily.add_room(f"easylesson-board-{9000 + index}", register=False)  # 60 min x 4 osoby
+
+    def test_pokoje_z_drugiej_strony_sa_liczone_do_rezerwacji(self, client, daily, monkeypatch, test_user):
+        monkeypatch.setattr(get_settings(), "call_admin_user_ids", str(test_user.id))
+        self.fill(daily, 130)
+
+        report = get_usage(client, test_user.id).json()["data"]
+
+        assert report["reserved_minutes"] == 130 * 60 * 4
+        assert report["state"] == "limit"
+        assert [r.url.params.get("starting_after") for r in daily.calls("GET", "/rooms")].count(None) == 2
+        assert any(r.url.params.get("starting_after") for r in daily.calls("GET", "/rooms"))
+
+    @pytest.mark.parametrize("variant", ["mniej_niz_total_count", "strona_sie_powtarza", "za_duzo_stron", "pokoj_bez_id"])
+    def test_niespojna_lista_pokoi_to_brak_tokenu(self, client, daily, monkeypatch, test_user, test_board, variant):
+        self.fill(daily, 130)
+        rooms = list(daily.rooms.values())
+        if variant == "mniej_niz_total_count":
+            daily.override("GET", "/rooms", httpx.Response(200, json={"total_count": 130, "data": rooms[:40]}))
+        elif variant == "strona_sie_powtarza":
+            daily.override("GET", "/rooms", httpx.Response(200, json={"total_count": 130, "data": rooms[:100]}))
+        elif variant == "za_duzo_stron":
+            monkeypatch.setattr(call_usage, "ROOMS_MAX_PAGES", 1)
+        else:
+            page = [{k: v for k, v in room.items() if k != "id"} for room in rooms[:100]]
+            daily.override("GET", "/rooms", httpx.Response(200, json={"data": page}))
+
+        r = post_call(client, test_board.id, test_user.id)
+
+        assert (r.status_code, r.json()["code"]) == (503, "VOICE_USAGE_UNAVAILABLE")
+        assert daily.writes() == []
 
 
 class TestRateLimitBuckets:
@@ -791,28 +1045,36 @@ class TestWorstCaseMonth:
         return respond
 
     @pytest.mark.parametrize("mode", ["na_biezaco", "duration_zero_do_wyjscia", "po_wyjsciu"])
+    @pytest.mark.parametrize("presence", ["ktos_jest", "pusta_mimo_ludzi"])
     @pytest.mark.asyncio
-    async def test_realne_minuty_nie_przekraczaja_progu(self, async_daily, clock, sync_redis_client, mode):
+    async def test_realne_minuty_nie_przekraczaja_progu(self, async_daily, clock, sync_redis_client, mode, presence):
+        """
+        `pusta_mimo_ludzi`: obecnosc z Daily zawsze [] (spozniona), kazde klikniecie idzie na NOWA
+        tablice (poprzedni pokoj jest kasowany jako "pusty"), a ludzie i tak siedza w kazdym pokoju
+        do jego exp (DELETE nie rozlacza) - sciezka zwrotu budzetu i kasowania pokoi.
+        """
         fake = async_daily
         fake.delay = 0
-        fake.default_presence = someone_present()
+        fake.default_presence = someone_present() if presence == "ktos_jest" else None
         fake.override("GET", "/meetings", self.reported(fake, mode))
         clock.set(mid_month())
 
         refused = set()
-        for _ in range(self.STEPS):
+        for step in range(self.STEPS):
             reset_rate_limits(sync_redis_client)
             for owner in range(1, self.OWNERS + 1):
-                result = await create(owner, owner, ip=f"10.0.{owner}.1")
+                board = owner if presence == "ktos_jest" else owner * 1000 + step
+                result = await create(owner, board, ip=f"10.0.{owner}.1")
                 if result != 200:
                     refused.add(result)
             clock.advance(self.STEP)
 
+        # realne minuty: 4 osoby w KAZDYM utworzonym pokoju od utworzenia do exp, takze po DELETE
         real_minutes = sum((room["exp"] - room["created"]) * 4 for room in fake.history) / 60
         cap = guard.monthly_cap_minutes()
         assert cap == 8000 and guard.room_ttl_seconds() == TTL and guard.max_participants() == 4
         assert "VOICE_MONTHLY_LIMIT" in refused  # atak naprawde doszedl do progu
         assert refused <= {"VOICE_MONTHLY_LIMIT", "VOICE_USER_LIMIT"}
-        assert real_minutes <= cap, f"{mode}: {real_minutes} min"
-        assert real_minutes >= 3500, f"{mode}: symulacja nie wygenerowala ruchu ({real_minutes} min)"
-        print(f"[najgorszy przypadek] {mode}: {real_minutes:.0f} min uczestnikow przy progu {cap}")
+        assert real_minutes <= cap, f"{mode}/{presence}: {real_minutes} min"
+        assert real_minutes >= 3500, f"{mode}/{presence}: symulacja nie wygenerowala ruchu ({real_minutes} min)"
+        print(f"[najgorszy przypadek] {mode}/{presence}: {real_minutes:.0f} min uczestnikow przy progu {cap}")

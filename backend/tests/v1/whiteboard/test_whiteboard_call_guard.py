@@ -307,7 +307,7 @@ class TestUserDailyCap:
 
         assert budget_of(sync_redis_client, test_user) == 2 * TTL
 
-    def test_pokoj_skasowany_poza_nami_jest_rozliczany_do_teraz_a_rezerwacja_miesieczna_zostaje(
+    def test_pokoj_skasowany_poza_nami_zostaje_w_budzecie_i_rezerwacji_miesiecznej(
         self, client, daily, clock, sync_redis_client, test_user, test_board
     ):
         assert post_call(client, test_board.id, test_user.id).status_code == 200
@@ -316,8 +316,9 @@ class TestUserDailyCap:
 
         assert post_call(client, test_board.id, test_user.id).status_code == 200
 
-        # budzet: stary pokoj zyl najwyzej do teraz + nowy pokoj
-        assert TTL + 120 <= budget_of(sync_redis_client, test_user) <= TTL + 130
+        # budzet: brak pokoju nie dowodzi, ze nikt w nim nie zostal - pelne obciazenie obu pokoi
+        # az do rozliczenia wg spotkan
+        assert budget_of(sync_redis_client, test_user) == 2 * TTL
         # prog miesieczny: nie wiemy, czy ktos w nim nie zostal - pelna rezerwacja obu pokoi
         rows = sync_redis_client.zrange("call:rooms", 0, -1, withscores=True)
         assert len(rows) == 2 and all(score > time.time() + TTL - 130 for _, score in rows)

@@ -12,6 +12,10 @@ docs/architecture/pipelines.md pkt 5a.
     w Daily); bez pokoju odmowa jest lokalna: 409 VOICE_CALL_NOT_STARTED / VOICE_CALL_ENDING,
   * kazdy pokoj jest wpisywany do rejestru i budzetu PRZED wywolaniem Daily (rezerwacja
     pelnego czasu zycia x max_participants); nieudane tworzenie cofa wpis,
+  * skasowanie pokoju (DELETE) NIGDY nie skraca jego rezerwacji miesiecznej: obecnosc z Daily
+    bywa spozniona do 15 s, a dokumentacja nie potwierdza, ze DELETE rozlacza trwajaca rozmowe.
+    Zwrot budzetu dziennego "na obecnosc" jest tymczasowy i ograniczony kredytem
+    (`guard.UNVERIFIED_REFUND_SECONDS`); ostatecznie rozlicza go czas spotkan wg Daily,
   * token dostaje tylko pokoj spelniajacy wymogi (`_room_problem`): prywatny, z `exp` <= 3 h,
     `eject_at_room_exp`, `max_participants` <= limit, bez platnych funkcji i bez adminow.
     Inny pokoj wlasciciel kasuje i tworzy od nowa, dolaczajacy dostaje odmowe,
@@ -54,9 +58,10 @@ TOKEN_ENTRY_SECONDS = 5 * 60
 MIN_JOIN_REMAINING_SECONDS = TOKEN_ENTRY_SECONDS + 60
 # Wlasciciel przedluza pokoj dopiero, gdy do `exp` zostalo mniej niz tyle.
 EXTEND_THRESHOLD_SECONDS = 15 * 60
-# Wlasciciel klika "Rozmowa", a jego pokoj (starszy niz tyle) jest PUSTY: stary pokoj jest
-# rozliczany do tej chwili i zastepowany nowym z pelnym czasem (kolejna lekcja na tej samej tablicy).
-RECYCLE_MIN_AGE_SECONDS = 10 * 60
+# Wlasciciel klika "Rozmowa", a jego pokoj (starszy niz tyle) wyglada na PUSTY: pokoj jest
+# przedluzany do pelnego czasu (kolejna lekcja na tej samej tablicy). Pokoju nie kasujemy i niczego
+# nie zwracamy - bledna (spozniona) obecnosc kosztuje wtedy tylko budzet tworzacego.
+RENEW_MIN_AGE_SECONDS = 10 * 60
 EXP_SKEW_SECONDS = 60
 # Ile zakonczonych pokoi tworzacego rozliczamy wg spotkan z Daily przy jednym zadaniu.
 SETTLE_MAX_PER_REQUEST = 3
@@ -235,7 +240,11 @@ async def _get_room(client: httpx.AsyncClient, name: str, api_key: str) -> dict 
 
 
 async def _room_is_empty(client: httpx.AsyncClient, name: str) -> bool:
-    """True tylko gdy Daily POTWIERDZI, ze w pokoju nikogo nie ma (GET /rooms/:name/presence)."""
+    """
+    True, gdy Daily odpowie, ze w pokoju nikogo nie ma (GET /rooms/:name/presence). To tylko
+    WSKAZOWKA: obecnosc bywa spozniona do 15 s (docs Daily), wiec osoby, ktore wlasnie weszly, sa
+    niewidoczne. Wolno na niej oprzec wylacznie decyzje ograniczone kredytem albo budzetem.
+    """
     try:
         response = await daily.request(client, "GET", f"/rooms/{name}/presence")
     except AppException:
@@ -244,19 +253,15 @@ async def _room_is_empty(client: httpx.AsyncClient, name: str) -> bool:
     return response.status_code == 200 and data.get("data") == [] and data.get("total_count") in (0, None)
 
 
-async def _delete_room(client: httpx.AsyncClient, name: str, api_key: str, empty: bool | None = None) -> bool:
+async def _delete_room(client: httpx.AsyncClient, name: str, api_key: str) -> None:
     """
     Kasuje pokoj; brak pokoju = OK. Inny blad -> wyjatek (nie tworzymy nic na niepewnym stanie).
-    Zwraca True, gdy tuz przed skasowaniem pokoj byl na pewno pusty - tylko wtedy wolno skrocic
-    jego rezerwacje i rozliczenie (dokumentacja Daily nie potwierdza, ze DELETE rozlacza
-    trwajaca rozmowe; uczestnikow i tak konczy `eject_after_elapsed` z ich tokenow).
-    `empty` = wynik sprawdzenia obecnosci zrobionego juz przez wolajacego.
+    Skasowanie NIE jest dowodem, ze rozmowa sie skonczyla (dokumentacja Daily nie potwierdza, ze
+    DELETE rozlacza; uczestnikow konczy `eject_after_elapsed` z ich tokenow) - rezerwacja zostaje.
     """
-    was_empty = await _room_is_empty(client, name) if empty is None else empty
     response = await daily.request(client, "DELETE", f"/rooms/{name}")
     if response.status_code != 200 and not _is_room_missing(response):
         raise daily.provider_error(response, "kasowanie pokoju", api_key)
-    return was_empty
 
 
 async def _cleanup_expired_rooms(owner: _Owner, own_name: str) -> None:
@@ -329,9 +334,11 @@ async def _save(owner: _Owner) -> None:
 
 async def _settle_closed_rooms(owner: _Owner) -> None:
     """
-    Zakonczone pokoje tworzacego, po okresie karencji: budzet dzienny obciaza REALNY czas rozmowy
-    wg spotkan z Daily (nie pelna rezerwacja) - uczciwy nauczyciel nie placi za czas, gdy pokoj
-    stal pusty. Rozliczenie moze obciazenie tylko ZMNIEJSZYC; kazda watpliwosc = bez zmian.
+    Zakonczone pokoje tworzacego, po okresie karencji od ich `exp`: budzet dzienny obciaza REALNY
+    czas rozmowy wg spotkan z Daily (nie pelna rezerwacja) - uczciwy nauczyciel nie placi za czas,
+    gdy pokoj stal pusty. Wynik to min(rezerwacja, czas spotkan): tymczasowy zwrot "na obecnosc"
+    jest tu potwierdzany albo COFANY (w pokoju jednak ktos byl). Kazda watpliwosc = wpis zostaje
+    nierozliczony (pelne obciazenie albo zajety kredyt zwrotow) i pytamy ponownie pozniej.
     """
     now = owner.now
     changed = False
@@ -342,7 +349,7 @@ async def _settle_closed_rooms(owner: _Owner) -> None:
         if entry.end > now - guard.RESERVATION_GRACE_SECONDS or done >= SETTLE_MAX_PER_REQUEST:
             continue
         done += 1
-        if entry.charged > guard.MIN_CHARGE_SECONDS:
+        if entry.reserved > guard.MIN_CHARGE_SECONDS:
             try:
                 seconds = await call_usage.room_meeting_seconds(
                     owner.client, entry.room, entry.created, entry.end, now
@@ -352,30 +359,54 @@ async def _settle_closed_rooms(owner: _Owner) -> None:
                 continue
             if seconds is None:
                 continue
-            entry.charged = min(entry.charged, max(guard.MIN_CHARGE_SECONDS, seconds))
+            entry.charged = min(entry.reserved, max(guard.MIN_CHARGE_SECONDS, seconds))
         entry.settled = True
         changed = True
     if changed:
         await _save(owner)
 
 
-async def _close_room(owner: _Owner, entry: guard.OwnerRoom, *, exists: bool, empty: bool | None = None) -> None:
+def _presence_refund(owner: _Owner, entry: guard.OwnerRoom) -> int:
     """
-    Konczy pokoj tworzacego (zastapienie nowym). Niewykorzystany czas wraca do budzetu TYLKO, gdy
-    Daily potwierdzil, ze pokoj byl pusty (albo pokoju juz nie ma) - rozliczenie = czas od
-    utworzenia do teraz. Wpis jest zamykany raz (pod blokada), wiec zwrotu nie da sie powtorzyc.
+    Ile sekund obciazenia mozna zdjac z pokoju zamykanego jako pusty WG OBECNOSCI: reszta ponad
+    czas od utworzenia, ale najwyzej tyle, ile zostalo kredytu niepotwierdzonych zwrotow.
     """
-    now = owner.now
-    was_empty = False
+    elapsed = max(guard.MIN_CHARGE_SECONDS, owner.now - entry.created)
+    return max(0, min(entry.charged - elapsed, guard.refund_credit_left(owner.state)))
+
+
+def _check_can_open(owner: _Owner, refund: int, adopt: int | None) -> None:
+    """
+    Przed zamknieciem zywego pokoju z innej tablicy: czy pokoj tej tablicy bedzie mozna otworzyc
+    (budzet dnia, liczba pokoi, prog miesiaca)? Inaczej tworzacy stracilby trwajaca rozmowe i nie
+    dostal nowej. `adopt` = sekundy do `exp` istniejacego zgodnego pokoju (przejecie) albo None
+    (powstanie nowy). Rozstrzygajace sprawdzenia i tak robia `_create_room` / `_adopt_room`.
+    """
+    state, day = owner.state, guard.day_of(owner.now)
+    left = guard.budget_left(state, day) + refund
+    need = guard.ROOM_MIN_TTL_SECONDS if adopt is None else adopt
+    if left < need or state.count(day) >= guard.MAX_ROOMS_PER_DAY:
+        raise guard.user_limit_reached()
+    if adopt is None:
+        # Stary pokoj zostaje w rezerwacji miesiecznej do swojego exp - nowy musi sie zmiescic OBOK.
+        minutes = math.ceil(min(guard.room_ttl_seconds(), left) * guard.max_participants() / 60)
+        if owner.planned + minutes > guard.monthly_cap_minutes():
+            logger.warning("Rozmowa: nowy pokój nie mieści się w progu miesięcznym - poprzedni zostaje")
+            raise _monthly_limit()
+
+
+async def _close_room(owner: _Owner, entry: guard.OwnerRoom, *, exists: bool, refund: int = 0) -> None:
+    """
+    Konczy pokoj tworzacego (zastapienie nowym): DELETE w Daily i zamkniecie wpisu (raz, pod
+    blokada). Rezerwacja MIESIECZNA i `end` wpisu zostaja do pierwotnego `exp` + karencja -
+    niezaleznie od obecnosci i od DELETE (obecnosc bywa spozniona, a DELETE nie musi rozlaczac).
+    `refund` = tymczasowy zwrot budzetu dziennego (`_presence_refund`); potwierdza go albo cofa
+    rozliczenie wg spotkan (`_settle_closed_rooms`).
+    """
     if exists:
-        was_empty = await _delete_room(owner.client, entry.room, owner.api_key, empty)
+        await _delete_room(owner.client, entry.room, owner.api_key)
     entry.open = False
-    if was_empty or not exists:
-        entry.charged = min(entry.charged, max(guard.MIN_CHARGE_SECONDS, now - entry.created))
-    if was_empty:
-        # Pusty i skasowany: rezerwacja miesieczna konczy sie teraz (+ okres karencji).
-        entry.end = max(entry.created, now)
-        await guard.register_room(entry.member, entry.end)
+    entry.charged = max(guard.MIN_CHARGE_SECONDS, entry.charged - max(0, refund))
     await _save(owner)
 
 
@@ -412,7 +443,8 @@ async def _create_room(owner: _Owner, name: str) -> dict:
     exp = now + ttl
     participants = guard.max_participants()
     entry = guard.OwnerRoom(
-        room=name, member=guard.room_member(name, now, participants), created=now, end=exp, charged=ttl, day=day
+        room=name, member=guard.room_member(name, now, participants), created=now, end=exp, charged=ttl,
+        day=day, reserved=ttl,
     )
     state.rooms.append(entry)
     await _save(owner)
@@ -447,7 +479,7 @@ async def _create_room(owner: _Owner, name: str) -> dict:
         room_exp = int(_room_exp(room))
         if room_exp != exp:
             entry.end = room_exp
-            entry.charged = max(guard.MIN_CHARGE_SECONDS, room_exp - now)
+            entry.charged = entry.reserved = max(guard.MIN_CHARGE_SECONDS, room_exp - now)
             await _save(owner)
             await guard.register_room(entry.member, room_exp)
         return room
@@ -478,7 +510,9 @@ async def _adopt_room(owner: _Owner, room: dict, name: str) -> guard.OwnerRoom:
     records = await guard.reserved_rooms(now)
     known = guard.live_record(records, name, now)
     member = known.member if known is not None else guard.room_member(name, born, limit)
-    entry = guard.OwnerRoom(room=name, member=member, created=now, end=exp, charged=cost, day=day)
+    entry = guard.OwnerRoom(
+        room=name, member=member, created=now, end=exp, charged=cost, day=day, reserved=cost
+    )
     state.rooms.append(entry)
     await _save(owner)
     await guard.register_room(member, exp)
@@ -487,19 +521,24 @@ async def _adopt_room(owner: _Owner, room: dict, name: str) -> guard.OwnerRoom:
 
 
 async def _extend_room(owner: _Owner, room: dict, entry: guard.OwnerRoom, name: str) -> dict:
-    """Przedluza konczacy sie pokoj wlasciciela o tyle, na ile pozwala budzet. Bez budzetu - bez zmian."""
+    """
+    Przedluza pokoj wlasciciela do pelnego czasu od teraz - o tyle, na ile pozwala budzet (bez
+    budzetu albo bez miejsca w progu miesiecznym pokoj zostaje, jaki byl). Dodany czas w calosci
+    obciaza budzet i rezerwacje miesieczna.
+    """
     now, state = owner.now, owner.state
     old_exp = int(_room_exp(room))
     added = min(now + guard.room_ttl_seconds() - old_exp, guard.budget_left(state, entry.day))
     if added < 60:
         return room
-    before = (entry.end, entry.charged)
-    entry.end, entry.charged = old_exp + added, entry.charged + added
+    before = (entry.end, entry.charged, entry.reserved)
+    entry.end, entry.charged, entry.reserved = old_exp + added, entry.charged + added, entry.reserved + added
     await _save(owner)
     await guard.register_room(entry.member, entry.end)
 
     async def restore(end: int) -> None:
-        entry.end, entry.charged = end, before[1] + max(0, end - old_exp)
+        kept = max(0, end - old_exp)
+        entry.end, entry.charged, entry.reserved = end, before[1] + kept, before[2] + kept
         try:
             await _save(owner)
             await guard.register_room(entry.member, end)
@@ -627,25 +666,22 @@ async def _owner_room(board_id: int, name: str, user: CallUser, api_key: str) ->
         owner = _Owner(client=client, api_key=api_key, user_id=user.id, state=state, usage=usage, now=now, planned=planned)
         await _settle_closed_rooms(owner)
 
-        # Jeden zywy pokoj na tworzacego: pokoj z innej tablicy konczymy.
-        live = state.live(now)
-        if live is not None and live.room != name:
-            # Najpierw sprawdzamy, czy po zamknieciu starczy budzetu na nowy pokoj - inaczej
-            # tworzacy stracilby trwajaca rozmowe i nie dostal nowej.
-            empty = await _room_is_empty(client, live.room)
-            day = guard.day_of(now)
-            refund = live.charged - max(guard.MIN_CHARGE_SECONDS, now - live.created)
-            left = guard.budget_left(state, day) + (max(0, refund) if empty and live.day == day else 0)
-            if left < guard.ROOM_MIN_TTL_SECONDS:
-                raise guard.user_limit_reached()
-            await _close_room(owner, live, exists=True, empty=empty)
-            live = None
-
         room = await _get_room(client, name, api_key)
         problem = _room_problem(room, name, now) if room is not None else "brak pokoju"
         remaining = int(_room_exp(room)) - now if problem is None else 0
+        replace = problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS
 
-        if problem is not None or remaining < MIN_JOIN_REMAINING_SECONDS:
+        # Jeden zywy pokoj na tworzacego: pokoj z innej tablicy konczymy - ale dopiero, gdy wiadomo,
+        # ze pokoj tej tablicy da sie otworzyc (budzet, liczba pokoi, prog miesiaca).
+        live = state.live(now)
+        if live is not None and live.room != name:
+            refund = _presence_refund(owner, live) if await _room_is_empty(client, live.room) else 0
+            today = refund if live.day == guard.day_of(now) else 0
+            _check_can_open(owner, today, None if replace else max(guard.MIN_CHARGE_SECONDS, remaining))
+            await _close_room(owner, live, exists=True, refund=refund)
+            live = None
+
+        if replace:
             if room is not None and (_room_exp(room) is None or _room_exp(room) > now):
                 logger.warning(f"Daily - pokój {name} zastępuję nowym ({problem or 'wygasa'})")
             if live is not None:
@@ -656,10 +692,10 @@ async def _owner_room(board_id: int, name: str, user: CallUser, api_key: str) ->
         else:
             if live is None:
                 live = await _adopt_room(owner, room, name)
-            if now - live.created >= RECYCLE_MIN_AGE_SECONDS and await _room_is_empty(client, name):
-                await _close_room(owner, live, exists=True, empty=True)
-                room = await _create_room(owner, name)
-            elif remaining < EXTEND_THRESHOLD_SECONDS:
+            # Pokoj starszy niz 10 min wyglada na pusty = kolejna lekcja na tej samej tablicy:
+            # przedluzamy go do pelnego czasu (bez DELETE i bez zwrotu - patrz RENEW_MIN_AGE_SECONDS).
+            idle = now - live.created >= RENEW_MIN_AGE_SECONDS and await _room_is_empty(client, name)
+            if idle or remaining < EXTEND_THRESHOLD_SECONDS:
                 room = await _extend_room(owner, room, live, name)
 
         room_exp = int(_room_exp(room))

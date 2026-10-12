@@ -186,7 +186,12 @@ class FakeDaily:
         if request.method == "POST" and path == "/meeting-tokens":
             return httpx.Response(200, json={"token": DAILY_TOKEN})
         if request.method == "GET" and path == "/rooms":
-            return httpx.Response(200, json={"total_count": len(self.rooms), "data": list(self.rooms.values())})
+            # Strony jak w Daily: `limit` (domyslnie 100) i `starting_after` = id pokoju.
+            rooms = list(self.rooms.values())
+            after = request.url.params.get("starting_after")
+            start = next(i for i, room in enumerate(rooms) if room["id"] == after) + 1 if after else 0
+            limit = int(request.url.params.get("limit", 100))
+            return httpx.Response(200, json={"total_count": len(rooms), "data": rooms[start:start + limit]})
         if request.method == "POST" and path == "/rooms":
             payload = json.loads(request.content)
             if payload["name"] in self.rooms:
