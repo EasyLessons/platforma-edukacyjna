@@ -30,7 +30,8 @@ export type SceneEl = {
   height: number;
   isDeleted: boolean;
   fileId?: string | null;
-  customData?: { kind?: string; spec?: { expression: string } };
+  customData?: { kind?: string; spec?: { expression: string }; content?: string };
+  link?: string | null;
   points?: number[][];
   originalText?: string;
 };

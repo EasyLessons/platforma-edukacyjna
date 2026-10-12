@@ -1,6 +1,6 @@
 /**
- * Wstawianie z paneli na prawdziwym Excalidraw: wzór (obraz + plik) i odpowiedź Tutora AI
- * (notatka z zawiniętym tekstem).
+ * Wstawianie wzorów z panelu na prawdziwym Excalidraw: obraz + plik + zaznaczenie.
+ * Notatka (odpowiedź Tutora AI): elements/note.excalidraw.test.tsx.
  */
 
 import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest';
@@ -8,11 +8,13 @@ import { render, waitFor, cleanup } from '@testing-library/react';
 import { Excalidraw } from '@excalidraw/excalidraw';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { insertResources, resourceFileId } from './insert-resources';
-import { NOTE_WIDTH, insertTextNote } from './insert-note';
 
 // 1x1 PNG
 const PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+// Montowanie Excalidraw w jsdom trwa kilka sekund pod obciążeniem (pełny przebieg) - 5 s to za mało.
+vi.setConfig({ testTimeout: 20_000 });
 
 beforeAll(() => {
   // src/test/setup.ts podmienia window.location bez `search`/`hash`, a Excalidraw ich używa.
@@ -83,28 +85,6 @@ describe('insertResources', () => {
         { path: '/x.png', title: 'X', dimensions: { width: 1, height: 1 } },
       ])
     ).toBe(0);
-    expect(api.getSceneElements()).toHaveLength(0);
-  });
-});
-
-describe('insertTextNote', () => {
-  it('notatka = prostokąt o stałej szerokości z tekstem jako etykietą', async () => {
-    const api = await mountExcalidraw();
-    await insertTextNote(api, '  Pole koła: P = πr²\nObwód: 2πr  ');
-
-    const elements = api.getSceneElements();
-    const rect = elements.find((e) => e.type === 'rectangle')!;
-    const text = elements.find((e) => e.type === 'text')!;
-    expect(rect.width).toBe(NOTE_WIDTH);
-    expect(rect.customData).toEqual({ kind: 'ai-note' });
-    expect(text.type === 'text' && text.containerId).toBe(rect.id);
-    expect(text.type === 'text' && text.originalText).toBe('Pole koła: P = πr²\nObwód: 2πr');
-    await waitFor(() => expect(api.getAppState().selectedElementIds).toEqual({ [rect.id]: true }));
-  });
-
-  it('pusta odpowiedź nic nie wstawia', async () => {
-    const api = await mountExcalidraw();
-    await insertTextNote(api, '   ');
     expect(api.getSceneElements()).toHaveLength(0);
   });
 });

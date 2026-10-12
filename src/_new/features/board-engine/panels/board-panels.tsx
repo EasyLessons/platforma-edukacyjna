@@ -30,7 +30,7 @@ import type {
 } from '@/_new/features/whiteboard/components/smartsearch/types';
 import { createLogger } from '@/_new/lib/logger';
 import { insertResources } from './insert-resources';
-import { insertTextNote } from './insert-note';
+import { insertNote } from '../elements/note';
 
 const log = createLogger('board-engine/board-panels');
 
@@ -116,7 +116,7 @@ export function PanelToggles({ panels, available, placement }: PanelTogglesProps
             aria-label={label}
             title={label}
             data-testid={`panel-toggle-${id}`}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium shadow-sm ${
+            className={`flex items-center gap-1.5 whitespace-nowrap rounded-md border px-3 py-1.5 text-sm font-medium shadow-sm ${
               active
                 ? 'border-blue-300 bg-blue-50 text-blue-700'
                 : 'border-gray-300 bg-white text-gray-800 hover:bg-gray-50'
@@ -204,7 +204,9 @@ export function PanelLayer({
   const addNote = useCallback((content: string) => {
     const current = apiRef.current;
     if (!current) return;
-    insertTextNote(current, content)
+    const text = content.trim();
+    if (!text) return;
+    insertNote(current, text)
       .then(() => setNotice('Dodano odpowiedź na tablicę'))
       .catch((error) => {
         log.error('Wstawianie odpowiedzi Tutora nie powiodło się', error);

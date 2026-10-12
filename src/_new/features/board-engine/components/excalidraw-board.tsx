@@ -123,6 +123,9 @@ export interface ExcalidrawBoardProps {
   storageBoardId?: string | null;
   /** API Excalidraw dla paneli wstawiających elementy (null po odmontowaniu). */
   onApiReady?: (api: ExcalidrawImperativeAPI | null) => void;
+  /** Własne elementy osadzone (notatki) - przekazywane wprost do Excalidraw. */
+  validateEmbeddable?: ExcalidrawProps['validateEmbeddable'];
+  renderEmbeddable?: ExcalidrawProps['renderEmbeddable'];
 }
 
 export function ExcalidrawBoard({
@@ -134,6 +137,8 @@ export function ExcalidrawBoard({
   topRightExtra,
   storageBoardId = null,
   onApiReady,
+  validateEmbeddable,
+  renderEmbeddable,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [editingSpec, setEditingSpec] = useState<FunctionSpec | null>(null);
@@ -396,6 +401,8 @@ export function ExcalidrawBoard({
         UIOptions={UI_OPTIONS}
         langCode="pl-PL"
         isCollaborating={awareness != null}
+        validateEmbeddable={validateEmbeddable}
+        renderEmbeddable={renderEmbeddable}
       />
       {(!viewMode || topRightExtra) && (
         <div className="easylesson-fx-mobile">

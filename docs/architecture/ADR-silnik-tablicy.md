@@ -431,3 +431,15 @@ Panele board-engine: `src/_new/features/board-engine/panels/` - przyciski w sloc
 | Zapisane szablony (`panels/saved-assets-panel.tsx`) | B2 | format elementów starego silnika; poprawka XSS osobno |
 | Notatka MD, tabela, PDF, upload obrazów | B2 | ustalenia 1-2 wyżej |
 | `toolbar_visible` | decyzja | pasek to pasek Excalidraw ("własny pasek - nie teraz") |
+
+## Etap B2 - elementy EasyLesson przy Excalidraw (12.10.2026)
+
+Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `topRightExtra` (tylko z prawem edycji).
+
+- **Notatka Markdown + KaTeX** (`elements/note.tsx`): element `embeddable` z linkiem `easylesson:note`
+  (wpuszczany przez `validateEmbeddable`; inne linki - domyślna lista Excalidraw), treść w `customData.content`,
+  render przez `renderEmbeddable` = `MarkdownNoteView` ze starego silnika (react-markdown, remark-gfm, remark-math,
+  rehype-katex). Edycja: przycisk "Notatka" (od razu w edycji), podwójne kliknięcie zaznaczonej notatki albo
+  w jej treść; zapis przy wyjściu z pola, Escape anuluje. Sync i F5 - jak każde pole elementu (Y.Doc).
+  Odpowiedź Tutora AI ("Dodaj do tablicy") trafia jako notatka. Dymek linku Excalidraw ukryty dla notatek (CSS).
+  Ograniczenie: eksport PNG/SVG rysuje embeddable jako zastępczy prostokąt (Excalidraw nie renderuje osadzeń w eksporcie).
