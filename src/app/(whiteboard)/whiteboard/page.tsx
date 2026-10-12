@@ -274,6 +274,7 @@ export function TablicaContent() {
       userRole={userRole || 'editor'}
       gridVisible={boardSettings.grid_visible}
       smartSearchVisible={boardSettings.smartsearch_visible}
+      aiEnabled={boardSettings.ai_enabled}
       topRightExtra={isDailyVoice ? renderCallButton : undefined}
     />
   ) : (

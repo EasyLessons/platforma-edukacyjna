@@ -32,6 +32,7 @@ export type SceneEl = {
   fileId?: string | null;
   customData?: { kind?: string; spec?: { expression: string } };
   points?: number[][];
+  originalText?: string;
 };
 
 /** Loguje użytkownika przez formularz (pole przyjmuje e-mail) i czeka na dashboard. */

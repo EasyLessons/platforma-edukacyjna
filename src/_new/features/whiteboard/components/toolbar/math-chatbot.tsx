@@ -78,6 +78,10 @@ interface MathChatbotProps {
    * pokazujemy prośbę o zalogowanie.
    */
   isDemo?: boolean;
+  /** Start rozwinięty, bez bąbelka (panel board-engine otwierany przyciskiem). */
+  defaultExpanded?: boolean;
+  /** Czat zwinął się (X, klik obok) - przy `defaultExpanded` rodzic chowa panel. */
+  onCollapse?: () => void;
 }
 
 // ==========================================
@@ -189,6 +193,8 @@ function MathChatbotInner({
   onActiveChange,
   userRole,
   isDemo = false,
+  defaultExpanded = false,
+  onCollapse,
 }: MathChatbotProps) {
   const router = useRouter();
   const uiMetrics = useWhiteboardUiMetrics();
@@ -196,7 +202,7 @@ function MathChatbotInner({
   const iconOnlyBubble = uiMetrics.isPhoneLayout;
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true); // 🆕 Domyślnie zwinięty - pokazuje bąbelek
+  const [isCollapsed, setIsCollapsed] = useState(!defaultExpanded); // domyślnie zwinięty - bąbelek
   const [isExiting, setIsExiting] = useState(false);
   const [width, setWidth] = useState(() => {
     // Załaduj z localStorage
@@ -372,6 +378,13 @@ function MathChatbotInner({
   const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
     e.stopPropagation();
   }, []);
+
+  // Zwinięcie oddaje panel rodzicowi (memo nie odświeża propsów-funkcji - stąd ref)
+  const onCollapseRef = useRef(onCollapse);
+  onCollapseRef.current = onCollapse;
+  useEffect(() => {
+    if (isCollapsed && defaultExpanded) onCollapseRef.current?.();
+  }, [isCollapsed, defaultExpanded]);
 
   // Notyfikuj parent o stanie aktywności (blokowanie tablicy)
   useEffect(() => {

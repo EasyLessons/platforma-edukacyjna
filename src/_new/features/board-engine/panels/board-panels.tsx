@@ -15,21 +15,26 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ComponentType, RefObject } from 'react';
-import { Calculator, Search } from 'lucide-react';
+import { Calculator, GraduationCap, Search } from 'lucide-react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { CalculatorTool } from '@/_new/features/whiteboard/components/toolbar/calculator-tool';
 import { SmartSearchBar } from '@/_new/features/whiteboard/components/smartsearch/smart-search-bar';
 import { CardViewer } from '@/_new/features/whiteboard/components/smartsearch/card-viewer';
+import {
+  MathChatbot,
+  type ChatMessage,
+} from '@/_new/features/whiteboard/components/toolbar/math-chatbot';
 import type {
   CardResource,
   FormulaResource,
 } from '@/_new/features/whiteboard/components/smartsearch/types';
 import { createLogger } from '@/_new/lib/logger';
 import { insertResources } from './insert-resources';
+import { insertTextNote } from './insert-note';
 
 const log = createLogger('board-engine/board-panels');
 
-export type BoardPanelId = 'calculator' | 'search';
+export type BoardPanelId = 'calculator' | 'search' | 'chat';
 
 const PANEL_BUTTONS: Record<
   BoardPanelId,
@@ -37,19 +42,23 @@ const PANEL_BUTTONS: Record<
 > = {
   search: { label: 'Wzory', icon: Search },
   calculator: { label: 'Kalkulator', icon: Calculator },
+  chat: { label: 'Tutor AI', icon: GraduationCap },
 };
 
 /**
  * Panele dostępne na tablicy. Kalkulator - zawsze (nie zmienia tablicy, także viewer).
  * Wzory (SmartSearch) - ustawienie `smartsearch_visible` i rola z prawem edycji (jak w starym silniku).
+ * Tutor AI - ustawienie `ai_enabled`; viewer rozmawia, ale nie wstawia odpowiedzi na tablicę.
  */
 export function availablePanels(opts: {
   readOnly: boolean;
   smartSearchVisible: boolean;
+  aiEnabled: boolean;
 }): BoardPanelId[] {
   const panels: BoardPanelId[] = [];
   if (opts.smartSearchVisible && !opts.readOnly) panels.push('search');
   panels.push('calculator');
+  if (opts.aiEnabled) panels.push('chat');
   return panels;
 }
 
@@ -142,13 +151,28 @@ interface PanelLayerProps {
   available: readonly BoardPanelId[];
   /** API Excalidraw do wstawiania elementów; null, dopóki płótno się nie załadowało. */
   api: ExcalidrawImperativeAPI | null;
+  /** Viewer: panele nie wstawiają niczego na tablicę. */
+  readOnly?: boolean;
+  /** Tablica demo (gość bez konta) - Tutor AI prosi o zalogowanie zamiast pytać `/api/chat`. */
+  demo?: boolean;
 }
 
-export function PanelLayer({ panels, available, api }: PanelLayerProps) {
+export function PanelLayer({
+  panels,
+  available,
+  api,
+  readOnly = false,
+  demo = false,
+}: PanelLayerProps) {
   const layerRef = useRef<HTMLDivElement>(null);
   const { width, height } = useContainerSize(layerRef);
   const [activeCard, setActiveCard] = useState<CardResource | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Rozmowa z Tutorem przeżywa zamknięcie panelu (jak w starym silniku)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  // MathChatbot jest memo i nie odświeża propsów-funkcji - wstawianie czyta API z refa
+  const apiRef = useRef(api);
+  apiRef.current = api;
   const shows = (id: BoardPanelId) => available.includes(id) && panels.isOpen(id);
 
   useEffect(() => {
@@ -176,6 +200,17 @@ export function PanelLayer({ panels, available, api }: PanelLayerProps) {
     },
     [api]
   );
+
+  const addNote = useCallback((content: string) => {
+    const current = apiRef.current;
+    if (!current) return;
+    insertTextNote(current, content)
+      .then(() => setNotice('Dodano odpowiedź na tablicę'))
+      .catch((error) => {
+        log.error('Wstawianie odpowiedzi Tutora nie powiodło się', error);
+        setNotice('Nie udało się dodać odpowiedzi');
+      });
+  }, []);
 
   // Wybór karty zamyka wyszukiwarkę - karta żyje tu, nie w panelu wyszukiwania.
   const canAddFormulas = available.includes('search');
@@ -216,6 +251,22 @@ export function PanelLayer({ panels, available, api }: PanelLayerProps) {
             canvasWidth={width}
             canvasHeight={height}
             onClose={() => panels.close('calculator')}
+          />
+        </div>
+      )}
+
+      {shows('chat') && width > 0 && (
+        <div className="pointer-events-auto" data-testid="panel-chat">
+          <MathChatbot
+            defaultExpanded
+            onCollapse={() => panels.close('chat')}
+            canvasWidth={width}
+            canvasHeight={height}
+            onAddToBoard={readOnly ? undefined : addNote}
+            messages={chatMessages}
+            setMessages={setChatMessages}
+            userRole={readOnly ? 'viewer' : 'editor'}
+            isDemo={demo}
           />
         </div>
       )}

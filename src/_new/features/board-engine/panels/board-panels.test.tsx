@@ -44,13 +44,12 @@ function Harness({
 }
 
 describe('availablePanels', () => {
-  it('wzory tylko przy smartsearch_visible i prawie edycji, kalkulator zawsze', () => {
-    expect(availablePanels({ readOnly: false, smartSearchVisible: true })).toEqual([
-      'search',
-      'calculator',
-    ]);
-    expect(availablePanels({ readOnly: false, smartSearchVisible: false })).toEqual(['calculator']);
-    expect(availablePanels({ readOnly: true, smartSearchVisible: true })).toEqual(['calculator']);
+  it('wzory: smartsearch_visible i prawo edycji; kalkulator zawsze; Tutor: ai_enabled (też viewer)', () => {
+    const all = { readOnly: false, smartSearchVisible: true, aiEnabled: true };
+    expect(availablePanels(all)).toEqual(['search', 'calculator', 'chat']);
+    expect(availablePanels({ ...all, smartSearchVisible: false })).toEqual(['calculator', 'chat']);
+    expect(availablePanels({ ...all, aiEnabled: false })).toEqual(['search', 'calculator']);
+    expect(availablePanels({ ...all, readOnly: true })).toEqual(['calculator', 'chat']);
   });
 });
 

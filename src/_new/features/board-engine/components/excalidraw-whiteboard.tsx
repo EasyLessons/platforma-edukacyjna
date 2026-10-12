@@ -42,13 +42,14 @@ export interface ExcalidrawWhiteboardProps {
   /** Tożsamość gościa (demo). Bez niej używany jest zalogowany użytkownik. */
   guest?: { id: number; username: string };
   /**
-   * Ustawienia tablicy (panel ustawień): `grid_visible`, `smartsearch_visible`.
+   * Ustawienia tablicy (panel ustawień): `grid_visible`, `smartsearch_visible`, `ai_enabled`.
    * TODO(decyzja): `toolbar_visible` - pasek to pasek Excalidraw (własny pasek "nie teraz");
-   * `ai_enabled` dotyczy panelu czatu AI (etap B1).
    */
   gridVisible?: boolean;
   /** Panel "Wzory" (SmartSearch) - ustawienie tablicy `smartsearch_visible`. */
   smartSearchVisible?: boolean;
+  /** Panel "Tutor AI" - ustawienie tablicy `ai_enabled`. */
+  aiEnabled?: boolean;
   /** Dodatkowy przycisk obok f(x) (strona podaje np. "Rozmowa"); demo go nie podaje. */
   topRightExtra?: TopRightExtra;
 }
@@ -64,6 +65,7 @@ function BoardSession({
   guest,
   gridVisible,
   smartSearchVisible = true,
+  aiEnabled = true,
   topRightExtra,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
@@ -71,8 +73,8 @@ function BoardSession({
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const readOnly = userRole === 'viewer';
   const available = useMemo(
-    () => availablePanels({ readOnly, smartSearchVisible }),
-    [readOnly, smartSearchVisible]
+    () => availablePanels({ readOnly, smartSearchVisible, aiEnabled }),
+    [readOnly, smartSearchVisible, aiEnabled]
   );
   // Slot Excalidraw: przycisk strony (np. "Rozmowa") + przełączniki naszych paneli
   const renderTopRight = useCallback<TopRightExtra>(
@@ -123,7 +125,13 @@ function BoardSession({
         storageBoardId={connection.isRemote ? boardId : null}
         onApiReady={setApi}
       />
-      <PanelLayer panels={panels} available={available} api={api} />
+      <PanelLayer
+        panels={panels}
+        available={available}
+        api={api}
+        readOnly={readOnly}
+        demo={!!guest}
+      />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />
