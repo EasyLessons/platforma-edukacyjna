@@ -7,7 +7,7 @@ Narzędzia dla autentykacji:
 from datetime import timedelta
 from core.time import utcnow
 from typing import Optional
-from jose import jwt
+import jwt
 from passlib.context import CryptContext
 import secrets
 import string
