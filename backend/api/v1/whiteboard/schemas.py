@@ -75,3 +75,22 @@ class CallResponse(BaseModel):
     token: str
     # Wygaśnięcie tokenu (UTC): do kiedy można nim WEJŚĆ; trwającej rozmowy nie przerywa.
     expires_at: datetime
+
+
+class CallUsageResponse(BaseModel):
+    """Stan bezpieczników rozmów dla admina (GET /whiteboard/call/usage) — patrz call_usage.py"""
+    # "enabled" | "disabled" (CALL_ENABLED=false) | "not_configured" (brak klucza)
+    # | "limit" (próg miesięczny osiągnięty) | "unknown" (nie udało się odczytać zużycia z Daily)
+    state: str
+    month: str
+    cap_minutes: int
+    user_daily_cap_minutes: int
+    max_participants: int
+    used_minutes: int | None = None  # minuty uczestników wg Daily /meetings
+    reserved_minutes: int | None = None  # najgorszy przypadek dla trwających pokoi
+    planned_minutes: int | None = None  # used + reserved: to porównujemy z progiem
+    meetings: int | None = None
+    ongoing_meetings: int | None = None
+    active_rooms: int | None = None  # nasze pokoje przed `exp` (rejestr w Redis)
+    rooms_count: int | None = None  # wszystkie pokoje konta Daily (limit konta: 50)
+    fetched_at: datetime | None = None

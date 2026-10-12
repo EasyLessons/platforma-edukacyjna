@@ -57,7 +57,7 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **PostgreSQL (Neon, serverless)** — baza produkcyjna. Bez lokalnego Postgresa w development — łączysz się przez `DATABASE_URL` do instancji Neon.
 
-**Autoryzacja: JWT cookie-first z rotacją refresh tokenów** — pełny opis w `docs/architecture/auth.md`. JWT przez `python-jose` (jedyna biblioteka JWT w projekcie). Limit prób logowania/rejestracji w Redisie (`core/rate_limit.py`).
+**Autoryzacja: JWT cookie-first z rotacją refresh tokenów** — pełny opis w `docs/architecture/auth.md`. JWT przez `PyJWT` (jedyna biblioteka JWT w projekcie). Limit prób logowania/rejestracji w Redisie (`core/rate_limit.py`).
 
 **passlib + bcrypt** — hashowanie haseł użytkowników.
 

@@ -13,13 +13,14 @@ import binascii
 from datetime import datetime
 from sqlalchemy.orm import Session
 from core.exceptions import AppException, NotFoundError, ValidationError
-from core.models import Board, BoardDocument, BoardUsers, User, WorkspaceMember
+from starlette.concurrency import run_in_threadpool
+from core.models import Board, BoardDocument, BoardUsers, User, Workspace, WorkspaceMember
 from .schemas import (
     BoardSettings, BoardSettingsPatch,
     DocumentResponse, AccessCheckResponse,
     CallResponse,
 )
-from .call import create_board_call
+from .call import CallUser, create_board_call
 from .storage import upload_board_image
 from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_board_owner
@@ -189,12 +190,30 @@ class WhiteboardService:
 
     # Voice call (Daily) --------------------------------------------------
 
-    async def create_call(self, board_id: int, user: User) -> CallResponse:
-        """Pokój + token rozmowy (call.py). Dołączyć może każdy członek, także viewer."""
-        _, role = self._get_board_and_role(board_id, user.id)
-        user_id, username = user.id, user.username
-        # Połączenie z bazą wraca do puli na czas wywołań Daily (do kilkunastu sekund).
-        self.db.rollback()
+    def _call_context(self, board_id: int, user: User) -> tuple[CallUser, bool]:
+        """Dane do rozmowy odczytane z bazy JEDNYM podejściem; po nim sesja nie trzyma połączenia."""
+        try:
+            if not user.is_active:
+                raise AppException(
+                    "Potwierdź adres e-mail, aby korzystać z rozmów",
+                    code="VOICE_EMAIL_NOT_VERIFIED",
+                    status_code=403,
+                )
+            board, role = self._get_board_and_role(board_id, user.id)
+            created_by = (
+                self.db.query(Workspace.created_by).filter(Workspace.id == board.workspace_id).scalar()
+            )
+            # Pokój tworzy tylko właściciel przestrzeni (twórca workspace'u z rolą owner).
+            is_owner = role == "owner" and created_by == user.id
+            return CallUser(id=user.id, username=user.username, email_verified=True), is_owner
+        finally:
+            # Połączenie z bazą wraca do puli na czas wywołań Daily (do kilkunastu sekund).
+            self.db.rollback()
+
+    async def create_call(self, board_id: int, user: User, client_ip: str) -> CallResponse:
+        """Pokój + token rozmowy (call.py). Dołączyć może każdy członek, tworzy tylko właściciel."""
+        # Synchroniczne zapytania SQLAlchemy poza pętlą zdarzeń.
+        call_user, is_owner = await run_in_threadpool(self._call_context, board_id, user)
         return await create_board_call(
-            board_id, user_id=user_id, username=username, is_owner=role == "owner"
+            board_id, user=call_user, is_workspace_owner=is_owner, client_ip=client_ip
         )

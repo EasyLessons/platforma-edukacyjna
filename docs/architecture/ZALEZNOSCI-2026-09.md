@@ -166,6 +166,10 @@ gdy typescript-eslint wyda major z obsługą TS 7). Razem ~15–30 h, największ
 - `python-jose` (+ `ecdsa`, `rsa`, `pyasn1`) → **PyJWT** (`pyjwt[crypto]`): python-jose ma
   dwa CVE bez fixa, a `ecdsa` "won't fix" Minerva. Użycie: `api/v1/auth/utils.py`,
   `api/v1/auth/dependencies.py` (`jwt.encode/decode`, `JWTError`). Szacunek 1–2 h, −4 pakiety.
+  **ZROBIONE (październik 2026, `refactor/auth-sessions`):** wystarczył `pyjwt` bez extras `[crypto]`
+  (HS256 nie używa `cryptography`); usunięte `python-jose` i `ecdsa` (−2 pakiety, +`pyjwt`), a `rsa`
+  i `pyasn1` zostają, bo wymaga ich `google-auth`. Znikają wpisy `CVE-2026-85394` i `PYSEC-2026-1325`
+  z `backend/pip-audit-ignore.txt`.
 - `passlib==1.7.4` + `bcrypt==4.0.1` — passlib nie jest rozwijany (ostatnie wydanie 2020),
   `bcrypt` jest trzymany na 4.0.x, bo passlib 1.7.4 czyta `bcrypt.__about__` i z bcrypt ≥4.1 loguje błąd wersji. Zamiana na samo
   `bcrypt` (≈10 linii) odblokuje aktualizacje `bcrypt`.

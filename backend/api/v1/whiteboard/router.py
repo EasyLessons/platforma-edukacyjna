@@ -8,12 +8,14 @@ POST   /{id}/doc                    — zapisz snapshot Y.Doc
 GET    /{id}/doc                    — wczytaj snapshot Y.Doc
 GET    /{id}/access                 — sprawdź dostęp do tablicy
 POST   /{id}/call                   — pokój + token rozmowy głosowej (Daily)
+GET    /call/usage                  — zużycie minut rozmów (tylko admin z CALL_ADMIN_USER_IDS)
 """
-from fastapi import APIRouter, Depends, File, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
 from core.database import get_db
+from core.rate_limit import get_client_ip
 from core.models import User
 from core.responses import ApiResponse
 
@@ -22,9 +24,9 @@ from .schemas import (
     BoardSettings, BoardSettingsPatch,
     SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
     AccessCheckResponse,
-    CallResponse,
+    CallResponse, CallUsageResponse,
 )
-from .call import call_rate_limit
+from .call_usage import usage_report
 from .service import WhiteboardService
 from .dependencies import DocCaller, get_doc_caller
 from .files import router as files_router
@@ -144,13 +146,24 @@ def check_access(
 )
 async def create_call(
     board_id: int,
+    request: Request,
     response: Response,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    _: None = Depends(call_rate_limit),
 ):
     """Pokój + token rozmowy głosowej tablicy (Daily) dla członka tablicy — patrz call.py."""
     service = WhiteboardService(db)
-    result = await service.create_call(board_id, current_user)
+    result = await service.create_call(board_id, current_user, get_client_ip(request))
+    response.headers["Cache-Control"] = "no-store"
+    return ApiResponse(success=True, data=result)
+
+
+@router.get("/call/usage", response_model=ApiResponse[CallUsageResponse])
+async def call_usage(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+):
+    """Zużycie minut rozmów i stan bezpieczników — tylko CALL_ADMIN_USER_IDS (call_usage.py)."""
+    result = await usage_report(current_user.id)
     response.headers["Cache-Control"] = "no-store"
     return ApiResponse(success=True, data=result)

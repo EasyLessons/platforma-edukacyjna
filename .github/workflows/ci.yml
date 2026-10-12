@@ -16,7 +16,7 @@ jobs:
       DATABASE_URL: postgresql://test:test@localhost:5432/test
       SUPABASE_URL: https://test.supabase.co
       SUPABASE_SERVICE_ROLE_KEY: test-service-role-key-not-real
-      SECRET_KEY: test-secret-key-not-real
+      SECRET_KEY: test-secret-key-not-real-0123456789
       RESEND_API_KEY: test-resend-key-not-real
       FROM_EMAIL: test@example.com
       GOOGLE_CLIENT_ID: test-google-client-id
