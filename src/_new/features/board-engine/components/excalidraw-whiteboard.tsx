@@ -16,7 +16,14 @@ import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-b
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
 import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
 import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
-import { ElementButtons, NOTE_BUTTON, type ElementButton } from '../elements/element-buttons';
+import {
+  ElementButtons,
+  NOTE_BUTTON,
+  TABLE_BUTTON,
+  type ElementButton,
+} from '../elements/element-buttons';
+import { insertTable } from '../elements/table';
+import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -79,6 +86,7 @@ function BoardSession({
     [readOnly, smartSearchVisible, aiEnabled]
   );
   const notes = useNoteElements({ api, readOnly });
+  const tableSelection = useSelectedTable(api, readOnly);
   const { startEditing } = notes;
   // Wstawianie elementów (B2) - tylko z prawem edycji
   const elementButtons = useMemo<ElementButton[]>(
@@ -90,6 +98,12 @@ function BoardSession({
               ...NOTE_BUTTON,
               onClick: () => {
                 if (api) void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
+              },
+            },
+            {
+              ...TABLE_BUTTON,
+              onClick: () => {
+                if (api) void insertTable(api);
               },
             },
           ],
@@ -154,6 +168,7 @@ function BoardSession({
         readOnly={readOnly}
         demo={!!guest}
       />
+      <TableToolbar api={api} selection={tableSelection} />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />

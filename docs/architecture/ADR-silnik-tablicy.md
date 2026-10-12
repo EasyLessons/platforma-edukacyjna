@@ -443,3 +443,9 @@ Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `
   w jej treść; zapis przy wyjściu z pola, Escape anuluje. Sync i F5 - jak każde pole elementu (Y.Doc).
   Odpowiedź Tutora AI ("Dodaj do tablicy") trafia jako notatka. Dymek linku Excalidraw ukryty dla notatek (CSS).
   Ograniczenie: eksport PNG/SVG rysuje embeddable jako zastępczy prostokąt (Excalidraw nie renderuje osadzeń w eksporcie).
+- **Tabela** (`elements/table.ts`, `table-toolbar.tsx`): grupa prostokątów-komórek z etykietą (natywny tekst w kontenerze),
+  `customData: { kind: 'table-cell', tableId, row, col }`, `groupIds: [tableId]`. Przycisk "Tabela" wstawia 3x3.
+  Przesuwanie = grupa Excalidraw; edycja komórki = natywna edycja etykiety (podwójne kliknięcie, w razie potrzeby
+  drugie - wejście w grupę). Mini-pasek nad płótnem przy zaznaczonej tabeli: +/- wiersz, +/- kolumna (przy wybranej
+  komórce obok niej, inaczej na końcu); zmiana struktury przebudowuje siatkę (teksty i szerokości kolumn zostają,
+  stare elementy usunięte jak zwykłe usunięcie - sync i cofanie działają). Limit 20 x 20.

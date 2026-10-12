@@ -2,7 +2,7 @@
  * E2E elementów EasyLesson na tablicy Excalidraw (etap B2): tworzenie -> druga osoba widzi -> F5 -> nadal jest.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { E2E_USERS, closeBoard, liveElements, openBoardAs } from './helpers';
 
 test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i po F5', async ({
@@ -47,8 +47,36 @@ test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i p
   await closeBoard(b);
 });
 
-test('viewer: bez przycisku notatki, notatkę tylko czyta', async ({ browser }) => {
+test('tabela: utworzenie, dodanie wiersza, widoczna u drugiej osoby i po F5', async ({
+  browser,
+}) => {
+  const a = await openBoardAs(browser, E2E_USERS.owner);
+  const b = await openBoardAs(browser, E2E_USERS.editor);
+  const tableCells = async (page: Page) =>
+    (await liveElements(page)).filter((e) => e.customData?.kind === 'table-cell');
+  const before = (await tableCells(a)).length;
+
+  await a.getByTestId('element-insert-table').filter({ visible: true }).click();
+  await expect.poll(async () => (await tableCells(a)).length).toBe(before + 9);
+
+  // Mini-pasek tabeli (tabela zaznaczona po wstawieniu): + wiersz
+  await a.getByTestId('table-add-row').click();
+  await expect.poll(async () => (await tableCells(a)).length).toBe(before + 12);
+  const ids = (await tableCells(a)).map((e) => e.id).sort();
+
+  await expect.poll(async () => (await tableCells(b)).map((e) => e.id).sort()).toEqual(ids);
+
+  await a.reload();
+  await a.waitForFunction(() => !!window.__boardEngine, null, { timeout: 90_000 });
+  await expect.poll(async () => (await tableCells(a)).map((e) => e.id).sort()).toEqual(ids);
+
+  await closeBoard(a);
+  await closeBoard(b);
+});
+
+test('viewer: bez przycisków notatki i tabeli', async ({ browser }) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
   await expect(v.getByTestId('element-insert-note')).toHaveCount(0);
+  await expect(v.getByTestId('element-insert-table')).toHaveCount(0);
   await closeBoard(v);
 });
