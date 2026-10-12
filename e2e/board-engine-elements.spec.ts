@@ -47,6 +47,33 @@ test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i p
   await closeBoard(b);
 });
 
+test('tabela: utworzenie, dodanie wiersza, widoczna u drugiej osoby i po F5', async ({
+  browser,
+}) => {
+  const a = await openBoardAs(browser, E2E_USERS.owner);
+  const b = await openBoardAs(browser, E2E_USERS.editor);
+  const tableCells = async (page: Page) =>
+    (await liveElements(page)).filter((e) => e.customData?.kind === 'table-cell');
+  const before = (await tableCells(a)).length;
+
+  await a.getByTestId('element-insert-table').filter({ visible: true }).click();
+  await expect.poll(async () => (await tableCells(a)).length).toBe(before + 9);
+
+  // Mini-pasek tabeli (tabela zaznaczona po wstawieniu): + wiersz
+  await a.getByTestId('table-add-row').click();
+  await expect.poll(async () => (await tableCells(a)).length).toBe(before + 12);
+  const ids = (await tableCells(a)).map((e) => e.id).sort();
+
+  await expect.poll(async () => (await tableCells(b)).map((e) => e.id).sort()).toEqual(ids);
+
+  await a.reload();
+  await a.waitForFunction(() => !!window.__boardEngine, null, { timeout: 90_000 });
+  await expect.poll(async () => (await tableCells(a)).map((e) => e.id).sort()).toEqual(ids);
+
+  await closeBoard(a);
+  await closeBoard(b);
+});
+
 test('PDF: strony jako obrazy, widoczne u drugiej osoby i po F5; zły plik = komunikat', async ({
   browser,
 }) => {
@@ -99,9 +126,10 @@ test('PDF: strony jako obrazy, widoczne u drugiej osoby i po F5; zły plik = kom
   await closeBoard(b);
 });
 
-test('viewer: bez przycisków notatki i PDF', async ({ browser }) => {
+test('viewer: bez przycisków notatki, tabeli i PDF', async ({ browser }) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
   await expect(v.getByTestId('element-insert-note')).toHaveCount(0);
+  await expect(v.getByTestId('element-insert-table')).toHaveCount(0);
   await expect(v.getByTestId('element-insert-pdf')).toHaveCount(0);
   await closeBoard(v);
 });

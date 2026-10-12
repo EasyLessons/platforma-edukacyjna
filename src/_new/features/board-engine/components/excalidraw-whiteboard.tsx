@@ -20,9 +20,12 @@ import {
   ElementButtons,
   NOTE_BUTTON,
   PDF_BUTTON,
+  TABLE_BUTTON,
   type ElementButton,
 } from '../elements/element-buttons';
 import { PdfImport } from '../elements/pdf-import';
+import { insertTable } from '../elements/table';
+import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -85,6 +88,7 @@ function BoardSession({
     [readOnly, smartSearchVisible, aiEnabled]
   );
   const notes = useNoteElements({ api, readOnly });
+  const tableSelection = useSelectedTable(api, readOnly);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const { startEditing } = notes;
   // Wstawianie elementów (B2) - tylko z prawem edycji
@@ -97,6 +101,12 @@ function BoardSession({
               ...NOTE_BUTTON,
               onClick: () => {
                 if (api) void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
+              },
+            },
+            {
+              ...TABLE_BUTTON,
+              onClick: () => {
+                if (api) void insertTable(api);
               },
             },
             { ...PDF_BUTTON, onClick: () => pdfInputRef.current?.click() },
@@ -162,6 +172,7 @@ function BoardSession({
         readOnly={readOnly}
         demo={!!guest}
       />
+      <TableToolbar api={api} selection={tableSelection} />
       {!readOnly && <PdfImport api={api} inputRef={pdfInputRef} />}
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
