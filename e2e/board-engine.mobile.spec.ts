@@ -42,3 +42,22 @@ test('rysowanie palcem tworzy element freedraw', async ({ page, context }) => {
   const free = (await liveElements(page)).find((e) => !before.has(e.id))!;
   expect(free.points!.length).toBeGreaterThan(5);
 });
+
+test('panel kalkulatora na telefonie: pływający przycisk, panel mieści się na ekranie', async ({
+  page,
+}) => {
+  await login(page, E2E_USERS.owner);
+  await openBoard(page);
+
+  await page.getByTestId('panel-toggle-calculator').filter({ visible: true }).tap();
+  const panel = page.getByTestId('panel-calculator').locator('> div');
+  await expect(panel).toBeVisible();
+
+  const box = (await panel.boundingBox())!;
+  const viewport = page.viewportSize()!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
+
+  await page.getByTestId('panel-toggle-calculator').filter({ visible: true }).tap();
+  await expect(page.getByTestId('panel-calculator')).toHaveCount(0);
+});

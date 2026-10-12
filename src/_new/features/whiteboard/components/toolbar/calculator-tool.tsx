@@ -13,29 +13,19 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { ViewportTransform } from '@/_new/features/whiteboard/types';
-import {
-  zoomViewport,
-  panViewportWithWheel,
-  constrainViewport,
-} from '@/_new/features/whiteboard/navigation/viewport-math';
 import { X, Delete, Divide, Plus, Minus, Equal, Percent, GripHorizontal } from 'lucide-react';
 import * as math from 'mathjs';
 
 interface CalculatorToolProps {
-  viewport: ViewportTransform;
+  /** Nieużywane - zostaje dla zgodności ze starym silnikiem. Kalkulator nie zależy od widoku. */
+  viewport?: ViewportTransform;
   canvasWidth: number;
   canvasHeight: number;
   onViewportChange?: (viewport: ViewportTransform) => void;
   onClose?: () => void;
 }
 
-export function CalculatorTool({
-  viewport,
-  canvasWidth,
-  canvasHeight,
-  onViewportChange,
-  onClose,
-}: CalculatorToolProps) {
+export function CalculatorTool({ canvasWidth, canvasHeight, onClose }: CalculatorToolProps) {
   const [display, setDisplay] = useState('0');
   const [expression, setExpression] = useState('');
   const [isResult, setIsResult] = useState(false);
