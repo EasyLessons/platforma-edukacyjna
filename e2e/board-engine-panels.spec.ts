@@ -73,7 +73,7 @@ async function mockTutor(page: Page) {
   );
 }
 
-test('Tutor AI: odpowiedź dodana na tablicę jako notatka, zwinięcie zamyka panel', async ({
+test('Tutor AI: odpowiedź dodana na tablicę jako notatka Markdown, zwinięcie zamyka panel', async ({
   browser,
 }) => {
   const page = await openBoardAs(browser, E2E_USERS.owner);
@@ -95,9 +95,10 @@ test('Tutor AI: odpowiedź dodana na tablicę jako notatka, zwinięcie zamyka pa
         .map((e) => e.type)
         .sort()
     )
-    .toEqual(['rectangle', 'text']);
+    .toEqual(['embeddable']);
+  // Odpowiedź = notatka Markdown/KaTeX (B2)
   const added = (await liveElements(page)).filter((e) => !before.has(e.id));
-  expect(added.find((e) => e.type === 'text')?.originalText).toBe(TUTOR_REPLY);
+  expect(added[0].customData).toEqual({ kind: 'note', content: TUTOR_REPLY });
 
   await chat.getByTitle('Zwiń').click();
   await expect(chat).toHaveCount(0);

@@ -29,6 +29,9 @@ const PNG_1X1 = `data:image/png;base64,${btoa('obraz-testowy-nie-png')}`;
 const FILE_ID = 'img-test-1' as FileId;
 const FILE_NAME = `${'0f'.repeat(16)}.webp`;
 
+// Montowanie Excalidraw w jsdom trwa kilka sekund pod obciążeniem (pełny przebieg) - 5 s to za mało.
+vi.setConfig({ testTimeout: 20_000 });
+
 beforeAll(() => {
   // src/test/setup.ts podmienia window.location bez `search`/`hash`, a Excalidraw
   // przy montowaniu czyta `location.search.slice(1)`.

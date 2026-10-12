@@ -15,6 +15,8 @@ import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
 import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
+import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
+import { ElementButtons, NOTE_BUTTON, type ElementButton } from '../elements/element-buttons';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -76,15 +78,33 @@ function BoardSession({
     () => availablePanels({ readOnly, smartSearchVisible, aiEnabled }),
     [readOnly, smartSearchVisible, aiEnabled]
   );
-  // Slot Excalidraw: przycisk strony (np. "Rozmowa") + przełączniki naszych paneli
+  const notes = useNoteElements({ api, readOnly });
+  const { startEditing } = notes;
+  // Wstawianie elementów (B2) - tylko z prawem edycji
+  const elementButtons = useMemo<ElementButton[]>(
+    () =>
+      readOnly
+        ? []
+        : [
+            {
+              ...NOTE_BUTTON,
+              onClick: () => {
+                if (api) void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
+              },
+            },
+          ],
+    [readOnly, api, startEditing]
+  );
+  // Slot Excalidraw: przycisk strony (np. "Rozmowa") + wstawianie elementów + przełączniki paneli
   const renderTopRight = useCallback<TopRightExtra>(
     (placement) => (
       <>
         {topRightExtra?.(placement)}
+        <ElementButtons buttons={elementButtons} placement={placement} />
         <PanelToggles panels={panels} available={available} placement={placement} />
       </>
     ),
-    [topRightExtra, panels, available]
+    [topRightExtra, elementButtons, panels, available]
   );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
@@ -114,7 +134,7 @@ function BoardSession({
     connection.isRemote && !connection.isConnected && !isWaitingForServer && !authError;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full" onDoubleClickCapture={notes.handleDoubleClickCapture}>
       <ExcalidrawBoard
         doc={connection.doc}
         awareness={connection.awareness}
@@ -124,6 +144,8 @@ function BoardSession({
         topRightExtra={renderTopRight}
         storageBoardId={connection.isRemote ? boardId : null}
         onApiReady={setApi}
+        validateEmbeddable={notes.validateEmbeddable}
+        renderEmbeddable={notes.renderEmbeddable}
       />
       <PanelLayer
         panels={panels}

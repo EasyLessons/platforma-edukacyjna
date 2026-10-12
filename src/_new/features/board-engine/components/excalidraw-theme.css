@@ -53,3 +53,9 @@
 .easylesson-board:has(.excalidraw--mobile) .easylesson-fx-mobile {
   display: flex;
 }
+
+/* Notatka (elements/note.tsx) to embeddable z wewnętrznym linkiem `easylesson:note` -
+   dymek linku Excalidraw (podgląd + edycja adresu) nie ma tu sensu, a zmiana adresu zepsułaby notatkę. */
+.easylesson-board .excalidraw-hyperlinkContainer:has(a[href^='easylesson:']) {
+  display: none;
+}
