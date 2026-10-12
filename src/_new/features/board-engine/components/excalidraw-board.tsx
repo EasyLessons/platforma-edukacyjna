@@ -126,6 +126,8 @@ export interface ExcalidrawBoardProps {
   /** Własne elementy osadzone (notatki) - przekazywane wprost do Excalidraw. */
   validateEmbeddable?: ExcalidrawProps['validateEmbeddable'];
   renderEmbeddable?: ExcalidrawProps['renderEmbeddable'];
+  /** Stan początkowy z Y.Doc jest w scenie (dalsze zmiany zdalne dochodzą na bieżąco). */
+  onSceneSynced?: () => void;
 }
 
 export function ExcalidrawBoard({
@@ -139,6 +141,7 @@ export function ExcalidrawBoard({
   onApiReady,
   validateEmbeddable,
   renderEmbeddable,
+  onSceneSynced,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [editingSpec, setEditingSpec] = useState<FunctionSpec | null>(null);
@@ -153,6 +156,9 @@ export function ExcalidrawBoard({
   const lastPointerPushRef = useRef(0);
   const editingIdRef = useRef<string | null>(null);
   const lastToolRef = useRef<string | null>(null);
+  // Ref, nie zależność efektu: nowa funkcja od rodzica nie może odtwarzać wiązania z Y.Doc
+  const onSceneSyncedRef = useRef(onSceneSynced);
+  onSceneSyncedRef.current = onSceneSynced;
 
   // Excalidraw inicjalizuje scenę asynchronicznie (initializeScene): po `await initialData`
   // nadpisuje elementy i appState, w tym `collaborators`. Wszystko, co wpiszemy przez
@@ -235,6 +241,7 @@ export function ExcalidrawBoard({
     // Stan początkowy (to, co już jest w dokumencie) + kolejne zmiany spoza tej karty
     fileSync.receive(binding.getFiles());
     applyRemote(binding.getElements());
+    onSceneSyncedRef.current?.();
 
     const unobserve = binding.observeRemote(applyRemote);
     const unobserveFiles = binding.observeRemoteFiles((added) => fileSync.receive(added));

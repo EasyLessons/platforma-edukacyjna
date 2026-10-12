@@ -26,6 +26,7 @@ import {
 import { PdfImport } from '../elements/pdf-import';
 import { insertTable } from '../elements/table';
 import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
+import { useSheetInsert } from '../templates/use-sheet-insert';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -63,6 +64,10 @@ export interface ExcalidrawWhiteboardProps {
   aiEnabled?: boolean;
   /** Dodatkowy przycisk obok f(x) (strona podaje np. "Rozmowa"); demo go nie podaje. */
   topRightExtra?: TopRightExtra;
+  /** Arkusz CKE do wstawienia raz po otwarciu (id z templates/catalog.ts; z `?arkusz=` dashboardu). */
+  sheetTemplateId?: string | null;
+  /** Arkusz jest na tablicy - strona usuwa `?arkusz=` z adresu. */
+  onSheetInserted?: () => void;
 }
 
 export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
@@ -78,6 +83,8 @@ function BoardSession({
   smartSearchVisible = true,
   aiEnabled = true,
   topRightExtra,
+  sheetTemplateId,
+  onSheetInserted,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
   const panels = useBoardPanels();
@@ -88,6 +95,8 @@ function BoardSession({
     [readOnly, smartSearchVisible, aiEnabled]
   );
   const notes = useNoteElements({ api, readOnly });
+  const [sceneSynced, setSceneSynced] = useState(false);
+  const markSceneSynced = useCallback(() => setSceneSynced(true), []);
   const tableSelection = useSelectedTable(api, readOnly);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const { startEditing } = notes;
@@ -126,6 +135,14 @@ function BoardSession({
   );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
+  const sheetState = useSheetInsert({
+    api,
+    templateId: sheetTemplateId,
+    // stan z serwera w scenie (tablica bez serwera - od razu)
+    ready: sceneSynced && (!connection.isRemote || connection.hasSynced),
+    readOnly,
+    onDone: onSheetInserted,
+  });
 
   useEffect(() => {
     if (authError === ACCESS_DENIED) clearLocalCache();
@@ -162,6 +179,7 @@ function BoardSession({
         topRightExtra={renderTopRight}
         storageBoardId={connection.isRemote ? boardId : null}
         onApiReady={setApi}
+        onSceneSynced={markSceneSynced}
         validateEmbeddable={notes.validateEmbeddable}
         renderEmbeddable={notes.renderEmbeddable}
       />
@@ -174,6 +192,15 @@ function BoardSession({
       />
       <TableToolbar api={api} selection={tableSelection} />
       {!readOnly && <PdfImport api={api} inputRef={pdfInputRef} />}
+      {(sheetState === 'loading' || sheetState === 'error') && (
+        <div
+          role="status"
+          data-testid="sheet-status"
+          className="pointer-events-none absolute bottom-20 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-gray-900/85 px-4 py-2 text-sm text-white shadow"
+        >
+          {sheetState === 'loading' ? 'Wczytywanie arkusza...' : 'Nie udało się wczytać arkusza.'}
+        </div>
+      )}
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />

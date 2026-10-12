@@ -6,6 +6,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createBoard } from '@/_new/features/board/api/boardApi';
 import { boardKeys } from '@/_new/features/board/hooks/useBoard';
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { isExcalidrawEngine } from '@/_new/features/board-engine';
+import { sheetByFolder, sheetThumbnail } from '@/_new/features/board-engine/templates/catalog';
 
 type Subject = 'Matematyka' | 'Angielski' | 'Chemia' | 'Fizyka' | 'Biologia';
 
@@ -101,7 +103,48 @@ const TEMPLATE_CARDS: TemplateCard[] = [
     thumbnail: THUMBNAILS.e82024,
     folder: '/arkusze/egzamin-8/2024/glowny',
   },
+  // 2023: PDF-y byly w repo, ale bez kart; miniatura = pierwsza strona z public/templates
+  {
+    id: 'mpp-2023-main',
+    subject: 'Matematyka',
+    year: 2023,
+    title: 'Matura podstawowa 2023',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: sheetThumbnail({ id: 'matura-podstawowa-2023' }),
+    folder: '/arkusze/matura-podstawowa/2023/glowna',
+  },
+  {
+    id: 'mpr-2023-main',
+    subject: 'Matematyka',
+    year: 2023,
+    title: 'Matura rozszerzona 2023',
+    subtitle: 'Matura glowna (maj)',
+    thumbnail: sheetThumbnail({ id: 'matura-rozszerzona-2023' }),
+    folder: '/arkusze/matura-rozszerzona/2023/glowna',
+  },
+  {
+    id: 'egz8-2023-main',
+    subject: 'Matematyka',
+    year: 2023,
+    title: 'Egzamin 8-klasisty 2023',
+    subtitle: 'Arkusz glowny',
+    thumbnail: sheetThumbnail({ id: 'egzamin-8-2023' }),
+    folder: '/arkusze/egzamin-8/2023/glowny',
+  },
 ];
+
+/**
+ * Czy karta arkusza otwiera tablice z arkuszem: arkusz musi byc w katalogu szablonow
+ * (strony w public/templates) i dziala tylko na tablicy Excalidraw. Stary silnik parametr
+ * `?arkusz=` ignorowal (dawal pusta tablice) - przy wylaczonej fladze karta jest wyszarzona
+ * z opisem (decyzja 12.10.2026, raport szablony).
+ */
+function sheetUnavailableReason(folder: string | undefined): string | null {
+  if (!folder) return null;
+  if (!sheetByFolder(folder)) return 'Wkrotce';
+  if (!isExcalidrawEngine) return 'Dostepne w nowej tablicy';
+  return null;
+}
 
 export default function TemplatesSection({ workspaceId }: TemplatesSectionProps) {
   const router = useRouter();
@@ -313,32 +356,43 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
           <p className="text-xs text-gray-500">Nowa pusta przestrzen robocza</p>
         </button>
 
-        {templates.map((template) => (
-          <button
-            key={template.id}
-            onClick={() =>
-              createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
-            }
-            className="dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
-          >
-            <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
-              <img
-                src={template.thumbnail}
-                alt={template.title}
-                className="h-full w-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
-                  <Plus size={18} />
+        {templates.map((template) => {
+          const unavailable = sheetUnavailableReason(template.folder);
+          return (
+            <button
+              key={template.id}
+              disabled={unavailable !== null}
+              title={unavailable ?? undefined}
+              data-testid={`template-card-${template.id}`}
+              onClick={() =>
+                createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
+              }
+              className={`dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left ${
+                unavailable ? 'cursor-not-allowed opacity-50' : 'hover:cursor-pointer'
+              }`}
+            >
+              <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
+                <img
+                  src={template.thumbnail}
+                  alt={template.title}
+                  className="h-full w-full object-cover"
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
+                    <Plus size={18} />
+                  </div>
                 </div>
               </div>
-            </div>
-            <p className="text-sm font-semibold text-gray-900">{template.title}</p>
-            <p className="mt-1 text-xs text-gray-500">
-              {template.subtitle} {template.year ? `• ${template.year}` : ''}
-            </p>
-          </button>
-        ))}
+              <p className="text-sm font-semibold text-gray-900">{template.title}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                {template.subtitle} {template.year ? `• ${template.year}` : ''}
+              </p>
+              {unavailable && (
+                <p className="mt-1 text-xs font-medium text-gray-600">{unavailable}</p>
+              )}
+            </button>
+          );
+        })}
       </div>
     </section>
   );
