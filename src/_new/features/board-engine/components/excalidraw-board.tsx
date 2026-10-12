@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import type * as Y from 'yjs';
 import {
   Excalidraw,
@@ -100,6 +101,13 @@ export interface BoardUser {
   name: string;
 }
 
+/**
+ * Slot na dodatkowy przycisk obok f(x) (np. "Rozmowa"). Renderowany także dla viewera.
+ * `top-right` - prawy górny róg na komputerze; `mobile` - pływający przycisk nad stopką
+ * na telefonie (tam zwykle sama ikona). board-engine nie zna feature'a, który go podaje.
+ */
+export type TopRightExtra = (placement: 'top-right' | 'mobile') => ReactNode;
+
 export interface ExcalidrawBoardProps {
   /** Dokument tablicy; transport (Hocuspocus, IndexedDB) podpina wywołujący. */
   doc: Y.Doc;
@@ -110,6 +118,7 @@ export interface ExcalidrawBoardProps {
   viewMode?: boolean;
   /** Siatka na płótnie (ustawienie tablicy `grid_visible`). */
   gridVisible?: boolean;
+  topRightExtra?: TopRightExtra;
   /** Id tablicy na serwerze - obrazy idą do Storage. null (demo, gość) = dataURL w Y.Doc. */
   storageBoardId?: string | null;
 }
@@ -120,6 +129,7 @@ export function ExcalidrawBoard({
   user,
   viewMode = false,
   gridVisible = true,
+  topRightExtra,
   storageBoardId = null,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
@@ -341,14 +351,23 @@ export function ExcalidrawBoard({
     [api]
   );
 
-  // Na telefonie prawy górny róg należy do paska narzędzi Excalidraw - f(x) jako pływający
-  // przycisk nad stopką (widoczność przełącza CSS w excalidraw-theme.css).
+  // Na telefonie prawy górny róg należy do paska narzędzi Excalidraw - f(x) i slot jako pływające
+  // przyciski nad stopką (widoczność przełącza CSS w excalidraw-theme.css).
   const renderTopRightUI = useCallback(
     (isMobile: boolean) =>
-      viewMode || isMobile ? null : (
-        <FunctionPanel editingSpec={editingSpec} onAdd={addFunction} onUpdate={updateFunction} />
+      isMobile || (viewMode && !topRightExtra) ? null : (
+        <>
+          {topRightExtra?.('top-right')}
+          {!viewMode && (
+            <FunctionPanel
+              editingSpec={editingSpec}
+              onAdd={addFunction}
+              onUpdate={updateFunction}
+            />
+          )}
+        </>
       ),
-    [viewMode, editingSpec, addFunction, updateFunction]
+    [viewMode, topRightExtra, editingSpec, addFunction, updateFunction]
   );
 
   return (
@@ -369,14 +388,17 @@ export function ExcalidrawBoard({
         langCode="pl-PL"
         isCollaborating={awareness != null}
       />
-      {!viewMode && (
+      {(!viewMode || topRightExtra) && (
         <div className="easylesson-fx-mobile">
-          <FunctionPanel
-            editingSpec={editingSpec}
-            onAdd={addFunction}
-            onUpdate={updateFunction}
-            placement="up-left"
-          />
+          {topRightExtra?.('mobile')}
+          {!viewMode && (
+            <FunctionPanel
+              editingSpec={editingSpec}
+              onAdd={addFunction}
+              onUpdate={updateFunction}
+              placement="up-left"
+            />
+          )}
         </div>
       )}
     </div>

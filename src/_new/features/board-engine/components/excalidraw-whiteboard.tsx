@@ -12,7 +12,7 @@ import dynamic from 'next/dynamic';
 import { useEffect } from 'react';
 import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
-import type { BoardUser } from './excalidraw-board';
+import type { BoardUser, TopRightExtra } from './excalidraw-board';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -45,6 +45,8 @@ export interface ExcalidrawWhiteboardProps {
    * `ai_enabled` / `smartsearch_visible` dotyczą paneli z etapu B.
    */
   gridVisible?: boolean;
+  /** Dodatkowy przycisk obok f(x) (strona podaje np. "Rozmowa"); demo go nie podaje. */
+  topRightExtra?: TopRightExtra;
 }
 
 export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
@@ -52,7 +54,13 @@ export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
   return <BoardSession key={props.boardId} {...props} />;
 }
 
-function BoardSession({ boardId, userRole, guest, gridVisible }: ExcalidrawWhiteboardProps) {
+function BoardSession({
+  boardId,
+  userRole,
+  guest,
+  gridVisible,
+  topRightExtra,
+}: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
@@ -89,6 +97,7 @@ function BoardSession({ boardId, userRole, guest, gridVisible }: ExcalidrawWhite
         user={me}
         viewMode={userRole === 'viewer'}
         gridVisible={gridVisible}
+        topRightExtra={topRightExtra}
         storageBoardId={connection.isRemote ? boardId : null}
       />
       {isWaitingForServer && (

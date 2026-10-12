@@ -36,14 +36,20 @@
   margin-top: calc(64px + env(safe-area-inset-top, 0px));
 }
 
-/* f(x) na telefonie: pływający przycisk nad stopką Excalidraw (na desktopie jest w prawym górnym rogu). */
+/*
+ * f(x) i slot `topRightExtra` (np. "Rozmowa") na telefonie: pływające przyciski nad stopką
+ * Excalidraw, jeden nad drugim (na desktopie są w prawym górnym rogu).
+ */
 .easylesson-fx-mobile {
   display: none;
   position: absolute;
   right: 12px;
   bottom: calc(76px + env(safe-area-inset-bottom, 0px));
   z-index: 5;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
 }
 .easylesson-board:has(.excalidraw--mobile) .easylesson-fx-mobile {
-  display: block;
+  display: flex;
 }

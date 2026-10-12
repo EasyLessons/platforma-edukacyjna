@@ -37,9 +37,9 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **Redis** — presence na tablicy (`backend/core/presence.py`, sorted set z TTL) i rate limit auth. W testach `fakeredis`.
 
-**Daily (rozmowa głosowa na tablicy)** — gotowa usługa WebRTC (TURN, reconnect, jakość po stronie Daily), wybrana 02.10.2026 zamiast własnego czatu głosowego. Backend (`backend/api/v1/whiteboard/call.py`, `POST /api/v1/whiteboard/{id}/call`) tworzy prywatny pokój tablicy i wydaje meeting token przez REST API Daily zwykłym `httpx` — bez SDK; klucz `DAILY_API_KEY` zna tylko backend. Opis: `pipelines.md` pkt 5a.
+**Daily (rozmowa przy tablicy; `@daily-co/daily-js`, Daily Prebuilt w iframe)** — gotowa usługa WebRTC (TURN, reconnect, jakość po stronie Daily), wybrana 02.10.2026 zamiast własnego czatu głosowego; działa w obu silnikach tablicy (audio, kamera na życzenie). Backend (`backend/api/v1/whiteboard/call.py`, `POST /api/v1/whiteboard/{id}/call`) tworzy prywatny pokój tablicy i wydaje meeting token przez REST API Daily zwykłym `httpx` — bez SDK; klucz `DAILY_API_KEY` zna tylko backend (Render). Frontend: `features/voice-call`, domyślny dostawca od 10.2026 (`NEXT_PUBLIC_VOICE_PROVIDER`). `@daily-co/daily-react` celowo nie jest używany (własnego UI rozmowy nie budujemy). Opis: `pipelines.md` par. 5 (backend 5a, frontend 5c).
 
-**WebRTC (Xirsys jako TURN/STUN provider)** — dotychczasowy własny czat głosowy: połączenia peer-to-peer między użytkownikami na tej samej tablicy, sygnalizacja przez Supabase Broadcast. Zostaje do czasu usunięcia po przejściu na Daily.
+**WebRTC (Xirsys jako TURN/STUN provider)** — stary własny czat głosowy peer-to-peer (sygnalizacja przez Supabase Broadcast); działa już tylko przy `NEXT_PUBLIC_VOICE_PROVIDER=legacy`, do usunięcia osobnym PR-em po przejściu na Daily.
 
 **PDF.js (`pdfjs-dist`)** — odczyt/renderowanie PDF-ów w przeglądarce (materiały wgrywane na tablicę).
 
@@ -71,4 +71,4 @@ Pipeline: `mathjs` (obliczenia/parsing wyrażeń) → `remark-math` (parsuje LaT
 
 **Docker + docker-compose** — uruchomienie całości (frontend + backend + redis + whiteboard-sync) lokalnie jednym poleceniem, patrz `docker-compose.yml` i `README.md`.
 
-**Neon (Postgres serverless)**, **Supabase (Realtime + Storage)**, **Redis**, **Resend (email)**, **Xirsys (WebRTC TURN/STUN)**, **Daily (rozmowa głosowa)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`). Backend deployowany na Render, frontend na Vercel (patrz `ci-cd.md`); `whiteboard-sync` ma `Procfile`/`Dockerfile`, hosting do ustalenia.
+**Neon (Postgres serverless)**, **Supabase (Realtime + Storage)**, **Redis**, **Resend (email)**, **Daily (rozmowa przy tablicy)**, **Xirsys (WebRTC TURN/STUN, tryb `legacy`)**, **Gemini API** — usługi zewnętrzne, wszystkie konfigurowane przez zmienne środowiskowe (`.env.local`, `backend/.env`). Backend deployowany na Render, frontend na Vercel (patrz `ci-cd.md`); `whiteboard-sync` ma `Procfile`/`Dockerfile`, hosting do ustalenia.

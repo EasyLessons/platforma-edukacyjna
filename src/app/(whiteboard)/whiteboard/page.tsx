@@ -28,6 +28,7 @@ import { Suspense, useState, useEffect } from 'react';
 import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
 import { VoiceChatProvider } from '@/_new/features/voice-chat';
+import { CallButton, DailyCallProvider, isDailyVoice } from '@/_new/features/voice-call';
 import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
 import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
@@ -44,9 +45,14 @@ import { usePrewarmWhiteboardSync } from '@/_new/features/whiteboard/yjs/prewarm
 import { clearBoardCache } from '@/_new/lib/board-cache/board-cache';
 import { createLogger } from '@/_new/lib/logger';
 import { isExcalidrawEngine } from '@/_new/features/board-engine';
+import type { TopRightExtra } from '@/_new/features/board-engine';
 import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
 
 const log = createLogger('whiteboard/page');
+
+/** Przycisk "Rozmowa" w slocie Excalidraw; na telefonie sama ikona (pływający przycisk). */
+const renderCallButton: TopRightExtra = (placement) =>
+  placement === 'mobile' ? <CallButton compact tooltipPosition="left" /> : <CallButton />;
 
 const DEFAULT_BOARD_SETTINGS: BoardSettings = {
   ai_enabled: true,
@@ -249,6 +255,41 @@ export function TablicaContent() {
     );
   }
 
+  const canvas = (
+    <WhiteboardCanvas
+      boardId={boardId ?? ''}
+      arkuszPath={arkuszPath}
+      userRole={userRole || 'editor'}
+      boardSettings={boardSettings}
+      toolbarLeftOffset={0}
+      isSidebarOpen={sidebar.isOpen}
+    />
+  );
+
+  const board = isExcalidrawEngine ? (
+    // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Arkusze i narzędzia
+    // matematyczne dochodzą w etapie B migracji; rozmowa (Daily) przez slot topRightExtra.
+    <ExcalidrawWhiteboard
+      boardId={boardId}
+      userRole={userRole || 'editor'}
+      gridVisible={boardSettings.grid_visible}
+      topRightExtra={isDailyVoice ? renderCallButton : undefined}
+    />
+  ) : (
+    /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */
+    <BoardRealtimeProvider boardId={boardId ?? ''}>
+      {isDailyVoice ? (
+        canvas
+      ) : (
+        /* VOICE CHAT PROVIDER - stary czat P2P (NEXT_PUBLIC_VOICE_PROVIDER=legacy) */
+        <VoiceChatProvider boardId={boardId ?? ''}>{canvas}</VoiceChatProvider>
+      )}
+    </BoardRealtimeProvider>
+  );
+
+  // Rozmowa Daily tylko dla prawdziwej tablicy (liczbowe id) - 'demo-board' jej nie ma.
+  const callBoardId = /^\d+$/.test(boardId) ? Number(boardId) : null;
+
   return (
     <div
       style={{
@@ -326,29 +367,10 @@ export function TablicaContent() {
           />
         )}
 
-        {isExcalidrawEngine ? (
-          // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Czat głosowy,
-          // arkusze i narzędzia matematyczne dochodzą w etapie B migracji.
-          <ExcalidrawWhiteboard
-            boardId={boardId}
-            userRole={userRole || 'editor'}
-            gridVisible={boardSettings.grid_visible}
-          />
+        {isDailyVoice ? (
+          <DailyCallProvider boardId={callBoardId}>{board}</DailyCallProvider>
         ) : (
-          /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */
-          <BoardRealtimeProvider boardId={boardId ?? ''}>
-            {/* VOICE CHAT PROVIDER - P2P audio */}
-            <VoiceChatProvider boardId={boardId ?? ''}>
-              <WhiteboardCanvas
-                boardId={boardId ?? ''}
-                arkuszPath={arkuszPath}
-                userRole={userRole || 'editor'}
-                boardSettings={boardSettings}
-                toolbarLeftOffset={0}
-                isSidebarOpen={sidebar.isOpen}
-              />
-            </VoiceChatProvider>
-          </BoardRealtimeProvider>
+          board
         )}
       </div>
     </div>

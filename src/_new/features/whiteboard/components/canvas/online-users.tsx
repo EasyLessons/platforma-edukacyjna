@@ -27,6 +27,7 @@ import VoiceChat from '@/_new/features/voice-chat';
 import { VoiceChatNotice } from '@/_new/features/voice-chat';
 import { useUserAvatar } from '@/_new/shared/hooks/use-user-avatar';
 import { useVoiceChat } from '@/_new/features/voice-chat';
+import { CallButton, isDailyVoice } from '@/_new/features/voice-call';
 import { Button } from '@/_new/shared/ui/button';
 import {
   useWhiteboardUiMetrics,
@@ -305,17 +306,22 @@ export function OnlineUsers({
             })}
           </div>
 
-          <Tooltip position="bottom" content="Czat głosowy">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleVoiceButton}
-              className={`font-semibold hover-shine h-10 rounded-lg bg-gray-200 hover:bg-gray-200 text-gray-700 ${metrics.onlineUsers.compactButtons ? 'px-0 w-10 min-w-10 justify-center' : 'px-3'} whitespace-nowrap transition-all duration-300 ease-in-out shrink-0`}
-              leftIcon={<Phone className="w-4 h-4" />}
-            >
-              {!metrics.onlineUsers.compactButtons && 'Czat głosowy'}
-            </Button>
-          </Tooltip>
+          {/* Rozmowa: Daily (features/voice-call) albo stary czat przy NEXT_PUBLIC_VOICE_PROVIDER=legacy */}
+          {isDailyVoice ? (
+            <CallButton compact={metrics.onlineUsers.compactButtons} />
+          ) : (
+            <Tooltip position="bottom" content="Czat głosowy">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleVoiceButton}
+                className={`font-semibold hover-shine h-10 rounded-lg bg-gray-200 hover:bg-gray-200 text-gray-700 ${metrics.onlineUsers.compactButtons ? 'px-0 w-10 min-w-10 justify-center' : 'px-3'} whitespace-nowrap transition-all duration-300 ease-in-out shrink-0`}
+                leftIcon={<Phone className="w-4 h-4" />}
+              >
+                {!metrics.onlineUsers.compactButtons && 'Czat głosowy'}
+              </Button>
+            </Tooltip>
+          )}
 
           <Tooltip
             position="bottom"
