@@ -1,9 +1,10 @@
 /**
  * E2E paneli EasyLesson przy tablicy Excalidraw (etap B1): otwarcie i zamknięcie panelu,
- * panel nie zmienia tablicy, wstawienie wzoru z SmartSearch, viewer bez paneli zmieniających tablicę.
+ * kalkulator nie zmienia tablicy, wstawienie wzoru z SmartSearch i odpowiedzi Tutora AI,
+ * viewer bez paneli zmieniających tablicę.
  */
 
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { E2E_USERS, closeBoard, liveElements, openBoardAs } from './helpers';
 
 test('kalkulator: otwarcie z przycisku, liczenie, zamknięcie', async ({ browser }) => {
@@ -63,10 +64,50 @@ test('wzory: wyszukanie i wstawienie obrazu wzoru, widoczny u drugiej osoby', as
   await closeBoard(b);
 });
 
-test('viewer: kalkulator dostępny (nie zmienia tablicy), bez panelu wzorów', async ({
+const TUTOR_REPLY = 'Pole koła: P = πr². Obwód: L = 2πr.';
+
+/** Atrapa /api/chat (w CI nie ma prawdziwego klucza Gemini). */
+async function mockTutor(page: Page) {
+  await page.route('**/api/chat', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', json: { response: TUTOR_REPLY } })
+  );
+}
+
+test('Tutor AI: odpowiedź dodana na tablicę jako notatka, zwinięcie zamyka panel', async ({
   browser,
 }) => {
+  const page = await openBoardAs(browser, E2E_USERS.owner);
+  await mockTutor(page);
+  const before = new Set((await liveElements(page)).map((e) => e.id));
+
+  await page.getByTestId('panel-toggle-chat').filter({ visible: true }).click();
+  const chat = page.getByTestId('panel-chat');
+  const input = chat.getByPlaceholder('Zadaj pytanie...');
+  await input.fill('Jaki jest wzór na pole koła?');
+  await input.press('Enter');
+  await expect(chat).toContainText(TUTOR_REPLY);
+
+  await chat.getByRole('button', { name: /Dodaj do tablicy/ }).click();
+  await expect
+    .poll(async () =>
+      (await liveElements(page))
+        .filter((e) => !before.has(e.id))
+        .map((e) => e.type)
+        .sort()
+    )
+    .toEqual(['rectangle', 'text']);
+  const added = (await liveElements(page)).filter((e) => !before.has(e.id));
+  expect(added.find((e) => e.type === 'text')?.originalText).toBe(TUTOR_REPLY);
+
+  await chat.getByTitle('Zwiń').click();
+  await expect(chat).toHaveCount(0);
+
+  await closeBoard(page);
+});
+
+test('viewer: kalkulator i Tutor AI (bez wstawiania), bez panelu wzorów', async ({ browser }) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
+  await mockTutor(v);
   await expect
     .poll(() => v.evaluate(() => window.__boardEngine!.api.getAppState().viewModeEnabled))
     .toBe(true);
@@ -74,6 +115,14 @@ test('viewer: kalkulator dostępny (nie zmienia tablicy), bez panelu wzorów', a
   await v.getByTestId('panel-toggle-calculator').filter({ visible: true }).click();
   await expect(v.getByTestId('panel-calculator')).toBeVisible();
   await expect(v.getByTestId('panel-toggle-search')).toHaveCount(0);
+
+  await v.getByTestId('panel-toggle-chat').filter({ visible: true }).click();
+  const chat = v.getByTestId('panel-chat');
+  const input = chat.getByPlaceholder('Zadaj pytanie...');
+  await input.fill('Pytanie');
+  await input.press('Enter');
+  await expect(chat).toContainText(TUTOR_REPLY);
+  await expect(chat.getByRole('button', { name: /Dodaj do tablicy/ })).toHaveCount(0);
 
   await closeBoard(v);
 });
