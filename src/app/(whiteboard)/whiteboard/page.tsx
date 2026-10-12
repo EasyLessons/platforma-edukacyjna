@@ -47,6 +47,7 @@ import { createLogger } from '@/_new/lib/logger';
 import { isExcalidrawEngine } from '@/_new/features/board-engine';
 import type { TopRightExtra } from '@/_new/features/board-engine';
 import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
+import { sheetByFolder } from '@/_new/features/board-engine/templates/catalog';
 
 const log = createLogger('whiteboard/page');
 
@@ -276,6 +277,13 @@ export function TablicaContent() {
       smartSearchVisible={boardSettings.smartsearch_visible}
       aiEnabled={boardSettings.ai_enabled}
       topRightExtra={isDailyVoice ? renderCallButton : undefined}
+      sheetTemplateId={sheetByFolder(arkuszPath)?.id}
+      onSheetInserted={() => {
+        // Arkusz jest już w dokumencie tablicy - parametr z dashboardu nie jest potrzebny (F5, link)
+        const params = new URLSearchParams(searchParams.toString());
+        params.delete('arkusz');
+        router.replace(`/whiteboard?${params.toString()}`);
+      }}
     />
   ) : (
     /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */

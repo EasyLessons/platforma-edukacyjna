@@ -1,8 +1,9 @@
 /**
  * Wstawianie wzorów z SmartSearch / kart wzorów na tablicę Excalidraw jako obrazy.
  *
- * Plik obrazu idzie przez `api.addFiles` - dalej robi to samo co wklejony obraz:
- * `board-file-sync` wysyła go do Storage i zapisuje w Y.Doc tylko odwołanie.
+ * Wzory z manifestu to WSPÓLNE pliki statyczne (WebP w `public/resources/`): id pliku `tpl:<ścieżka>`
+ * (files/shared-files.ts), więc `board-file-sync` zapisuje tylko odwołanie - bez kopii w Storage tablicy
+ * i bez wpływu na quota. Ścieżka spoza wspólnych katalogów (awaryjnie) idzie jak wklejony obraz (upload).
  *
  * `@excalidraw/excalidraw` jest importowany dynamicznie: ten moduł trafia do strony
  * renderowanej na serwerze, a Excalidraw czyta `window` przy imporcie (issue excalidraw#9907).
@@ -12,6 +13,7 @@ import type { AppState, BinaryFileData, DataURL } from '@excalidraw/excalidraw/t
 import type { ExcalidrawElement, FileId } from '@excalidraw/excalidraw/element/types';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { blobToDataURL } from '../files/data-url';
+import { fetchSharedFile, isSharedPath, sharedFileId, sharedFileUrl } from '../files/shared-files';
 
 /** Wzór z manifestu `/resources/manifest.json` (podzbiór `FormulaResource`). */
 export interface InsertableResource {
@@ -25,8 +27,12 @@ export const RESOURCE_WIDTH = 500;
 export const RESOURCE_GAP = 40;
 export const RESOURCE_COLUMNS = 2;
 
-/** Deterministyczne id pliku ze ścieżki - ten sam wzór wstawiony drugi raz nie dubluje pliku. */
+/**
+ * Id pliku wzoru: wspólny plik `tpl:<ścieżka>`; inna ścieżka - deterministyczny hash (upload jak obraz).
+ * Ten sam wzór wstawiony drugi raz nie dubluje pliku.
+ */
 export function resourceFileId(path: string): FileId {
+  if (isSharedPath(path.replace(/^\/+/, ''))) return sharedFileId(path) as FileId;
   let h = 2166136261;
   for (let i = 0; i < path.length; i++) {
     h ^= path.charCodeAt(i);
@@ -89,9 +95,8 @@ export function layoutResources(
 }
 
 async function loadResourceFile(path: string): Promise<BinaryFileData> {
-  const response = await fetch(path);
-  if (!response.ok) throw new Error(`Nie udało się pobrać wzoru (${response.status})`);
-  const blob = await response.blob();
+  const clean = path.replace(/^\/+/, '');
+  const blob = await fetchSharedFile(isSharedPath(clean) ? sharedFileUrl(clean) : path);
   return {
     id: resourceFileId(path),
     mimeType: (blob.type || 'image/webp') as BinaryFileData['mimeType'],

@@ -455,3 +455,17 @@ Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `
   **Limity:** plik do 20 MB (większy = odmowa), najwyżej 20 stron (dłuższy = pierwsze 20 + komunikat), strona
   renderowana do 1440 px dłuższego boku (backend przyjmuje do 1600 px), JPEG 0.85. Do tego limity tablicy z backendu:
   300 plików / 100 MB (`files.py`). Uszkodzony lub zabezpieczony hasłem PDF = komunikat, nic nie trafia na tablicę.
+
+## Wspólne szablony - arkusze CKE i karty wzorów (12.10.2026)
+
+- Arkusze i karty wzorów to **wspólne zasoby**: przechowywane raz jako pliki statyczne (`public/templates/arkusze/<id>/pNN.webp`,
+  `public/resources/**`), wstawiane na tablicę przez **odwołanie** (`tpl:<ścieżka>` - `files/shared-files.ts`, opis w
+  `pipelines.md` 2c), nie kopię w Storage tablicy - nie liczą się do quota.
+- Katalog arkuszy w kodzie: `board-engine/templates/catalog.ts` (id, egzamin, tytuł, rok, liczba stron, folder z dashboardu).
+  Tabela w bazie dopiero przy dodawaniu szablonów z panelu admina.
+- Strony WebP generuje RAZ `scripts/build-templates.mjs` (pdf.js w Chromium z Playwrighta, 1440 px, WebP 0.82):
+  9 arkuszy, 257 stron, **13 MB** w repo (PDF-y źródłowe `public/arkusze/` - 29 MB - zostają jako źródło generatora).
+  Przy rozroście > ~100 MB: publiczny bucket `templates` zamiast repo.
+- Dashboard: karta arkusza -> nowa tablica z `?arkusz=<folder>` -> board-engine wstawia arkusz raz (strona pod stroną,
+  grupa), po synchronizacji sceny z serwerem; potem `?arkusz=` znika z adresu. Przy wyłączonej fladze Excalidraw karty
+  arkuszy są wyszarzone ("Dostępne w nowej tablicy") - stary silnik parametr ignorował.

@@ -46,10 +46,10 @@ export async function login(page: Page, username: string): Promise<void> {
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
-/** Otwiera tablicę z seeda i czeka, aż Excalidraw będzie gotowy. */
-export async function openBoard(page: Page): Promise<void> {
+/** Otwiera tablicę (domyślnie z seeda) i czeka, aż Excalidraw będzie gotowy. */
+export async function openBoard(page: Page, boardId?: string | number): Promise<void> {
   const { board_id, workspace_id } = seedState();
-  await page.goto(`/whiteboard?boardId=${board_id}&workspace=${workspace_id}`);
+  await page.goto(`/whiteboard?boardId=${boardId ?? board_id}&workspace=${workspace_id}`);
   await page.waitForFunction(() => !!window.__boardEngine, null, { timeout: 90_000 });
   // Nakładka "Synchronizacja tablicy..." znika po pierwszej synchronizacji z whiteboard-sync.
   await expect(page.getByText('Synchronizacja tablicy...')).toHaveCount(0);
@@ -68,13 +68,28 @@ const sessions = new Map<string, StorageState>();
 const pageUsers = new WeakMap<Page, string>();
 
 /** Nowa karta (osobny kontekst = osobne ciasteczka) z zalogowanym użytkownikiem na tablicy. */
-export async function openBoardAs(browser: Browser, username: string): Promise<Page> {
+export async function openBoardAs(
+  browser: Browser,
+  username: string,
+  boardId?: string | number
+): Promise<Page> {
   const saved = sessions.get(username);
   const context = await browser.newContext(saved ? { storageState: saved } : {});
   const page = await context.newPage();
   if (!saved) await login(page, username);
-  await openBoard(page);
+  await openBoard(page, boardId);
   sessions.set(username, await context.storageState());
+  pageUsers.set(page, username);
+  return page;
+}
+
+/** Nowa karta zalogowanego użytkownika na dowolnej stronie (np. dashboard) - sesja jak w openBoardAs. */
+export async function openPageAs(browser: Browser, username: string, url: string): Promise<Page> {
+  const saved = sessions.get(username);
+  const context = await browser.newContext(saved ? { storageState: saved } : {});
+  const page = await context.newPage();
+  if (!saved) await login(page, username);
+  await page.goto(url);
   pageUsers.set(page, username);
   return page;
 }

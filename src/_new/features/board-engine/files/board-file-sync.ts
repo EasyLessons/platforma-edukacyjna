@@ -12,6 +12,9 @@
  *   ODBIÓR   wpis z `ref` -> GET /whiteboard/{id}/files/{name} (blob) -> dataURL tylko
  *            w pamięci karty -> `addFiles`. Wpis z `dataURL` (stary format) - jak dawniej.
  *
+ * WSPÓLNE pliki (`tpl:<ścieżka>` - arkusze, karty wzorów; shared-files.ts): bez uploadu, w Y.Doc
+ * odwołanie `{ ref: { v: 1, shared } }`, odbiór z adresu statycznego - także na tablicy bez serwera.
+ *
  * Zostają w dokumencie jako dataURL (jak dawniej):
  *   - SVG wykresów funkcji (małe, generowane lokalnie; id `fn-<hash>`),
  *   - wszystko na tablicy bez serwera (`boardId === null`: demo, gość),
@@ -41,6 +44,13 @@ import {
 } from '../yjs/excalidraw-binding';
 import { BOARD_FILE_NAME_PATTERN, boardFileApi, type BoardFileTransport } from './board-file-api';
 import { blobToDataURL, dataURLToBlob } from './data-url';
+import {
+  fetchSharedFile,
+  isSharedFileId,
+  isSharedPath,
+  sharedFileUrl,
+  sharedPathOf,
+} from './shared-files';
 
 const SVG_MIME = 'image/svg+xml';
 const STORAGE_NOT_CONFIGURED = 'STORAGE_NOT_CONFIGURED';
@@ -70,6 +80,7 @@ export interface FileBinding {
   hasElement(id: string): boolean;
   pushFiles(files: readonly StoredInlineFile[]): number;
   setFileRef(file: { id: string; mimeType: string; created: number; name: string }): void;
+  setSharedFileRef(file: { id: string; mimeType: string; created: number; path: string }): void;
 }
 
 /** Minimalny kształt elementu sceny potrzebny do decyzji o wysyłce (zgodny ze StoredElement). */
@@ -110,7 +121,9 @@ interface PendingUpload {
 
 interface PendingDownload {
   id: string;
-  name: string;
+  /** Plik tablicy w Storage (`name`) albo wspólny plik statyczny (`url`). */
+  name: string | null;
+  url?: string;
   mimeType: string;
   created: number;
   attempt: number;
@@ -222,6 +235,23 @@ export class BoardFileSync {
 
     for (const file of Object.values(files)) {
       if (!isInlineFile(file) || this.binding.hasFile(file.id)) continue;
+
+      if (isSharedFileId(file.id)) {
+        // Wspólny plik (arkusz, karta wzorów): tylko odwołanie, bez uploadu i bez dataURL w dokumencie.
+        const path = sharedPathOf(file.id);
+        if (path) {
+          this.binding.setSharedFileRef({
+            id: file.id,
+            mimeType: file.mimeType,
+            created: file.created,
+            path,
+          });
+          this.onStored(file.id);
+        } else {
+          this.log.warn('pominięto plik z niepoprawnym id wspólnego zasobu');
+        }
+        continue;
+      }
 
       const isSvg = file.mimeType === SVG_MIME;
       if (this.boardId === null || (isSvg && FUNCTION_PLOT_FILE_ID_PATTERN.test(file.id))) {
@@ -392,8 +422,25 @@ export class BoardFileSync {
       }
       if (!isFileRef(entry) || this.downloads.has(entry.id)) continue;
 
+      const { v, name, shared } = entry.ref as { v?: unknown; name?: unknown; shared?: unknown };
+      if (v === 1 && shared !== undefined) {
+        // Wspólny plik statyczny: ścieżka tylko z naszych katalogów i zgodna z id pliku.
+        if (!isSharedPath(shared) || sharedPathOf(entry.id) !== shared) {
+          this.log.warn('pominięto wpis wspólnego pliku z niepoprawną ścieżką');
+          continue;
+        }
+        this.downloads.add(entry.id);
+        this.downloadQueue.push({
+          id: entry.id,
+          name: null,
+          url: sharedFileUrl(shared),
+          mimeType: entry.mimeType,
+          created: entry.created,
+          attempt: 0,
+        });
+        continue;
+      }
       // Treść dokumentu pochodzi od innych osób - do adresu trafia wyłącznie nazwa w formacie backendu.
-      const { v, name } = entry.ref as { v?: unknown; name?: unknown };
       if (v !== 1 || typeof name !== 'string' || !BOARD_FILE_NAME_PATTERN.test(name)) {
         this.log.warn('pominięto wpis pliku z nieobsługiwanym odwołaniem');
         continue;
@@ -434,7 +481,9 @@ export class BoardFileSync {
       return;
     }
     try {
-      const blob = await this.transport.download(this.boardId as string, item.name);
+      const blob = item.url
+        ? await (this.transport.downloadShared ?? fetchSharedFile)(item.url)
+        : await this.transport.download(this.boardId as string, item.name as string);
       if (this.disposed) return;
       const typed = blob.type.startsWith('image/')
         ? blob

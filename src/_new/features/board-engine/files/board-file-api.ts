@@ -22,6 +22,8 @@ export interface UploadedBoardFile {
 export interface BoardFileTransport {
   upload(boardId: string, blob: Blob): Promise<UploadedBoardFile>;
   download(boardId: string, fileName: string): Promise<Blob>;
+  /** Wspólny plik statyczny (arkusz, karta wzorów); domyślnie `fetchSharedFile`. */
+  downloadShared?(url: string): Promise<Blob>;
 }
 
 export const boardFileApi: BoardFileTransport = {
