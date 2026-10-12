@@ -411,3 +411,23 @@ ADR zaakceptowany przez Patryka: **Opcja 2 — Excalidraw**. Prototyp #72 sprawd
 
 Realizacja etapu A: PR #88–#92 (feature `src/_new/features/board-engine/`, strony za flagą, motyw, fonty bez CDN, e2e).
 Bezpieczeństwo `whiteboard-sync` (rola viewer na serwerze, zapis `/doc` kluczem serwisu): PR #95, #96.
+
+## Etap B1 - panele przy Excalidraw (inwentaryzacja 12.10.2026)
+
+Panele i nakładki starego silnika (`features/whiteboard`, montowane w `whiteboard-canvas.tsx`) i ich los w board-engine.
+Panele board-engine: `src/_new/features/board-engine/panels/` - przyciski w slocie `topRightExtra` Excalidraw
+(prawy górny róg / pływające nad stopką na telefonie), okna na warstwie nad płótnem (`PanelLayer`).
+
+| Panel starego silnika | Etap | Uwagi |
+| --- | --- | --- |
+| Kalkulator (`toolbar/calculator-tool.tsx`) | **B1** | import bez zmian (nic nie wstawia na tablicę); dostępny też dla viewera |
+| SmartSearch + CardViewer (`smartsearch/*`) | **B1** | `smartsearch_visible`; wstawienie wzoru = obraz Excalidraw; viewer bez panelu (jak dziś) |
+| Czat AI (`toolbar/math-chatbot.tsx`) | **B1** | `ai_enabled`; "dodaj do tablicy" = tekst Excalidraw (do B2: notatka MD/KaTeX); viewer czyta, nie wstawia |
+| Czat tekstowy między użytkownikami | wcale | stary silnik go nie ma |
+| Rozmowa głosowa (Daily / legacy) | B3 | Daily już przez `topRightExtra` (#105) |
+| Lista osób online, kursory, follow | wcale | Excalidraw: współpracownicy z awareness; follow - ewentualnie później |
+| Historia aktywności | wcale (na razie) | oparta o model elementów starego silnika |
+| Pasek narzędzi, zoom, snap, loading, status połączenia | wcale | własne Excalidraw / board-engine |
+| Zapisane szablony (`panels/saved-assets-panel.tsx`) | B2 | format elementów starego silnika; poprawka XSS osobno |
+| Notatka MD, tabela, PDF, upload obrazów | B2 | ustalenia 1-2 wyżej |
+| `toolbar_visible` | decyzja | pasek to pasek Excalidraw ("własny pasek - nie teraz") |

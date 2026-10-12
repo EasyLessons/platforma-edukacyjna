@@ -9,10 +9,11 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
+import { PanelLayer, PanelToggles, useBoardPanels } from '../panels/board-panels';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -62,6 +63,17 @@ function BoardSession({
   topRightExtra,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
+  const panels = useBoardPanels();
+  // Slot Excalidraw: przycisk strony (np. "Rozmowa") + przełączniki naszych paneli
+  const renderTopRight = useCallback<TopRightExtra>(
+    (placement) => (
+      <>
+        {topRightExtra?.(placement)}
+        <PanelToggles panels={panels} placement={placement} />
+      </>
+    ),
+    [topRightExtra, panels]
+  );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
 
@@ -97,9 +109,10 @@ function BoardSession({
         user={me}
         viewMode={userRole === 'viewer'}
         gridVisible={gridVisible}
-        topRightExtra={topRightExtra}
+        topRightExtra={renderTopRight}
         storageBoardId={connection.isRemote ? boardId : null}
       />
+      <PanelLayer panels={panels} />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />
