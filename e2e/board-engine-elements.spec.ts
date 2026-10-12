@@ -2,8 +2,8 @@
  * E2E elementów EasyLesson na tablicy Excalidraw (etap B2): tworzenie -> druga osoba widzi -> F5 -> nadal jest.
  */
 
-import { test, expect } from '@playwright/test';
-import { E2E_USERS, closeBoard, liveElements, openBoardAs } from './helpers';
+import { test, expect, type Page } from '@playwright/test';
+import { E2E_USERS, closeBoard, liveElements, makePdf, openBoardAs } from './helpers';
 
 test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i po F5', async ({
   browser,
@@ -47,8 +47,61 @@ test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i p
   await closeBoard(b);
 });
 
-test('viewer: bez przycisku notatki, notatkę tylko czyta', async ({ browser }) => {
+test('PDF: strony jako obrazy, widoczne u drugiej osoby i po F5; zły plik = komunikat', async ({
+  browser,
+}) => {
+  const a = await openBoardAs(browser, E2E_USERS.owner);
+  const b = await openBoardAs(browser, E2E_USERS.editor);
+  const pdfPages = async (page: Page) =>
+    (await liveElements(page)).filter((e) => e.customData?.kind === 'pdf-page');
+  const before = new Set((await pdfPages(a)).map((e) => e.id));
+
+  await expect(a.getByTestId('element-insert-pdf').filter({ visible: true })).toHaveCount(1);
+  await a.getByTestId('pdf-file-input').setInputFiles({
+    name: 'zadania.pdf',
+    mimeType: 'application/pdf',
+    buffer: makePdf(['Zadanie 1', 'Zadanie 2']),
+  });
+  await expect(a.getByTestId('pdf-status')).toHaveText('Dodano PDF: 2 strony', { timeout: 60_000 });
+  const added = (await pdfPages(a)).filter((e) => !before.has(e.id));
+  expect(added.map((e) => e.type)).toEqual(['image', 'image']);
+  const ids = added.map((e) => e.id).sort();
+
+  // Pliki stron idą do Storage jak każdy obraz (#106) - druga osoba widzi strony
+  await expect
+    .poll(async () =>
+      (await pdfPages(b))
+        .map((e) => e.id)
+        .filter((id) => ids.includes(id))
+        .sort()
+    )
+    .toEqual(ids);
+
+  await a.reload();
+  await a.waitForFunction(() => !!window.__boardEngine, null, { timeout: 90_000 });
+  await expect
+    .poll(async () =>
+      (await pdfPages(a))
+        .map((e) => e.id)
+        .filter((id) => ids.includes(id))
+        .sort()
+    )
+    .toEqual(ids);
+
+  await a.getByTestId('pdf-file-input').setInputFiles({
+    name: 'zly.pdf',
+    mimeType: 'application/pdf',
+    buffer: Buffer.from('to nie jest pdf'),
+  });
+  await expect(a.getByTestId('pdf-status')).toContainText('Nie udało się otworzyć pliku PDF');
+
+  await closeBoard(a);
+  await closeBoard(b);
+});
+
+test('viewer: bez przycisków notatki i PDF', async ({ browser }) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
   await expect(v.getByTestId('element-insert-note')).toHaveCount(0);
+  await expect(v.getByTestId('element-insert-pdf')).toHaveCount(0);
   await closeBoard(v);
 });

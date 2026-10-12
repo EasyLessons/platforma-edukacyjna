@@ -6,7 +6,7 @@
  */
 
 import type { ComponentType } from 'react';
-import { NotebookPen } from 'lucide-react';
+import { FileText, NotebookPen } from 'lucide-react';
 
 export interface ElementButton {
   id: string;
@@ -16,6 +16,7 @@ export interface ElementButton {
 }
 
 export const NOTE_BUTTON = { id: 'note', label: 'Notatka', icon: NotebookPen } as const;
+export const PDF_BUTTON = { id: 'pdf', label: 'PDF', icon: FileText } as const;
 
 interface ElementButtonsProps {
   buttons: readonly ElementButton[];

@@ -9,14 +9,20 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
 import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
 import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
-import { ElementButtons, NOTE_BUTTON, type ElementButton } from '../elements/element-buttons';
+import {
+  ElementButtons,
+  NOTE_BUTTON,
+  PDF_BUTTON,
+  type ElementButton,
+} from '../elements/element-buttons';
+import { PdfImport } from '../elements/pdf-import';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -79,6 +85,7 @@ function BoardSession({
     [readOnly, smartSearchVisible, aiEnabled]
   );
   const notes = useNoteElements({ api, readOnly });
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const { startEditing } = notes;
   // Wstawianie elementów (B2) - tylko z prawem edycji
   const elementButtons = useMemo<ElementButton[]>(
@@ -92,6 +99,7 @@ function BoardSession({
                 if (api) void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
               },
             },
+            { ...PDF_BUTTON, onClick: () => pdfInputRef.current?.click() },
           ],
     [readOnly, api, startEditing]
   );
@@ -154,6 +162,7 @@ function BoardSession({
         readOnly={readOnly}
         demo={!!guest}
       />
+      {!readOnly && <PdfImport api={api} inputRef={pdfInputRef} />}
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />

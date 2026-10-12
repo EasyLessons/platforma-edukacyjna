@@ -141,3 +141,28 @@ export async function drawRect(page: Page, sx: number, sy: number, w = 120, h = 
     .toBe(1);
   return (await liveElements(page)).find((e) => !before.has(e.id))!;
 }
+
+/** Minimalny poprawny PDF (strony A4, każda z jednym napisem Helvetica) - plik testowy importu PDF. */
+export function makePdf(texts: string[]): Buffer {
+  const objs: string[] = [];
+  objs[1] = '<< /Type /Catalog /Pages 2 0 R >>';
+  objs[2] = `<< /Type /Pages /Kids [${texts.map((_, i) => `${4 + i * 2} 0 R`).join(' ')}] /Count ${texts.length} >>`;
+  objs[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>';
+  texts.forEach((text, i) => {
+    const stream = `BT /F1 48 Tf 72 700 Td (${text}) Tj ET`;
+    objs[4 + i * 2] =
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ${5 + i * 2} 0 R >>`;
+    objs[5 + i * 2] = `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`;
+  });
+  let out = '%PDF-1.4\n';
+  const offsets: number[] = [];
+  for (let i = 1; i < objs.length; i++) {
+    offsets[i] = out.length;
+    out += `${i} 0 obj\n${objs[i]}\nendobj\n`;
+  }
+  const xref = out.length;
+  out += `xref\n0 ${objs.length}\n0000000000 65535 f \n`;
+  for (let i = 1; i < objs.length; i++) out += `${String(offsets[i]).padStart(10, '0')} 00000 n \n`;
+  out += `trailer\n<< /Size ${objs.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Buffer.from(out, 'latin1');
+}

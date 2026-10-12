@@ -443,3 +443,9 @@ Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `
   w jej treść; zapis przy wyjściu z pola, Escape anuluje. Sync i F5 - jak każde pole elementu (Y.Doc).
   Odpowiedź Tutora AI ("Dodaj do tablicy") trafia jako notatka. Dymek linku Excalidraw ukryty dla notatek (CSS).
   Ograniczenie: eksport PNG/SVG rysuje embeddable jako zastępczy prostokąt (Excalidraw nie renderuje osadzeń w eksporcie).
+- **PDF** (`elements/pdf.ts`, `pdf-import.tsx`): przycisk "PDF" -> plik -> strony renderowane w przeglądarce (pdfjs-dist,
+  worker z naszego bundla, nie z CDN) do JPEG -> elementy `image` ułożone pionowo w jednej grupie, widok dopasowany
+  do wstawionych stron. Pliki stron przez `api.addFiles` -> `board-file-sync` -> Storage (jak obrazy z #106).
+  **Limity:** plik do 20 MB (większy = odmowa), najwyżej 20 stron (dłuższy = pierwsze 20 + komunikat), strona
+  renderowana do 1440 px dłuższego boku (backend przyjmuje do 1600 px), JPEG 0.85. Do tego limity tablicy z backendu:
+  300 plików / 100 MB (`files.py`). Uszkodzony lub zabezpieczony hasłem PDF = komunikat, nic nie trafia na tablicę.
