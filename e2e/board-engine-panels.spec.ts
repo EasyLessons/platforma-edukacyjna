@@ -1,6 +1,6 @@
 /**
  * E2E paneli EasyLesson przy tablicy Excalidraw (etap B1): otwarcie i zamknięcie panelu,
- * panel nie zmienia tablicy, viewer ma panele tylko do odczytu.
+ * panel nie zmienia tablicy, wstawienie wzoru z SmartSearch, viewer bez paneli zmieniających tablicę.
  */
 
 import { test, expect } from '@playwright/test';
@@ -31,7 +31,41 @@ test('kalkulator: otwarcie z przycisku, liczenie, zamknięcie', async ({ browser
   await closeBoard(page);
 });
 
-test('viewer: kalkulator dostępny (nie zmienia tablicy)', async ({ browser }) => {
+test('wzory: wyszukanie i wstawienie obrazu wzoru, widoczny u drugiej osoby', async ({
+  browser,
+}) => {
+  const a = await openBoardAs(browser, E2E_USERS.owner);
+  const b = await openBoardAs(browser, E2E_USERS.editor);
+  const before = new Set((await liveElements(a)).map((e) => e.id));
+
+  await a.getByTestId('panel-toggle-search').filter({ visible: true }).click();
+  const search = a.getByTestId('panel-search');
+  const input = search.locator('input');
+  await expect(input).toBeFocused();
+  await input.fill('ciąg arytmetyczny');
+  await expect(search.locator('li').first()).toBeVisible();
+  await input.press('Enter');
+
+  // Wybór wzoru zamyka wyszukiwarkę i wstawia obraz na środek widoku
+  await expect(search).toHaveCount(0);
+  await expect
+    .poll(async () => (await liveElements(a)).filter((e) => !before.has(e.id)).map((e) => e.type))
+    .toEqual(['image']);
+  await expect(a.getByTestId('panel-notice')).toContainText('Dodano');
+  const formula = (await liveElements(a)).find((e) => !before.has(e.id))!;
+
+  // Obraz idzie przez Storage jak wklejony plik - druga osoba widzi element
+  await expect
+    .poll(async () => (await liveElements(b)).some((e) => e.id === formula.id))
+    .toBe(true);
+
+  await closeBoard(a);
+  await closeBoard(b);
+});
+
+test('viewer: kalkulator dostępny (nie zmienia tablicy), bez panelu wzorów', async ({
+  browser,
+}) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
   await expect
     .poll(() => v.evaluate(() => window.__boardEngine!.api.getAppState().viewModeEnabled))
@@ -39,6 +73,7 @@ test('viewer: kalkulator dostępny (nie zmienia tablicy)', async ({ browser }) =
 
   await v.getByTestId('panel-toggle-calculator').filter({ visible: true }).click();
   await expect(v.getByTestId('panel-calculator')).toBeVisible();
+  await expect(v.getByTestId('panel-toggle-search')).toHaveCount(0);
 
   await closeBoard(v);
 });

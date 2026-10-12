@@ -9,11 +9,12 @@
  */
 
 import dynamic from 'next/dynamic';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { useAuth } from '@/_new/lib/auth';
 import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
-import { PanelLayer, PanelToggles, useBoardPanels } from '../panels/board-panels';
+import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -41,11 +42,13 @@ export interface ExcalidrawWhiteboardProps {
   /** Tożsamość gościa (demo). Bez niej używany jest zalogowany użytkownik. */
   guest?: { id: number; username: string };
   /**
-   * Ustawienia tablicy (panel ustawień). Na razie działa `grid_visible`.
+   * Ustawienia tablicy (panel ustawień): `grid_visible`, `smartsearch_visible`.
    * TODO(decyzja): `toolbar_visible` - pasek to pasek Excalidraw (własny pasek "nie teraz");
-   * `ai_enabled` / `smartsearch_visible` dotyczą paneli z etapu B.
+   * `ai_enabled` dotyczy panelu czatu AI (etap B1).
    */
   gridVisible?: boolean;
+  /** Panel "Wzory" (SmartSearch) - ustawienie tablicy `smartsearch_visible`. */
+  smartSearchVisible?: boolean;
   /** Dodatkowy przycisk obok f(x) (strona podaje np. "Rozmowa"); demo go nie podaje. */
   topRightExtra?: TopRightExtra;
 }
@@ -60,19 +63,26 @@ function BoardSession({
   userRole,
   guest,
   gridVisible,
+  smartSearchVisible = true,
   topRightExtra,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
   const panels = useBoardPanels();
+  const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const readOnly = userRole === 'viewer';
+  const available = useMemo(
+    () => availablePanels({ readOnly, smartSearchVisible }),
+    [readOnly, smartSearchVisible]
+  );
   // Slot Excalidraw: przycisk strony (np. "Rozmowa") + przełączniki naszych paneli
   const renderTopRight = useCallback<TopRightExtra>(
     (placement) => (
       <>
         {topRightExtra?.(placement)}
-        <PanelToggles panels={panels} placement={placement} />
+        <PanelToggles panels={panels} available={available} placement={placement} />
       </>
     ),
-    [topRightExtra, panels]
+    [topRightExtra, panels, available]
   );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
@@ -107,12 +117,13 @@ function BoardSession({
         doc={connection.doc}
         awareness={connection.awareness}
         user={me}
-        viewMode={userRole === 'viewer'}
+        viewMode={readOnly}
         gridVisible={gridVisible}
         topRightExtra={renderTopRight}
         storageBoardId={connection.isRemote ? boardId : null}
+        onApiReady={setApi}
       />
-      <PanelLayer panels={panels} />
+      <PanelLayer panels={panels} available={available} api={api} />
       {isWaitingForServer && (
         <div className="absolute inset-0 z-10 bg-white/80">
           <BoardLoading label="Synchronizacja tablicy..." />

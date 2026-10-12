@@ -43,6 +43,10 @@ interface SmartSearchBarProps {
   onActiveChange?: (isActive: boolean) => void; // Callback gdy search się otwiera/zamyka
   userRole?: 'owner' | 'editor' | 'viewer'; // 🆕 Rola użytkownika
   browseButtonPlacement?: 'inside' | 'outside-right';
+  /** Start z otwartym polem wyszukiwania (panel board-engine otwierany przyciskiem). */
+  defaultOpen?: boolean;
+  /** Wyszukiwarka zamknęła się sama (Escape, klik obok, wybór wyniku). */
+  onClose?: () => void;
 }
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -61,12 +65,14 @@ export function SmartSearchBar({
   onActiveChange,
   userRole,
   browseButtonPlacement = 'inside',
+  defaultOpen = false,
+  onClose,
 }: SmartSearchBarProps) {
   // 🔒 Viewer nie ma dostępu do wyszukiwarki
   if (userRole === 'viewer') {
     return null;
   }
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   const [isClosing, setIsClosing] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -214,6 +220,7 @@ export function SmartSearchBar({
       setSelectedItemId(null);
       setIsAnimatingSelection(false);
       setCopiedCalculation(false);
+      onClose?.();
     }, 300);
   };
 

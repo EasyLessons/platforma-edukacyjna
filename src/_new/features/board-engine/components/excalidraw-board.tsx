@@ -121,6 +121,8 @@ export interface ExcalidrawBoardProps {
   topRightExtra?: TopRightExtra;
   /** Id tablicy na serwerze - obrazy idą do Storage. null (demo, gość) = dataURL w Y.Doc. */
   storageBoardId?: string | null;
+  /** API Excalidraw dla paneli wstawiających elementy (null po odmontowaniu). */
+  onApiReady?: (api: ExcalidrawImperativeAPI | null) => void;
 }
 
 export function ExcalidrawBoard({
@@ -131,6 +133,7 @@ export function ExcalidrawBoard({
   gridVisible = true,
   topRightExtra,
   storageBoardId = null,
+  onApiReady,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [editingSpec, setEditingSpec] = useState<FunctionSpec | null>(null);
@@ -241,6 +244,12 @@ export function ExcalidrawBoard({
       bindingRef.current = null;
     };
   }, [api, sceneReady, doc, flushPending, storageBoardId]);
+
+  useEffect(() => {
+    if (!api || !onApiReady) return;
+    onApiReady(api);
+    return () => onApiReady(null);
+  }, [api, onApiReady]);
 
   useEffect(() => {
     if (!api || !EXPOSE_E2E_HOOK) return;

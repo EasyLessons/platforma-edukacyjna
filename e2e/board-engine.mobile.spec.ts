@@ -46,7 +46,8 @@ test('rysowanie palcem tworzy element freedraw', async ({ page, context }) => {
 test('panel kalkulatora na telefonie: pływający przycisk, panel mieści się na ekranie', async ({
   page,
 }) => {
-  await login(page, E2E_USERS.owner);
+  // editor, nie owner: limit logowań backendu (10 / 5 min) liczy się na konto
+  await login(page, E2E_USERS.editor);
   await openBoard(page);
 
   await page.getByTestId('panel-toggle-calculator').filter({ visible: true }).tap();
