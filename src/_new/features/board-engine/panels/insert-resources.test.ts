@@ -14,7 +14,11 @@ describe('resourceFileId', () => {
   it('ta sama ścieżka = to samo id, inna ścieżka = inne id', () => {
     expect(resourceFileId('/resources/a.webp')).toBe(resourceFileId('/resources/a.webp'));
     expect(resourceFileId('/resources/a.webp')).not.toBe(resourceFileId('/resources/b.webp'));
-    expect(resourceFileId('/resources/a.webp')).toMatch(/^res-[0-9a-f]+$/);
+    // wzór z manifestu = wspólny plik (odwołanie, bez uploadu); inna ścieżka = hash (upload)
+    expect(resourceFileId('/resources/wzory/funkcja kwadratowa/delta.webp')).toBe(
+      'tpl:resources/wzory/funkcja kwadratowa/delta.webp'
+    );
+    expect(resourceFileId('/inne/a.png')).toMatch(/^res-[0-9a-f]+$/);
   });
 });
 

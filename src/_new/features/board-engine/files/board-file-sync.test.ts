@@ -798,3 +798,96 @@ describe('BoardFileSync - poprawki po przeglądzie PR #106', () => {
     expect(h.transport.upload).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('wspólne pliki (arkusze, karty wzorów)', () => {
+  const SHARED_PATH = 'templates/arkusze/egzamin-8-2025/p01.webp';
+  const sharedFile = (): StoredInlineFile => ({
+    id: `tpl:${SHARED_PATH}`,
+    mimeType: 'image/webp',
+    dataURL: `data:image/webp;base64,${btoa('webp')}`,
+    created: 5,
+  });
+
+  it('wysyłka: tylko odwołanie w Y.Doc, bez uploadu i bez dataURL', async () => {
+    const h = harness();
+    h.sync.syncLocal({ [sharedFile().id]: sharedFile() }, [imageEl('e1', sharedFile().id)]);
+    await settle();
+
+    expect(h.transport.upload).not.toHaveBeenCalled();
+    const entry = h.binding.getFile(sharedFile().id);
+    expect(entry).toEqual({
+      id: sharedFile().id,
+      mimeType: 'image/webp',
+      created: 5,
+      ref: { v: 1, shared: SHARED_PATH },
+    });
+    expect(h.onStored).toHaveBeenCalledWith(sharedFile().id);
+    expect(h.sync.shareable([imageEl('e1', sharedFile().id)])).toHaveLength(1);
+  });
+
+  it('także na tablicy bez serwera (demo) - odwołanie, nie dataURL', async () => {
+    const h = harness(undefined, { boardId: null });
+    h.sync.syncLocal({ [sharedFile().id]: sharedFile() }, [imageEl('e1', sharedFile().id)]);
+    expect(isFileRef(h.binding.getFile(sharedFile().id))).toBe(true);
+  });
+
+  it('odbiór: pobranie z adresu statycznego (spacje zakodowane), bez API tablicy', async () => {
+    const downloadShared = vi
+      .fn<NonNullable<BoardFileTransport['downloadShared']>>()
+      .mockResolvedValue(new Blob(['webp'], { type: 'image/webp' }));
+    const download = vi.fn<BoardFileTransport['download']>();
+    const h = harness(undefined, {
+      transport: { upload: vi.fn<BoardFileTransport['upload']>(), download, downloadShared },
+    });
+    const path = 'resources/matematyka/wzory/funkcja kwadratowa/delta.webp';
+    h.sync.receive([
+      { id: `tpl:${path}`, mimeType: 'image/webp', created: 1, ref: { v: 1, shared: path } },
+    ]);
+    await settle();
+
+    expect(downloadShared).toHaveBeenCalledWith(
+      '/resources/matematyka/wzory/funkcja%20kwadratowa/delta.webp'
+    );
+    expect(download).not.toHaveBeenCalled();
+    expect(h.addFiles).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: `tpl:${path}`,
+        dataURL: expect.stringMatching(/^data:image\/webp/),
+      }),
+    ]);
+  });
+
+  it('odbiór: ścieżka spoza wspólnych katalogów albo niezgodna z id - pominięta', async () => {
+    const downloadShared = vi.fn<NonNullable<BoardFileTransport['downloadShared']>>();
+    const h = harness(undefined, {
+      transport: {
+        upload: vi.fn<BoardFileTransport['upload']>(),
+        download: vi.fn<BoardFileTransport['download']>(),
+        downloadShared,
+      },
+    });
+    h.sync.receive([
+      {
+        id: 'tpl:templates/../x.webp',
+        mimeType: 'image/webp',
+        created: 1,
+        ref: { v: 1, shared: 'templates/../x.webp' },
+      },
+      {
+        id: 'tpl:templates/a.webp',
+        mimeType: 'image/webp',
+        created: 1,
+        ref: { v: 1, shared: 'templates/b.webp' },
+      },
+      {
+        id: 'tpl:x',
+        mimeType: 'image/webp',
+        created: 1,
+        ref: { v: 1, shared: 'https://evil.example/x.webp' },
+      },
+    ] as StoredFile[]);
+    await settle();
+    expect(downloadShared).not.toHaveBeenCalled();
+    expect(h.addFiles).not.toHaveBeenCalled();
+  });
+});

@@ -53,9 +53,12 @@ export interface StoredInlineFile extends StoredFileBase {
   dataURL: string;
 }
 
-/** Odwołanie do pliku w Storage; `name` to nazwa nadana przez backend (`<32 hex>.webp`). */
+/**
+ * Odwołanie do pliku poza dokumentem: `name` - plik tablicy w Storage (`<32 hex>.webp`, nadaje backend);
+ * `shared` - wspólny plik statyczny (arkusz CKE, karta wzorów; files/shared-files.ts).
+ */
 export interface StoredFileRef extends StoredFileBase {
-  ref: { v: 1; name: string };
+  ref: { v: 1; name: string } | { v: 1; shared: string };
 }
 
 export type StoredFile = StoredInlineFile | StoredFileRef;
@@ -151,6 +154,17 @@ export class ExcalidrawYjsBinding {
       mimeType: file.mimeType,
       created: file.created,
       ref: { v: 1, name: file.name },
+    };
+    this.doc.transact(() => this.files.set(file.id, entry), this.origin);
+  }
+
+  /** Wpis wspólnego pliku statycznego (bez uploadu) - files/shared-files.ts. */
+  setSharedFileRef(file: { id: string; mimeType: string; created: number; path: string }): void {
+    const entry: StoredFileRef = {
+      id: file.id,
+      mimeType: file.mimeType,
+      created: file.created,
+      ref: { v: 1, shared: file.path },
     };
     this.doc.transact(() => this.files.set(file.id, entry), this.origin);
   }
