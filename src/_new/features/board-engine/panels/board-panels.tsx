@@ -109,7 +109,7 @@ export function PanelLayer({ panels }: PanelLayerProps) {
       data-testid="board-panel-layer"
     >
       {panels.isOpen('calculator') && width > 0 && (
-        <div data-testid="panel-calculator">
+        <div className="absolute inset-0" data-testid="panel-calculator">
           <CalculatorTool
             canvasWidth={width}
             canvasHeight={height}
