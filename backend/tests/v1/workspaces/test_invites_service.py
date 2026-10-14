@@ -80,6 +80,28 @@ class TestCreateInvite:
             await service.create_invite(test_workspace.id, test_user2.id, test_user3.id, send_email=False)
 
     @pytest.mark.asyncio
+    async def test_editor_cannot_invite(self, db_session, shared_workspace, test_user2, test_user3):
+        """Decyzja B: zapraszanie tylko dla właściciela przestrzeni."""
+        service = InviteService(db_session)
+        with pytest.raises(AppException) as exc:
+            await service.create_invite(shared_workspace.id, test_user2.id, test_user3.id, send_email=False)
+        assert exc.value.status_code == 403
+        assert db_session.query(WorkspaceInvite).filter(WorkspaceInvite.invited_id == test_user3.id).count() == 0
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_invite(self, db_session, shared_workspace, test_user2, test_user3):
+        member = db_session.query(WorkspaceMember).filter(
+            WorkspaceMember.workspace_id == shared_workspace.id,
+            WorkspaceMember.user_id == test_user2.id,
+        ).first()
+        member.role = "viewer"
+        db_session.commit()
+        service = InviteService(db_session)
+        with pytest.raises(AppException) as exc:
+            await service.create_invite(shared_workspace.id, test_user2.id, test_user3.id, send_email=False)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
     async def test_already_member_raises_conflict(self, db_session, test_workspace, test_user, test_user2):
         db_session.add(WorkspaceMember(
             workspace_id=test_workspace.id, user_id=test_user2.id,

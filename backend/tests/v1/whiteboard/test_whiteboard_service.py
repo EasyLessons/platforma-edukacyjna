@@ -91,6 +91,18 @@ class TestBoardSettings:
             service.update_settings(board.id, BoardSettingsPatch(ai_enabled=False), test_user2.id)
         assert exc.value.status_code == 403
 
+    def test_update_editor_creator_raises_403(self, db_session, test_user2, shared_workspace):
+        """Decyzja B: ustawienia tablicy zmienia właściciel przestrzeni, nie twórca tablicy."""
+        board = _shared_board(db_session, shared_workspace, test_user2)
+        with pytest.raises(AppException) as exc:
+            WhiteboardService(db_session).update_settings(board.id, BoardSettingsPatch(ai_enabled=False), test_user2.id)
+        assert exc.value.status_code == 403
+
+    def test_update_owner_on_editor_board_ok(self, db_session, test_user, test_user2, shared_workspace):
+        board = _shared_board(db_session, shared_workspace, test_user2)
+        result = WhiteboardService(db_session).update_settings(board.id, BoardSettingsPatch(ai_enabled=False), test_user.id)
+        assert result.ai_enabled is False
+
 
 class TestDocument:
 

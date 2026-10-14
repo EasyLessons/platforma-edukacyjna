@@ -15,7 +15,7 @@ from core.models import User, WorkspaceInvite, WorkspaceMember
 from core.logging import get_logger
 from api.v1.notifications.service import create_notification
 from api.v1.notifications.realtime import broadcast_notification
-from ..authorization import get_workspace_or_404, require_membership
+from ..authorization import get_workspace_or_404, require_workspace_owner
 from .utils import send_workspace_invite_email
 from .schemas import (
     InviteResponse, UserSearchResult, AcceptInviteResponse,
@@ -44,7 +44,7 @@ class InviteService:
     ) -> InviteResponse:
         """Tworzy zaproszenie + powiadomienie + opcjonalnie email."""
         db = self.db
-        workspace, _ = require_membership(db, workspace_id, user_id)
+        workspace = require_workspace_owner(db, workspace_id, user_id, "Tylko właściciel przestrzeni może zapraszać")
         
         invited_user = db.query(User).filter(User.id == invited_user_id).first()
         if not invited_user:
@@ -149,7 +149,7 @@ class InviteService:
         """Wyszukuje użytkowników do zaproszenia - 
         wyklucza siebie i obecnych członków, oznacza już zaproszonych."""
         db = self.db
-        require_membership(db, workspace_id, current_user_id)
+        require_workspace_owner(db, workspace_id, current_user_id, "Tylko właściciel przestrzeni może zapraszać")
 
         query = query.strip().lower()
         if len(query) < 2:
