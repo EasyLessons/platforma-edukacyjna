@@ -134,6 +134,11 @@ function DashboardContent() {
     }
   }, [activeWorkspaceId]);
 
+  const activeWorkspaceIsOwner = useMemo(() => {
+    if (!activeWorkspaceId) return false;
+    return workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.is_owner === true;
+  }, [workspaces, activeWorkspaceId]);
+
   const activeWorkspaceName = useMemo(() => {
     if (!activeWorkspaceId) return undefined;
     return workspaces.find((workspace) => workspace.id === activeWorkspaceId)?.name;
@@ -213,12 +218,14 @@ function DashboardContent() {
               </div>
 
               <div className="p-4 pb-10 md:p-8 md:pb-20">
-                <TemplatesSection workspaceId={activeWorkspaceId} />
+                {/* Szablony tworzą tablice - tylko właściciel przestrzeni (decyzja B). */}
+                {activeWorkspaceIsOwner && <TemplatesSection workspaceId={activeWorkspaceId} />}
 
                 {activeWorkspaceId && (
                   <BoardsSection
                     workspace_id={activeWorkspaceId}
                     workspace_name={activeWorkspaceName}
+                    isOwner={activeWorkspaceIsOwner}
                     stickyOffset={workspaceTopNavHeight}
                   />
                 )}

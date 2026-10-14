@@ -197,7 +197,7 @@ export default function RecentsView() {
                 <div key={board.id} className="border-b border-gray-100 group relative">
                   <BoardCard
                     board={board}
-                    canRename={false}
+                    canManage={false}
                     onlineUsers={[]}
                     onAction={{ edit: () => {}, delete: () => {} }}
                     onToggleFavourite={handleToggleFavourite}

@@ -17,7 +17,7 @@ import type { OnlineUser } from '@/_new/shared/types/user';
 
 interface BoardCardProps {
   board: Board;
-  canRename: boolean;
+  canManage: boolean;
   onlineUsers: OnlineUser[];
   onAction: BoardCardActions;
   onToggleFavourite: (id: number, isFavourite: boolean) => Promise<void>;
@@ -26,7 +26,7 @@ interface BoardCardProps {
 
 export function BoardCard({
   board,
-  canRename,
+  canManage,
   onlineUsers,
   onAction,
   onToggleFavourite,
@@ -87,7 +87,7 @@ export function BoardCard({
         </div>
 
         <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-          {canRename && (
+          {canManage && (
             <button
               onClick={handleDropdownEdit}
               className="p-1.5 max-md:p-3.5 rounded-lg text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
@@ -105,11 +105,9 @@ export function BoardCard({
               className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400 text-yellow-400' : ''}`}
             />
           </button>
-          <BoardDropdownMenu
-            canRename={canRename}
-            onEdit={handleDropdownEdit}
-            onDelete={handleDropdownDelete}
-          />
+          {canManage && (
+            <BoardDropdownMenu onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          )}
         </div>
       </div>
 
@@ -164,7 +162,7 @@ export function BoardCard({
           className="col-span-2 flex items-center justify-end gap-1"
           onClick={(e) => e.stopPropagation()}
         >
-          {canRename && (
+          {canManage && (
             <button
               onClick={handleDropdownEdit}
               className="opacity-100 p-2 rounded-lg transition-all opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-700 hover:bg-gray-100"
@@ -184,11 +182,9 @@ export function BoardCard({
             <Star className={`w-4 h-4 ${board.is_favourite ? 'fill-yellow-400' : ''}`} />
           </button>
 
-          <BoardDropdownMenu
-            canRename={canRename}
-            onEdit={handleDropdownEdit}
-            onDelete={handleDropdownDelete}
-          />
+          {canManage && (
+            <BoardDropdownMenu onEdit={handleDropdownEdit} onDelete={handleDropdownDelete} />
+          )}
         </div>
       </div>
     </div>
@@ -202,12 +198,11 @@ import { Settings, Trash2 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 
 interface BoardDropdownMenuProps {
-  canRename: boolean;
   onEdit: (e: React.MouseEvent) => void;
   onDelete: (e: React.MouseEvent) => void;
 }
 
-function BoardDropdownMenu({ canRename, onEdit, onDelete }: BoardDropdownMenuProps) {
+function BoardDropdownMenu({ onEdit, onDelete }: BoardDropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -235,32 +230,28 @@ function BoardDropdownMenu({ canRename, onEdit, onDelete }: BoardDropdownMenuPro
 
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl shadow-xl border border-gray-200 py-2 min-w-[180px]">
-          {canRename && (
-            <>
-              <button
-                onClick={(e) => {
-                  onEdit(e);
-                  setOpen(false);
-                }}
-                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-              >
-                <Pencil size={16} className="text-gray-500" />
-                <span>Zmień nazwę</span>
-              </button>
+          <button
+            onClick={(e) => {
+              onEdit(e);
+              setOpen(false);
+            }}
+            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+          >
+            <Pencil size={16} className="text-gray-500" />
+            <span>Zmień nazwę</span>
+          </button>
 
-              <button
-                onClick={(e) => {
-                  onEdit(e);
-                  setOpen(false);
-                }}
-                className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-              >
-                <Settings size={16} className="text-gray-500" />
-                <span>Ustawienia</span>
-              </button>
-              <div className="border-t border-gray-100 my-1" />
-            </>
-          )}
+          <button
+            onClick={(e) => {
+              onEdit(e);
+              setOpen(false);
+            }}
+            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+          >
+            <Settings size={16} className="text-gray-500" />
+            <span>Ustawienia</span>
+          </button>
+          <div className="border-t border-gray-100 my-1" />
 
           <button
             onClick={(e) => {

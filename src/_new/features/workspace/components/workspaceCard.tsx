@@ -224,14 +224,16 @@ export function WorkspaceCard({
             <Star size={16} className={workspace.is_favourite ? 'fill-yellow-500' : ''} />
           </button>
 
-          <button
-            onClick={() => onAction.invite(workspace)}
-            className="flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
-            title="Zaproś członków"
-            aria-label="Zaproś członków"
-          >
-            <UserPlus size={16} />
-          </button>
+          {workspace.is_owner && (
+            <button
+              onClick={() => onAction.invite(workspace)}
+              className="flex justify-center items-center w-[30px] h-[30px] rounded bg-transparent hover:bg-gray-200 transition-colors text-gray-400 hover:text-gray-600"
+              title="Zaproś członków"
+              aria-label="Zaproś członków"
+            >
+              <UserPlus size={16} />
+            </button>
+          )}
 
           {workspace.is_owner && (
             <button
