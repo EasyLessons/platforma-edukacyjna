@@ -31,12 +31,15 @@ import type { SortBy, FilterOwner } from '@/_new/features/board/utils/helpers';
 interface BoardsSectionProps {
   workspace_id: number;
   workspace_name?: string;
+  /** Czy zalogowany jest właścicielem przestrzeni (tylko owner tworzy i zarządza tablicami). */
+  isOwner?: boolean;
   stickyOffset?: number;
 }
 
 export default function BoardsSection({
   workspace_id,
   workspace_name,
+  isOwner = false,
   stickyOffset = 72,
 }: BoardsSectionProps) {
   const router = useRouter();
@@ -102,15 +105,17 @@ export default function BoardsSection({
             <h2 className="min-w-0 text-2xl max-md:text-xl max-md:truncate md:text-[28px] font-bold text-gray-900">
               {workspace_name ? `Tablice — ${workspace_name}` : 'Tablice'}
             </h2>
-            <DashboardButton
-              variant="primary"
-              leftIcon={<Plus size={16} />}
-              onClick={() => setShowCreateModal(true)}
-              className="h-8 max-md:h-11 shrink-0"
-            >
-              <span className="hidden sm:inline">Nowa tablica</span>
-              <span className="sm:hidden">Nowa</span>
-            </DashboardButton>
+            {isOwner && (
+              <DashboardButton
+                variant="primary"
+                leftIcon={<Plus size={16} />}
+                onClick={() => setShowCreateModal(true)}
+                className="h-8 max-md:h-11 shrink-0"
+              >
+                <span className="hidden sm:inline">Nowa tablica</span>
+                <span className="sm:hidden">Nowa</span>
+              </DashboardButton>
+            )}
           </div>
 
           {/* Filters */}
@@ -177,6 +182,7 @@ export default function BoardsSection({
         sortBy={sortBy}
         filterOwner={filterOwner}
         currentUsername={currentUsername}
+        canManage={isOwner}
         workspaceId={workspace_id}
         onlineUsersEnabled
         onAction={cardActions}

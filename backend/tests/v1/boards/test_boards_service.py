@@ -73,10 +73,12 @@ class TestCreateBoard:
             await service.create_board(make_board_data(test_workspace.id), test_user2.id)
 
     @pytest.mark.asyncio
-    async def test_editor_can_create(self, db_session, test_user2, shared_workspace):
+    async def test_editor_forbidden(self, db_session, test_user2, shared_workspace):
+        """Decyzja B: tablice tworzy tylko właściciel przestrzeni."""
         service = BoardService(db_session)
-        result = await service.create_board(make_board_data(shared_workspace.id), test_user2.id)
-        assert isinstance(result, BoardResponse)
+        with pytest.raises(AppException) as exc:
+            await service.create_board(make_board_data(shared_workspace.id), test_user2.id)
+        assert exc.value.status_code == 403
 
     @pytest.mark.asyncio
     async def test_viewer_forbidden(self, db_session, test_user2, shared_workspace):
@@ -305,3 +307,76 @@ class TestToggleFavourite:
             BoardUsers.user_id == test_user2.id,
         ).first()
         assert row is not None
+
+
+def _board_by(db_session, workspace, creator):
+    board = Board(
+        name="Tablica", icon="PenTool", bg_color="bg-gray-500",
+        workspace_id=workspace.id, created_by=creator.id,
+        created_at=datetime.utcnow(), last_modified=datetime.utcnow(),
+        last_modified_by=creator.id,
+    )
+    db_session.add(board)
+    db_session.commit()
+    db_session.refresh(board)
+    return board
+
+
+def _set_role(db_session, workspace, user, role):
+    member = db_session.query(WorkspaceMember).filter(
+        WorkspaceMember.workspace_id == workspace.id,
+        WorkspaceMember.user_id == user.id,
+    ).first()
+    member.role = role
+    db_session.commit()
+
+
+class TestBoardManagementIsWorkspaceOwnerOnly:
+    """Decyzja B: zmiana nazwy i usuwanie tablic należy do właściciela przestrzeni, nie twórcy tablicy."""
+
+    @pytest.mark.asyncio
+    async def test_editor_cannot_rename_own_board(self, db_session, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user2)
+        with pytest.raises(AppException) as exc:
+            await BoardService(db_session).update_board(board.id, UpdateBoard(name="X"), test_user2.id)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_editor_cannot_delete_own_board(self, db_session, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user2)
+        with pytest.raises(AppException) as exc:
+            await BoardService(db_session).delete_board(board.id, test_user2.id)
+        assert exc.value.status_code == 403
+        assert db_session.query(Board).filter(Board.id == board.id).first() is not None
+
+    @pytest.mark.asyncio
+    async def test_owner_can_rename_board_created_by_editor(self, db_session, test_user, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user2)
+        result = await BoardService(db_session).update_board(board.id, UpdateBoard(name="Nowa"), test_user.id)
+        assert result.name == "Nowa"
+
+    @pytest.mark.asyncio
+    async def test_owner_can_delete_board_created_by_editor(self, db_session, test_user, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user2)
+        board_id = board.id
+        await BoardService(db_session).delete_board(board_id, test_user.id)
+        assert db_session.query(Board).filter(Board.id == board_id).first() is None
+
+    @pytest.mark.asyncio
+    async def test_viewer_cannot_update_or_delete(self, db_session, test_user, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user)
+        _set_role(db_session, shared_workspace, test_user2, "viewer")
+        service = BoardService(db_session)
+        with pytest.raises(AppException) as exc:
+            await service.update_board(board.id, UpdateBoard(name="X"), test_user2.id)
+        assert exc.value.status_code == 403
+        with pytest.raises(AppException) as exc:
+            await service.delete_board(board.id, test_user2.id)
+        assert exc.value.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_viewer_can_toggle_favourite(self, db_session, test_user, test_user2, shared_workspace):
+        board = _board_by(db_session, shared_workspace, test_user)
+        _set_role(db_session, shared_workspace, test_user2, "viewer")
+        result = await BoardService(db_session).toggle_favourite(board.id, ToggleFavourite(is_favourite=True), test_user2.id)
+        assert result.is_favourite is True

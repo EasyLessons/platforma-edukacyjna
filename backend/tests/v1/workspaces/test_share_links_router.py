@@ -117,14 +117,13 @@ class TestCreateShareLink:
         assert link is not None
         assert link.revoked_at is None
 
-    def test_editor_tez_moze_tworzyc(self, client, test_user2, shared_workspace):
-        """POST /share-link jako editor → 200 (require_editor_or_owner dopuszcza editora)"""
+    def test_403_dla_editora(self, client, test_user2, shared_workspace):
+        """POST /share-link jako editor → 403 (decyzja B: tylko właściciel przestrzeni)"""
         r = client.post(
             f"/api/v1/workspaces/{shared_workspace.id}/share-link",
             headers=make_auth_headers(test_user2.id),
         )
-        assert r.status_code == 200
-        assert r.json()["data"]["workspace_id"] == shared_workspace.id
+        assert r.status_code == 403
 
     def test_403_dla_viewera(self, client, db_session, test_user3, test_workspace):
         """POST /share-link jako viewer → 403 w kształcie ApiResponse, brak linku w bazie"""

@@ -210,19 +210,8 @@ export function WorkspaceDropdownMenu({
                 </button>
               </>
             ) : workspace.role === 'editor' ? (
-              // Editor menu
+              // Editor menu - udostępnianie i zapraszanie tylko dla właściciela (decyzja B)
               <>
-                {onShareLink && (
-                  <button
-                    onClick={handleAction(onShareLink)}
-                    className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 flex items-center gap-2 transition-colors cursor-pointer"
-                    role="menuitem"
-                  >
-                    <Link2 size={14} />
-                    <span>Udostępnij link</span>
-                  </button>
-                )}
-
                 <button
                   onClick={handleAction(onLeave)}
                   className="w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors cursor-pointer"

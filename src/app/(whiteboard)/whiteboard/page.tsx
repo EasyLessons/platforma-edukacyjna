@@ -171,8 +171,8 @@ export function TablicaContent() {
           log.info('Rola użytkownika:', roleData.role, '| Workspace ID:', workspaceId);
         } catch (error) {
           console.error('❌ Błąd pobierania roli:', error);
-          // Domyślnie editor jeśli nie ma tokenu
-          setUserRole('editor');
+          // Fail-closed w UI: bez znanej roli nie pokazujemy akcji właściciela (serwer i tak egzekwuje)
+          setUserRole('viewer');
           log.info('Ustawiono domyślną rolę: editor (brak tokenu)');
         }
       }
@@ -360,7 +360,7 @@ export function TablicaContent() {
               boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined
             }
             onShareClick={
-              boardId !== 'demo-board' && userRole !== 'viewer'
+              boardId !== 'demo-board' && userRole === 'owner'
                 ? () => setShowShareModal(true)
                 : undefined
             }

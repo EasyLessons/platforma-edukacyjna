@@ -23,7 +23,7 @@ from .schemas import (
 from .call import CallUser, create_board_call
 from .storage import upload_board_image
 from core.presence import PresenceService
-from api.v1.workspaces.authorization import require_membership, require_board_owner
+from api.v1.workspaces.authorization import require_membership, require_workspace_owner
 
 
 def can_edit(role: str) -> bool:
@@ -97,7 +97,7 @@ class WhiteboardService:
 
     def update_settings(self, board_id: int, patch: BoardSettingsPatch, user_id: int) -> BoardSettings:
         board = self._get_board_or_404(board_id)
-        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może zmienić jej ustawienia")
+        require_workspace_owner(self.db, board.workspace_id, user_id, "Tylko właściciel przestrzeni może zmienić ustawienia tablicy")
 
         effective = BoardSettings(**(board.settings or {})).model_dump()
         board.settings = {**effective, **patch.model_dump(exclude_unset=True)}

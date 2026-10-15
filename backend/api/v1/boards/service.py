@@ -19,7 +19,7 @@ from core.logging import get_logger
 from core.models import Board, BoardUsers
 from core.presence import PresenceService
 
-from api.v1.workspaces.authorization import require_membership, require_editor_or_owner, require_board_owner
+from api.v1.workspaces.authorization import require_membership, require_workspace_owner
 from api.v1.whiteboard.storage import delete_board_folder
 from api.v1.whiteboard.files import delete_board_files
 
@@ -126,7 +126,7 @@ class BoardService:
         return board
 
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
-        require_editor_or_owner(self.db, board_data.workspace_id, user_id)
+        require_workspace_owner(self.db, board_data.workspace_id, user_id, "Tylko właściciel przestrzeni może tworzyć tablice")
 
         board = _new_board_with_owner(
             self.db,
@@ -191,7 +191,7 @@ class BoardService:
 
     async def update_board(self, board_id: int, data: UpdateBoard, user_id: int) -> BoardResponse:
         board = self._get_board_or_404(board_id)
-        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją edytować")
+        require_workspace_owner(self.db, board.workspace_id, user_id, "Tylko właściciel przestrzeni może edytować tablice")
         
         if data.name is not None:
             board.name = data.name
@@ -214,7 +214,7 @@ class BoardService:
 
     async def delete_board(self, board_id: int, user_id: int) -> dict:
         board = self._get_board_or_404(board_id)
-        require_board_owner(self.db, board, user_id, message="Tylko właściciel tablicy może ją usunąć")
+        require_workspace_owner(self.db, board.workspace_id, user_id, "Tylko właściciel przestrzeni może usuwać tablice")
         
         self.db.delete(board)
         self.db.commit()

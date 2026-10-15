@@ -40,12 +40,22 @@ def make_link(db_session, workspace_id, board_id=None, *, expired=False, revoked
 
 class TestCreateLink:
 
-    def test_editor_can_create(self, db_session, shared_workspace, test_user2):
+    def test_editor_forbidden(self, db_session, shared_workspace, test_user2):
+        """Decyzja B: share-linki tworzy tylko właściciel przestrzeni."""
         service = ShareLinkService(db_session)
-        result = service.get_or_create_link(shared_workspace.id, None, test_user2.id)
-        assert isinstance(result, ShareLinkResponse)
-        assert result.workspace_id == shared_workspace.id
-        assert result.board_id is None
+        with pytest.raises(AppException) as exc_info:
+            service.get_or_create_link(shared_workspace.id, None, test_user2.id)
+        assert exc_info.value.status_code == 403
+
+    def test_editor_cannot_refresh_or_revoke(self, db_session, shared_workspace, test_user2):
+        service = ShareLinkService(db_session)
+        link = service.get_or_create_link(shared_workspace.id, None, shared_workspace.created_by)
+        with pytest.raises(AppException) as exc_info:
+            service.refresh_link(shared_workspace.id, None, test_user2.id)
+        assert exc_info.value.status_code == 403
+        with pytest.raises(AppException) as exc_info:
+            service.revoke_link(shared_workspace.id, link.token, test_user2.id)
+        assert exc_info.value.status_code == 403
 
     def test_owner_can_create(self, db_session, test_workspace, test_user):
         service = ShareLinkService(db_session)

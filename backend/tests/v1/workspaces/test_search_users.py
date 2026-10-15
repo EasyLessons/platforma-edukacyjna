@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from api.v1.workspaces.invites.service import InviteService
 from api.v1.workspaces.invites.schemas import UserSearchResult
 from api.v1.auth.utils import hash_password
-from core.exceptions import NotFoundError
+from core.exceptions import AppException, NotFoundError
 from core.models import User, WorkspaceInvite
 
 
@@ -143,6 +143,13 @@ class TestSearchUsersAuthorization:
         service = InviteService(db_session)
         with pytest.raises(NotFoundError):
             service.search_invitable_users(test_workspace.id, "testuser", test_user3.id, limit=10)
+
+    def test_editor_caller_raises_403(self, db_session, shared_workspace, test_user2):
+        """Wyszukiwarka zwraca e-maile - tylko właściciel przestrzeni."""
+        service = InviteService(db_session)
+        with pytest.raises(AppException) as exc:
+            service.search_invitable_users(shared_workspace.id, "testuser", test_user2.id, limit=10)
+        assert exc.value.status_code == 403
 
     def test_nonexistent_workspace_raises_not_found(self, db_session, test_user):
         service = InviteService(db_session)

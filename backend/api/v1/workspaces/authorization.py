@@ -5,7 +5,7 @@ Używane przez WorkspaceService, InviteService i MemeberService.
 from sqlalchemy.orm import Session
 
 from core.exceptions import NotFoundError, AppException
-from core.models import Board, Workspace, WorkspaceMember
+from core.models import Workspace, WorkspaceMember
 
 
 def get_workspace_or_404(db: Session, workspace_id: int) -> Workspace:
@@ -39,26 +39,15 @@ def require_owner(
         raise AppException(message, status_code=403)
     return workspace
 
-def require_editor_or_owner(
+def require_workspace_owner(
     db: Session,
     workspace_id: int,
     user_id: int,
-    message: str = "Musisz być właścicielem lub edytorem, aby wykonać tę operację"
-) -> tuple[Workspace, WorkspaceMember]:
-    """Sprawdza czy workspace istnieje i user ma rolę 'editor' lub 'owner'.
-    Zwraca (workspace, membership) albo rzuca NotFoundError/AppException."""
-    workspace, membership = require_membership(db, workspace_id, user_id)
-    if membership.role not in ("owner", "editor"):
+    message: str = "Tylko właściciel przestrzeni może wykonać tę operację"
+) -> Workspace:
+    """Członkostwo (404 dla obcego), potem właściciel przestrzeni (403 dla editora/viewera).
+    Używane przy zarządzaniu tablicami, zaproszeniami i share-linkami."""
+    workspace, _ = require_membership(db, workspace_id, user_id)
+    if workspace.created_by != user_id:
         raise AppException(message, status_code=403)
-    return workspace, membership
-
-def require_board_owner(
-    db: Session,
-    board: Board,
-    user_id: int, 
-    message: str = "Tylko właściciel tablicy może wykonać tę oprerację"
-) -> None:
-    """Sprawdza czy user jest twórcą tablicy."""
-    require_membership(db, board.workspace_id, user_id)
-    if board.created_by != user_id:
-        raise AppException(message, status_code=403)
+    return workspace

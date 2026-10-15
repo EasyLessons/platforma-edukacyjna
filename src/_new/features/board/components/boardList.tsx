@@ -25,6 +25,8 @@ interface BoardListProps {
   sortBy: SortBy;
   filterOwner: FilterOwner;
   currentUsername: string;
+  /** Owner przestrzeni: tylko on zmienia nazwę, ustawienia i usuwa tablice (decyzja B). */
+  canManage: boolean;
   workspaceId: number;
   onSelect: (boardId: number, workspaceId?: number) => void;
   onAction: BoardCardActions;
@@ -39,6 +41,7 @@ export function BoardList({
   sortBy,
   filterOwner,
   currentUsername,
+  canManage,
   workspaceId,
   onAction,
   onSelect,
@@ -169,7 +172,7 @@ export function BoardList({
         <BoardCard
           key={board.id}
           board={board}
-          canRename={board.owner_username === currentUsername}
+          canManage={canManage}
           onlineUsers={onlineUsersMap[board.id] ?? []}
           onAction={onAction}
           onToggleFavourite={onToggleFavourite}

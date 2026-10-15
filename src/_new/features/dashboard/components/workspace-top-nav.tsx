@@ -172,13 +172,15 @@ export default function WorkspaceTopNav({
                 )}
               </div>
 
-              <button
-                onClick={() => setInvitingWorkspace(activeWorkspace)}
-                className="hover-shine cursor-pointer hidden sm:flex items-center gap-2 h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-200 text-[13px] font-semibold text-gray-700 transition"
-              >
-                <UserPlus size={14} className="text-gray-600" />
-                <span>Zaproś uczestników</span>
-              </button>
+              {activeWorkspace.is_owner && (
+                <button
+                  onClick={() => setInvitingWorkspace(activeWorkspace)}
+                  className="hover-shine cursor-pointer hidden sm:flex items-center gap-2 h-8 px-3 rounded-md border border-gray-200 bg-white hover:bg-gray-200 text-[13px] font-semibold text-gray-700 transition"
+                >
+                  <UserPlus size={14} className="text-gray-600" />
+                  <span>Zaproś uczestników</span>
+                </button>
+              )}
 
               {activeWorkspace.is_owner && (
                 <button

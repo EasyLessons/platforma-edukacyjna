@@ -140,6 +140,9 @@ stosie: backend (seed `backend/scripts/seed_e2e.py`: właściciel, edytor i view
 `whiteboard-sync` z autoryzacją, frontend. Serwery startuje Playwright (`webServer`), bazę i Redisa - Docker.
 Stan aplikacji czytają przez `window.__boardEngine` (wystawiane tylko przy `NEXT_PUBLIC_E2E=1`).
 
+Role: `e2e/roles.spec.ts` (editor nie tworzy tablicy i dostaje 403 na zaproszenia/share-link/zmianę nazwy, viewer
+403 na upload; owner widzi „Nowa tablica"). Viewer bez prawa zapisu na tablicy: `board-engine.spec.ts`.
+
 ```bash
 docker compose -f docker-compose.e2e.yml up -d     # Postgres :55432 + Redis :56379
 npm --prefix whiteboard-sync ci                    # raz

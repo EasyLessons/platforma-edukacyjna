@@ -18,7 +18,7 @@ from core.exceptions import NotFoundError, AppException
 from core.logging import get_logger
 from core.models import Board, Workspace, WorkspaceMember, WorkspaceShareLink
 
-from ..authorization import require_editor_or_owner
+from ..authorization import require_workspace_owner
 from .schemas import ShareLinkResponse, ShareLinkPreview, JoinShareLinkResponse
 
 logger = get_logger(__name__)
@@ -51,7 +51,7 @@ class ShareLinkService:
             raise AppException("Tablica nie należy do tego workspace'a", status_code=400)
 
     def get_or_create_link(self, workspace_id: int, board_id: int | None, user_id: int) -> ShareLinkResponse:
-        require_editor_or_owner(self.db, workspace_id, user_id)
+        require_workspace_owner(self.db, workspace_id, user_id, "Tylko właściciel przestrzeni może zarządzać linkami")
         if board_id is not None:
             self._validate_board(workspace_id, board_id)
 
@@ -72,7 +72,7 @@ class ShareLinkService:
         return ShareLinkResponse.model_validate(link)
 
     def revoke_link(self, workspace_id: int, token: str, user_id: int) -> dict:
-        require_editor_or_owner(self.db, workspace_id, user_id)
+        require_workspace_owner(self.db, workspace_id, user_id, "Tylko właściciel przestrzeni może zarządzać linkami")
 
         link = self.db.query(WorkspaceShareLink).filter(
             WorkspaceShareLink.workspace_id == workspace_id,
@@ -87,7 +87,7 @@ class ShareLinkService:
         return {"message": "Link został unieważniony"}
 
     def refresh_link(self, workspace_id: int, board_id: int | None, user_id: int) -> ShareLinkResponse:
-        require_editor_or_owner(self.db, workspace_id, user_id)
+        require_workspace_owner(self.db, workspace_id, user_id, "Tylko właściciel przestrzeni może zarządzać linkami")
         if board_id is not None:
             self._validate_board(workspace_id, board_id)
 
