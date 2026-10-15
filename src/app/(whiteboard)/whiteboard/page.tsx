@@ -84,6 +84,7 @@ export function TablicaContent() {
     return Number.isFinite(parsedWorkspaceId) && parsedWorkspaceId > 0 ? parsedWorkspaceId : null;
   });
   const [boardSettings, setBoardSettings] = useState<BoardSettings>(DEFAULT_BOARD_SETTINGS);
+  const [elementLimit, setElementLimit] = useState<number | null>(null);
   const [showBoardSettings, setShowBoardSettings] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
@@ -125,6 +126,7 @@ export function TablicaContent() {
           setBoardIcon(board.icon || 'PenTool');
           setBoardBgColor(board.bg_color || 'gray-500');
           setWorkspaceId(board.workspace_id);
+          setElementLimit(board.element_limit ?? null);
           // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
           try {
             const s = await fetchBoardSettings(numericId);
@@ -276,6 +278,7 @@ export function TablicaContent() {
       gridVisible={boardSettings.grid_visible}
       smartSearchVisible={boardSettings.smartsearch_visible}
       aiEnabled={boardSettings.ai_enabled}
+      elementLimit={elementLimit}
       topRightExtra={isDailyVoice ? renderCallButton : undefined}
       sheetTemplateId={sheetByFolder(arkuszPath)?.id}
       onSheetInserted={() => {

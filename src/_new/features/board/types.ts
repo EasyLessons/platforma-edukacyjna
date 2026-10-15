@@ -22,6 +22,8 @@ export interface Board {
   last_modified: string;
   last_modified_by: string | null;
   last_opened: string | null;
+  /** Limit zywych elementow wg planu wlasciciela przestrzeni (tylko GET /boards/{id}); null = bez limitu. */
+  element_limit?: number | null;
 }
 
 // FORM DATA TYPES

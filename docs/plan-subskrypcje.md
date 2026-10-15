@@ -57,7 +57,7 @@ Członkostwo w cudzych przestrzeniach jest bez limitu. Ostrzeżenie „tablica s
   zmiana nazwy, usunięcie. Nowy powstanie po zejściu poniżej limitu albo po Premium. Badge pokazuje
   wtedy np. „7/3" na czerwono. Migracja nie dotyka danych.
 - **Elementy:** liczone z dokumentu Excalidraw w Y.Doc (`excalidraw-elements`,
-  `isDeleted !== true`), nie z bazy — egzekwuje `whiteboard-sync` (PR 3).
+  `isDeleted !== true`), nie z bazy — egzekwuje `whiteboard-sync` (sekcja niżej).
 
 ## Gdzie egzekwowane (backend)
 
@@ -109,7 +109,7 @@ przez lekturę kodu. Constraint/trigger w bazie odrzucony: limit zależy od plan
 
 `boards_by_workspace` obejmuje tylko własne przestrzenie (pusta przestrzeń = 0). Kody 403:
 `PLAN_LIMIT_WORKSPACES`, `PLAN_LIMIT_BOARDS`; `PLAN_LIMIT_ELEMENTS` zarezerwowany dla komunikatu
-klienta (PR 3).
+klienta.
 
 ## Frontend (`src/_new/features/plans/`)
 
@@ -120,10 +120,34 @@ klienta (PR 3).
 - `UpgradeModal` — otwierany po 403 `PLAN_LIMIT_*` w `BoardsSection`, `TemplateSection`
   i `workspace-sidebar`. Bez płatności; opcjonalny link `NEXT_PUBLIC_PREMIUM_INTEREST_URL`.
 - Brak trybu „cała tablica tylko do odczytu po przekroczeniu" — zdecydowano, że limit elementów
-  blokuje tylko dodawanie nowych (PR 3).
+  blokuje tylko dodawanie nowych.
+
+## Limit elementów (whiteboard-sync, PR 3)
+
+- Backend zwraca `element_limit` (plan właściciela przestrzeni; `null` = bez limitu) w
+  `GET /whiteboard/{id}/access` (dla serwera synchronizacji) i `GET /boards/{id}` (dla UI).
+- `whiteboard-sync/src/element-limit.ts`: serwer PRZYJMUJE update i w `observe` mapy
+  `excalidraw-elements` cofa nadmiar tombstonem (`isDeleted: true`, `version + 1`, `versionNonce: 0`)
+  z originem = połączenie sprawcy. Liczą się tylko elementy, które „stały się żywe": edycja,
+  przesuwanie, gumka i undo usunięcia w granicach limitu przechodzą zawsze. Wartości-śmieci
+  (`Y.Map`, tablica, liczba) ponad limitem są usuwane, nie zamieniane w tombstone.
+- Próg to `max(limit, liczba żywych przy załadowaniu)` - tablica już ponad limitem nie traci
+  danych, ale nie rośnie. Limit siedzi w kontekście połączenia (zero stanu współdzielonego),
+  więc zmiana planu działa po ponownym połączeniu.
+- `beforeHandleMessage` odrzucony: rzut zamyka połączenie, a wiadomości nie da się pominąć.
+- Nigdy `readOnly` z powodu planu. Stary silnik (klucz `elements`) bez limitu - limit działa
+  przy `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`.
+- Obejście `POST /doc`: gdy `SYNC_SERVICE_TOKEN` jest ustawiony, zapis snapshotu z JWT dostaje 403
+  (GET zostaje). **Klucz musi być ustawiony w backendzie ORAZ w whiteboard-sync** - inaczej zapisy
+  sync spadają na token usera i dostają 403.
+- Front: `useElementLimit` - baner od 80% i 100%; przy 100% narzędzia rysujące wracają do
+  zaznaczania (gumka, hand, lasso, laser zostają).
+- Ryzyka: odrzucony element mruga i znika; limit liczy wpisy, nie bajty (limit rozmiaru dokumentu
+  i pliki to osobne zadanie); praca offline ponad limit jest cofana po reconnect.
 
 ## Do zrobienia
 
-- **PR 3:** limit elementów w `whiteboard-sync` (`element_limit` w `/access`, cofanie nadmiaru
-  w `observe` mapy `excalidraw-elements`), ostrzeżenie przy 80%, limity techniczne Premium.
+- Limity techniczne Premium (10 000 elementów, rozmiar snapshotu/update, pula Storage, fair use,
+  dzienny limit AI) - liczby do zmierzenia; limit miejsca na pliki i sprzątanie (dopisek 12.10).
+- Scenariusz e2e „1001. element odrzucony, gumka działa" (wymaga drugiej tablicy w seedzie).
 - Płatności (Stripe), nadawanie planu z UI.
