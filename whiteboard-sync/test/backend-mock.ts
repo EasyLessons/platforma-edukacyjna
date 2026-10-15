@@ -9,6 +9,7 @@ export interface AccessResponse {
   status: number;
   role?: string;
   can_edit?: boolean;
+  element_limit?: number | null;
 }
 
 export function jsonResponse(status: number, data: unknown): Response {
@@ -31,6 +32,7 @@ export function mockAccess(byToken: Record<string, AccessResponse>) {
       username: `user-${token}`,
       role: access.role,
       can_edit: access.can_edit,
+      element_limit: access.element_limit,
     });
   });
   vi.stubGlobal('fetch', fetchMock);
