@@ -27,6 +27,10 @@ import { PdfImport } from '../elements/pdf-import';
 import { insertTable } from '../elements/table';
 import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
 import { useSheetInsert } from '../templates/use-sheet-insert';
+import { useElementLimit } from '../yjs/use-element-limit';
+
+/** Narzedzia dostepne, gdy tablica osiagnela limit elementow (nic nie dodaja). */
+const TOOLS_ALLOWED_AT_LIMIT = new Set(['selection', 'lasso', 'eraser', 'hand', 'laser']);
 
 /**
  * Fonty Excalidraw z naszego serwera, nie z CDN (esm.sh) - szkoły bywają offline.
@@ -68,6 +72,8 @@ export interface ExcalidrawWhiteboardProps {
   sheetTemplateId?: string | null;
   /** Arkusz jest na tablicy - strona usuwa `?arkusz=` z adresu. */
   onSheetInserted?: () => void;
+  /** Limit zywych elementow wg planu wlasciciela przestrzeni (null/brak = bez limitu, np. demo). */
+  elementLimit?: number | null;
 }
 
 export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
@@ -85,6 +91,7 @@ function BoardSession({
   topRightExtra,
   sheetTemplateId,
   onSheetInserted,
+  elementLimit,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
   const panels = useBoardPanels();
@@ -135,6 +142,22 @@ function BoardSession({
   );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
+  const limit = useElementLimit(connection.doc, guest ? null : elementLimit);
+  const atLimit = limit.level === 'full' && !readOnly;
+
+  // Pelna tablica: narzedzia rysujace wracaja do zaznaczania (gumka, przesuwanie, edycja dzialaja).
+  useEffect(() => {
+    if (!api || !atLimit) return;
+    const guard = () => {
+      const state = api.getAppState();
+      if (state.newElement) return; // nie przerywamy trwajacego rysowania
+      if (!TOOLS_ALLOWED_AT_LIMIT.has(state.activeTool.type)) {
+        api.setActiveTool({ type: 'selection' });
+      }
+    };
+    guard();
+    return api.onChange(guard);
+  }, [api, atLimit]);
   const sheetState = useSheetInsert({
     api,
     templateId: sheetTemplateId,
@@ -199,6 +222,17 @@ function BoardSession({
           className="pointer-events-none absolute bottom-20 left-1/2 z-20 -translate-x-1/2 rounded-lg bg-gray-900/85 px-4 py-2 text-sm text-white shadow"
         >
           {sheetState === 'loading' ? 'Wczytywanie arkusza...' : 'Nie udało się wczytać arkusza.'}
+        </div>
+      )}
+      {!readOnly && limit.level !== 'none' && (
+        <div
+          role="status"
+          data-testid="board-element-limit"
+          className="pointer-events-none absolute bottom-28 left-1/2 z-10 -translate-x-1/2 rounded-lg bg-gray-900/85 px-4 py-2 text-sm text-white shadow"
+        >
+          {limit.level === 'full'
+            ? `Tablica osiągnęła limit ${limit.limit} elementów. Usuń coś (gumka działa), aby dodać nowe, albo przejdź na Premium.`
+            : `Tablica się zapełnia: ${limit.count}/${limit.limit} elementów.`}
         </div>
       )}
       {isWaitingForServer && (

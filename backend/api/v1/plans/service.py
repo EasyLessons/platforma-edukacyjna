@@ -69,6 +69,10 @@ class PlanService:
         )
         return {int(ws_id): int(n) for ws_id, n in self.db.execute(stmt).all()}
 
+    def element_limit_for_workspace(self, workspace: Workspace) -> int | None:
+        """Limit zywych elementow na tablicy wg planu WLASCICIELA przestrzeni (None = bez limitu)."""
+        return self.get_limits(workspace.created_by).max_elements_per_board
+
     # -- egzekwowanie ----------------------------------------------------
 
     def ensure_can_create_workspace(self, user_id: int) -> None:

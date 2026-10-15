@@ -67,6 +67,9 @@ class AccessCheckResponse(BaseModel):
     # Rola w workspace tablicy; whiteboard-sync ustawia viewerowi połączenie tylko do odczytu.
     role: str
     can_edit: bool
+    # Limit zywych elementow wg planu wlasciciela przestrzeni; None = bez limitu.
+    # whiteboard-sync egzekwuje go na serwerze (bez trybu tylko do odczytu).
+    element_limit: Optional[int] = None
 
 
 class CallResponse(BaseModel):

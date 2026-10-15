@@ -16,6 +16,8 @@ interface AccessCheckData {
   username: string;
   role?: string;
   can_edit?: boolean;
+  /** Limit zywych elementow wg planu wlasciciela przestrzeni; brak/null = bez limitu. */
+  element_limit?: number | null;
 }
 
 export interface AuthContext {
@@ -23,6 +25,8 @@ export interface AuthContext {
   username: string;
   token: string;
   canEdit: boolean;
+  /** Limit zywych elementow tablicy (null = bez limitu), stały dla połączenia. */
+  elementLimit: number | null;
 }
 
 /** Powód odmowy autoryzacji, na podstawie którego klient decyduje,
@@ -67,5 +71,10 @@ export async function onAuthenticate({
   const canEdit = body.data.can_edit !== false;
   if (connection) connection.readOnly = !canEdit;
 
-  return { userId: body.data.user_id, username: body.data.username, token, canEdit };
+  // Brak pola albo wartosc nieliczbowa/ujemna = bez limitu (stary backend nie blokuje edycji).
+  const raw = body.data.element_limit;
+  const elementLimit =
+    typeof raw === 'number' && Number.isInteger(raw) && raw >= 0 ? raw : null;
+
+  return { userId: body.data.user_id, username: body.data.username, token, canEdit, elementLimit };
 }

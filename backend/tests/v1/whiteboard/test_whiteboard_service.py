@@ -163,6 +163,22 @@ class TestAccessCheck:
         assert result.role == "owner"
         assert result.can_edit is True
 
+    def test_access_returns_element_limit_of_workspace_owner(self, db_session, test_user, test_user2, shared_workspace):
+        """Limit wg planu WLASCICIELA przestrzeni, nie wolajacego (editor Premium nie podnosi limitu Free)."""
+        from api.v1.plans.models import UserPlan
+        board = _shared_board(db_session, shared_workspace, test_user)
+        db_session.add(UserPlan(user_id=test_user2.id, plan="premium"))
+        db_session.commit()
+        result = WhiteboardService(db_session).check_access(board.id, test_user2)
+        assert result.element_limit == 1000
+
+    def test_access_element_limit_none_for_premium_owner(self, db_session, test_user, test_board):
+        from api.v1.plans.models import UserPlan
+        db_session.add(UserPlan(user_id=test_user.id, plan="premium"))
+        db_session.commit()
+        result = WhiteboardService(db_session).check_access(test_board.id, test_user)
+        assert result.element_limit is None
+
     def test_viewer_has_access_without_edit(self, db_session, test_user, test_user2, shared_workspace):
         board = _shared_board(db_session, shared_workspace, test_user)
         _set_role(db_session, shared_workspace, test_user2, "viewer")
