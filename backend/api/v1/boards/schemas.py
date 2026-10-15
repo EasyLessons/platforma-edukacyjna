@@ -39,6 +39,9 @@ class BoardResponse(BaseModel):
     last_modified: datetime
     last_modified_by: Optional[str]
     last_opened: Optional[datetime]
+    # Wypelniane tylko w GET /boards/{id}: limit zywych elementow wg planu wlasciciela
+    # przestrzeni (None = bez limitu). Klient pokazuje ostrzezenie przy 80% i 100%.
+    element_limit: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
 

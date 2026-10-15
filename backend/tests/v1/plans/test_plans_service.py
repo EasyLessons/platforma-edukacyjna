@@ -262,3 +262,24 @@ class TestGetMe:
         assert me.limits.max_boards_per_workspace is None
         assert me.usage.own_workspaces == 0
         assert me.usage.boards_by_workspace == {}
+
+
+# -- limit elementow (egzekwuje whiteboard-sync, tu tylko wartosc) -----------
+
+class TestElementLimit:
+
+    @pytest.mark.asyncio
+    async def test_get_board_zwraca_limit_wlasciciela(self, db_session, test_user, test_board):
+        result = await BoardService(db_session).get_board(test_board.id, test_user.id)
+        assert result.element_limit == 1000
+
+    @pytest.mark.asyncio
+    async def test_get_board_premium_bez_limitu(self, db_session, test_user, test_board):
+        grant_premium(db_session, test_user.id)
+        result = await BoardService(db_session).get_board(test_board.id, test_user.id)
+        assert result.element_limit is None
+
+    @pytest.mark.asyncio
+    async def test_lista_nie_wypelnia_limitu(self, db_session, test_user, test_board):
+        result = await BoardService(db_session).list_boards(test_board.workspace_id, test_user.id)
+        assert result.boards[0].element_limit is None
