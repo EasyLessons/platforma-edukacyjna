@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from main import app
 from core.database import get_db
 from core.config import get_settings
-from core.models import Board, BoardElement, BoardUsers
+from core.models import Board, BoardUsers
 from api.v1.auth.utils import create_access_token
 from api.v1.plans.models import UserPlan
 
@@ -65,12 +65,15 @@ class TestGetMe:
         assert data["data"] == {
             "plan": "free",
             "limits": {
-                "max_own_workspaces": 1,
-                "max_boards": 3,
-                "max_elements_per_board": 300,
+                "max_own_workspaces": 2,
+                "max_boards_per_workspace": 3,
+                "max_elements_per_board": 1000,
                 "ai_chat_daily": None,
             },
-            "usage": {"own_workspaces": 1, "boards": 1},
+            "usage": {
+                "own_workspaces": 1,
+                "boards_by_workspace": {str(test_workspace.id): 1},
+            },
         }
 
     def test_premium(self, client, db_session, test_user):
@@ -80,7 +83,7 @@ class TestGetMe:
         assert r.status_code == 200
         data = r.json()["data"]
         assert data["plan"] == "premium"
-        assert data["limits"]["max_boards"] is None
+        assert data["limits"]["max_boards_per_workspace"] is None
         assert data["limits"]["max_own_workspaces"] is None
 
     def test_401_bez_tokenu(self, client):
@@ -92,17 +95,23 @@ class TestGetMe:
 
 class TestPlanLimitResponses:
 
-    def test_drugi_workspace_403_z_kodem(self, client, test_user, test_workspace):
+    def test_trzecia_przestrzen_403_z_kodem(self, client, test_user, test_workspace):
+        ok = client.post(
+            "/api/v1/workspaces",
+            json={"name": "Druga"},
+            headers=make_auth_headers(test_user.id),
+        )
+        assert ok.status_code in (200, 201)
         r = client.post(
             "/api/v1/workspaces",
-            json={"name": "Drugi"},
+            json={"name": "Trzecia"},
             headers=make_auth_headers(test_user.id),
         )
         assert r.status_code == 403
         body = r.json()
         assert body["success"] is False
         assert body["code"] == "PLAN_LIMIT_WORKSPACES"
-        assert body["data"] == {"limit": 1, "used": 1}
+        assert body["data"] == {"limit": 2, "used": 2}
 
     def test_czwarta_tablica_403_z_kodem(self, client, db_session, test_user, test_workspace):
         for i in range(3):
@@ -116,7 +125,7 @@ class TestPlanLimitResponses:
         body = r.json()
         assert body["success"] is False
         assert body["code"] == "PLAN_LIMIT_BOARDS"
-        assert body["data"] == {"limit": 3, "used": 3}
+        assert body["data"] == {"limit": 3, "used": 3, "workspace_id": test_workspace.id}
 
     def test_premium_tworzy_bez_limitu(self, client, db_session, test_user, test_workspace):
         db_session.add(UserPlan(user_id=test_user.id, plan="premium"))
@@ -130,22 +139,13 @@ class TestPlanLimitResponses:
         )
         assert r.status_code == 201
 
-    def test_get_board_read_only_ponad_limitem(self, client, db_session, test_user, test_board):
-        for i in range(301):
-            db_session.add(BoardElement(
-                board_id=test_board.id, element_id=f"e{i}", type="path",
-                data={"i": i}, created_by=test_user.id, is_deleted=False,
-            ))
-        db_session.commit()
-        r = client.get(f"/api/v1/boards/{test_board.id}", headers=make_auth_headers(test_user.id))
-        assert r.status_code == 200
-        data = r.json()["data"]
-        assert data["read_only"] is True
-        assert data["read_only_reason"] == "PLAN_LIMIT_ELEMENTS"
-
-    def test_get_board_edytowalna_ponizej_limitu(self, client, test_user, test_board):
-        r = client.get(f"/api/v1/boards/{test_board.id}", headers=make_auth_headers(test_user.id))
-        assert r.status_code == 200
-        data = r.json()["data"]
-        assert data["read_only"] is False
-        assert data["read_only_reason"] is None
+    def test_editor_dostaje_403_roli_nie_limitu(self, client, db_session, test_user, test_user2, shared_workspace):
+        for i in range(3):
+            add_board(db_session, shared_workspace.id, test_user.id, f"T{i}")
+        r = client.post(
+            "/api/v1/boards",
+            json={"name": "Czwarta", "workspace_id": shared_workspace.id},
+            headers=make_auth_headers(test_user2.id),
+        )
+        assert r.status_code == 403
+        assert r.json()["code"] != "PLAN_LIMIT_BOARDS"

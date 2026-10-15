@@ -20,6 +20,7 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 16. **`docs/architecture/ZALEZNOSCI-2026-09.md`** — audyt zależności (`npm audit` front + whiteboard-sync, `pip-audit` backend), co zostało załatane, co wymaga skoku major (FastAPI/Starlette, Next/React/Vitest/ESLint/TS, pdfjs-dist) z listą zmian łamiących, szacunkiem i kolejnością. Czytaj przed podnoszeniem wersji czegokolwiek.
 17. **`docs/architecture/ADR-silnik-tablicy.md`** — decyzja o silniku tablicy (własny vs Excalidraw vs tldraw): stan zmierzony, licencje, koszt migracji w dniach, warunki dla prototypu `proto/excalidraw-yjs`, pytania do Patryka i Bartka; na końcu plan płatności (Stripe + polskie faktury — co bierzemy gotowe, co piszemy sami).
 18. **`docs/security/AUDYT-2026-09.md`** — audyt bezpieczeństwa (znaleziska SEC-xx z dowodami `plik:linia`, plan PR-ów naprawczych, akcje dla Patryka). Obok: `rls-board-images.sql` i `rls-realtime.sql` — gotowe polityki do uruchomienia w Supabase SQL Editor.
+19. **`docs/plan-subskrypcje.md`** — plany Free/Premium (bez płatności): tabela `user_plans`, limity w jednym miejscu (2 przestrzenie / 3 tablice w przestrzeni / 1000 elementów), liczenie wg planu właściciela przestrzeni, grandfathering, wyścig `FOR UPDATE`, `GET /plans/me`, SQL do ręcznego nadania Premium.
 
 ## Zasada utrzymania
 

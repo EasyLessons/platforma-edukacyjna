@@ -1,7 +1,7 @@
 """user_plans (plany free/premium)
 
 Revision ID: c4a9e1f27b3d
-Revises: 0059c60824f3
+Revises: d315e28cb69c
 Create Date: 2026-09-22 12:00:00.000000
 
 Osobna tabela zamiast kolumny w `users` — `core/models.py` jest w strefie
@@ -21,7 +21,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'c4a9e1f27b3d'
-down_revision: Union[str, Sequence[str], None] = '0059c60824f3'
+down_revision: Union[str, Sequence[str], None] = 'd315e28cb69c'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
