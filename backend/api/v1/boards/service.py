@@ -22,6 +22,7 @@ from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_workspace_owner
 from api.v1.whiteboard.storage import delete_board_folder
 from api.v1.whiteboard.files import delete_board_files
+from api.v1.plans.service import PlanService
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -126,7 +127,11 @@ class BoardService:
         return board
 
     async def create_board(self, board_data: CreateBoard, user_id: int) -> BoardResponse:
-        require_workspace_owner(self.db, board_data.workspace_id, user_id, "Tylko właściciel przestrzeni może tworzyć tablice")
+        workspace = require_workspace_owner(
+            self.db, board_data.workspace_id, user_id, "Tylko właściciel przestrzeni może tworzyć tablice"
+        )
+        # Limit planu WŁAŚCICIELA przestrzeni (free: 3 tablice w przestrzeni) -> 403 PLAN_LIMIT_BOARDS
+        PlanService(self.db).ensure_can_create_board(workspace)
 
         board = _new_board_with_owner(
             self.db,

@@ -7,6 +7,7 @@ import { createBoard } from '@/_new/features/board/api/boardApi';
 import { boardKeys } from '@/_new/features/board/hooks/useBoard';
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { isExcalidrawEngine } from '@/_new/features/board-engine';
+import { UpgradeModal, getPlanLimitCode, usePlan, type PlanLimitCode } from '@/_new/features/plans';
 import { sheetByFolder, sheetThumbnail } from '@/_new/features/board-engine/templates/catalog';
 
 type Subject = 'Matematyka' | 'Angielski' | 'Chemia' | 'Fizyka' | 'Biologia';
@@ -149,6 +150,8 @@ function sheetUnavailableReason(folder: string | undefined): string | null {
 export default function TemplatesSection({ workspaceId }: TemplatesSectionProps) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { refresh: refreshPlan } = usePlan();
+  const [upgradeReason, setUpgradeReason] = useState<PlanLimitCode | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const subjectDropdownRef = useRef<HTMLDivElement>(null);
   const yearDropdownRef = useRef<HTMLDivElement>(null);
@@ -202,6 +205,7 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
       // tam to zawsze działało poprawnie). boardKeys.workspace(id) to ten
       // sam klucz cache, którego używa useBoards w BoardsSection.tsx.
       queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspaceId) });
+      refreshPlan();
 
       const route = folder
         ? `/whiteboard?boardId=${newBoard.id}&workspace=${workspaceId}&arkusz=${encodeURIComponent(folder)}`
@@ -209,6 +213,11 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
 
       router.push(route);
     } catch (error) {
+      const code = getPlanLimitCode(error);
+      if (code) {
+        setUpgradeReason(code);
+        return;
+      }
       console.error('Blad tworzenia tablicy:', error);
     }
   };
@@ -231,169 +240,176 @@ export default function TemplatesSection({ workspaceId }: TemplatesSectionProps)
   }, []);
 
   return (
-    <section className="mb-8 rounded-3xl bg-[#ffffff] border border-[var(--dash-border)] p-4 sm:p-5">
-      <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-          <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 ml-3 mb-2">Szablony</h2>
+    <>
+      <section className="mb-8 rounded-3xl bg-[#ffffff] border border-[var(--dash-border)] p-4 sm:p-5">
+        <div className="mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
+            <h2 className="text-2xl md:text-[28px] font-bold text-gray-900 ml-3 mb-2">Szablony</h2>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="relative" ref={subjectDropdownRef}>
-              <button
-                onClick={() => {
-                  setSubjectOpen((prev) => !prev);
-                  setYearOpen(false);
-                }}
-                className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
-              >
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 my-auto">
-                  Zestaw szablonow:
-                </span>
-                <span className="font-medium text-gray-900">{subject}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative" ref={subjectDropdownRef}>
+                <button
+                  onClick={() => {
+                    setSubjectOpen((prev) => !prev);
+                    setYearOpen(false);
+                  }}
+                  className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-gray-600 my-auto">
+                    Zestaw szablonow:
+                  </span>
+                  <span className="font-medium text-gray-900">{subject}</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${subjectOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
 
-              {subjectOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 min-w-[220px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
-                  {SUBJECTS.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => {
-                        setSubject(item);
-                        setSubjectOpen(false);
-                        setSelectedYear(null);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
-                        item === subject ? 'text-black font-medium' : 'text-gray-700'
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+                {subjectOpen && (
+                  <div className="absolute left-0 top-full z-20 mt-1 min-w-[220px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                    {SUBJECTS.map((item) => (
+                      <button
+                        key={item}
+                        onClick={() => {
+                          setSubject(item);
+                          setSubjectOpen(false);
+                          setSelectedYear(null);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                          item === subject ? 'text-black font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {item}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            <div className="relative" ref={yearDropdownRef}>
-              <button
-                onClick={() => {
-                  setYearOpen((prev) => !prev);
-                  setSubjectOpen(false);
-                }}
-                className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
-              >
-                <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">
-                  Rok:
-                </span>
-                <span className="font-medium text-gray-900">{effectiveYear ?? 'Wszystkie'}</span>
-                <ChevronDown
-                  size={14}
-                  className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
+              <div className="relative" ref={yearDropdownRef}>
+                <button
+                  onClick={() => {
+                    setYearOpen((prev) => !prev);
+                    setSubjectOpen(false);
+                  }}
+                  className="dashboard-soft-panel-no-border flex cursor-pointer items-center gap-2 px-3 py-2 text-sm text-gray-800"
+                >
+                  <span className="text-xs font-semibold uppercase tracking-wide text-gray-600">
+                    Rok:
+                  </span>
+                  <span className="font-medium text-gray-900">{effectiveYear ?? 'Wszystkie'}</span>
+                  <ChevronDown
+                    size={14}
+                    className={`transition-transform ${yearOpen ? 'rotate-180' : ''}`}
+                  />
+                </button>
 
-              {yearOpen && (
-                <div className="absolute left-0 top-full z-20 mt-1 min-w-[130px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
-                  {yearsForSubject.map((year) => (
-                    <button
-                      key={year}
-                      onClick={() => {
-                        setSelectedYear(year);
-                        setYearOpen(false);
-                      }}
-                      className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
-                        year === effectiveYear ? 'text-black font-medium' : 'text-gray-700'
-                      }`}
-                    >
-                      {year}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="hidden items-center gap-1 md:flex">
-          <button
-            onClick={() => scrollByCards('left')}
-            className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            onClick={() => scrollByCards('right')}
-            className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
-
-      <div
-        ref={scrollContainerRef}
-        className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        <button
-          onClick={() => createAndOpenBoard('Czysta tablica')}
-          className="dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
-        >
-          <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white border border-dashed border-gray-300 flex items-center justify-center">
-            <img
-              src={THUMBNAILS.whiteboard}
-              alt="Czysta tablica"
-              className="h-full w-full object-cover"
-            />
-            <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
-                <Plus size={18} />
+                {yearOpen && (
+                  <div className="absolute left-0 top-full z-20 mt-1 min-w-[130px] animate-in slide-in-from-top-1 fade-in zoom-in-95 duration-150 ease-out rounded-xl bg-white py-1 shadow-md">
+                    {yearsForSubject.map((year) => (
+                      <button
+                        key={year}
+                        onClick={() => {
+                          setSelectedYear(year);
+                          setYearOpen(false);
+                        }}
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-[#ececef] hover:cursor-pointer ${
+                          year === effectiveYear ? 'text-black font-medium' : 'text-gray-700'
+                        }`}
+                      >
+                        {year}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>
-          <p className="text-sm font-medium text-gray-900">Czysta tablica</p>
-          <p className="text-xs text-gray-500">Nowa pusta przestrzen robocza</p>
-        </button>
 
-        {templates.map((template) => {
-          const unavailable = sheetUnavailableReason(template.folder);
-          return (
+          <div className="hidden items-center gap-1 md:flex">
             <button
-              key={template.id}
-              disabled={unavailable !== null}
-              title={unavailable ?? undefined}
-              data-testid={`template-card-${template.id}`}
-              onClick={() =>
-                createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
-              }
-              className={`dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left ${
-                unavailable ? 'cursor-not-allowed opacity-50' : 'hover:cursor-pointer'
-              }`}
+              onClick={() => scrollByCards('left')}
+              className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
             >
-              <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
-                <img
-                  src={template.thumbnail}
-                  alt={template.title}
-                  className="h-full w-full object-cover"
-                />
-                <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
-                    <Plus size={18} />
+              <ChevronLeft size={14} />
+            </button>
+            <button
+              onClick={() => scrollByCards('right')}
+              className="dashboard-soft-panel p-1.5 text-gray-600 hover:bg-[#ececef]"
+            >
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
+
+        <div
+          ref={scrollContainerRef}
+          className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        >
+          <button
+            onClick={() => createAndOpenBoard('Czysta tablica')}
+            className="dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left hover:cursor-pointer"
+          >
+            <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white border border-dashed border-gray-300 flex items-center justify-center">
+              <img
+                src={THUMBNAILS.whiteboard}
+                alt="Czysta tablica"
+                className="h-full w-full object-cover"
+              />
+              <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
+                  <Plus size={18} />
+                </div>
+              </div>
+            </div>
+            <p className="text-sm font-medium text-gray-900">Czysta tablica</p>
+            <p className="text-xs text-gray-500">Nowa pusta przestrzen robocza</p>
+          </button>
+
+          {templates.map((template) => {
+            const unavailable = sheetUnavailableReason(template.folder);
+            return (
+              <button
+                key={template.id}
+                disabled={unavailable !== null}
+                title={unavailable ?? undefined}
+                data-testid={`template-card-${template.id}`}
+                onClick={() =>
+                  createAndOpenBoard(`${template.title} - ${template.subtitle}`, template.folder)
+                }
+                className={`dashboard-hover-surface group relative w-[280px] max-md:w-[min(280px,calc(100vw-7rem))] flex-shrink-0 p-2.5 text-left ${
+                  unavailable ? 'cursor-not-allowed opacity-50' : 'hover:cursor-pointer'
+                }`}
+              >
+                <div className="relative mb-3 aspect-video overflow-hidden rounded-xl bg-white">
+                  <img
+                    src={template.thumbnail}
+                    alt={template.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#212224] text-white shadow-md">
+                      <Plus size={18} />
+                    </div>
                   </div>
                 </div>
-              </div>
-              <p className="text-sm font-semibold text-gray-900">{template.title}</p>
-              <p className="mt-1 text-xs text-gray-500">
-                {template.subtitle} {template.year ? `• ${template.year}` : ''}
-              </p>
-              {unavailable && (
-                <p className="mt-1 text-xs font-medium text-gray-600">{unavailable}</p>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+                <p className="text-sm font-semibold text-gray-900">{template.title}</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  {template.subtitle} {template.year ? `• ${template.year}` : ''}
+                </p>
+                {unavailable && (
+                  <p className="mt-1 text-xs font-medium text-gray-600">{unavailable}</p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+      <UpgradeModal
+        isOpen={upgradeReason !== null}
+        reason={upgradeReason}
+        onClose={() => setUpgradeReason(null)}
+      />
+    </>
   );
 }

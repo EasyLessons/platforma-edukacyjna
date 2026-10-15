@@ -6,6 +6,7 @@ from typing import List
 
 from sqlalchemy.orm import Session
 from api.v1.boards.service import reassign_boards_on_member_removal
+from api.v1.plans.service import PlanService
 
 from core.exceptions import AppException
 from core.models import Workspace, WorkspaceMember
@@ -93,6 +94,8 @@ class WorkspaceService:
     def create_workspace(self, data: WorkspaceCreate, user_id: int) -> WorkspaceResponse:
         """Tworzy nowy workspace z membership ownerem."""
         db = self.db
+        # Limit planu (free: 1 własny workspace) -> 403 PLAN_LIMIT_WORKSPACES
+        PlanService(db).ensure_can_create_workspace(user_id)
         new_ws, membership = _build_workspace_with_owner(
             db, name=data.name,
             icon=data.icon or "Home",

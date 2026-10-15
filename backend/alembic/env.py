@@ -27,6 +27,8 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from core.models import Base  # Import twoich modeli
+# Modele spoza core/models.py — muszą być zaimportowane, żeby autogenerate je widział
+import api.v1.plans.models  # noqa: F401  (tabela user_plans)
 from core.config import get_settings  # Import konfiguracji
 
 # Alembic Config object
