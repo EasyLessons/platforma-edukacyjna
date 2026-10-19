@@ -12,7 +12,12 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { useAuth } from '@/_new/lib/auth';
-import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
+import {
+  ACCESS_DENIED,
+  DEMO_EXPIRED,
+  SESSION_EXPIRED,
+  useBoardConnection,
+} from '../yjs/use-board-connection';
 import type { BoardUser, TopRightExtra } from './excalidraw-board';
 import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
 import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
@@ -72,7 +77,7 @@ export interface ExcalidrawWhiteboardProps {
   sheetTemplateId?: string | null;
   /** Arkusz jest na tablicy - strona usuwa `?arkusz=` z adresu. */
   onSheetInserted?: () => void;
-  /** Limit zywych elementow wg planu wlasciciela przestrzeni (null/brak = bez limitu, np. demo). */
+  /** Limit zywych elementow wg planu wlasciciela przestrzeni (null/brak = bez limitu); w demo stala z serwera demo. */
   elementLimit?: number | null;
 }
 
@@ -142,7 +147,7 @@ function BoardSession({
   );
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
-  const limit = useElementLimit(connection.doc, guest ? null : elementLimit);
+  const limit = useElementLimit(connection.doc, elementLimit);
   const atLimit = limit.level === 'full' && !readOnly;
 
   // Pelna tablica: narzedzia rysujace wracaja do zaznaczania (gumka, przesuwanie, edycja dzialaja).
@@ -186,8 +191,13 @@ function BoardSession({
   }
 
   // Nakładka do pierwszej synchronizacji, chyba że jest co pokazać z kopii lokalnej.
+  // Demo (gość) nie czeka na serwer: tablica jest pusta albo dochodzi do niej synchronizacja w tle.
   const isWaitingForServer =
-    connection.isRemote && !connection.hasSynced && !connection.hasLocalContent && !authError;
+    connection.isRemote &&
+    !guest &&
+    !connection.hasSynced &&
+    !connection.hasLocalContent &&
+    !authError;
   const isOffline =
     connection.isRemote && !connection.isConnected && !isWaitingForServer && !authError;
 
@@ -200,7 +210,8 @@ function BoardSession({
         viewMode={readOnly}
         gridVisible={gridVisible}
         topRightExtra={renderTopRight}
-        storageBoardId={connection.isRemote ? boardId : null}
+        // Pliki w Storage tylko dla prawdziwych tablic; w demo obrazy zostaja w dokumencie.
+        storageBoardId={connection.isRemote && !guest ? boardId : null}
         onApiReady={setApi}
         onSceneSynced={markSceneSynced}
         validateEmbeddable={notes.validateEmbeddable}
@@ -250,7 +261,11 @@ function BoardSession({
             ? 'Nie masz już dostępu do tej tablicy.'
             : authError === SESSION_EXPIRED
               ? 'Sesja wygasła. Zaloguj się ponownie - zmiany są zapisywane na tym urządzeniu.'
-              : 'Brak połączenia - zmiany zapiszą się po powrocie sieci.'}
+              : authError === DEMO_EXPIRED
+                ? 'Sesja demo wygasła. Zacznij nową z strony głównej.'
+                : guest
+                  ? 'Brak połączenia z serwerem - tablica działa tylko u Ciebie.'
+                  : 'Brak połączenia - zmiany zapiszą się po powrocie sieci.'}
         </div>
       )}
     </div>

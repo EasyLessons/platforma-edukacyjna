@@ -11,8 +11,9 @@
  * Bartka, więc logika tokenu i ponowień jest tu powtórzona 1:1.
  * TODO(decyzja): po wystawieniu `provider`/`awareness` z `useYjsSync` usunąć duplikat.
  *
- * Tablica demo (`demo-...`) i brak zalogowanego użytkownika: tylko dokument lokalny,
- * bez serwera - whiteboard-sync wymaga tokenu i liczbowego id tablicy.
+ * Tablica demo (`demo-...`): gość bez konta łączy się z whiteboard-sync BEZ tokenu (serwer wpuszcza
+ * tylko dokumenty demo, nie zapisuje ich w bazie i wygasza sesję po kilku godzinach - patrz
+ * whiteboard-sync/src/demo.ts). Brak zalogowanego użytkownika na zwykłej tablicy: tylko dokument lokalny.
  *
  * Jeden dokument na cały cykl życia komponentu: przy zmianie tablicy wywołujący
  * montuje go od nowa (`key={boardId}`).
@@ -28,6 +29,7 @@ import { createLogger } from '@/_new/lib/logger';
 import { WHITEBOARD_SYNC_URL } from '@/_new/features/whiteboard/yjs/sync-url';
 import { ACCESS_DENIED, SESSION_EXPIRED } from '@/_new/features/whiteboard/yjs/use-yjs-sync';
 import { useYjsLocalCache } from '@/_new/features/whiteboard/yjs/use-yjs-local-cache';
+import { isDemoBoard } from '@/_new/features/demo/is-demo-board';
 import { ELEMENTS_KEY } from './excalidraw-binding';
 import type { BoardAwareness } from './types';
 
@@ -37,6 +39,11 @@ const log = createLogger('board-engine/use-board-connection');
 const RETRY_DELAYS_MS = [2_000, 5_000, 10_000, 30_000];
 
 export { ACCESS_DENIED, SESSION_EXPIRED };
+
+/** Sesja demo wygasła (whiteboard-sync odmawia z tym powodem) - połączenie wstrzymane na stałe. */
+export const DEMO_EXPIRED = 'demo-expired';
+/** Serwer demo nie sprawdza tokenu; provider i tak wysyła niepustą wartość. */
+const DEMO_TOKEN = 'demo';
 
 export interface UseBoardConnectionOptions {
   boardId: string;
@@ -55,14 +62,15 @@ export interface BoardConnection {
   hasSynced: boolean;
   /** Kopia lokalna (IndexedDB) miała elementy Excalidraw. */
   hasLocalContent: boolean;
-  /** ACCESS_DENIED albo SESSION_EXPIRED - połączenie wstrzymane na stałe. */
+  /** ACCESS_DENIED, SESSION_EXPIRED albo DEMO_EXPIRED - połączenie wstrzymane na stałe. */
   authError: string | null;
   /** Usuwa kopię lokalną tablicy (np. po odebraniu dostępu). */
   clearLocalCache: () => void;
 }
 
-/** Czy tablica synchronizuje się przez whiteboard-sync (zalogowany user + liczbowe id). */
+/** Czy tablica synchronizuje się przez whiteboard-sync (demo albo zalogowany user + liczbowe id). */
 export function isRemoteBoard(boardId: string, userId: number | null): boolean {
+  if (isDemoBoard(boardId)) return true;
   return userId != null && boardId !== '' && !Number.isNaN(Number(boardId));
 }
 
@@ -101,14 +109,16 @@ export function useBoardConnection({
       url: WHITEBOARD_SYNC_URL,
       name: boardId,
       document: doc,
-      token: async () => {
-        try {
-          return await getFreshToken();
-        } catch (err) {
-          if (!(err instanceof RefreshUnavailableError)) sessionExpired = true;
-          throw err;
-        }
-      },
+      token: isDemoBoard(boardId)
+        ? DEMO_TOKEN
+        : async () => {
+            try {
+              return await getFreshToken();
+            } catch (err) {
+              if (!(err instanceof RefreshUnavailableError)) sessionExpired = true;
+              throw err;
+            }
+          },
       onStatus: ({ status }) => setIsConnected(status === 'connected'),
       onAuthenticated: () => {
         attempt = 0;
@@ -119,6 +129,11 @@ export function useBoardConnection({
         if (!next.hasUnsyncedChanges) setDirty(false);
       },
       onAuthenticationFailed: ({ reason }) => {
+        if (reason === DEMO_EXPIRED) {
+          log.warn('sesja demo wygasła');
+          setAuthError(DEMO_EXPIRED);
+          return;
+        }
         if (reason === ACCESS_DENIED || sessionExpired) {
           const error = reason === ACCESS_DENIED ? ACCESS_DENIED : SESSION_EXPIRED;
           log.error(`połączenie z tablicą wstrzymane: ${error}`);
