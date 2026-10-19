@@ -52,7 +52,7 @@ Presence/kursory/typing/follow nadal idą przez Supabase (pkt 2) — Yjs zastęp
 
 #### Kopia lokalna (IndexedDB) i edycja offline
 
-Każda prawdziwa tablica zalogowanego użytkownika ma kopię `Y.Doc` w IndexedDB przeglądarki (`y-indexeddb`), baza `easylesson-wb-v{CACHE_VERSION}-u{userId}-b{boardId}`. Demo i goście — bez kopii.
+Każda prawdziwa tablica zalogowanego użytkownika ma kopię `Y.Doc` w IndexedDB przeglądarki (`y-indexeddb`), baza `easylesson-wb-v{CACHE_VERSION}-u{userId}-b{boardId}`. Demo i goście — bez kopii (demo synchronizuje się z whiteboard-sync, ale nic nie zapisuje: patrz 2d).
 
 ```
 Wejście na tablicę
@@ -118,6 +118,37 @@ Znane ograniczenia:
 - **Brak leniwej migracji**: stare wpisy z dataURL zostają w dokumencie; nowe obrazy idą już do Storage.
 - **Brak limitu rozmiaru snapshotu** po stronie `/doc` i `whiteboard-sync`; front tylko loguje ostrzeżenie, gdy plik inline > 200 KB.
 - Ruch obrazów idzie przez backend (proxy), nie bezpośrednio ze Storage; przeglądarka trzyma plik w prywatnym cache.
+
+### 2d. Tablica demo bez konta (`/demo/<id>`, Excalidraw)
+
+Przycisk „Wypróbuj demo" (HeroSection / HeroMobileSection) otwiera `/demo/<id>`, gdzie `<id>` to 22 znaki
+base64url ze 128 bitów (`createDemoSessionId`). Strona (`app/(whiteboard)/demo/[sessionId]/page.tsx`) renderuje
+wyłącznie `ExcalidrawWhiteboard` z tożsamością gościa (ujemne id, nick `Gosc-XXXX` w `sessionStorage`) — bez
+starego silnika i bez `BoardRealtimeContext`.
+
+```
+gość A: /demo/<id> → useBoardConnection (boardId = "demo-<id>") → HocuspocusProvider BEZ tokenu
+  → whiteboard-sync/src/auth.ts: dokument pasuje do ^demo-[A-Za-z0-9_-]{16,64}$ → demoSessions.admit() (demo.ts)
+     (bez pytania backendu; kontekst: canEdit, elementLimit = DEMO_ELEMENT_LIMIT, demo: true)
+  → database.ts: dla dokumentów demo fetch zwraca null, store nic nie robi (zero zapytań do backendu / bazy)
+gość B: ten sam link → ten sam dokument w pamięci serwera → kursory (awareness) i elementy na żywo
+```
+
+- **Nic nie jest zapisywane.** Dokument żyje w pamięci whiteboard-sync, dopóki ktoś jest połączony; po wyjściu
+  ostatniej osoby jest zwalniany, a link otwiera pustą tablicę. Przeglądarka też nie trzyma kopii (IndexedDB tylko
+  dla prawdziwych tablic), a obrazy zostają w dokumencie (`storageBoardId = null`, bez uploadu do Storage).
+- **Sesja wygasa.** Po `DEMO_SESSION_TTL_MINUTES` (domyślnie 180) od pierwszego wejścia `demoSessions.sweep`
+  (co 30 s, `index.ts`) rozłącza wszystkich, a powrót dostaje odmowę `demo-expired` (front: komunikat „Sesja demo
+  wygasła", bez ponawiania). Wpis wygasłej sesji jest pamiętany 24 h, potem id jest znów wolne.
+- **Ograniczenia nadużyć** (anonimowe wejście): najwyżej `DEMO_MAX_CONNECTIONS_PER_DOC` (10) osób w sesji i
+  `DEMO_MAX_SESSIONS` (200) równoległych sesji — nadmiar dostaje `demo-full` (front ponawia z odstępem); puste
+  sesje są zapominane po 10 min; liczba żywych elementów jest limitowana jak na planie Free
+  (`DEMO_ELEMENT_LIMIT`, 500; ten sam mechanizm tombstonów co `element-limit.ts`, front pokazuje ostrzeżenie —
+  stała `features/demo/demo-limits.ts` musi zgadzać się z serwerem).
+- **Gość nie czeka na serwer** (brak nakładki „Synchronizacja tablicy..."); gdy serwer jest niedostępny, tablica
+  działa lokalnie z komunikatem „tablica działa tylko u Ciebie".
+- Liczniki sesji siedzą w pamięci jednego procesu whiteboard-sync (jak reszta serwisu). Nie ma limitu rozmiaru
+  pojedynczej wiadomości ani limitu zapytań na IP — to zostaje po stronie brzegu (Render / Cloudflare).
 
 ## 3. Powiadomienia (np. zaproszenie do workspace'u)
 
