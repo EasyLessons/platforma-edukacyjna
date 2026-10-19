@@ -126,6 +126,15 @@ class Settings(BaseSettings):
             return True
         return text in ("1", "true", "t", "yes", "y", "on")
 
+    # === SPRZATANIE STORAGE (api/v1/storage_quota/cleanup.py) ===
+    # Cykliczny job: rejestr plikow, sieroty, pliki usunietych tablic (30 dni), awatary-sieroty,
+    # stare powiadomienia/zaproszenia. false = wylaczony (reczny przebieg: scripts/storage_cleanup.py).
+    storage_cleanup_enabled: bool = True
+    # Co ile godzin najwyzej jeden przebieg (restart procesu go nie przyspiesza).
+    storage_cleanup_interval_hours: int = 24
+    # Po ilu minutach od startu procesu petla zaczyna sprawdzac, czy pora na przebieg.
+    storage_cleanup_initial_delay_minutes: int = 10
+
     # === CORS (SEC-04) ===
     # Jawna lista originow rozdzielona przecinkami (env ALLOWED_ORIGINS). Credentials
     # (refresh cookie) sa wlaczone, wiec kazdy origin wpisujemy osobno - zadnych wildcardow.

@@ -118,13 +118,18 @@ def _usage_keys(board_id: int) -> tuple[str, str]:
     return f"board_files:{int(board_id)}:count", f"board_files:{int(board_id)}:bytes"
 
 
-async def delete_board_files(board_id: int) -> None:
-    """Kasuje wszystkie pliki tablicy z `board-files` (przy usunieciu tablicy). Best-effort."""
-    await delete_prefix(BOARD_FILES_BUCKET, f"{int(board_id)}/")
+async def delete_board_usage_counters(board_id: int) -> None:
+    """Kasuje miekki licznik plikow tablicy z Redis (best-effort)."""
     try:
         await redis_client_module.get_redis_client().delete(*_usage_keys(board_id))
     except RedisError:
         logger.warning(f"Nie udało się skasować licznika plików tablicy {board_id} (Redis)")
+
+
+async def delete_board_files(board_id: int) -> None:
+    """Kasuje wszystkie pliki tablicy z `board-files` od razu (najpierw natychmiast, bez karencji). Best-effort."""
+    await delete_prefix(BOARD_FILES_BUCKET, f"{int(board_id)}/")
+    await delete_board_usage_counters(board_id)
 
 
 def user_rate_limit(scope: str, limit: int, window_seconds: int):
