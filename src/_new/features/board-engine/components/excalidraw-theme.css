@@ -24,34 +24,36 @@
 }
 
 /*
- * Lewy górny róg zajmuje nagłówek EasyLesson (BoardHeaderFrame: 56 px + odstęp od góry),
- * więc menu Excalidraw (hamburger z eksportem obrazu, pomocą, tłem płótna) schodzi pod niego.
+ * Ukryj natywny górny toolbar Excalidraw oraz podpowiedź "Aby przesunąć płótno...".
+ * Własny pionowy pasek narzędzi przejmuje pełną kontrolę nad narzędziami.
  */
-.easylesson-board .excalidraw:not(.excalidraw--mobile) .App-menu_top > *:first-child {
-  margin-top: 72px;
-}
-
-/* Telefon: pasek narzędzi Excalidraw jest na górze na całą szerokość - pod nasz przycisk sidebara. */
-.easylesson-board .excalidraw.excalidraw--mobile .App-top-bar {
-  margin-top: calc(64px + env(safe-area-inset-top, 0px));
+.easylesson-board .App-toolbar,
+.easylesson-board .App-toolbar-content,
+.easylesson-board .App-top-bar,
+.easylesson-board .HintViewer,
+.easylesson-board .App-menu_top {
+  display: none !important;
 }
 
 /*
- * f(x) i slot `topRightExtra` (np. "Rozmowa") na telefonie: pływające przyciski nad stopką
- * Excalidraw, jeden nad drugim (na desktopie są w prawym górnym rogu).
+ * Natywne kontrolki stopki Excalidraw (zoom i akcje płótna) przenosimy poza widok,
+ * zachowując je w DOM dla zachowania natywnej obsługi zdarzeń.
+ */
+.easylesson-board .layer-ui__wrapper__footer-left,
+.easylesson-board .layer-ui__wrapper__footer-right {
+  position: absolute !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  bottom: -9999px !important;
+  left: -9999px !important;
+}
+
+/*
+ * f(x) i slot `topRightExtra` - stara responsywność wycofana na rzecz układu 1:1.
  */
 .easylesson-fx-mobile {
-  display: none;
-  position: absolute;
-  right: 12px;
-  bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-  z-index: 5;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-}
-.easylesson-board:has(.excalidraw--mobile) .easylesson-fx-mobile {
-  display: flex;
+  display: none !important;
 }
 
 /* Notatka (elements/note.tsx) to embeddable z wewnętrznym linkiem `easylesson:note` -

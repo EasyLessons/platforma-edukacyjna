@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import {
   DEFAULT_FUNCTION_SPEC,
   validateExpression,
@@ -17,8 +18,10 @@ interface FunctionPanelProps {
   editingSpec: FunctionSpec | null;
   onAdd: (spec: FunctionSpec) => void;
   onUpdate: (spec: FunctionSpec) => void;
-  /** 'up-left' - panel otwiera się w górę i w lewo (pływający przycisk w prawym dolnym rogu). */
-  placement?: 'down-right' | 'up-left';
+  /** 'up-left' - panel otwiera się w górę i w lewo. 'floating' - samo okno bez przycisku toggle. */
+  placement?: 'down-right' | 'up-left' | 'floating';
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export function FunctionPanel({
@@ -26,8 +29,17 @@ export function FunctionPanel({
   onAdd,
   onUpdate,
   placement = 'down-right',
+  isOpen,
+  onClose,
 }: FunctionPanelProps) {
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isControlled = isOpen !== undefined;
+  const open = isControlled ? isOpen : internalOpen;
+  const setOpen = (val: boolean) => {
+    if (!isControlled) setInternalOpen(val);
+    if (!val) onClose?.();
+  };
+
   const [spec, setSpec] = useState<FunctionSpec>(DEFAULT_FUNCTION_SPEC);
   const [error, setError] = useState<string | null>(null);
 
@@ -54,18 +66,32 @@ export function FunctionPanel({
       className={`flex gap-2 ${placement === 'up-left' ? 'flex-row-reverse items-end' : 'items-start'}`}
       data-testid="function-panel"
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
-        data-testid="function-panel-toggle"
-      >
-        f(x)
-      </button>
+      {placement !== 'floating' && (
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-800 shadow-sm hover:bg-gray-50"
+          data-testid="function-panel-toggle"
+        >
+          f(x)
+        </button>
+      )}
       {open && (
-        <div className="w-64 rounded-lg border border-gray-200 bg-white p-3 text-sm shadow-lg">
-          <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500">
-            {editingSpec ? 'Edytuj wykres' : 'Nowy wykres'}
+        <div className="w-64 rounded-xl border border-gray-200 bg-white p-3 text-sm shadow-xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {editingSpec ? 'Edytuj wykres' : 'Nowy wykres'}
+            </div>
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                title="Zamknij"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
           <input
             data-testid="function-expression"
