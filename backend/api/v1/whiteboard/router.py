@@ -9,6 +9,7 @@ GET    /{id}/doc                    — wczytaj snapshot Y.Doc
 GET    /{id}/access                 — sprawdź dostęp do tablicy
 POST   /{id}/call                   — pokój + token rozmowy głosowej (Daily)
 GET    /call/usage                  — zużycie minut rozmów (tylko admin z CALL_ADMIN_USER_IDS)
+GET    /storage/usage               — zajętość Storage i kont (tylko admin z CALL_ADMIN_USER_IDS)
 """
 from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
 from sqlalchemy.orm import Session
@@ -27,6 +28,8 @@ from .schemas import (
     CallResponse, CallUsageResponse,
 )
 from .call_usage import usage_report
+from ..storage_quota.schemas import StorageUsageResponse
+from ..storage_quota.usage import usage_report as storage_usage_report
 from .service import WhiteboardService
 from .dependencies import DocCaller, get_doc_caller
 from .files import router as files_router
@@ -165,5 +168,17 @@ async def call_usage(
 ):
     """Zużycie minut rozmów i stan bezpieczników — tylko CALL_ADMIN_USER_IDS (call_usage.py)."""
     result = await usage_report(current_user.id)
+    response.headers["Cache-Control"] = "no-store"
+    return ApiResponse(success=True, data=result)
+
+
+@router.get("/storage/usage", response_model=ApiResponse[StorageUsageResponse])
+async def storage_usage(
+    response: Response,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Zajętość Storage (rejestr plików, konta, stan względem 1 GB) — tylko CALL_ADMIN_USER_IDS (storage_quota/usage.py)."""
+    result = await storage_usage_report(db, current_user.id)
     response.headers["Cache-Control"] = "no-store"
     return ApiResponse(success=True, data=result)
