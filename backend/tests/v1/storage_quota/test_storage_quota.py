@@ -205,7 +205,8 @@ class TestZwalnianieMiejsca:
         await BoardService(db_session).delete_board(board_id, test_user.id)
 
         assert used(db_session, test_user.id) == 0
-        assert db_session.query(BoardFile).count() == 0
+        # wiersz zostaje z `deleted_at` - fizyczne skasowanie po 30 dniach (test_cleanup.py)
+        assert db_session.query(BoardFile).filter(BoardFile.deleted_at.isnot(None)).count() == 1
 
     def test_usuniecie_przestrzeni_zwalnia_miejsce(
         self, client, db_session, test_user, test_workspace, test_board, fake_storage

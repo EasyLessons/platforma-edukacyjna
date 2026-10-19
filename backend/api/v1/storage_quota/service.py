@@ -8,7 +8,7 @@ ZASADY (decyzje Patryka z 12.10.2026):
     i edycja dzialaja (grandfathering: konto ponad limitem nic nie traci, tylko nie dolozy),
   * pliki wspolne (arkusze CKE, karty wzorow) nie sa w Storage ani w rejestrze,
   * do limitu liczy sie suma `size_bytes` wierszy BEZ `deleted_at` (pliki czekajace na
-    skasowanie zwalniaja miejsce od razu).
+    skasowanie zwalniaja miejsce od razu; fizycznie usuwa je job: cleanup.py).
 
 DWA SPRAWDZENIA UPLOADU (files.py):
   1. `ensure_can_upload` PRZED czytaniem ciala - gdy konto jest juz na limicie, odrzucamy
@@ -85,13 +85,11 @@ def limit_error(db: Session, owner_id: int) -> PlanLimitError:
     return _limit_error(storage_limit(db, owner_id) or 0, used_bytes(db, owner_id))
 
 
-def forget_board(db: Session, board_id: int) -> None:
-    """Pliki tablicy zostaly skasowane ze Storage - usuwa je z rejestru (zwalnia miejsce)."""
-    db.query(BoardFile).filter(BoardFile.board_id == board_id).delete(synchronize_session=False)
-
-
 def mark_deleted(db: Session, board_ids: list[int], now: datetime | None = None) -> None:
-    """Tablice usuniete (np. kaskada przy usunieciu przestrzeni): pliki zwalniaja miejsce od razu."""
+    """
+    Tablice usuniete (tablica albo cala przestrzen): pliki zwalniaja miejsce od razu, a ze
+    Storage znikaja po okresie karencji (cleanup.py: RETENTION_DAYS) - tyle trwa "okno na pomylke".
+    """
     if not board_ids:
         return
     db.query(BoardFile).filter(
