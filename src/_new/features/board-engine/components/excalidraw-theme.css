@@ -61,3 +61,9 @@
 .easylesson-board .excalidraw-hyperlinkContainer:has(a[href^='easylesson:']) {
   display: none;
 }
+
+/* Ukryj wskaźnik deweloperski Next.js (czarny badge 'N') oraz TanStack Query Devtools */
+nextjs-portal,
+.tsqd-parent-container {
+  display: none !important;
+}
