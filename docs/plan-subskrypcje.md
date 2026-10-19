@@ -118,7 +118,9 @@ klienta.
 - `PlanUsageBadge` — „2/3 tablice" (`workspaceId` własnej przestrzeni) lub „1/2 przestrzenie".
   Dla cudzej przestrzeni nic nie renderuje (limit liczy się u właściciela).
 - `UpgradeModal` — otwierany po 403 `PLAN_LIMIT_*` w `BoardsSection`, `TemplateSection`
-  i `workspace-sidebar`. Bez płatności; opcjonalny link `NEXT_PUBLIC_PREMIUM_INTEREST_URL`.
+  i `workspace-sidebar`. Bez płatności: treść „Płatności jeszcze nie ma – Premium nadajemy ręcznie. Daj znać:
+  kontakt@easylesson.app" (adres ze stopki i strony `/contact`, link `mailto:`); opcjonalny przycisk z
+  `NEXT_PUBLIC_PREMIUM_INTEREST_URL`.
 - Brak trybu „cała tablica tylko do odczytu po przekroczeniu" — zdecydowano, że limit elementów
   blokuje tylko dodawanie nowych.
 
