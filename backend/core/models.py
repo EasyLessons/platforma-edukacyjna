@@ -1,9 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, text, LargeBinary
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey, Text, Index, UniqueConstraint, text, LargeBinary
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
 from core.database import Base
+from core.time import utcnow
 
 class User(Base):
     __tablename__ = "users"
@@ -21,7 +22,11 @@ class User(Base):
     auth_provider = Column(String(20), default="email", nullable=False)  # "email" lub "google"
     profile_picture = Column(String, nullable=True)  # URL do zdjęcia profilowego
     avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
-  
+
+    # Zgoda na regulamin i politykę prywatności
+    terms_accepted_at = Column(DateTime, nullable=True)
+    terms_version = Column(String(20), nullable=True)
+
     # Relationships
     created_workspaces = relationship("Workspace", back_populates="creator", foreign_keys="[Workspace.created_by]")
     workspace_memberships = relationship("WorkspaceMember", back_populates="user")
@@ -38,6 +43,26 @@ class User(Base):
     board_users = relationship("BoardUsers", back_populates="user")
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
     saved_assets = relationship("SavedAsset", back_populates="user", cascade="all, delete-orphan")
+    identities = relationship("UserIdentity", back_populates="user", cascade="all, delete-orphan")
+
+class UserIdentity(Base):
+    __tablename__ = "user_identities"
+    __table_args__= (
+        UniqueConstraint("provider", "provider_user_id", name="uq_user_identities_provider_subject"),
+        UniqueConstraint("user_id", "provider", name="uq_user_identities_user_provider"),
+    )
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    provider = Column(String(20), nullable=False)
+    provider_user_id = Column(String(255), nullable=False)
+    email = Column(String, nullable=True)
+    email_verified = Column(Boolean, nullable=False, default=False)
+    picture_url = Column(String, nullable=True)
+    created_at = Column(DateTime, nullable=False, default=utcnow)
+    last_login_at = Column(DateTime, nullable=True)
+
+    user = relationship("User", back_populates="identities")
 
 class Workspace(Base):
     __tablename__ = "workspaces"
