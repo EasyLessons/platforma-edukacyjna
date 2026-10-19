@@ -22,6 +22,7 @@ from .schemas import (
     GoogleLoginRequest, AvatarUpdate
 )
 from .service import AuthService
+from .oauth.service import OAuthService
 from .sessions import SessionService
 from core.models import User
 
@@ -182,7 +183,10 @@ async def reset_password(
     response_model=ApiResponse[AuthResponse],
     summary="Login with Google ID token",
     description="Weryfikuje ID token z Google Identity Services i loguje/rejestruje użytkownika.",
-    responses={401: {"description": "Invalid Google credential"}}
+    responses={
+        401: {"description": "Invalid Google credential"},
+        409: {"description": "Account already linked with another Google account"},
+    }
 )
 async def google_login(
     payload: GoogleLoginRequest,
@@ -191,8 +195,8 @@ async def google_login(
     _: None = Depends(rate_limit("google_login", limit=10, window_seconds=300, identifier_field="credential"))
 ):
     """Logowanie/rejestracja przez Google ID token"""
-    service = AuthService(db)
-    result, refresh_token = await service.google_login(payload.credential)
+    service = OAuthService(db)
+    result, refresh_token = await service.login("google", payload.credential)
     _set_refresh_cookie(response, refresh_token, service.settings)
     return ApiResponse(success=True, data=result)
 

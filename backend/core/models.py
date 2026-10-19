@@ -16,11 +16,6 @@ class User(Base):
     full_name = Column(String, nullable=True)
     is_active = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    
-    # Google OAuth
-    google_id = Column(String, unique=True, nullable=True, index=True)
-    auth_provider = Column(String(20), default="email", nullable=False)  # "email" lub "google"
-    profile_picture = Column(String, nullable=True)  # URL do zdjęcia profilowego
     avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
 
     # Zgoda na regulamin i politykę prywatności
