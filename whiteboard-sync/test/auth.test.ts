@@ -75,6 +75,20 @@ describe('onAuthenticate', () => {
     );
   });
 
+  it.each([
+    [1000, 1000],
+    [0, 0],
+    [null, null],
+    [undefined, null],
+    [-5, null],
+    [1.5, null],
+    ['1000', null],
+  ])('element_limit %j -> elementLimit %j', async (raw, expected) => {
+    mockAccess({ t: { status: 200, role: 'editor', can_edit: true, element_limit: raw as never } });
+    const ctx = await onAuthenticate({ token: 't', documentName: '1' });
+    expect(ctx.elementLimit).toBe(expected);
+  });
+
   it('backend nieosiągalny -> server-unavailable', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
     expect(await failureReason(onAuthenticate({ token: 't', documentName: '1' }))).toBe(

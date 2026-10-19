@@ -79,7 +79,21 @@ class TestServiceToken:
 
 class TestUserToken:
 
-    def test_member_can_save(self, client, test_user, test_board):
+    def test_user_save_403_when_service_token_configured(self, client, test_user, test_board):
+        """Obejscie limitu elementow: edytor nie wgrywa snapshotu przez JWT, gdy jest klucz serwisu."""
+        r = client.post(
+            f"/api/v1/whiteboard/{test_board.id}/doc",
+            json={"snapshot": SNAPSHOT},
+            headers=user_headers(test_user.id),
+        )
+        assert r.status_code == 403
+
+    def test_user_can_still_read_when_service_token_configured(self, client, test_user, test_board):
+        r = client.get(f"/api/v1/whiteboard/{test_board.id}/doc", headers=user_headers(test_user.id))
+        assert r.status_code == 200
+
+    def test_member_can_save(self, client, test_user, test_board, monkeypatch):
+        monkeypatch.setattr(get_settings(), "sync_service_token", "")  # tryb zgodnosci bez klucza
         r = client.post(
             f"/api/v1/whiteboard/{test_board.id}/doc",
             json={"snapshot": SNAPSHOT},
@@ -87,7 +101,8 @@ class TestUserToken:
         )
         assert r.status_code == 200
 
-    def test_viewer_save_403(self, client, db_session, test_user2, test_board):
+    def test_viewer_save_403(self, client, db_session, test_user2, test_board, monkeypatch):
+        monkeypatch.setattr(get_settings(), "sync_service_token", "")
         db_session.add(WorkspaceMember(workspace_id=test_board.workspace_id, user_id=test_user2.id, role="viewer"))
         db_session.commit()
         r = client.post(
@@ -97,7 +112,8 @@ class TestUserToken:
         )
         assert r.status_code == 403
 
-    def test_expired_user_token_401(self, client, test_user, test_board):
+    def test_expired_user_token_401(self, client, test_user, test_board, monkeypatch):
+        monkeypatch.setattr(get_settings(), "sync_service_token", "")
         """Scenariusz utraty zapisu: token usera z chwili polaczenia wygasl."""
         r = client.post(
             f"/api/v1/whiteboard/{test_board.id}/doc",

@@ -158,7 +158,9 @@ class BoardService:
             BoardUsers.board_id == board.id,
             BoardUsers.user_id == user_id,
         ).first()
-        return _build_board_response(board, board_user)
+        response = _build_board_response(board, board_user)
+        response.element_limit = PlanService(self.db).element_limit_for_workspace(board.workspace)
+        return response
 
     async def list_boards(
         self, workspace_id: int, user_id: int, limit: int = 10, offset: int = 0

@@ -12,6 +12,7 @@ import base64
 import binascii
 from datetime import datetime
 from sqlalchemy.orm import Session
+from core.config import get_settings
 from core.exceptions import AppException, NotFoundError, ValidationError
 from starlette.concurrency import run_in_threadpool
 from core.models import Board, BoardDocument, BoardUsers, User, Workspace, WorkspaceMember
@@ -24,6 +25,7 @@ from .call import CallUser, create_board_call
 from .storage import upload_board_image
 from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_workspace_owner
+from api.v1.plans.service import PlanService
 
 
 def can_edit(role: str) -> bool:
@@ -130,6 +132,12 @@ class WhiteboardService:
         if user_id is None:
             self._get_board_or_404(board_id)
         else:
+            # Gdy whiteboard-sync ma klucz serwisu, snapshot zapisuje tylko on: edytor z JWT
+            # mogl by wgrac dokument z dowolna liczba elementow (obejscie limitu planu).
+            if get_settings().sync_service_token:
+                raise AppException(
+                    "Zapis dokumentu tylko przez serwis synchronizacji", code="FORBIDDEN", status_code=403
+                )
             _, role = self._get_board_and_role(board_id, user_id)
             if not can_edit(role):
                 raise AppException("Rola viewer nie może zapisywać tablicy", status_code=403)
@@ -178,7 +186,7 @@ class WhiteboardService:
 
     def check_access(self, board_id: int, user: User) -> AccessCheckResponse:
         """Sprawdza czy użytkownik ma dostęp do tablicy i zwraca info o nim."""
-        _, role = self._get_board_and_role(board_id, user.id)
+        board, role = self._get_board_and_role(board_id, user.id)
 
         return AccessCheckResponse(
             has_access=True,
@@ -186,6 +194,7 @@ class WhiteboardService:
             username=user.username,
             role=role,
             can_edit=can_edit(role),
+            element_limit=PlanService(self.db).element_limit_for_workspace(board.workspace),
         )
 
     # Voice call (Daily) --------------------------------------------------

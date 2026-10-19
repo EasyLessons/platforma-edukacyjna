@@ -5,13 +5,14 @@
 import { Server } from '@hocuspocus/server';
 import { onAuthenticate } from './auth';
 import { database } from './database';
+import { elementLimit } from './element-limit';
 
 const port = Number(process.env.PORT ?? 1234);
 
 const server = Server.configure({
   port,
   onAuthenticate,
-  extensions: [database],
+  extensions: [database, elementLimit],
   onConnect: async ({ documentName }) => {
     console.log(`[whiteboard-sync] connect: ${documentName}`);
   },
