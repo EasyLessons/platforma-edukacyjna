@@ -10,6 +10,7 @@ const FREE_LIMITS = {
   max_own_workspaces: 2,
   max_boards_per_workspace: 3,
   max_elements_per_board: 1000,
+  max_storage_bytes: 104857600,
   ai_chat_daily: null,
 };
 
@@ -32,7 +33,7 @@ describe('usePlan', () => {
     mockPlan({
       plan: 'free',
       limits: FREE_LIMITS,
-      usage: { own_workspaces: 2, boards_by_workspace: { '7': 2 } },
+      usage: { own_workspaces: 2, boards_by_workspace: { '7': 2 }, storage_bytes: 0 },
     });
     const { result } = renderHook(() => usePlan(), { wrapper: makeWrapper() });
 
@@ -41,7 +42,11 @@ describe('usePlan', () => {
     expect(result.current.plan).toBe('free');
     expect(result.current.isPremium).toBe(false);
     expect(result.current.limits).toEqual(FREE_LIMITS);
-    expect(result.current.usage).toEqual({ own_workspaces: 2, boards_by_workspace: { '7': 2 } });
+    expect(result.current.usage).toEqual({
+      own_workspaces: 2,
+      boards_by_workspace: { '7': 2 },
+      storage_bytes: 0,
+    });
     expect(result.current.boardsIn(7)).toBe(2);
     expect(result.current.canCreateBoardIn(7)).toBe(true);
     expect(result.current.canCreateWorkspace).toBe(false);
@@ -51,7 +56,7 @@ describe('usePlan', () => {
     mockPlan({
       plan: 'free',
       limits: FREE_LIMITS,
-      usage: { own_workspaces: 2, boards_by_workspace: { '7': 3, '8': 0 } },
+      usage: { own_workspaces: 2, boards_by_workspace: { '7': 3, '8': 0 }, storage_bytes: 0 },
     });
     const { result } = renderHook(() => usePlan(), { wrapper: makeWrapper() });
 
@@ -67,9 +72,10 @@ describe('usePlan', () => {
         max_own_workspaces: null,
         max_boards_per_workspace: null,
         max_elements_per_board: null,
+        max_storage_bytes: null,
         ai_chat_daily: null,
       },
-      usage: { own_workspaces: 7, boards_by_workspace: { '1': 40 } },
+      usage: { own_workspaces: 7, boards_by_workspace: { '1': 40 }, storage_bytes: 0 },
     });
     const { result } = renderHook(() => usePlan(), { wrapper: makeWrapper() });
 
@@ -83,7 +89,7 @@ describe('usePlan', () => {
     mockPlan({
       plan: 'free',
       limits: FREE_LIMITS,
-      usage: { own_workspaces: 2, boards_by_workspace: { '7': 3 } },
+      usage: { own_workspaces: 2, boards_by_workspace: { '7': 3 }, storage_bytes: 0 },
     });
     const { result } = renderHook(() => usePlan(), { wrapper: makeWrapper() });
 
