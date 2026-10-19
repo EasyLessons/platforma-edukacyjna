@@ -142,6 +142,9 @@ Stan aplikacji czytają przez `window.__boardEngine` (wystawiane tylko przy `NEX
 
 Role: `e2e/roles.spec.ts` (editor nie tworzy tablicy i dostaje 403 na zaproszenia/share-link/zmianę nazwy, viewer
 403 na upload; owner widzi „Nowa tablica"). Viewer bez prawa zapisu na tablicy: `board-engine.spec.ts`.
+Limit elementów planu Free: `e2e/board-engine-limit.spec.ts` (własna tablica tworzona przez API i usuwana na końcu;
+800 elementów -> ostrzeżenie „800/1000", 1000 -> blokada narzędzi rysujących, 1001. element - z UI i z obejściem UI -
+nie zostaje u obu osób, po usunięciu elementu można znów dodawać).
 
 ```bash
 docker compose -f docker-compose.e2e.yml up -d     # Postgres :55432 + Redis :56379
