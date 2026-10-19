@@ -183,6 +183,21 @@ Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENA
 Ręcznie: `python scripts/storage_cleanup.py --dry-run` (z `backend/`) — raport JSON bez żadnego zapisu;
 bez `--dry-run` robi to samo co pętla. Pierwszy przebieg na produkcji: najpierw `--dry-run`.
 
+### Podgląd zajętości (admin)
+
+`GET /api/v1/whiteboard/storage/usage` (`storage_quota/usage.py`, w stylu `/whiteboard/call/usage`):
+tylko konta z `CALL_ADMIN_USER_IDS` (inni 403), `Cache-Control: no-store`, odpowiedź bez kluczy i
+adresu Storage. Zwraca:
+
+- `state` (`ok` / `warning` od 70% / `critical` od 90%) względem budżetu 1 GB planu Supabase Free
+  i `hint` z przypomnieniem o Cloudflare R2 (10 GB free) zamiast Supabase Pro — **tylko opis, bez wdrożenia**,
+- `estimated_bytes` = większy z (rejestr, pomiar bucketu `board-files`) + pomiar bucketu `avatars`;
+  stary silnik (`board-images`) nie jest mierzony,
+- rejestr: aktywne pliki i bajty oraz pliki czekające na skasowanie (30 dni karencji),
+- `top_accounts` (10 największych kont: plan, limit, procent), `accounts_over_limit`,
+- pomiar prawdziwego Storage i raport ostatniego przebiegu sprzątania (z Redis) — bez dodatkowych
+  zapytań do Supabase przy otwieraniu ekranu; do czasu pierwszego przebiegu pomiaru nie ma (`null`).
+
 ## Limit elementów (whiteboard-sync, PR 3)
 
 - Backend zwraca `element_limit` (plan właściciela przestrzeni; `null` = bez limitu) w
