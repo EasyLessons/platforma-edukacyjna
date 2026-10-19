@@ -141,15 +141,47 @@ z PR #106 (300 plików / 100 MB na tablicę, licznik w Redis — zostaje jako dr
   obiekt jest kasowany, `403 PLAN_LIMIT_STORAGE`, `data: {limit_bytes, used_bytes}`).
 - **Blokada tylko dodawania.** Przeglądanie, pobieranie, edycja i usuwanie działają na limicie;
   konto ponad limitem (np. po spadku z Premium) niczego nie traci, tylko nie dokłada.
-- **Zwalnianie miejsca:** usunięcie tablicy kasuje jej pliki i wiersze rejestru; usunięcie
-  przestrzeni oznacza wiersze `deleted_at` (nie liczą się do limitu; fizycznie usuwa je job
-  sprzątający). Plik usunięty z tablicy (element) zostaje — cofnięcie może go przywrócić.
+- **Zwalnianie miejsca:** usunięcie tablicy albo przestrzeni oznacza wiersze `deleted_at` — przestają
+  liczyć się do limitu od razu, a pliki znikają ze Storage po 30 dniach (job sprzątający, niżej).
+  Plik usunięty z tablicy jako element zostaje — cofnięcie może go przywrócić.
 - **Pliki sprzed migracji** nie mają wierszy w rejestrze, więc nie liczą się do limitu, dopóki job
-  sprzątający nie dopisze ich przy porównaniu bucketu z rejestrem.
+  sprzątający (pierwszy przebieg) nie dopisze ich przy porównaniu bucketu z rejestrem.
 - **Nie liczą się:** wspólne szablony (arkusze CKE, karty wzorów — `tpl:` w `Y.Doc`, nie są w
   Storage), awatary (`avatars`, 5 MB WEBP 512 px na konto) i stary silnik (`board-images`).
 - Front: `GET /plans/me` zwraca `limits.max_storage_bytes` i `usage.storage_bytes`; błąd uploadu
   `PLAN_LIMIT_STORAGE` pokazuje komunikat (`excalidraw-file-sync.ts`), a `UpgradeModal` zna ten kod.
+
+### Sprzątanie (job cykliczny)
+
+`backend/api/v1/storage_quota/cleanup.py`, decyzje Patryka z 12.10.2026. Pętla w `lifespan`
+(`main.py`) sprawdza co godzinę, czy minęły 24 h od ostatniego przebiegu (raport w Redis
+`storage_cleanup:last_report`, więc restart procesu nie uruchamia go od nowa), pierwszy start 10 min po
+uruchomieniu. Jeden przebieg naraz (blokada `storage_cleanup:lock`). Kroki, każdy w osobnym
+`try/except`:
+
+1. **Rejestr = bucket** — pliki z `board-files` bez wiersza są dopisywane (właściciel z przestrzeni;
+   brak tablicy → od razu `deleted_at`), wiersze bez obiektu (starsze niż 1 h) znikają.
+2. **Zniknięte tablice** — wiersze tablic, których nie ma w `boards` (kaskady, usunięte konta), dostają `deleted_at`.
+3. **Sieroty** — plik starszy niż 7 dni, którego nazwy nie ma w `board_documents.snapshot` swojej
+   tablicy, dostaje `deleted_at`. Odwołanie = nazwa `<32 hex>.webp` w bajtach snapshotu (Yjs trzyma
+   ją jako zwykły tekst UTF-8; sprawdzone na prawdziwym `Y.encodeStateAsUpdate`).
+4. **Skasowanie** — `deleted_at` starsze niż 30 dni: snapshot sprawdzany PONOWNIE (plik, do którego jest
+   odwołanie, wraca do użycia i nie jest kasowany), reszta znika ze Storage i z rejestru. Błąd Storage
+   = wpis zostaje do następnego przebiegu.
+5. **Awatary-sieroty** — obiekty `avatars/` bez żadnego `users.avatar_url`, starsze niż 7 dni.
+6. **Baza** — powiadomienia przeczytane >30 dni i wszystkie >90 dni; zaproszenia i linki zaproszeniowe
+   30 dni po terminie (linki także 30 dni po odwołaniu).
+
+Bezpieczniki: nic nie jest kasowane od razu (najpierw `deleted_at`, 30 dni na pomyłkę); krok, który
+oznaczyłby ponad połowę plików (min. 20), jest pomijany i trafia do `errors` raportu; nieudane
+listowanie Storage nigdy nie znaczy „plików nie ma". Wspólne szablony, pliki starego silnika
+(`board-images`) i dokumenty Yjs nie są ruszane. Za „stare pliki" uznajemy tylko sieroty i pliki
+usuniętych tablic — plik z żywej tablicy nie jest kasowany z powodu wieku.
+
+Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENABLED` (domyślnie `true`;
+`false` wyłącza pętlę), `STORAGE_CLEANUP_INTERVAL_HOURS` (24), `STORAGE_CLEANUP_INITIAL_DELAY_MINUTES` (10).
+Ręcznie: `python scripts/storage_cleanup.py --dry-run` (z `backend/`) — raport JSON bez żadnego zapisu;
+bez `--dry-run` robi to samo co pętla. Pierwszy przebieg na produkcji: najpierw `--dry-run`.
 
 ## Limit elementów (whiteboard-sync, PR 3)
 
