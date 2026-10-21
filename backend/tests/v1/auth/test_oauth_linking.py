@@ -30,7 +30,6 @@ class TestNewAccount:
         assert user.full_name == "New User"
         assert user.is_active is True
         assert user.hashed_password is None
-        assert user.terms_accepted_at is None
         assert [(i.provider, i.provider_user_id) for i in user.identities] == [("google", "sub-1")]
         assert db_session.query(Workspace).filter(Workspace.created_by == user.id).first() is not None
 
@@ -76,7 +75,7 @@ class TestLinkingExistingAccount:
 
         assert db_session.query(UserIdentity).count() == 0
 
-    def test_link_keeps_avatar_and_terms_untouched(self, db_session, test_user):
+    def test_link_keeps_avatar_untouched(self, db_session, test_user):
         test_user.avatar_url = "https://example.com/own-avatar.webp"
         db_session.commit()
 
@@ -85,7 +84,6 @@ class TestLinkingExistingAccount:
         assert result.created is False
         db_session.refresh(test_user)
         assert test_user.avatar_url == "https://example.com/own-avatar.webp"
-        assert test_user.terms_accepted_at is None
 
 
 class TestErrorHandling:

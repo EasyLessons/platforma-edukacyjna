@@ -1,4 +1,4 @@
-"""add user_identities and terms columns
+"""add user_identities
 
 Revision ID: 277be8f6f08e
 Revises: c4a9e1f27b3d
@@ -46,8 +46,6 @@ def upgrade() -> None:
         WHERE google_id IS NOT NULL
         """
     )
-    op.add_column("users", sa.Column("terms_accepted_at", sa.DateTime(), nullable=True))
-    op.add_column("users", sa.Column("terms_version", sa.String(length=20), nullable=True))
 
 
 def downgrade() -> None:
@@ -60,6 +58,4 @@ def downgrade() -> None:
         WHERE i.user_id = users.id AND i.provider = 'google' AND users.google_id IS NULL
         """
     )
-    op.drop_column("users", "terms_version")
-    op.drop_column("users", "terms_accepted_at")
     op.drop_table("user_identities")

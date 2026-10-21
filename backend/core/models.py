@@ -18,10 +18,6 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     avatar_url = Column(String, nullable=True)  # Otwarty adres awatara
 
-    # Zgoda na regulamin i politykę prywatności
-    terms_accepted_at = Column(DateTime, nullable=True)
-    terms_version = Column(String(20), nullable=True)
-
     # Relationships
     created_workspaces = relationship("Workspace", back_populates="creator", foreign_keys="[Workspace.created_by]")
     workspace_memberships = relationship("WorkspaceMember", back_populates="user")
