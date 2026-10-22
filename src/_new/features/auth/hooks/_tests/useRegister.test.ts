@@ -37,7 +37,6 @@ describe('useRegister', () => {
       result.current.handleChange({
         target: { name: 'password_confirm', value: 'Pass1word' },
       } as React.ChangeEvent<HTMLInputElement>);
-      result.current.handleTermsChange(true);
     });
   };
 
@@ -49,41 +48,16 @@ describe('useRegister', () => {
       password: '',
       password_confirm: '',
     });
-    expect(result.current.acceptTerms).toBe(false);
     expect(result.current.generalError).toBe('');
   });
 
   describe('walidacja', () => {
-    it('ustawia błąd gdy regulamin niezaakceptowany', async () => {
-      const { result } = setup();
-      act(() => {
-        result.current.handleChange({
-          target: { name: 'username', value: 'janek' },
-        } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({
-          target: { name: 'email', value: 'jan@example.com' },
-        } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({
-          target: { name: 'password', value: 'Pass1word' },
-        } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleChange({
-          target: { name: 'password_confirm', value: 'Pass1word' },
-        } as React.ChangeEvent<HTMLInputElement>);
-      });
-      await act(async () => {
-        await result.current.handleSubmit(fakeEvent);
-      });
-      expect(result.current.generalError).toBe('Musisz zaakceptować regulamin');
-      expect(registerUser).not.toHaveBeenCalled();
-    });
-
     it('ustawia błąd dla nieprawidłowego emaila', async () => {
       const { result } = setup();
       act(() => {
         result.current.handleChange({
           target: { name: 'email', value: 'zly-email' },
         } as React.ChangeEvent<HTMLInputElement>);
-        result.current.handleTermsChange(true);
       });
       await act(async () => {
         await result.current.handleSubmit(fakeEvent);

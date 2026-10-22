@@ -28,7 +28,7 @@ Nie istnieją (mimo starszych wzmianek w docs): `backend/auth/`, `backend/dashbo
 
 12 tabel. Motyw ogólny: znormalizowane relacje tam gdzie struktura jest stała (users/workspaces/boards), JSONB tam gdzie dane są zmienne kształtem (elementy tablicy, payload powiadomień, ustawienia).
 
-- **User** — konto. `hashed_password` nullable (konta założone przez providera nie mają hasła). `is_active=False` domyślnie — aktywacja po weryfikacji emaila. `avatar_url`. Metody logowania przez providerów są w tabeli `user_identities` (provider + subject; dziś Google, docelowo Microsoft), jedna tożsamość na providera. `terms_accepted_at` i `terms_version` zapisują zgodę na regulamin (NULL = konto sprzed jej rejestrowania). Kolumny `google_id`, `auth_provider`, `profile_picture` nie są już używane przez kod i zostaną usunięte z bazy osobną migracją po wdrożeniu.
+- **User** — konto. `hashed_password` nullable (konta założone przez providera nie mają hasła). `is_active=False` domyślnie — aktywacja po weryfikacji emaila. `avatar_url`. Metody logowania przez providerów są w tabeli `user_identities` (provider + subject; dziś Google, docelowo Microsoft), jedna tożsamość na providera. Kolumny `google_id`, `auth_provider`, `profile_picture` nie są już używane przez kod i zostaną usunięte z bazy osobną migracją po wdrożeniu.
 - **Workspace** — kontener na boardy. `created_by` → właściciel.
 - **WorkspaceMember** — tabela łącząca User↔Workspace (many-to-many) z dodatkowymi atrybutami: `role` (`owner`/`editor`/`viewer`; domyślna dla nowego członka: `editor`), `is_favourite`, `joined_at`.
 - **Board** — należy do workspace'u. `settings` jako JSONB (elastyczna konfiguracja boardu bez migracji schematu przy każdej nowej opcji).
