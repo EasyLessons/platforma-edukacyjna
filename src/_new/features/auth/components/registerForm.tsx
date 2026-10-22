@@ -7,18 +7,10 @@ import { Eye, EyeOff } from 'lucide-react';
 import { Input } from '@new/shared/ui/input';
 import { Button } from '@new/shared/ui/button';
 import { useRegister } from '../hooks/useRegister';
+import { TermsNotice } from './termsNotice';
 
 export function RegisterForm() {
-  const {
-    formData,
-    errors,
-    isLoading,
-    generalError,
-    acceptTerms,
-    handleChange,
-    handleTermsChange,
-    handleSubmit,
-  } = useRegister();
+  const { formData, errors, isLoading, generalError, handleChange, handleSubmit } = useRegister();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
@@ -77,38 +69,11 @@ export function RegisterForm() {
         error={errors.password_confirm}
       />
 
-      {/* Terms Checkbox */}
-      <label className="flex items-start gap-3 cursor-pointer group py-3">
-        <input
-          type="checkbox"
-          checked={acceptTerms}
-          onChange={(e) => handleTermsChange(e.target.checked)}
-          className="mt-1 w-4 h-4 text-gray-900 border-gray-300 rounded focus:ring-2 focus:ring-gray-400"
-        />
-        <span className="text-sm text-gray-600 font-light">
-          Akceptuję{' '}
-          <Link
-            href="/terms"
-            className="text-blue-600 hover:text-blue-700 hover:underline"
-            target="_blank"
-          >
-            regulamin
-          </Link>{' '}
-          i{' '}
-          <Link
-            href="/privacy-policy"
-            className="text-blue-600 hover:text-blue-700 hover:underline"
-            target="_blank"
-          >
-            politykę prywatności
-          </Link>
-        </span>
-      </label>
-
       {/* Submit Button */}
       <Button variant="dark" type="submit" loading={isLoading} className="w-full mb-5">
         Zarejestruj
       </Button>
+      <TermsNotice action="Tworząc konto" className="mb-5" />
 
       {/* Masz już konto */}
       <p className="py-5 text-center text-gray-600 font-light mb-8">

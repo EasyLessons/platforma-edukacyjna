@@ -57,7 +57,7 @@ Każda grupa ma dokładnie jeden powód do zmiany layoutu (Single Responsibility
 src/_new/
 ├── features/
 │   ├── account/        (panel konta: Sidebar, ProfileSection; components/_mock/ = makiety bez backendu, known-issues #5)
-│   ├── auth/           (formularze logowania/rejestracji, hooki useLogin/useRegister, Google OAuth button)
+│   ├── auth/           (formularze logowania/rejestracji, hooki useLogin/useRegister, Google OAuth button, TermsNotice z informacją o regulaminie)
 │   ├── board/          (lista boardów, tworzenie/edycja, karty boardów)
 │   ├── dashboard/      (układ panelu: sidebar workspace'ów, sekcje boardów, nagłówek z popupami)
 │   ├── demo/           (tablica demo bez konta: tożsamość gościa, sesja demo, CTA na landingu)

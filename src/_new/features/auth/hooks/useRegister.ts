@@ -34,7 +34,6 @@ export function useRegister() {
   const [errors, setErrors] = useState<FormErrors<RegisterFormData>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [generalError, setGeneralError] = useState('');
-  const [acceptTerms, setAcceptTerms] = useState(false);
 
   const { handleError, isError } = useErrorHandler({
     onError: setGeneralError,
@@ -71,12 +70,6 @@ export function useRegister() {
       newErrors.password_confirm = passwordsMatchValidation.error;
     }
 
-    // Terms acceptance
-    if (!acceptTerms) {
-      setGeneralError('Musisz zaakceptować regulamin');
-      return false;
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -86,11 +79,6 @@ export function useRegister() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: '' }));
-    setGeneralError('');
-  };
-
-  const handleTermsChange = (checked: boolean) => {
-    setAcceptTerms(checked);
     setGeneralError('');
   };
 
@@ -133,10 +121,8 @@ export function useRegister() {
     errors,
     isLoading,
     generalError,
-    acceptTerms,
     // Handlers
     handleChange,
-    handleTermsChange,
     handleSubmit,
   };
 }
