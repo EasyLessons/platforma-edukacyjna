@@ -2,6 +2,7 @@
 MAIN.PY - Entry point aplikacji
 """
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +20,7 @@ from core.request_context import REQUEST_ID_HEADER, get_request_id
 from core.request_id import RequestIdMiddleware
 
 from api.v1.router import get_v1_router
+from api.v1.storage_quota.cleanup import cleanup_loop
 
 # Logging setup
 log_level = "DEBUG" if os.getenv("ENV", "production") == "development" else "INFO"
@@ -29,7 +31,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Education Platform API started ...")
+    # Sprzatanie Storage / powiadomien / zaproszen (STORAGE_CLEANUP_ENABLED=false wylacza).
+    cleanup_task = asyncio.create_task(cleanup_loop()) if get_settings().storage_cleanup_enabled else None
     yield
+    if cleanup_task:
+        cleanup_task.cancel()
     logger.info("... Education Platform API stopped")
 
 # App

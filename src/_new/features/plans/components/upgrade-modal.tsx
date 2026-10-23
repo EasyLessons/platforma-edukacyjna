@@ -24,6 +24,8 @@ const REASON_TEXT: Record<PlanLimitCode, string> = {
   PLAN_LIMIT_BOARDS: 'Osiągnąłeś limit tablic w jednej przestrzeni w planie Free.',
   PLAN_LIMIT_ELEMENTS:
     'Ta tablica osiągnęła limit elementów planu Free. Usuń coś albo przejdź na Premium.',
+  PLAN_LIMIT_STORAGE:
+    'Ta przestrzeń wykorzystała limit miejsca na pliki w planie Free. Usuń niepotrzebne tablice albo przejdź na Premium.',
 };
 
 const BENEFITS = [

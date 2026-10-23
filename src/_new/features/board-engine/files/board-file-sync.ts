@@ -72,7 +72,7 @@ export const INLINE_WARN_BYTES = 200 * 1024;
 export const RETRY_AFTER_FAILURE_MS = 5_000;
 
 export type UploadFailure =
-  'too-large' | 'dimensions' | 'unsupported' | 'svg' | 'quota' | 'forbidden' | 'failed';
+  'too-large' | 'dimensions' | 'unsupported' | 'svg' | 'quota' | 'storage' | 'forbidden' | 'failed';
 
 /** Część wiązania Y.Doc, której potrzebuje ten moduł (excalidraw-binding.ts). */
 export interface FileBinding {
@@ -152,6 +152,8 @@ function failureReason(err: unknown): UploadFailure {
       return 'dimensions';
     case 'BOARD_FILE_QUOTA_EXCEEDED':
       return 'quota';
+    case 'PLAN_LIMIT_STORAGE':
+      return 'storage';
   }
   switch (errorStatus(err)) {
     case 413:
