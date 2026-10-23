@@ -20,6 +20,7 @@ pierwszym uploadem w procesie sprawdzamy jego flage `public` (`_bucket_is_public
 import re
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import httpx
 
@@ -467,3 +468,113 @@ async def delete_prefix(bucket: str, prefix: str) -> int:
     if deleted:
         logger.info(f"Skasowano {deleted} plik(ow) z {bucket}/{folder}/")
     return deleted
+
+
+@dataclass(frozen=True)
+class StoredObject:
+    """Plik z listingu Storage: sciezka wzgledna bucketu, rozmiar w bajtach, data utworzenia (UTC, naive)."""
+    path: str
+    size: int
+    created_at: datetime | None
+
+
+def _parse_storage_time(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+    return parsed
+
+
+async def list_folder(bucket: str, folder: str = "") -> tuple[list[StoredObject], list[str]] | None:
+    """
+    Listuje JEDEN poziom folderu `folder` ("" = korzen bucketu), strona po stronie.
+    Zwraca (pliki, nazwy podfolderow) albo None, gdy listowania nie udalo sie dokonczyc
+    (siec, blad Storage, brak bucketu) - wolajacy NIE moze wtedy uznac, ze plikow "nie ma".
+    Pozycje z `id: null` to podfoldery. Sciezki o niebezpiecznych znakach sa pomijane.
+    """
+    config = _storage_config()
+    if not config:
+        return None
+    supabase_url, service_role_key = config
+    headers = {**_auth_headers(service_role_key), "Content-Type": "application/json"}
+    prefix = f"{folder.strip('/')}/" if folder.strip("/") else ""
+    files: list[StoredObject] = []
+    folders: list[str] = []
+
+    try:
+        async with httpx.AsyncClient(timeout=DELETE_TIMEOUT_SECONDS) as client:
+            for page in range(DELETE_PREFIX_MAX_PAGES):
+                response = await client.post(
+                    f"{supabase_url}/storage/v1/object/list/{bucket}",
+                    headers=headers,
+                    json={
+                        "prefix": prefix,
+                        "limit": LIST_PAGE_SIZE,
+                        "offset": page * LIST_PAGE_SIZE,
+                        "sortBy": {"column": "name", "order": "asc"},
+                    },
+                )
+                if response.status_code >= 400:
+                    logger.warning(f"Listowanie {bucket}/{prefix} nieudane: HTTP {response.status_code}")
+                    return None
+                entries = response.json()
+                if not isinstance(entries, list):
+                    return None
+                for entry in entries:
+                    if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+                        continue
+                    path = f"{prefix}{entry['name']}"
+                    if not _SAFE_OBJECT_PATH.fullmatch(path):
+                        continue
+                    if entry.get("id", "") is None:
+                        folders.append(entry["name"])
+                        continue
+                    metadata = entry.get("metadata") if isinstance(entry.get("metadata"), dict) else {}
+                    size = metadata.get("size", metadata.get("contentLength", 0))
+                    files.append(
+                        StoredObject(
+                            path=path,
+                            size=size if isinstance(size, int) and size >= 0 else 0,
+                            created_at=_parse_storage_time(entry.get("created_at")),
+                        )
+                    )
+                if len(entries) < LIST_PAGE_SIZE:
+                    return files, folders
+            logger.warning(f"Listowanie {bucket}/{prefix} przerwane po {DELETE_PREFIX_MAX_PAGES} stronach")
+            return None
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning(f"Listowanie {bucket}/{prefix} nieudane: {type(e).__name__}")
+        return None
+
+
+async def delete_objects(bucket: str, paths: list[str]) -> bool:
+    """
+    Kasuje wskazane obiekty jednym zadaniem (Storage przyjmuje wiele sciezek naraz).
+    True = Storage potwierdzil (brakujace obiekty nie sa bledem). False = nie wiadomo, czy
+    skasowano - wolajacy zostawia wpisy w rejestrze i ponawia przy nastepnym przebiegu.
+    """
+    config = _storage_config()
+    safe = [p for p in paths if _SAFE_OBJECT_PATH.fullmatch(p)]
+    if not config or not safe:
+        return not paths
+    supabase_url, service_role_key = config
+    try:
+        async with httpx.AsyncClient(timeout=DELETE_TIMEOUT_SECONDS) as client:
+            response = await client.request(
+                "DELETE",
+                f"{supabase_url}/storage/v1/object/{bucket}",
+                headers={**_auth_headers(service_role_key), "Content-Type": "application/json"},
+                json={"prefixes": safe},
+            )
+    except httpx.HTTPError as e:
+        logger.warning(f"Kasowanie {len(safe)} obiektow z {bucket} nieudane: {type(e).__name__}")
+        return False
+    if response.status_code >= 400:
+        logger.warning(f"Kasowanie {len(safe)} obiektow z {bucket} nieudane: HTTP {response.status_code}")
+        return False
+    return True

@@ -15,6 +15,7 @@ export const PLAN_LIMIT_CODES: readonly PlanLimitCode[] = [
   'PLAN_LIMIT_WORKSPACES',
   'PLAN_LIMIT_BOARDS',
   'PLAN_LIMIT_ELEMENTS',
+  'PLAN_LIMIT_STORAGE',
 ];
 
 /** Kod limitu z błędu albo null, gdy to nie jest błąd planu. */

@@ -68,11 +68,13 @@ class TestGetMe:
                 "max_own_workspaces": 2,
                 "max_boards_per_workspace": 3,
                 "max_elements_per_board": 1000,
+                "max_storage_bytes": 100 * 1024 * 1024,
                 "ai_chat_daily": None,
             },
             "usage": {
                 "own_workspaces": 1,
                 "boards_by_workspace": {str(test_workspace.id): 1},
+                "storage_bytes": 0,
             },
         }
 
@@ -85,6 +87,7 @@ class TestGetMe:
         assert data["plan"] == "premium"
         assert data["limits"]["max_boards_per_workspace"] is None
         assert data["limits"]["max_own_workspaces"] is None
+        assert data["limits"]["max_storage_bytes"] == 5 * 1024 * 1024 * 1024
 
     def test_401_bez_tokenu(self, client):
         r = client.get("/api/v1/plans/me")
