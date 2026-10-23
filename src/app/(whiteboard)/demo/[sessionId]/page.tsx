@@ -64,13 +64,6 @@ export default function DemoBoardPage() {
   if (isExcalidrawEngine) {
     return (
       <div className="relative h-dvh w-screen overflow-hidden">
-        <BoardHeaderFrame compact={!metrics.showFullHeader}>
-          <BoardLogoButton
-            href="/"
-            tooltip="Wróć na stronę główną"
-            compact={metrics.isPhoneLayout}
-          />
-        </BoardHeaderFrame>
         <ExcalidrawWhiteboard boardId={boardId} userRole="editor" guest={guest} />
       </div>
     );

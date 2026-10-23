@@ -126,6 +126,9 @@ export interface ExcalidrawBoardProps {
   /** Własne elementy osadzone (notatki) - przekazywane wprost do Excalidraw. */
   validateEmbeddable?: ExcalidrawProps['validateEmbeddable'];
   renderEmbeddable?: ExcalidrawProps['renderEmbeddable'];
+  /** Stan otwarcia panelu wykresu funkcji (z własnego pionowego toolbara). */
+  isFunctionPanelOpen?: boolean;
+  onFunctionPanelClose?: () => void;
   /** Stan początkowy z Y.Doc jest w scenie (dalsze zmiany zdalne dochodzą na bieżąco). */
   onSceneSynced?: () => void;
 }
@@ -141,6 +144,8 @@ export function ExcalidrawBoard({
   onApiReady,
   validateEmbeddable,
   renderEmbeddable,
+  isFunctionPanelOpen = false,
+  onFunctionPanelClose,
   onSceneSynced,
 }: ExcalidrawBoardProps) {
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
@@ -372,25 +377,6 @@ export function ExcalidrawBoard({
     [api]
   );
 
-  // Na telefonie prawy górny róg należy do paska narzędzi Excalidraw - f(x) i slot jako pływające
-  // przyciski nad stopką (widoczność przełącza CSS w excalidraw-theme.css).
-  const renderTopRightUI = useCallback(
-    (isMobile: boolean) =>
-      isMobile || (viewMode && !topRightExtra) ? null : (
-        <>
-          {topRightExtra?.('top-right')}
-          {!viewMode && (
-            <FunctionPanel
-              editingSpec={editingSpec}
-              onAdd={addFunction}
-              onUpdate={updateFunction}
-            />
-          )}
-        </>
-      ),
-    [viewMode, topRightExtra, editingSpec, addFunction, updateFunction]
-  );
-
   return (
     <div
       className="easylesson-board"
@@ -402,7 +388,6 @@ export function ExcalidrawBoard({
         initialData={initialData}
         onChange={handleChange}
         onPointerUpdate={handlePointerUpdate}
-        renderTopRightUI={renderTopRightUI}
         viewModeEnabled={viewMode}
         gridModeEnabled={gridVisible}
         UIOptions={UI_OPTIONS}
@@ -411,17 +396,25 @@ export function ExcalidrawBoard({
         validateEmbeddable={validateEmbeddable}
         renderEmbeddable={renderEmbeddable}
       />
-      {(!viewMode || topRightExtra) && (
-        <div className="easylesson-fx-mobile">
-          {topRightExtra?.('mobile')}
-          {!viewMode && (
-            <FunctionPanel
-              editingSpec={editingSpec}
-              onAdd={addFunction}
-              onUpdate={updateFunction}
-              placement="up-left"
-            />
-          )}
+      {isFunctionPanelOpen && !viewMode && (
+        <div
+          className="absolute left-16 top-1/2 -translate-y-1/2 z-50 pointer-events-auto"
+          data-testid="function-panel-container"
+        >
+          <FunctionPanel
+            editingSpec={editingSpec}
+            onAdd={(spec) => {
+              addFunction(spec);
+              onFunctionPanelClose?.();
+            }}
+            onUpdate={(spec) => {
+              updateFunction(spec);
+              onFunctionPanelClose?.();
+            }}
+            placement="floating"
+            isOpen={true}
+            onClose={onFunctionPanelClose}
+          />
         </div>
       )}
     </div>
