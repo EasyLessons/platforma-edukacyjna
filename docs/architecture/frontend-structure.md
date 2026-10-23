@@ -37,7 +37,7 @@ src/app/
 │
 ├── (whiteboard)/               ← fullscreen, bez header/footer
 │   ├── whiteboard/               (tablica zalogowanego usera; ?boardId=)
-│   └── demo/[sessionId]/         (tablica demo bez konta — feature `demo`)
+│   └── demo/[sessionId]/         (tablica demo bez konta — feature `demo`, Excalidraw + whiteboard-sync; pipelines.md 2d)
 │
 ├── (info)/                     ← dokumentacja i regulaminy (MDX), sidebar
 │   └── docs/, privacy-policy/, terms/, terms-of-use/, gdpr/, cookies-policy/
