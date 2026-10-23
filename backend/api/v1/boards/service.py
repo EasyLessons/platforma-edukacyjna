@@ -23,6 +23,7 @@ from api.v1.workspaces.authorization import require_membership, require_workspac
 from api.v1.whiteboard.storage import delete_board_folder
 from api.v1.whiteboard.files import delete_board_files
 from api.v1.plans.service import PlanService
+from api.v1.storage_quota import service as storage_quota
 
 from .schemas import (
     CreateBoard, UpdateBoard, ToggleFavourite,
@@ -229,6 +230,9 @@ class BoardService:
         await delete_board_folder(board_id)
         # Obrazy silnika Excalidraw (prywatny bucket board-files) - best-effort jak wyzej.
         await delete_board_files(board_id)
+        # Rejestr plikow (limit miejsca na konto): pliki skasowane, miejsce wolne.
+        storage_quota.forget_board(self.db, board_id)
+        self.db.commit()
 
         logger.info(f"Tablica usunięta: {board_id}")
         return {"success": True, "message": "Tablica została pomyślnie usunięta."}
