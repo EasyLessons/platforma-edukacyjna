@@ -27,8 +27,10 @@ Ochrona przed zalaniem uploadami (kolejnosc = kolejnosc sprawdzania, wszystko PR
 czytaniem ciala):
   1. limit zadan per IP i per UZYTKOWNIK (Redis, fail-open),
   2. uprawnienia do tablicy,
-  3. miekka quota tablicy (liczba plikow i bajty, licznik w Redis, fail-open),
-  4. `upload_slot`: najwyzej MAX_UPLOADS_IN_FLIGHT uploadow w toku w procesie i
+  3. limit miejsca na konto wlasciciela przestrzeni wg planu (baza, api/v1/storage_quota;
+     sprawdzenie wstepne tutaj, autorytatywne po zapisie w Storage) - 403 PLAN_LIMIT_STORAGE,
+  4. miekka quota tablicy (liczba plikow i bajty, licznik w Redis, fail-open),
+  5. `upload_slot`: najwyzej MAX_UPLOADS_IN_FLIGHT uploadow w toku w procesie i
      MAX_UPLOADS_IN_FLIGHT_PER_USER na konto; nadmiar dostaje od razu 503/429 z Retry-After
      i jego cialo NIE jest czytane. Bez tego 60 rownoleglych uploadow lezalo w RAM (5 MB
      kazdy) w kolejce do semafora dekodowania i blokowalo awatary na ~2 min.
@@ -49,13 +51,14 @@ from core.logging import get_logger
 from core.models import User
 from core.rate_limit import rate_limit
 from core.responses import ApiResponse
-from core.storage import BucketSpec, delete_prefix, download_object, upload_object
+from core.storage import BucketSpec, delete_prefix, delete_public_object, download_object, upload_object
 
 # Czytanie multipart z limitem 5 MB / 60 s i kolejka dekodowania sa wspolne z awatarem:
 # semafor MUSI byc jeden na proces (szczyt RAM jednego uploadu tablicy: do ~145 MB).
 from ..auth.avatar import _read_avatar_file as read_image_upload
 from ..auth.avatar import _sanitize_one_at_a_time as sanitize_one_at_a_time
 from ..auth.dependencies import get_current_user
+from ..storage_quota import service as storage_quota
 from .schemas import BoardFileResponse
 from .service import WhiteboardService, can_edit
 
@@ -226,7 +229,7 @@ def upload_slot(user_id: int) -> Iterator[None]:
     ),
     responses={
         400: {"description": "Invalid upload or unsupported image"},
-        403: {"description": "Viewer cannot upload"},
+        403: {"description": "Viewer cannot upload, or the space owner's storage limit is reached (PLAN_LIMIT_STORAGE)"},
         404: {"description": "Board not found or no access"},
         409: {"description": "Board file quota exceeded"},
         413: {"description": "File too large"},
@@ -261,10 +264,13 @@ async def upload_board_file(
     ),
 ):
     # Uprawnienia PRZED czytaniem ciala: viewer i nie-czlonek nie wysylaja nam 5 MB.
-    _board, role = WhiteboardService(db)._get_board_and_role(board_id, current_user.id)
+    board, role = WhiteboardService(db)._get_board_and_role(board_id, current_user.id)
     if not can_edit(role):
         raise AppException("Rola viewer nie może dodawać obrazów do tablicy", code="FORBIDDEN", status_code=403)
     user_id = current_user.id
+    # Miejsce liczy sie wlascicielowi przestrzeni, nie temu, kto wgrywa (jak limity planow).
+    owner_id = board.workspace.created_by
+    storage_quota.ensure_can_upload(db, owner_id)
     # Polaczenie z baza wraca do puli na czas wolnego uploadu i dekodowania (jak w avatar.py).
     db.rollback()
 
@@ -290,6 +296,11 @@ async def upload_board_file(
             image.content_type,
             create_bucket=BOARD_FILES_BUCKET_SPEC,
         )
+    # Autorytatywne sprawdzenie limitu miejsca (pod blokada wlasciciela) - dopiero tu, bo
+    # dopiero teraz znamy rozmiar po przekodowaniu. Nie zmiescil sie -> kasujemy obiekt.
+    if not storage_quota.record_upload(db, board_id, owner_id, file_name, len(image.data)):
+        await delete_public_object(BOARD_FILES_BUCKET, board_file_path(board_id, file_name))
+        raise storage_quota.limit_error(db, owner_id)
     await _record_board_usage(board_id, len(image.data))
 
     logger.info(

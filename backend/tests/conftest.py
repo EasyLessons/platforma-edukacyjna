@@ -46,6 +46,7 @@ from sqlalchemy.pool import StaticPool
 from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers
 # Modele spoza core/models.py — import rejestruje tabelę w Base.metadata (create_all)
 import api.v1.plans.models  # noqa: F401  (user_plans)
+import api.v1.storage_quota.models  # noqa: F401  (board_files)
 from api.v1.auth.utils import hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"

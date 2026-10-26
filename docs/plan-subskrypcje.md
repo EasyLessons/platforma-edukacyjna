@@ -34,13 +34,15 @@ DELETE FROM user_plans WHERE user_id = <id_usera>;
 
 `backend/api/v1/plans/limits.py` (`PlanLimits`, `PLAN_LIMITS`). `None` = bez limitu. Liczby Free
 można nadpisać zmiennymi środowiskowymi (`PLAN_FREE_MAX_WORKSPACES`,
-`PLAN_FREE_MAX_BOARDS_PER_WORKSPACE`, `PLAN_FREE_MAX_ELEMENTS`).
+`PLAN_FREE_MAX_BOARDS_PER_WORKSPACE`, `PLAN_FREE_MAX_ELEMENTS`, `PLAN_FREE_MAX_STORAGE_MB`,
+`PLAN_PREMIUM_MAX_STORAGE_MB`).
 
 | limit                      | Free | Premium |
 | -------------------------- | ---- | ------- |
 | `max_own_workspaces`       | 2    | —       |
 | `max_boards_per_workspace` | 3    | —       |
 | `max_elements_per_board`   | 1000 | —       |
+| `max_storage_bytes`        | 100 MB | 5 GB  |
 | `ai_chat_daily`            | —    | —       |
 
 Członkostwo w cudzych przestrzeniach jest bez limitu. Ostrzeżenie „tablica się zapełnia" przy
@@ -56,6 +58,8 @@ Członkostwo w cudzych przestrzeniach jest bez limitu. Ostrzeżenie „tablica s
   ponad limitem (np. 15 tablic w przestrzeni po zmianie planu) zostają i działają: lista, odczyt,
   zmiana nazwy, usunięcie. Nowy powstanie po zejściu poniżej limitu albo po Premium. Badge pokazuje
   wtedy np. „7/3" na czerwono. Migracja nie dotyka danych.
+- **Miejsce na pliki:** suma `board_files.size_bytes` (bez wierszy z `deleted_at`) po `owner_id` =
+  właściciel przestrzeni; limit wg jego planu. Szczegóły: sekcja „Miejsce na pliki" niżej.
 - **Elementy:** liczone z dokumentu Excalidraw w Y.Doc (`excalidraw-elements`,
   `isDeleted !== true`), nie z bazy — egzekwuje `whiteboard-sync` (sekcja niżej).
 
@@ -121,6 +125,31 @@ klienta.
   i `workspace-sidebar`. Bez płatności; opcjonalny link `NEXT_PUBLIC_PREMIUM_INTEREST_URL`.
 - Brak trybu „cała tablica tylko do odczytu po przekroczeniu" — zdecydowano, że limit elementów
   blokuje tylko dodawanie nowych.
+
+## Miejsce na pliki (decyzja Patryka, 12.10.2026)
+
+Limit na KONTO właściciela przestrzeni: Free 100 MB, Premium 5 GB. Rozszerza miękką quotę tablicy
+z PR #106 (300 plików / 100 MB na tablicę, licznik w Redis — zostaje jako druga, lokalna zapora).
+
+- **Rejestr `board_files`** (`backend/api/v1/storage_quota/`, migracja `e5b2d8a47c10`): jeden wiersz
+  na obiekt `board-files/{board_id}/{file_name}` (`board_id`, `owner_id`, `file_name`, `size_bytes`,
+  `created_at`, `deleted_at`). Bez kluczy obcych — rejestr ma przeżyć usunięcie tablicy, przestrzeni
+  i konta (pliki kasowane po okresie karencji). Zapis wiersza następuje po udanym zapisie w Storage.
+- **Dwa sprawdzenia uploadu** (`whiteboard/files.py`): wstępne PRZED czytaniem ciała (konto już na
+  limicie → od razu `403 PLAN_LIMIT_STORAGE`, bez 5 MB w RAM) i autorytatywne PO zapisie w Storage
+  (suma pod `FOR UPDATE` na wierszu właściciela + rozmiar po przekodowaniu; nie mieści się →
+  obiekt jest kasowany, `403 PLAN_LIMIT_STORAGE`, `data: {limit_bytes, used_bytes}`).
+- **Blokada tylko dodawania.** Przeglądanie, pobieranie, edycja i usuwanie działają na limicie;
+  konto ponad limitem (np. po spadku z Premium) niczego nie traci, tylko nie dokłada.
+- **Zwalnianie miejsca:** usunięcie tablicy kasuje jej pliki i wiersze rejestru; usunięcie
+  przestrzeni oznacza wiersze `deleted_at` (nie liczą się do limitu; fizycznie usuwa je job
+  sprzątający). Plik usunięty z tablicy (element) zostaje — cofnięcie może go przywrócić.
+- **Pliki sprzed migracji** nie mają wierszy w rejestrze, więc nie liczą się do limitu, dopóki job
+  sprzątający nie dopisze ich przy porównaniu bucketu z rejestrem.
+- **Nie liczą się:** wspólne szablony (arkusze CKE, karty wzorów — `tpl:` w `Y.Doc`, nie są w
+  Storage), awatary (`avatars`, 5 MB WEBP 512 px na konto) i stary silnik (`board-images`).
+- Front: `GET /plans/me` zwraca `limits.max_storage_bytes` i `usage.storage_bytes`; błąd uploadu
+  `PLAN_LIMIT_STORAGE` pokazuje komunikat (`excalidraw-file-sync.ts`), a `UpgradeModal` zna ten kod.
 
 ## Limit elementów (whiteboard-sync, PR 3)
 
