@@ -33,6 +33,18 @@ describe('UpgradeModal', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('limit elementów planu Free');
   });
 
+  it('mówi, że płatności nie ma, a Premium nadajemy ręcznie, i podaje adres kontaktowy', () => {
+    render(<UpgradeModal isOpen onClose={vi.fn()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveTextContent(
+      'Płatności jeszcze nie ma – Premium nadajemy ręcznie. Daj znać: kontakt@easylesson.app'
+    );
+    expect(screen.getByRole('link', { name: 'kontakt@easylesson.app' })).toHaveAttribute(
+      'href',
+      'mailto:kontakt@easylesson.app'
+    );
+  });
+
   it('klik „Zamknij" woła onClose', () => {
     const onClose = vi.fn();
     render(<UpgradeModal isOpen onClose={onClose} />);

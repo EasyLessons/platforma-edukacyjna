@@ -1,8 +1,8 @@
 /**
  * UPGRADE MODAL — „Przejdź na Premium"
  *
- * Bez płatności (Stripe później): tekst, lista korzyści, przycisk zamknij
- * i opcjonalny link zainteresowania (NEXT_PUBLIC_PREMIUM_INTEREST_URL —
+ * Bez płatności (Stripe później): tekst z adresem kontaktowym (Premium nadajemy ręcznie),
+ * lista korzyści, przycisk zamknij i opcjonalny link zainteresowania (NEXT_PUBLIC_PREMIUM_INTEREST_URL —
  * mailto: albo formularz; gdy brak zmiennej, przycisk się nie renderuje).
  *
  * Otwierany, gdy API zwróci 403 z kodem PLAN_LIMIT_* (patrz utils/plan-limit-error.ts)
@@ -34,6 +34,9 @@ const BENEFITS = [
 ];
 
 const PREMIUM_INTEREST_URL = process.env.NEXT_PUBLIC_PREMIUM_INTEREST_URL;
+
+/** Adres kontaktowy ze stopki strony (landing/navigation/Footer.tsx) i podstrony /contact. */
+const CONTACT_EMAIL = 'kontakt@easylesson.app';
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -95,8 +98,13 @@ export function UpgradeModal({ isOpen, onClose, reason }: UpgradeModalProps) {
         </ul>
 
         <p className="mb-5 text-xs text-gray-500">
-          Płatności jeszcze nie ma — Premium nadajemy ręcznie. Daj znać, jeśli chcesz z niego
-          korzystać.
+          Płatności jeszcze nie ma – Premium nadajemy ręcznie. Daj znać:{' '}
+          <a
+            href={`mailto:${CONTACT_EMAIL}`}
+            className="font-semibold text-violet-700 underline hover:text-violet-800"
+          >
+            {CONTACT_EMAIL}
+          </a>
         </p>
 
         <div className="flex justify-end gap-2">
