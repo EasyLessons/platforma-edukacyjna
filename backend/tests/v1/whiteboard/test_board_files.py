@@ -701,15 +701,16 @@ class TestBoardQuota:
         assert len(fake_storage.keys()) == 1
 
     @pytest.mark.asyncio
-    async def test_usuniecie_tablicy_zeruje_licznik(
-        self, client, db_session, test_user, test_board, fake_storage, sync_redis_client
+    async def test_skasowanie_plikow_tablicy_zeruje_licznik(
+        self, client, test_user, test_board, fake_storage, sync_redis_client
     ):
         upload_ok(client, test_board.id, test_user)
         board_id = test_board.id
         assert self.usage(sync_redis_client, board_id)[0] == 1
 
-        await BoardService(db_session).delete_board(board_id, test_user.id)
+        await files_module.delete_board_files(board_id)
 
+        assert fake_storage.keys() == []
         assert sync_redis_client.exists(*files_module._usage_keys(board_id)) == 0
 
 
@@ -912,16 +913,19 @@ class TestDownload:
 class TestDeleteWithBoard:
 
     @pytest.mark.asyncio
-    async def test_usuniecie_tablicy_kasuje_jej_pliki(self, client, db_session, test_user, test_workspace, test_board, fake_storage):
+    async def test_usuniecie_tablicy_zostawia_pliki_na_okres_karencji(
+        self, client, db_session, test_user, test_workspace, test_board, fake_storage
+    ):
+        # Pliki usunietej tablicy znikaja po 30 dniach (job sprzatajacy: test_cleanup.py), nie od razu.
         other = make_board(db_session, test_workspace, test_user, name="Inna")
-        upload_ok(client, test_board.id, test_user)
-        upload_ok(client, test_board.id, test_user)
+        first = upload_ok(client, test_board.id, test_user)
+        second = upload_ok(client, test_board.id, test_user)
         kept = upload_ok(client, other.id, test_user)
         board_id = test_board.id
 
         await BoardService(db_session).delete_board(board_id, test_user.id)
 
-        assert fake_storage.keys() == [f"{other.id}/{kept}"]
+        assert fake_storage.keys() == sorted([f"{board_id}/{first}", f"{board_id}/{second}", f"{other.id}/{kept}"])
 
     @pytest.mark.asyncio
     async def test_blad_storage_nie_blokuje_usuniecia_tablicy(self, db_session, test_user, test_board, monkeypatch):

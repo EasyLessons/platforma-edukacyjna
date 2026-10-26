@@ -7,9 +7,10 @@ from typing import List
 from sqlalchemy.orm import Session
 from api.v1.boards.service import reassign_boards_on_member_removal
 from api.v1.plans.service import PlanService
+from api.v1.storage_quota import service as storage_quota
 
 from core.exceptions import AppException
-from core.models import Workspace, WorkspaceMember
+from core.models import Board, Workspace, WorkspaceMember
 from .authorization import require_membership, require_owner
 from .schemas import (
     WorkspaceCreate, WorkspaceUpdate, 
@@ -136,6 +137,11 @@ class WorkspaceService:
         """Usuwa workspace — tylko owner."""
         db = self.db
         workspace = require_owner(db, workspace_id, user_id, "Tylko właściciel może usunąć workspace")
+
+        # Tablice znikna kaskada, a ich pliki zostaja w Storage - w rejestrze oznaczamy je jako
+        # skasowane, zeby przestaly liczyc sie do limitu miejsca (fizycznie usuwa je job sprzatajacy).
+        board_ids = [board_id for (board_id,) in db.query(Board.id).filter(Board.workspace_id == workspace_id)]
+        storage_quota.mark_deleted(db, board_ids)
 
         db.delete(workspace)
         db.commit()

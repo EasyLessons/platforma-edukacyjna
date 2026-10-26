@@ -34,13 +34,15 @@ DELETE FROM user_plans WHERE user_id = <id_usera>;
 
 `backend/api/v1/plans/limits.py` (`PlanLimits`, `PLAN_LIMITS`). `None` = bez limitu. Liczby Free
 można nadpisać zmiennymi środowiskowymi (`PLAN_FREE_MAX_WORKSPACES`,
-`PLAN_FREE_MAX_BOARDS_PER_WORKSPACE`, `PLAN_FREE_MAX_ELEMENTS`).
+`PLAN_FREE_MAX_BOARDS_PER_WORKSPACE`, `PLAN_FREE_MAX_ELEMENTS`, `PLAN_FREE_MAX_STORAGE_MB`,
+`PLAN_PREMIUM_MAX_STORAGE_MB`).
 
 | limit                      | Free | Premium |
 | -------------------------- | ---- | ------- |
 | `max_own_workspaces`       | 2    | —       |
 | `max_boards_per_workspace` | 3    | —       |
 | `max_elements_per_board`   | 1000 | —       |
+| `max_storage_bytes`        | 100 MB | 5 GB  |
 | `ai_chat_daily`            | —    | —       |
 
 Członkostwo w cudzych przestrzeniach jest bez limitu. Ostrzeżenie „tablica się zapełnia" przy
@@ -56,6 +58,8 @@ Członkostwo w cudzych przestrzeniach jest bez limitu. Ostrzeżenie „tablica s
   ponad limitem (np. 15 tablic w przestrzeni po zmianie planu) zostają i działają: lista, odczyt,
   zmiana nazwy, usunięcie. Nowy powstanie po zejściu poniżej limitu albo po Premium. Badge pokazuje
   wtedy np. „7/3" na czerwono. Migracja nie dotyka danych.
+- **Miejsce na pliki:** suma `board_files.size_bytes` (bez wierszy z `deleted_at`) po `owner_id` =
+  właściciel przestrzeni; limit wg jego planu. Szczegóły: sekcja „Miejsce na pliki" niżej.
 - **Elementy:** liczone z dokumentu Excalidraw w Y.Doc (`excalidraw-elements`,
   `isDeleted !== true`), nie z bazy — egzekwuje `whiteboard-sync` (sekcja niżej).
 
@@ -121,6 +125,63 @@ klienta.
   i `workspace-sidebar`. Bez płatności; opcjonalny link `NEXT_PUBLIC_PREMIUM_INTEREST_URL`.
 - Brak trybu „cała tablica tylko do odczytu po przekroczeniu" — zdecydowano, że limit elementów
   blokuje tylko dodawanie nowych.
+
+## Miejsce na pliki (decyzja Patryka, 12.10.2026)
+
+Limit na KONTO właściciela przestrzeni: Free 100 MB, Premium 5 GB. Rozszerza miękką quotę tablicy
+z PR #106 (300 plików / 100 MB na tablicę, licznik w Redis — zostaje jako druga, lokalna zapora).
+
+- **Rejestr `board_files`** (`backend/api/v1/storage_quota/`, migracja `e5b2d8a47c10`): jeden wiersz
+  na obiekt `board-files/{board_id}/{file_name}` (`board_id`, `owner_id`, `file_name`, `size_bytes`,
+  `created_at`, `deleted_at`). Bez kluczy obcych — rejestr ma przeżyć usunięcie tablicy, przestrzeni
+  i konta (pliki kasowane po okresie karencji). Zapis wiersza następuje po udanym zapisie w Storage.
+- **Dwa sprawdzenia uploadu** (`whiteboard/files.py`): wstępne PRZED czytaniem ciała (konto już na
+  limicie → od razu `403 PLAN_LIMIT_STORAGE`, bez 5 MB w RAM) i autorytatywne PO zapisie w Storage
+  (suma pod `FOR UPDATE` na wierszu właściciela + rozmiar po przekodowaniu; nie mieści się →
+  obiekt jest kasowany, `403 PLAN_LIMIT_STORAGE`, `data: {limit_bytes, used_bytes}`).
+- **Blokada tylko dodawania.** Przeglądanie, pobieranie, edycja i usuwanie działają na limicie;
+  konto ponad limitem (np. po spadku z Premium) niczego nie traci, tylko nie dokłada.
+- **Zwalnianie miejsca:** usunięcie tablicy albo przestrzeni oznacza wiersze `deleted_at` — przestają
+  liczyć się do limitu od razu, a pliki znikają ze Storage po 30 dniach (job sprzątający, niżej).
+  Plik usunięty z tablicy jako element zostaje — cofnięcie może go przywrócić.
+- **Pliki sprzed migracji** nie mają wierszy w rejestrze, więc nie liczą się do limitu, dopóki job
+  sprzątający (pierwszy przebieg) nie dopisze ich przy porównaniu bucketu z rejestrem.
+- **Nie liczą się:** wspólne szablony (arkusze CKE, karty wzorów — `tpl:` w `Y.Doc`, nie są w
+  Storage), awatary (`avatars`, 5 MB WEBP 512 px na konto) i stary silnik (`board-images`).
+- Front: `GET /plans/me` zwraca `limits.max_storage_bytes` i `usage.storage_bytes`; błąd uploadu
+  `PLAN_LIMIT_STORAGE` pokazuje komunikat (`excalidraw-file-sync.ts`), a `UpgradeModal` zna ten kod.
+
+### Sprzątanie (job cykliczny)
+
+`backend/api/v1/storage_quota/cleanup.py`, decyzje Patryka z 12.10.2026. Pętla w `lifespan`
+(`main.py`) sprawdza co godzinę, czy minęły 24 h od ostatniego przebiegu (raport w Redis
+`storage_cleanup:last_report`, więc restart procesu nie uruchamia go od nowa), pierwszy start 10 min po
+uruchomieniu. Jeden przebieg naraz (blokada `storage_cleanup:lock`). Kroki, każdy w osobnym
+`try/except`:
+
+1. **Rejestr = bucket** — pliki z `board-files` bez wiersza są dopisywane (właściciel z przestrzeni;
+   brak tablicy → od razu `deleted_at`), wiersze bez obiektu (starsze niż 1 h) znikają.
+2. **Zniknięte tablice** — wiersze tablic, których nie ma w `boards` (kaskady, usunięte konta), dostają `deleted_at`.
+3. **Sieroty** — plik starszy niż 7 dni, którego nazwy nie ma w `board_documents.snapshot` swojej
+   tablicy, dostaje `deleted_at`. Odwołanie = nazwa `<32 hex>.webp` w bajtach snapshotu (Yjs trzyma
+   ją jako zwykły tekst UTF-8; sprawdzone na prawdziwym `Y.encodeStateAsUpdate`).
+4. **Skasowanie** — `deleted_at` starsze niż 30 dni: snapshot sprawdzany PONOWNIE (plik, do którego jest
+   odwołanie, wraca do użycia i nie jest kasowany), reszta znika ze Storage i z rejestru. Błąd Storage
+   = wpis zostaje do następnego przebiegu.
+5. **Awatary-sieroty** — obiekty `avatars/` bez żadnego `users.avatar_url`, starsze niż 7 dni.
+6. **Baza** — powiadomienia przeczytane >30 dni i wszystkie >90 dni; zaproszenia i linki zaproszeniowe
+   30 dni po terminie (linki także 30 dni po odwołaniu).
+
+Bezpieczniki: nic nie jest kasowane od razu (najpierw `deleted_at`, 30 dni na pomyłkę); krok, który
+oznaczyłby ponad połowę plików (min. 20), jest pomijany i trafia do `errors` raportu; nieudane
+listowanie Storage nigdy nie znaczy „plików nie ma". Wspólne szablony, pliki starego silnika
+(`board-images`) i dokumenty Yjs nie są ruszane. Za „stare pliki" uznajemy tylko sieroty i pliki
+usuniętych tablic — plik z żywej tablicy nie jest kasowany z powodu wieku.
+
+Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENABLED` (domyślnie `true`;
+`false` wyłącza pętlę), `STORAGE_CLEANUP_INTERVAL_HOURS` (24), `STORAGE_CLEANUP_INITIAL_DELAY_MINUTES` (10).
+Ręcznie: `python scripts/storage_cleanup.py --dry-run` (z `backend/`) — raport JSON bez żadnego zapisu;
+bez `--dry-run` robi to samo co pętla. Pierwszy przebieg na produkcji: najpierw `--dry-run`.
 
 ## Limit elementów (whiteboard-sync, PR 3)
 
