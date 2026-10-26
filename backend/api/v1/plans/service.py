@@ -69,6 +69,13 @@ class PlanService:
         )
         return {int(ws_id): int(n) for ws_id, n in self.db.execute(stmt).all()}
 
+    def storage_used_bytes(self, user_id: int) -> int:
+        """Miejsce zajęte przez pliki tablic w przestrzeniach tego użytkownika (api/v1/storage_quota)."""
+        # Import lokalny: storage_quota.service importuje PlanService (unikamy cyklu).
+        from api.v1.storage_quota.service import used_bytes
+
+        return used_bytes(self.db, user_id)
+
     def element_limit_for_workspace(self, workspace: Workspace) -> int | None:
         """Limit zywych elementow na tablicy wg planu WLASCICIELA przestrzeni (None = bez limitu)."""
         return self.get_limits(workspace.created_by).max_elements_per_board
@@ -122,5 +129,6 @@ class PlanService:
             usage=PlanUsageResponse(
                 own_workspaces=self.count_own_workspaces(user_id),
                 boards_by_workspace={str(k): v for k, v in by_ws.items()},
+                storage_bytes=self.storage_used_bytes(user_id),
             ),
         )

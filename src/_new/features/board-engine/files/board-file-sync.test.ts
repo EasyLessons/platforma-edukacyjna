@@ -687,6 +687,7 @@ describe('BoardFileSync - poprawki po przeglądzie PR #106', () => {
     [400, 'IMAGE_TOO_LARGE', 'dimensions'],
     [400, 'INVALID_FILE_TYPE', 'unsupported'],
     [409, 'BOARD_FILE_QUOTA_EXCEEDED', 'quota'],
+    [403, 'PLAN_LIMIT_STORAGE', 'storage'],
   ] as const)('HTTP %i %s: bez ponowień, powód "%s"', async (status, code, reason) => {
     const h = harness();
     h.transport.upload.mockRejectedValue(apiError(status, code));
