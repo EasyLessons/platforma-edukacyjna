@@ -9,33 +9,25 @@
  *  (b) link do wyslania jest czysty: easylesson.app/demo/<id>,
  *  (c) zero ryzyka, ze prawdziwa tablica dostanie boardId w formacie demo.
  *
- * VoiceChatProvider jest tu SWIADOMIE pominiety - WhiteboardCanvas dziala bez
- * niego (useVoiceChat() zwraca null poza providerem, a konsumenci uzywaja
- * `voiceChat?.`), a WebRTC to koszt i 1484 linie legacy, ktorych demo nie
- * potrzebuje.
+ * Tablica to Excalidraw (jedyny silnik; stary zostaje usuniety). Gosc laczy sie z whiteboard-sync
+ * BEZ tokenu - serwer wpuszcza tylko dokumenty `demo-<id>`, nie zapisuje ich w bazie, ogranicza
+ * liczbe osob i elementow oraz wygasza sesje po kilku godzinach (whiteboard-sync/src/demo.ts).
+ * Druga osoba wchodzi tym samym linkiem i widzi tablice na zywo, dopoki ktos jest polaczony.
  *
- * Zapisu do bazy nie ma: boardId to string `demo-...`, wiec kazde parseInt
- * daje NaN i warstwa REST wychodzi wczesniej (use-elements.ts, engine).
- * Jedyne miejsce, ktore tego nie sprawdzalo - markOpened w useRealtimeChannel -
- * dostalo guard isDemoBoard.
- *
- * Przy NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw demo renderuje tablice Excalidraw
- * tylko lokalnie (whiteboard-sync wymaga tokenu i liczbowego id tablicy).
+ * VoiceChatProvider jest tu SWIADOMIE pominiety - demo nie potrzebuje rozmowy glosowej.
  */
 
 'use client';
 
 import { useParams } from 'next/navigation';
 
-import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
 import { useDemoSession } from '@/_new/features/demo/use-demo-session';
+import { DEMO_ELEMENT_LIMIT } from '@/_new/features/demo/demo-limits';
 import {
   BoardHeaderFrame,
   BoardLogoButton,
 } from '@/_new/features/whiteboard/components/layout/board-header';
 import { useWhiteboardUiMetrics } from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
-import { BoardRealtimeProvider } from '../../../context/BoardRealtimeContext';
-import { isExcalidrawEngine } from '@/_new/features/board-engine';
 import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
 
 export default function DemoBoardPage() {
@@ -61,43 +53,26 @@ export default function DemoBoardPage() {
     );
   }
 
-  if (isExcalidrawEngine) {
-    return (
-      <div className="relative h-dvh w-screen overflow-hidden">
-        <BoardHeaderFrame compact={!metrics.showFullHeader}>
-          <BoardLogoButton
-            href="/"
-            tooltip="Wróć na stronę główną"
-            compact={metrics.isPhoneLayout}
-          />
-        </BoardHeaderFrame>
-        <ExcalidrawWhiteboard boardId={boardId} userRole="editor" guest={guest} />
-      </div>
-    );
-  }
-
   return (
-    <BoardRealtimeProvider boardId={boardId} identity={guest}>
-      <div className="relative h-dvh w-screen overflow-hidden">
-        {/*
-          Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona, a bez
-          tego przycisku z tablicy nie da sie wyjsc inaczej niz "wstecz".
+    <div className="relative h-dvh w-screen overflow-hidden">
+      {/*
+        Powrot na landing. Demo jest czesto pierwszym kontaktem ze strona, a bez
+        tego przycisku z tablicy nie da sie wyjsc inaczej niz "wstecz".
 
-          Logo i ramka to TE SAME komponenty, ktorych uzywa BoardHeader na zwyklej
-          tablicy — zeby demo wygladalo identycznie. Jedyne roznice sa celowe:
-          prowadzi na "/" zamiast do panelu, i jest widoczne przy kazdej szerokosci
-          (BoardHeader ponizej 1300 px chowa logo, a w demo to jedyna droga powrotu).
-        */}
-        <BoardHeaderFrame compact={!metrics.showFullHeader}>
-          <BoardLogoButton
-            href="/"
-            tooltip="Wróć na stronę główną"
-            compact={metrics.isPhoneLayout}
-          />
-        </BoardHeaderFrame>
-
-        <WhiteboardCanvas boardId={boardId} userRole="editor" />
-      </div>
-    </BoardRealtimeProvider>
+        Logo i ramka to TE SAME komponenty, ktorych uzywa BoardHeader na zwyklej
+        tablicy — zeby demo wygladalo identycznie. Jedyne roznice sa celowe:
+        prowadzi na "/" zamiast do panelu, i jest widoczne przy kazdej szerokosci
+        (BoardHeader ponizej 1300 px chowa logo, a w demo to jedyna droga powrotu).
+      */}
+      <BoardHeaderFrame compact={!metrics.showFullHeader}>
+        <BoardLogoButton href="/" tooltip="Wróć na stronę główną" compact={metrics.isPhoneLayout} />
+      </BoardHeaderFrame>
+      <ExcalidrawWhiteboard
+        boardId={boardId}
+        userRole="editor"
+        guest={guest}
+        elementLimit={DEMO_ELEMENT_LIMIT}
+      />
+    </div>
   );
 }

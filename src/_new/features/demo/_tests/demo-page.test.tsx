@@ -14,12 +14,12 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock, replace: vi.fn(), prefetch: vi.fn() }),
 }));
 
-vi.mock('@/_new/features/whiteboard/components/canvas/whiteboard-canvas', () => ({
-  default: () => <div data-testid="canvas" />,
-}));
-
-vi.mock('@/app/context/BoardRealtimeContext', () => ({
-  BoardRealtimeProvider: ({ children }: any) => <>{children}</>,
+const whiteboardProps = vi.fn();
+vi.mock('@/_new/features/board-engine/components/excalidraw-whiteboard', () => ({
+  ExcalidrawWhiteboard: (props: unknown) => {
+    whiteboardProps(props);
+    return <div data-testid="excalidraw-board" />;
+  },
 }));
 
 vi.mock('@/_new/features/demo/use-demo-session', () => ({
@@ -31,9 +31,27 @@ vi.mock('@/_new/features/demo/use-demo-session', () => ({
 }));
 
 import DemoBoardPage from '@/app/(whiteboard)/demo/[sessionId]/page';
+import { DEMO_ELEMENT_LIMIT } from '@/_new/features/demo/demo-limits';
 
 describe('Strona demo', () => {
-  beforeEach(() => pushMock.mockClear());
+  beforeEach(() => {
+    pushMock.mockClear();
+    whiteboardProps.mockClear();
+  });
+
+  it('renderuje tablice Excalidraw dla goscia: bez konta, rola edytora, limit elementow demo', () => {
+    render(<DemoBoardPage />);
+
+    expect(screen.getByTestId('excalidraw-board')).toBeInTheDocument();
+    expect(whiteboardProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        boardId: 'demo-abc123',
+        userRole: 'editor',
+        guest: { id: -42, username: 'Gosc-7K2P', isGuest: true },
+        elementLimit: DEMO_ELEMENT_LIMIT,
+      })
+    );
+  });
 
   it('pokazuje to samo logo co zwykla tablica (LogoEasyLesson.webp)', () => {
     render(<DemoBoardPage />);
