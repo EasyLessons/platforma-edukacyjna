@@ -1,7 +1,7 @@
 """board_files (rejestr plikow tablic, limit miejsca na konto)
 
 Revision ID: e5b2d8a47c10
-Revises: c4a9e1f27b3d
+Revises: da956c2af27b
 Create Date: 2026-10-19 12:00:00.000000
 
 Bez backfillu: pliki wgrane przed ta migracja dopisze job sprzatajacy, gdy porowna
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = 'e5b2d8a47c10'
-down_revision: Union[str, Sequence[str], None] = 'c4a9e1f27b3d'
+down_revision: Union[str, Sequence[str], None] = 'da956c2af27b'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
