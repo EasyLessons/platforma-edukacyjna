@@ -8,7 +8,8 @@ STORAGE CLEANUP - reczny przebieg sprzatania (api/v1/storage_quota/cleanup.py)
 `--dry-run` nic nie zapisuje ani nie kasuje - drukuje raport, co przebieg by zrobil.
 Pierwszy przebieg na produkcji warto zaczac od niego. Ten sam kod chodzi cyklicznie w procesie
 backendu (STORAGE_CLEANUP_ENABLED); skrypt przydaje sie do podgladu i do uruchomienia z zewnatrz.
-Raport (JSON) leci na stdout; kody wyjscia: 0 = bez bledow krokow, 1 = byly bledy, 2 = inny przebieg trwa.
+Raport (JSON) leci na stdout; kody wyjscia: 0 = bez bledow krokow, 1 = byly bledy,
+2 = pominiety (inny przebieg trwa albo Redis nie dal blokady - pole `skipped`).
 """
 import argparse
 import asyncio

@@ -477,8 +477,24 @@ class TestPrzebieg:
 
         report = await run(db_session)
 
-        assert report["skipped"] == "inny przebieg trwa"
+        assert report["skipped"] == cleanup.SKIPPED_BUSY
         assert storage.requests == []
+
+    @pytest.mark.asyncio
+    async def test_bez_redis_przebieg_jest_pomijany(self, db_session, storage, redis_client, monkeypatch):
+        """Decyzja 09.11.2026: brak blokady (Redis lezy) = nic nie kasujemy, job wroci za godzine."""
+        from redis.exceptions import ConnectionError as RedisConnectionError
+
+        async def broken_set(*args, **kwargs):
+            raise RedisConnectionError("connection refused")
+
+        monkeypatch.setattr(redis_client, "set", broken_set)
+
+        report = await run(db_session)
+
+        assert report["skipped"] == cleanup.SKIPPED_NO_REDIS
+        assert storage.requests == []
+        assert await cleanup.last_report() is None
 
     @pytest.mark.asyncio
     async def test_petla_uruchamia_przebieg_dopiero_gdy_minal_interwal(self, redis_client):

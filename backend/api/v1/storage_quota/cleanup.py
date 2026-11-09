@@ -351,21 +351,23 @@ async def _step(name: str, report: CleanupReport, db: Session, call) -> None:
         report.errors.append(f"{name}: wyjatek (szczegoly w logu)")
 
 
+SKIPPED_BUSY = "inny przebieg trwa"
+SKIPPED_NO_REDIS = "Redis niedostepny - brak blokady, przebieg pominiety"
+
+
 async def _acquire_lock() -> str | None:
-    """Token blokady; None = inny przebieg trwa. Brak Redis nie blokuje (kroki sa idempotentne)."""
+    """
+    Token blokady; None = inny przebieg trwa. Blad Redis (RedisError) leci dalej: bez blokady
+    przebieg jest POMIJANY (decyzja Patryka 09.11.2026) - dwa procesy bez wspolnej blokady
+    moglyby kasowac rownolegle, a job i tak wraca za godzine.
+    """
     token = secrets.token_hex(8)
-    try:
-        if await redis_client_module.get_redis_client().set(LOCK_KEY, token, nx=True, ex=LOCK_TTL_SECONDS):
-            return token
-        return None
-    except RedisError:
-        logger.warning("Sprzatanie Storage: Redis niedostepny - przebieg bez blokady")
-        return ""
+    if await redis_client_module.get_redis_client().set(LOCK_KEY, token, nx=True, ex=LOCK_TTL_SECONDS):
+        return token
+    return None
 
 
 async def _release_lock(token: str) -> None:
-    if not token:
-        return
     try:
         redis = redis_client_module.get_redis_client()
         if await redis.get(LOCK_KEY) == token:
@@ -390,9 +392,14 @@ async def run_cleanup(*, dry_run: bool = False, now: datetime | None = None, ses
     """Jeden pelny przebieg sprzatania. Zwraca raport (dict); nie rzuca wyjatkow z krokow."""
     now = now or utcnow()
     report = CleanupReport(dry_run=dry_run, started_at=now.isoformat())
-    token = await _acquire_lock()
+    try:
+        token = await _acquire_lock()
+    except RedisError:
+        logger.warning(f"Sprzatanie Storage: {SKIPPED_NO_REDIS}")
+        report.skipped = SKIPPED_NO_REDIS
+        return report.as_dict()
     if token is None:
-        report.skipped = "inny przebieg trwa"
+        report.skipped = SKIPPED_BUSY
         return report.as_dict()
 
     db = (session_factory or SessionLocal)()
