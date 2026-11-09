@@ -68,7 +68,8 @@ test('editor nie zaprasza i nie tworzy share-linku (403), viewer nie wgrywa plik
   expect(rename.status()).toBe(403);
 
   const viewerToken = await apiToken(request, E2E_USERS.viewer);
-  const upload = await request.post(`${API}/whiteboard/${board_id}/upload-image`, {
+  // Pliki tablicy (board-engine, prywatny bucket): viewer dostaje 403 zanim backend przeczyta cialo.
+  const upload = await request.post(`${API}/whiteboard/${board_id}/files`, {
     headers: bearer(viewerToken),
     multipart: { file: { name: 'x.png', mimeType: 'image/png', buffer: Buffer.from('x') } },
   });
