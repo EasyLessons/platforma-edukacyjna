@@ -349,7 +349,9 @@ Przeglądarki trzymają kopie tablic w IndexedDB (opis: `architecture/pipelines.
 3. Przywrócić wiersz `board_documents`, wznowić whiteboard-sync.
 4. Otwarte w tym czasie karty nadal mają starą wersję w pamięci — jeśli to istotne, poprosić użytkowników tablicy o przeładowanie przed kontynuowaniem pracy.
 
-## 8. Stopka landingu: placeholderowy telefon, prawdopodobnie nieistniejące linki social, link `/faq` do 404 (niski priorytet, treść)
+## 8. Stopka landingu: placeholderowy telefon, prawdopodobnie nieistniejące linki social (niski priorytet, treść)
+
+**Aktualizacja 10.11.2026 (release/baseline):** link `/faq` poprawiony na `/docs/faq` (commit `f9cf610`); `/api/contact` przepisany (commit `ebb75b7`): mail jako `text` z `reply_to` nadawcy, nadawca `EasyLesson <onboarding@resend.dev>`, limit per IP, honeypot — nadawca z własnej domeny wymaga weryfikacji domeny w Resend (Patryk). Telefon i linki social nadal do decyzji.
 
 **Zgłoszone:** 10.11.2026, audyt `release/baseline`.
 
@@ -381,9 +383,9 @@ Mylące (pusta „tablica”, która nic nie zapisuje), ale wejście wymaga ręc
 
 Zamiast fallbacku `demo-board`: przekierowanie na `/dashboard` (zalogowany) albo `/login`; usunięcie gałęzi `demo_mode` z middleware. Do zrobienia razem z etapem F (ten sam plik strony traci gałąź legacy).
 
-## 10. Telefon: nagłówek tablicy Excalidraw nie ma logo ani przycisku powrotu — w demo brak drogi na landing (średni priorytet, UX mobile)
+## 10. Telefon: nagłówek tablicy Excalidraw nie ma logo ani przycisku powrotu — w demo brak drogi na landing (NAPRAWIONE 10.11.2026)
 
-**Zgłoszone:** 10.11.2026, audyt `release/baseline`.
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`. **Naprawione** tego samego dnia (commit `3a15d49`): w gałęzi phone lewa karta ma kompaktowy przycisk z logo (`data-testid="header-home-button"`, prowadzi do `homeHref`) obok przycisku sidebara. Zweryfikowane vitest + typecheck; bez osobnego testu e2e (do dopisania w `demo.spec.ts`/`board-engine.mobile.spec.ts`). Opis pierwotny poniżej.
 
 ### Co się dzieje
 
@@ -428,6 +430,17 @@ Użytkownik klika „Kup” i trafia na zwykłą rejestrację; obietnice z landi
 ### Opcje
 
 Do czasu płatności (Stripe, `roadmap.md`): sekcja z dwoma planami (Free z realnymi limitami, Premium „wkrótce / napisz na kontakt@easylesson.app”) albo ukrycie cennika. Treść do decyzji Patryka.
+
+## Naprawione (10.11.2026, audyt przed BASELINE na `release/baseline`)
+
+Krótkie wpisy — pełny opis w komunikatach commitów.
+
+- **„Moje Szablony” na tablicy Excalidraw** otwierało `SavedAssetsPanel` starego silnika: przeciągnięcie zasobu nic nie robiło (Excalidraw nie obsługuje tego dropu), a nic na Excalidraw nie tworzyło zasobów. Przycisk i panel usunięte z tablicy (`3a15d49`); kod panelu zostaje do etapu F. Decyzja produktowa: czy zastąpić biblioteką Excalidraw (`UIOptions`/`updateLibrary`).
+- **„Test głosu” w menu ⋮ nagłówka** pokazywał fałszywy toast „Mikrofon działa prawidłowo” bez żadnego testu — usunięte (`3a15d49`).
+- **Ustawienie tablicy „Toolbar” (`toolbar_visible`) było ignorowane** na Excalidraw — teraz chowa własny pionowy pasek (`3a15d49`).
+- **Kotwica `/#pricing`** (menu użytkownika, nagłówek tablicy, Tutor AI) nie działała, bo sekcja cennika miała `id="pakiet-premium"` — id zmienione na `pricing`, stopka i regulamin zaktualizowane (`f9cf610`).
+- **Panel konta „Edytuj / Zapisz zmiany”** nic nie zapisywało (`TODO` w kodzie; `PUT /users/me` przyjmuje tylko `avatar_url`) — formularz usunięty, pola tylko do odczytu, etykieta „Nazwa użytkownika” (`98edabd`). Edycja nazwy = nowa funkcja (endpoint), decyzja produktowa.
+- **`/api/contact`** bez limitu, walidacji długości i z HTML-em od nadawcy w mailu (SEC-08) — patrz #8 (`ebb75b7`).
 
 ## Zasada
 
