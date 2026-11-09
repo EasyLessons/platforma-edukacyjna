@@ -18,10 +18,6 @@ class OnlineStatusResponse(BaseModel):
     user_id: int
 
 
-class UploadImageResponse(BaseModel):
-    """Zwracana po udanym uploadzie obrazu do Supabase Storage — patrz storage.py"""
-    url: str
-
 
 class BoardFileResponse(BaseModel):
     """Plik tablicy (silnik Excalidraw) w prywatnym buckecie - patrz files.py"""

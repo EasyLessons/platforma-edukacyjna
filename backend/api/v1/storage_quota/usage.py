@@ -8,7 +8,6 @@ Skad liczby:
   * rejestr `board_files` - zajetosc wg kont (aktywne pliki i takie, ktore czekaja na skasowanie),
   * ostatni przebieg sprzatania (Redis) - pomiar prawdziwego Storage: bajty bucketow
     `board-files` i `avatars`. Bez dodatkowych zapytan do Supabase przy kazdym wejsciu na ekran.
-Stary silnik (`board-images`) nie jest mierzony - nie ma rejestru i listing bylby kosztowny.
 
 Ocena wzgledem budzetu (plan Supabase Free = 1 GB): od 70% `warning`, od 90% `critical`;
 w obu stanach `hint` przypomina o decyzji Patryka (12.10.2026): przy zblizaniu sie do 1 GB

@@ -11,7 +11,7 @@ POST   /{id}/call                   — pokój + token rozmowy głosowej (Daily)
 GET    /call/usage                  — zużycie minut rozmów (tylko admin z CALL_ADMIN_USER_IDS)
 GET    /storage/usage               — zajętość Storage i kont (tylko admin z CALL_ADMIN_USER_IDS)
 """
-from fastapi import APIRouter, Depends, File, Request, Response, UploadFile
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from ..auth.dependencies import get_current_user
@@ -21,7 +21,7 @@ from core.models import User
 from core.responses import ApiResponse
 
 from .schemas import (
-    OnlineStatusResponse, UploadImageResponse,
+    OnlineStatusResponse,
     BoardSettings, BoardSettingsPatch,
     SaveDocumentRequest, SaveDocumentResponse, DocumentResponse,
     AccessCheckResponse,
@@ -74,28 +74,6 @@ def update_settings(
 ):
     service = WhiteboardService(db)
     return ApiResponse(success=True, data=service.update_settings(board_id, patch, current_user.id))
-
-@router.post(
-    "/{board_id}/upload-image",
-    response_model=ApiResponse[UploadImageResponse],
-)
-async def upload_image(
-    board_id: int,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    """
-    Upload obrazu tablicy do Supabase Storage (nie przez Realtime Broadcast —
-    patrz docs/known-issues.md #2). Frontend wywołuje to PRZED broadcastem
-    element-created, żeby wysłać w wiadomości tylko URL, nie base64.
-    """
-    service = WhiteboardService(db)
-    file_bytes = await file.read()
-    url = await service.upload_image(
-        board_id, current_user.id, file_bytes, file.content_type or "application/octet-stream"
-    )
-    return ApiResponse(success=True, data=UploadImageResponse(url=url))
 
 # Document (Yjs snapshot) --------------------------------------------------
 

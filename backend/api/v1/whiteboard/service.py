@@ -4,7 +4,6 @@ Logika biznesowa sesji whiteboard.
 WhiteboardService obsługuje:
 - presence, 
 - ustawienia tablicy, 
-- upload obrazów, 
 - snapshot dokumentu Yjs,
 - sprawdzanie dostępu.
 """
@@ -22,7 +21,6 @@ from .schemas import (
     CallResponse,
 )
 from .call import CallUser, create_board_call
-from .storage import upload_board_image
 from core.presence import PresenceService
 from api.v1.workspaces.authorization import require_membership, require_workspace_owner
 from api.v1.plans.service import PlanService
@@ -106,24 +104,6 @@ class WhiteboardService:
         self.db.commit()
         self.db.refresh(board)
         return BoardSettings(**board.settings)
-
-    # Image upload --------------------------------------------------
-
-    async def upload_image(
-        self,
-        board_id: int,
-        user_id: int,
-        file_bytes: bytes,
-        content_type: str,
-    ) -> str:
-        """
-        Sprawdza dostęp do tablicy, uploaduje obraz do Supabase Storage
-        (storage.py), zwraca publiczny URL do wpisania w element.src.
-        """
-        _, role = self._get_board_and_role(board_id, user_id)
-        if not can_edit(role):
-            raise AppException("Rola viewer nie może dodawać obrazów do tablicy", code="FORBIDDEN", status_code=403)
-        return await upload_board_image(board_id, file_bytes, content_type)
 
     # Document (Yjs snapshot) --------------------------------------------------
 
