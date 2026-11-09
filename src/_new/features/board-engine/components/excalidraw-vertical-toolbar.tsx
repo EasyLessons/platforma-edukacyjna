@@ -214,145 +214,155 @@ export function ExcalidrawVerticalToolbar({
           onClick={() => selectTool('hand')}
         />
 
-        {/* 3. Pisak (Freedraw) */}
-        <ToolbarButton
-          icon={Pen}
-          title="Pisak (P lub 7)"
-          active={activeTool === 'freedraw'}
-          onClick={() => selectTool('freedraw')}
-          disabled={readOnly}
-        />
+        {/*
+          Narzędzia edycji tylko z prawem zapisu. Viewer ich NIE dostaje (zamiast wyszarzenia),
+          tak jak w trybie podglądu Excalidraw i jak sprawdzają testy e2e (brak f(x), notatki,
+          tabeli i PDF u viewera).
+        */}
+        {!readOnly && (
+          <>
+            {/* 3. Pisak (Freedraw) */}
+            <ToolbarButton
+              icon={Pen}
+              title="Pisak (P lub 7)"
+              active={activeTool === 'freedraw'}
+              onClick={() => selectTool('freedraw')}
+            />
 
-        {/* 4. Tekst (Text) */}
-        <ToolbarButton
-          icon={Type}
-          title="Tekst (T lub 8)"
-          active={activeTool === 'text'}
-          onClick={() => selectTool('text')}
-          disabled={readOnly}
-        />
+            {/* 4. Tekst (Text) */}
+            <ToolbarButton
+              icon={Type}
+              title="Tekst (T lub 8)"
+              active={activeTool === 'text'}
+              onClick={() => selectTool('text')}
+            />
 
-        {/* 5. Kształty – rozwijany przycisk */}
-        <div className="relative" ref={shapeMenuRef}>
-          <Tooltip content={`Kształt: ${SHAPE_CONFIG[selectedShape].label}`} position="right">
-            <div className="relative group">
-              <button
-                type="button"
-                data-testid="vertical-toolbar-shapes"
-                onClick={() => {
-                  if (isShapeActive) {
-                    setIsShapeMenuOpen((prev) => !prev);
-                  } else {
-                    selectTool(selectedShape);
-                  }
-                }}
-                disabled={readOnly}
-                aria-label={`Kształt: ${SHAPE_CONFIG[selectedShape].label}`}
-                className={`relative p-1.5 rounded-md transition-colors flex items-center justify-center ${
-                  isShapeActive ? 'bg-blue-500/20 text-blue-600' : 'text-gray-700 hover:bg-gray-100'
-                } ${readOnly ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'}`}
-              >
-                <ShapeIcon className="w-5 h-5" />
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!readOnly) setIsShapeMenuOpen((prev) => !prev);
-                  }}
-                  className="absolute bottom-0 right-0 w-2 h-2 flex items-center justify-center text-[8px] opacity-60 group-hover:opacity-100"
-                >
-                  ▾
-                </span>
-              </button>
-            </div>
-          </Tooltip>
-
-          {/* Popup wyboru kształtu */}
-          {isShapeMenuOpen && !readOnly && (
-            <div className="absolute left-12 top-0 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-1 flex flex-col gap-1 min-w-[150px] animate-in fade-in duration-100">
-              {SHAPES_LIST.map((shape) => {
-                const conf = SHAPE_CONFIG[shape];
-                const Icon = conf.icon;
-                const isSelected =
-                  activeTool === shape || (isShapeActive && selectedShape === shape);
-                return (
+            {/* 5. Kształty – rozwijany przycisk */}
+            <div className="relative" ref={shapeMenuRef}>
+              <Tooltip content={`Kształt: ${SHAPE_CONFIG[selectedShape].label}`} position="right">
+                <div className="relative group">
                   <button
-                    key={shape}
                     type="button"
-                    onClick={() => selectShape(shape)}
-                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                      isSelected
-                        ? 'bg-blue-50 text-blue-700 font-semibold'
+                    data-testid="vertical-toolbar-shapes"
+                    onClick={() => {
+                      if (isShapeActive) {
+                        setIsShapeMenuOpen((prev) => !prev);
+                      } else {
+                        selectTool(selectedShape);
+                      }
+                    }}
+                    aria-label={`Kształt: ${SHAPE_CONFIG[selectedShape].label}`}
+                    className={`relative p-1.5 rounded-md transition-colors flex items-center justify-center cursor-pointer ${
+                      isShapeActive
+                        ? 'bg-blue-500/20 text-blue-600'
                         : 'text-gray-700 hover:bg-gray-100'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span>{conf.label}</span>
+                    <ShapeIcon className="w-5 h-5" />
+                    <span
+                      data-testid="vertical-toolbar-shapes-menu"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsShapeMenuOpen((prev) => !prev);
+                      }}
+                      className="absolute bottom-0 right-0 w-2 h-2 flex items-center justify-center text-[8px] opacity-60 group-hover:opacity-100"
+                    >
+                      ▾
+                    </span>
                   </button>
-                );
-              })}
+                </div>
+              </Tooltip>
+
+              {/* Popup wyboru kształtu */}
+              {isShapeMenuOpen && (
+                <div className="absolute left-12 top-0 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-1 flex flex-col gap-1 min-w-[150px] animate-in fade-in duration-100">
+                  {SHAPES_LIST.map((shape) => {
+                    const conf = SHAPE_CONFIG[shape];
+                    const Icon = conf.icon;
+                    const isSelected =
+                      activeTool === shape || (isShapeActive && selectedShape === shape);
+                    return (
+                      <button
+                        key={shape}
+                        type="button"
+                        onClick={() => selectShape(shape)}
+                        className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-blue-50 text-blue-700 font-semibold'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <Icon className="w-4 h-4" />
+                        <span>{conf.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* 6. f(x) – wykres funkcji */}
-        <ToolbarButton
-          icon={TrendingUp}
-          title="Wykres funkcji f(x)"
-          active={isFunctionPanelOpen}
-          onClick={() => onToggleFunctionPanel?.()}
-          disabled={readOnly}
-          testId="function-panel-toggle"
-        />
+            {/* 6. f(x) – wykres funkcji */}
+            <ToolbarButton
+              icon={TrendingUp}
+              title="Wykres funkcji f(x)"
+              active={isFunctionPanelOpen}
+              onClick={() => onToggleFunctionPanel?.()}
+              testId="function-panel-toggle"
+            />
 
-        {/* 7. Obraz (Image) */}
-        <ToolbarButton
-          icon={ImageIcon}
-          title="Wstaw obraz (9)"
-          active={activeTool === 'image'}
-          onClick={() => selectTool('image')}
-          disabled={readOnly}
-        />
+            {/* 7. Obraz (Image) */}
+            <ToolbarButton
+              icon={ImageIcon}
+              title="Wstaw obraz (9)"
+              active={activeTool === 'image'}
+              onClick={() => selectTool('image')}
+            />
 
-        {/* 8. Gumka (Eraser) */}
-        <ToolbarButton
-          icon={Eraser}
-          title="Gumka (E lub 0)"
-          active={activeTool === 'eraser'}
-          onClick={() => selectTool('eraser')}
-          disabled={readOnly}
-        />
+            {/* 8. Gumka (Eraser) */}
+            <ToolbarButton
+              icon={Eraser}
+              title="Gumka (E lub 0)"
+              active={activeTool === 'eraser'}
+              onClick={() => selectTool('eraser')}
+            />
+          </>
+        )}
 
         <Divider />
 
         {/* Grupa 2: Nasze elementy (w trybie kompaktowym część chowana do menu Więcej) */}
         {!isCompactHeight ? (
           <>
-            {/* 9. Notatka */}
-            <ToolbarButton
-              icon={StickyNote}
-              title="Wstaw notatkę"
-              active={false}
-              onClick={() => onInsertNote?.()}
-              disabled={readOnly}
-            />
+            {!readOnly && (
+              <>
+                {/* 9. Notatka */}
+                <ToolbarButton
+                  icon={StickyNote}
+                  title="Wstaw notatkę"
+                  active={false}
+                  onClick={() => onInsertNote?.()}
+                  testId="element-insert-note"
+                />
 
-            {/* 10. Tabela */}
-            <ToolbarButton
-              icon={TableIcon}
-              title="Wstaw tabelę"
-              active={false}
-              onClick={() => onInsertTable?.()}
-              disabled={readOnly}
-            />
+                {/* 10. Tabela */}
+                <ToolbarButton
+                  icon={TableIcon}
+                  title="Wstaw tabelę"
+                  active={false}
+                  onClick={() => onInsertTable?.()}
+                  testId="element-insert-table"
+                />
 
-            {/* 11. PDF */}
-            <ToolbarButton
-              icon={FileText}
-              title="Wstaw PDF"
-              active={false}
-              onClick={() => onInsertPdf?.()}
-              disabled={readOnly}
-            />
+                {/* 11. PDF */}
+                <ToolbarButton
+                  icon={FileText}
+                  title="Wstaw PDF"
+                  active={false}
+                  onClick={() => onInsertPdf?.()}
+                  testId="element-insert-pdf"
+                />
+              </>
+            )}
 
             {/* 12. Kalkulator */}
             <ToolbarButton
@@ -363,13 +373,15 @@ export function ExcalidrawVerticalToolbar({
               testId="panel-toggle-calculator"
             />
 
-            {/* 13. Moje Szablony */}
-            <ToolbarButton
-              icon={FolderHeart}
-              title="Moje Szablony"
-              active={false}
-              onClick={() => onToggleLibrary?.()}
-            />
+            {/* 13. Moje Szablony (wstawia na tablicę - tylko z prawem edycji) */}
+            {!readOnly && (
+              <ToolbarButton
+                icon={FolderHeart}
+                title="Moje Szablony"
+                active={false}
+                onClick={() => onToggleLibrary?.()}
+              />
+            )}
           </>
         ) : (
           /* Tryb kompaktowy: menu Więcej */
@@ -379,103 +391,91 @@ export function ExcalidrawVerticalToolbar({
               title="Więcej narzędzi"
               active={isMoreMenuOpen}
               onClick={() => setIsMoreMenuOpen((v) => !v)}
+              testId="vertical-toolbar-more"
             />
             {isMoreMenuOpen && (
               <div className="absolute left-12 top-0 z-50 bg-white rounded-xl shadow-xl border border-gray-200 p-1.5 flex flex-col gap-1 min-w-[160px] animate-in fade-in duration-100">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    onInsertNote?.();
-                  }}
-                  disabled={readOnly}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <StickyNote className="w-4 h-4 text-gray-500" />
-                  <span>Notatka</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    onInsertTable?.();
-                  }}
-                  disabled={readOnly}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <TableIcon className="w-4 h-4 text-gray-500" />
-                  <span>Tabela</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    onInsertPdf?.();
-                  }}
-                  disabled={readOnly}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <FileText className="w-4 h-4 text-gray-500" />
-                  <span>Wstaw PDF</span>
-                </button>
-                <button
-                  type="button"
-                  data-testid="panel-toggle-calculator"
+                {!readOnly && (
+                  <>
+                    <MoreMenuItem
+                      icon={StickyNote}
+                      label="Notatka"
+                      testId="element-insert-note"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onInsertNote?.();
+                      }}
+                    />
+                    <MoreMenuItem
+                      icon={TableIcon}
+                      label="Tabela"
+                      testId="element-insert-table"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onInsertTable?.();
+                      }}
+                    />
+                    <MoreMenuItem
+                      icon={FileText}
+                      label="Wstaw PDF"
+                      testId="element-insert-pdf"
+                      onClick={() => {
+                        setIsMoreMenuOpen(false);
+                        onInsertPdf?.();
+                      }}
+                    />
+                  </>
+                )}
+                <MoreMenuItem
+                  icon={Calculator}
+                  label="Kalkulator"
+                  testId="panel-toggle-calculator"
                   onClick={() => {
                     setIsMoreMenuOpen(false);
                     onToggleCalculator?.();
                   }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <Calculator className="w-4 h-4 text-gray-500" />
-                  <span>Kalkulator</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsMoreMenuOpen(false);
-                    onToggleLibrary?.();
-                  }}
-                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-                >
-                  <FolderHeart className="w-4 h-4 text-gray-500" />
-                  <span>Moje Szablony</span>
-                </button>
+                />
+                {!readOnly && (
+                  <MoreMenuItem
+                    icon={FolderHeart}
+                    label="Moje Szablony"
+                    onClick={() => {
+                      setIsMoreMenuOpen(false);
+                      onToggleLibrary?.();
+                    }}
+                  />
+                )}
               </div>
             )}
           </div>
         )}
 
-        <Divider />
+        {!readOnly && (
+          <>
+            <Divider />
 
-        {/* 14. Cofnij (Undo) */}
-        <ToolbarButton
-          icon={Undo}
-          title="Cofnij (Ctrl+Z)"
-          active={false}
-          onClick={handleUndo}
-          disabled={readOnly}
-        />
+            {/* 14. Cofnij (Undo) */}
+            <ToolbarButton
+              icon={Undo}
+              title="Cofnij (Ctrl+Z)"
+              active={false}
+              onClick={handleUndo}
+            />
 
-        {/* 15. Ponów (Redo) */}
-        <ToolbarButton
-          icon={Redo}
-          title="Ponów (Ctrl+Y)"
-          active={false}
-          onClick={handleRedo}
-          disabled={readOnly}
-        />
+            {/* 15. Ponów (Redo) */}
+            <ToolbarButton icon={Redo} title="Ponów (Ctrl+Y)" active={false} onClick={handleRedo} />
 
-        <Divider />
+            <Divider />
 
-        {/* 16. Kosz (Clear Canvas) */}
-        <ToolbarButton
-          icon={Trash2}
-          title="Wyczyść tablicę"
-          active={false}
-          onClick={() => onClearCanvas?.()}
-          disabled={readOnly}
-        />
+            {/* 16. Kosz (Clear Canvas) */}
+            <ToolbarButton
+              icon={Trash2}
+              title="Wyczyść tablicę"
+              active={false}
+              onClick={() => onClearCanvas?.()}
+            />
+          </>
+        )}
       </div>
     </aside>
   );
@@ -511,6 +511,30 @@ function ToolbarButton({
         <Icon className="w-5 h-5" />
       </button>
     </Tooltip>
+  );
+}
+
+function MoreMenuItem({
+  icon: Icon,
+  label,
+  onClick,
+  testId,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  testId?: string;
+}) {
+  return (
+    <button
+      type="button"
+      data-testid={testId}
+      onClick={onClick}
+      className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
+    >
+      <Icon className="w-4 h-4 text-gray-500" />
+      <span>{label}</span>
+    </button>
   );
 }
 
