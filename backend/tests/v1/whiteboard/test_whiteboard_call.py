@@ -458,6 +458,10 @@ class TestExtend:
         self, client, daily, clock, monkeypatch, sync_redis_client, test_user, test_board
     ):
         monkeypatch.setattr(get_settings(), "call_user_daily_minutes_cap", 90)
+        # Budzet jest dzienny (UTC): zegar na poludnie, zeby +80 min nie przeszlo przez polnoc
+        # (test padal uruchamiany miedzy 22:40 a 24:00 UTC).
+        now = int(time.time())
+        clock.set(now - now % 86400 + 12 * 3600)
         name = room_of(test_board)
         assert post_call(client, test_board.id, test_user.id).status_code == 200  # caly budzet: 90 min
         exp = daily.rooms[name]["config"]["exp"]
