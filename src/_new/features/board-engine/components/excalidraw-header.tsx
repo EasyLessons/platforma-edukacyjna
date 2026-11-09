@@ -25,7 +25,6 @@ import {
   History,
   Sliders,
   Sparkles,
-  Mic,
   UserPlus,
   Check,
 } from 'lucide-react';
@@ -74,7 +73,6 @@ export function ExcalidrawHeader({
   const metrics = useWhiteboardUiMetrics();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [voiceTestToast, setVoiceTestToast] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const isDemo = boardId.startsWith('demo-') || !!guest;
@@ -127,12 +125,6 @@ export function ExcalidrawHeader({
     }
   }, [onShareClick, copyBoardLink]);
 
-  const handleVoiceTest = useCallback(() => {
-    setIsMenuOpen(false);
-    setVoiceTestToast(true);
-    setTimeout(() => setVoiceTestToast(false), 3000);
-  }, []);
-
   // Dane użytkownika do awatara
   const displayName = guest?.username || currentUser?.username || 'Użytkownik';
   const userId = guest?.id || currentUser?.id || 1;
@@ -153,16 +145,33 @@ export function ExcalidrawHeader({
         data-testid="header-left-card"
       >
         {metrics.isPhoneLayout ? (
-          // Telefon: kompaktowy przycisk sidebara
-          onSidebarToggle && (
+          // Telefon: kompaktowe logo (powrót do panelu / na stronę główną w demo) + przycisk sidebara
+          <div className="flex items-center gap-1.5">
             <button
-              onClick={onSidebarToggle}
-              aria-label={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
-              className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-md hover:bg-gray-50 transition-colors"
+              type="button"
+              onClick={() => router.push(homeHref)}
+              aria-label={isDemo ? 'Strona główna' : 'Wróć do panelu'}
+              data-testid="header-home-button"
+              className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white shadow-md hover:bg-gray-50 transition-colors"
             >
-              {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+              <Image
+                src="/resources/LogoEasyLesson.webp"
+                alt="EasyLesson Logo"
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
             </button>
-          )
+            {onSidebarToggle && (
+              <button
+                onClick={onSidebarToggle}
+                aria-label={isSidebarOpen ? 'Zamknij panel' : 'Wysuń panel tablic'}
+                className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-700 shadow-md hover:bg-gray-50 transition-colors"
+              >
+                {isSidebarOpen ? <PanelLeftClose size={20} /> : <PanelLeftOpen size={20} />}
+              </button>
+            )}
+          </div>
         ) : (
           // Desktop: karta z logo, togglem sidebaru, menu ⋮ i linkiem
           <div className="flex h-14 items-center gap-1.5 rounded-2xl border-2 border-[#e0e0e0] bg-white px-3 shadow-[0_4px_12px_rgba(0,0,0,0.1)]">
@@ -246,14 +255,6 @@ export function ExcalidrawHeader({
                   >
                     <Sparkles size={16} className="text-amber-500" />
                     <span>Zmień wersję</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleVoiceTest}
-                    className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
-                  >
-                    <Mic size={16} className="text-blue-500" />
-                    <span>Test głosu</span>
                   </button>
                 </div>
               )}
@@ -402,17 +403,6 @@ export function ExcalidrawHeader({
           </Tooltip>
         </div>
       </div>
-
-      {/* Toast testu głosu */}
-      {voiceTestToast && (
-        <div
-          role="status"
-          className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[1200] pointer-events-none rounded-xl bg-gray-900/90 px-4 py-2 text-sm text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200 flex items-center gap-2"
-        >
-          <Mic size={16} className="text-green-400 animate-pulse" />
-          <span>Mikrofon działa prawidłowo (test głosu OK)</span>
-        </div>
-      )}
     </>
   );
 }

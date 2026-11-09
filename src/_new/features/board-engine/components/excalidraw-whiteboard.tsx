@@ -29,7 +29,6 @@ import { useElementLimit } from '../yjs/use-element-limit';
 import { ExcalidrawHeader } from './excalidraw-header';
 import { ExcalidrawVerticalToolbar } from './excalidraw-vertical-toolbar';
 import { ExcalidrawZoomControls } from './excalidraw-zoom-controls';
-import { SavedAssetsPanel } from '@/_new/features/whiteboard/components/panels/saved-assets-panel';
 import {
   useWhiteboardUiMetrics,
   safeInset,
@@ -71,6 +70,8 @@ export interface ExcalidrawWhiteboardProps {
   smartSearchVisible?: boolean;
   /** Panel "Tutor AI" - ustawienie tablicy `ai_enabled`. */
   aiEnabled?: boolean;
+  /** Własny pionowy pasek narzędzi - ustawienie tablicy `toolbar_visible`. */
+  toolbarVisible?: boolean;
   /** Opcjonalna wsteczna kompatybilność. */
   topRightExtra?: TopRightExtra;
   /** Arkusz CKE do wstawienia raz po otwarciu (id z templates/catalog.ts; z `?arkusz=` dashboardu). */
@@ -101,6 +102,7 @@ function BoardSession({
   gridVisible,
   smartSearchVisible = true,
   aiEnabled = true,
+  toolbarVisible = true,
   sheetTemplateId,
   onSheetInserted,
   elementLimit,
@@ -115,7 +117,6 @@ function BoardSession({
   const panels = useBoardPanels();
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
   const [isFunctionPanelOpen, setIsFunctionPanelOpen] = useState(false);
-  const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const readOnly = userRole === 'viewer';
   const available = useMemo(
     () => availablePanels({ readOnly, smartSearchVisible, aiEnabled }),
@@ -151,10 +152,6 @@ function BoardSession({
   const handleToggleCalculator = useCallback(() => {
     panels.toggle('calculator');
   }, [panels]);
-
-  const handleToggleLibrary = useCallback(() => {
-    setIsLibraryOpen((prev) => !prev);
-  }, []);
 
   const handleClearCanvas = useCallback(() => {
     if (!api || readOnly) return;
@@ -262,20 +259,21 @@ function BoardSession({
         onFunctionPanelClose={() => setIsFunctionPanelOpen(false)}
       />
 
-      {/* 3. Własny pionowy pasek narzędzi (lewa strona) */}
-      <ExcalidrawVerticalToolbar
-        api={api}
-        readOnly={readOnly}
-        isFunctionPanelOpen={isFunctionPanelOpen}
-        onToggleFunctionPanel={handleToggleFunctionPanel}
-        onInsertNote={handleInsertNote}
-        onInsertTable={handleInsertTable}
-        onInsertPdf={handleInsertPdf}
-        isCalculatorOpen={panels.isOpen('calculator')}
-        onToggleCalculator={handleToggleCalculator}
-        onToggleLibrary={handleToggleLibrary}
-        onClearCanvas={handleClearCanvas}
-      />
+      {/* 3. Własny pionowy pasek narzędzi (lewa strona); ustawienie tablicy "Toolbar" go chowa */}
+      {toolbarVisible && (
+        <ExcalidrawVerticalToolbar
+          api={api}
+          readOnly={readOnly}
+          isFunctionPanelOpen={isFunctionPanelOpen}
+          onToggleFunctionPanel={handleToggleFunctionPanel}
+          onInsertNote={handleInsertNote}
+          onInsertTable={handleInsertTable}
+          onInsertPdf={handleInsertPdf}
+          isCalculatorOpen={panels.isOpen('calculator')}
+          onToggleCalculator={handleToggleCalculator}
+          onClearCanvas={handleClearCanvas}
+        />
+      )}
 
       {/* 4. Kontrolki zoom i reset widoku (lewy dolny róg) */}
       <ExcalidrawZoomControls api={api} />
@@ -313,13 +311,6 @@ function BoardSession({
         readOnly={readOnly}
         demo={!!guest}
       />
-
-      {/* 7. Biblioteka zapisanych szablonów (SavedAssetsPanel) */}
-      {isLibraryOpen && (
-        <div className="absolute right-4 top-20 z-50 pointer-events-auto">
-          <SavedAssetsPanel onClose={() => setIsLibraryOpen(false)} />
-        </div>
-      )}
 
       {/* 8. Pasek narzędzi tabeli */}
       <TableToolbar api={api} selection={tableSelection} />

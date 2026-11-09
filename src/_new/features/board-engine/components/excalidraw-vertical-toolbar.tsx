@@ -34,7 +34,6 @@ import {
   Table as TableIcon,
   FileText,
   Calculator,
-  FolderHeart,
   Undo,
   Redo,
   Trash2,
@@ -56,7 +55,6 @@ interface ExcalidrawVerticalToolbarProps {
   onInsertPdf?: () => void;
   isCalculatorOpen?: boolean;
   onToggleCalculator?: () => void;
-  onToggleLibrary?: () => void;
   onClearCanvas?: () => void;
 }
 
@@ -83,7 +81,6 @@ export function ExcalidrawVerticalToolbar({
   onInsertPdf,
   isCalculatorOpen = false,
   onToggleCalculator,
-  onToggleLibrary,
   onClearCanvas,
 }: ExcalidrawVerticalToolbarProps) {
   const [activeTool, setActiveTool] = useState<string>('selection');
@@ -372,16 +369,6 @@ export function ExcalidrawVerticalToolbar({
               onClick={() => onToggleCalculator?.()}
               testId="panel-toggle-calculator"
             />
-
-            {/* 13. Moje Szablony (wstawia na tablicę - tylko z prawem edycji) */}
-            {!readOnly && (
-              <ToolbarButton
-                icon={FolderHeart}
-                title="Moje Szablony"
-                active={false}
-                onClick={() => onToggleLibrary?.()}
-              />
-            )}
           </>
         ) : (
           /* Tryb kompaktowy: menu Więcej */
@@ -435,16 +422,6 @@ export function ExcalidrawVerticalToolbar({
                     onToggleCalculator?.();
                   }}
                 />
-                {!readOnly && (
-                  <MoreMenuItem
-                    icon={FolderHeart}
-                    label="Moje Szablony"
-                    onClick={() => {
-                      setIsMoreMenuOpen(false);
-                      onToggleLibrary?.();
-                    }}
-                  />
-                )}
               </div>
             )}
           </div>

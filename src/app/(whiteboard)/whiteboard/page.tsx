@@ -286,6 +286,7 @@ export function TablicaContent() {
       gridVisible={boardSettings.grid_visible}
       smartSearchVisible={boardSettings.smartsearch_visible}
       aiEnabled={boardSettings.ai_enabled}
+      toolbarVisible={boardSettings.toolbar_visible}
       elementLimit={elementLimit}
       topRightExtra={isDailyVoice ? renderCallButton : undefined}
       sheetTemplateId={sheetByFolder(arkuszPath)?.id}
