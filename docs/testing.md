@@ -1,16 +1,18 @@
 # Testy w systemie EasyLesson
 
-**Stan:** 21.09.2026 (`origin/main@b9a0c2e`)
-**Zakres:** backend (Python/pytest) + frontend (TypeScript/Vitest)
+**Stan:** 10.11.2026 (`release/baseline`)
+**Zakres:** backend (Python/pytest) + frontend (TypeScript/Vitest) + `whiteboard-sync` (Vitest) + E2E (Playwright)
 
 ---
 
 ## Liczby (zmierzone)
 
-| Warstwa  | Narzędzie | Pliki | Testy | Czas pełnego przebiegu |
-| -------- | --------- | ----- | ----- | ---------------------- |
-| backend  | pytest    | 25    | 334   | ~3 min (SQLite in-memory + fakeredis) |
-| frontend | vitest    | 38    | 450   | ~35 s (jsdom)          |
+| Warstwa         | Narzędzie  | Pliki | Testy | Czas pełnego przebiegu |
+| --------------- | ---------- | ----- | ----- | ---------------------- |
+| backend         | pytest     | 53    | 1426  | kilka minut (SQLite in-memory + fakeredis) |
+| frontend        | vitest     | 96    | 1004  | ~45 s (jsdom)          |
+| whiteboard-sync | vitest     | 6     | —     | sekundy (atrapa backendu + prawdziwy Hocuspocus) |
+| E2E             | Playwright | 11    | 27    | minuty (pełny stos w Dockerze) |
 
 Aktualizuj tę tabelę w PR, który zmienia liczbę plików testowych — nie "przy okazji".
 
@@ -18,44 +20,66 @@ Aktualizuj tę tabelę w PR, który zmienia liczbę plików testowych — nie "p
 
 ## Struktura testów
 
+Pełna lista to `find src backend/tests whiteboard-sync/test e2e -name '*test*'`; poniżej mapa katalogów (stan 10.11.2026).
+
 ```
 backend/tests/
   conftest.py                        # wspólne fixtures (db, redis, users, workspaces, boards, invites)
-  core/
-    test_email.py
-    test_presence.py                 # online users w Redisie (fakeredis)
+  core/                              # cors, email (+escape), image_sanitizer (+formats), presence,
+                                     # redis_degradation (ResilientRedis), request_id, storage (+buckets)
   v1/
     auth/                            # login, register, verify_email, password_reset, refresh,
-                                     # logout, me, google_login, resend_code, dependencies,
-                                     # rate_limit, integration
+                                     # logout, me, google_login, oauth_linking, user_identities, resend_code,
+                                     # dependencies, rate_limit (+hardening), integration, avatar_upload, avatar_url
+    assets/                          # test_assets.py, test_asset_limits.py
     boards/                          # test_boards_router.py, test_boards_service.py
-    workspaces/                      # workspaces_router/service, members_service,
-                                     # invites_service, share_links_service, search_users
+    health/                          # /health (ok/degraded), /health/live
     notifications/                   # notifications_router/service
-    whiteboard/                      # test_whiteboard_service.py (elementy legacy + snapshot Yjs)
+    onboarding/                      # test_onboarding_service.py
+    plans/                           # test_plans_router.py, test_plans_service.py (limity, FOR UPDATE, grandfathering)
+    storage_quota/                   # test_storage_quota.py, test_cleanup.py, test_usage.py
+    whiteboard/                      # test_whiteboard_service.py (snapshot Yjs), test_whiteboard_doc_router.py
+                                     # (/doc, /access, klucz serwisu), test_board_files.py (/files, quota),
+                                     # test_whiteboard_call.py, _call_guard.py, _call_redteam.py (Daily; daily_fake.py)
+    workspaces/                      # workspaces_router/service, members_service, invites_service,
+                                     # share_links_router/service, search_users
 
 src/
   _new/features/
-    auth/        api/authApi.test.ts, hooks/_tests/{useLogin,useRegister,usePasswordReset,useCodeInput}, utils/validation.test.ts
-    board/       api/boardApi.test.ts, hooks/_tests/{useCreateBoardForm,useEditBoardForm}, utils/helpers.test.ts
-    demo/        _tests/demo-page.test.tsx
-    notifications/ api/notificationApi.test.ts
-    whiteboard/  commands/_tests/commands.test.ts, elements/math-eval.test.ts,
-                 handlers/handler-utils.test.ts, navigation/viewport-math.test.ts,
-                 selection/snap-utils.test.ts, hooks/use-yjs-board.test.ts,
-                 hooks/use-whiteboard-ui-metrics.test.ts, yjs/board-doc.test.ts,
-                 components/toolbar/_tests/{math-chatbot-demo,mobile-layout}.test.tsx
-    workspace/   api/{workspaceApi,inviteApi,memberApi,shareLinkApi}.test.ts,
-                 hooks/_tests/{useCreateWorkspaceForm,useEditWorkspaceForm,useWorkspaceMembers}
+    auth/          api, hooks/_tests, utils
+    board/         api, hooks/_tests, utils
+    board-engine/  config (engine-flag, default-fill), elements (note, table, pdf), files (board-file-sync,
+                   excalidraw-file-sync, shared-files, data-url), math (function-element/plot), panels
+                   (board-panels, insert), templates (catalog, insert-sheet), yjs (binding, awareness,
+                   use-board-connection, use-element-limit), components (excalidraw-header)
+                   -- pliki *.excalidraw.test.tsx renderują prawdziwy Excalidraw w jsdom
+    dashboard/     _tests (workspace-sidebar-mobile)
+    demo/          _tests/demo-page.test.tsx
+    notifications/ api
+    plans/         components (plan-usage-badge, upgrade-modal), hooks (use-plan), utils (plan-limit-error)
+    voice-call/    daily-call-provider.test.tsx
+    voice-chat/    VoiceChatContext.{test,flows.test,mobile.test,ice-restart.test}.tsx, constants.test.ts
+    whiteboard/    commands/_tests, elements/math-eval, handlers, navigation, selection, hooks
+                   (use-yjs-board, use-whiteboard-ui-metrics), yjs (board-doc, prewarm-sync,
+                   use-yjs-local-cache, use-yjs-sync), components/toolbar/_tests
+    workspace/     api, hooks/_tests
   _new/lib/
-    auth/tokenService.test.ts, errors/{AppError,errorHandler}.test.ts
+    api/           client.test.ts, client.request-id.test.ts, client.success-false.test.ts, request-id.test.ts
+    auth/          tokenService.test.ts
+    board-cache/   board-cache.test.ts
+    errors/        AppError, errorHandler
   app/api/
     chat/{route,auth}.test.ts        # trasy Next.js (środowisko node)
     contact/route.test.ts
-  app/context/
-    VoiceChatContext.test.tsx, VoiceChatContext.flows.test.tsx, VoiceChatContext.mobile.test.tsx,
-    voice-chat/mediaSupport.test.ts
-  app/(dashboard)/dashboard/Components/_tests/workspace-sidebar-mobile.test.tsx
+
+whiteboard-sync/test/
+  auth.test.ts, viewer-readonly.test.ts, token-expiry.test.ts, database.test.ts,
+  element-limit.test.ts, demo.test.ts                      # backend-mock.ts = atrapa FastAPI
+
+e2e/
+  board-engine.spec.ts, board-engine.mobile.spec.ts, board-engine-elements.spec.ts,
+  board-engine-images.spec.ts, board-engine-limit.spec.ts, board-engine-panels.spec.ts,
+  board-engine-templates.spec.ts, demo.spec.ts, roles.spec.ts, voice-call.spec.ts, voice-call.mobile.spec.ts
 ```
 
 ---
@@ -66,8 +90,8 @@ src/
 | ------------------- | -------------------------------- | ------------------------------------ |
 | Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze, model Y.Doc |
 | Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
-| Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo |
-| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage |
+| Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo, panele i elementy board-engine na prawdziwym Excalidraw (`*.excalidraw.test.tsx`) |
+| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, role, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage, szablony, limit elementów, demo bez konta, rozmowa Daily bez klucza |
 
 ---
 
@@ -171,22 +195,22 @@ docker compose -f docker-compose.e2e.yml down -v   # sprzątanie
 
 Katalogi z kodem i zerem testów — kolejność wg ryzyka:
 
-1. `src/_new/lib/api/` — klient axios z interceptorem 401 → refresh (krytyczna ścieżka).
-2. `src/_new/features/whiteboard/realtime/` — 10 hooków Supabase Realtime (presence, kursory, typing, sync elementów), ~1 900 linii.
-3. `src/app/context/BoardRealtimeContext.tsx`.
-4. `src/_new/features/whiteboard/{tools,engine,stores,api}/`.
-5. Wszystkie `components/` w `auth`, `board`, `workspace`, `notifications`; `shared/ui`, `shared/hooks`.
-6. `whiteboard-sync/` — zero testów i zero kroku w CI.
+1. `src/_new/features/whiteboard/realtime/` (presence, kursory, typing starego silnika przez Supabase) i `src/app/context/BoardRealtimeContext.tsx` — legacy, znikają w etapie F; nie dopisywać testów.
+2. `src/_new/features/whiteboard/{tools,engine,stores,api}/` — stary silnik, jak wyżej.
+3. Wszystkie `components/` w `auth`, `board`, `workspace`, `notifications`; `shared/ui`, `shared/hooks`.
+4. `src/_new/features/dashboard/components/` poza testem mobilnego sidebara (m.in. scenariusz z `known-issues.md` #4 — odświeżanie list bez F5 — nie ma testu).
 
-Backend bez testów: `assets/`, `onboarding/`, `whiteboard/router.py`, `whiteboard/storage.py`, `share_links/router.py`.
+Ma testy (zmiana od 21.09): `src/_new/lib/api/` (klient axios: interceptor 401 → refresh, `success:false`, `X-Request-ID`), `whiteboard-sync/` (6 plików + joby CI `sync-typecheck`/`sync-test`), `features/board-engine`, `features/plans`.
 
-`vitest.config.ts` → `coverage.include` obejmuje tylko `auth`, `lib/auth`, `lib/errors` — raport pokrycia nic nie mówi o tablicy. Rozszerzenie zaplanowane w `docs/architecture/REFAKTOR-PLAN.md`.
+Backend bez testów routera: `whiteboard/storage.py` i `POST /{id}/upload-image` (legacy, etap F). `assets/`, `onboarding/`, `share_links/router.py`, `whiteboard/router.py` (`/doc`, `/access`, `/files`, `/call`) mają testy.
+
+`vitest.config.ts` → `coverage.include` obejmuje `src/_new/features/**` i `src/_new/lib/**` (bez `_mock/`).
 
 ---
 
 ## Znane ograniczenia
 
 - E2E pokrywają tylko tablicę na Excalidraw (za flagą); stary silnik, logowanie przez Google, dashboard i stary czat głosowy nie mają testów E2E. Rozmowa na Daily (`e2e/voice-call*.spec.ts`) jest sprawdzana bez klucza (503 `VOICE_NOT_CONFIGURED` → komunikat „Rozmowa chwilowo niedostępna.”, brak ramki; owner i viewer) i z atrapą odpowiedzi (`page.route`) — prawdziwego połączenia z Daily testy nie nawiązują; to zostaje testem ręcznym na dwóch urządzeniach.
-- Brak testów WebSocket dla synchronizacji tablicy (Supabase Realtime w ścieżce legacy, Hocuspocus w ścieżce Yjs) — trudne do izolacji; model `Y.Doc` jest testowany jednostkowo (`yjs/board-doc.test.ts`).
+- Synchronizacja tablicy po WebSocket jest testowana tylko po stronie serwera (`whiteboard-sync/test/*` na prawdziwym Hocuspocusie z atrapą backendu) i w E2E (dwie przeglądarki); hooki klienta (`use-yjs-sync`, `use-board-connection`) mają testy jednostkowe z mockiem providera; presence starego silnika przez Supabase Realtime — bez testów (legacy).
 - `pytest-asyncio` 0.21.1 ma bug z `@pytest_asyncio.fixture` w trybie STRICT — testy integracyjne backendowe używają synchronicznego `TestClient` zamiast async httpx.
 - Lokalnie na Windows `prettier --check` może zgłaszać setki plików przez `core.autocrlf=true` (CRLF) — CI na Linuksie jest miarodajne.
