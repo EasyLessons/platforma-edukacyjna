@@ -3,8 +3,6 @@
  * Importuj z tego pliku zamiast z konkretnych plików.
  *
  * Przykład:
- *   import { DrawingElement, Point, Tool, ViewportTransform } from '@/_new/features/whiteboard/types'
+ *   import { DrawingElement, MarkdownNote } from '@/_new/features/whiteboard/types'
  */
 export * from './elements';
-export * from './tools';
-export * from './canvas';

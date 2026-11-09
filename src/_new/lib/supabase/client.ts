@@ -5,12 +5,9 @@
  * ═══════════════════════════════════════════════════════════════════════════
  *
  * 🎯 CEL:
- * Ten plik tworzy klienta Supabase do komunikacji z backendem Supabase.
- * Używany do synchronizacji tablicy w czasie rzeczywistym (Realtime API).
- *
- * 📡 UŻYWANE W:
- * - BoardRealtimeContext.tsx → synchronizacja elementów tablicy
- * - WhiteboardCanvas.tsx → realtime updates
+ * Ten plik tworzy klienta Supabase (Realtime API). Treść tablicy NIE idzie tędy
+ * (Yjs + whiteboard-sync, board-engine/yjs) - Supabase zostało dla powiadomień
+ * i zmian ról (postgres_changes na workspace_members w stronie tablicy).
  *
  * 🔑 KLUCZE:
  * - NEXT_PUBLIC_SUPABASE_URL → URL projektu Supabase

@@ -11,16 +11,10 @@ module.exports = {
       severity: 'error',
       comment:
         "Kod w src/_new (logika, feature'y, shared, lib) nie moze importowac z src/app " +
-        '(routing). Wyjatki ponizej sa TYMCZASOWE i znikaja w kolejnych PR-ach planu: ' +
-        'DashboardButton -> PR-A3 (zrobione, #47), VoiceChatContext -> PR-B1 (zrobione, #54), ' +
-        'BoardRealtimeContext -> PR-C1 (features/whiteboard/realtime).',
+        '(routing). Dawne wyjatki (DashboardButton #47, VoiceChatContext #54, ' +
+        'BoardRealtimeContext - usuniety w etapie F razem ze starym silnikiem) juz nie istnieja.',
       from: { path: '^src/_new/', pathNot: '[.](?:spec|test)[.](?:ts|tsx)$' },
-      to: {
-        path: '^src/app/',
-        pathNot: [
-          '^src/app/context/BoardRealtimeContext\\.tsx$', // PR-C1
-        ],
-      },
+      to: { path: '^src/app/' },
     },
     {
       name: 'no-app-cross-group',

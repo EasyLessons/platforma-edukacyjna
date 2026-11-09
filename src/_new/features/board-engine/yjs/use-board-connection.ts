@@ -166,7 +166,7 @@ export function useBoardConnection({
     };
   }, [doc, boardId, isRemote, isReady, setDirty]);
 
-  // Nie localCache.hasLocalContent - ten liczy mapę elementów starego silnika.
+  // Treść kopii lokalnej liczona z mapy elementów Excalidraw (hook cache zna tylko Y.Doc).
   const hasLocalContent = isReady && doc.getMap(ELEMENTS_KEY).size > 0;
 
   return {

@@ -1,5 +1,5 @@
 /**
- * Playwright - testy E2E tablicy na Excalidraw (e2e/*.spec.ts), NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw.
+ * Playwright - testy E2E tablicy na Excalidraw (e2e/*.spec.ts).
  *
  * Uruchomienie lokalne (pelny opis: docs/testing.md, sekcja "E2E"):
  *   docker compose -f docker-compose.e2e.yml up -d      # Postgres + Redis
@@ -9,7 +9,7 @@
  * Backend (z seedem), whiteboard-sync, frontend i atrapę Supabase Storage
  * (e2e/fake-storage.mjs - obrazy tablicy) startuje sam Playwright (webServer).
  * Wszystkie sekrety ponizej to ZASLEPKI - te same, ktorych uzywa ci.yml.
- * Frontend lokalnie to osobny `next dev` (flaga silnika jest wklejana w czasie builda).
+ * Frontend lokalnie to osobny `next dev`.
  */
 import { defineConfig, devices } from '@playwright/test';
 import path from 'path';
@@ -57,7 +57,6 @@ const backendEnv = {
 const frontendEnv = {
   NEXT_PUBLIC_API_URL: apiURL,
   NEXT_PUBLIC_WHITEBOARD_SYNC_URL: `ws://localhost:${SYNC_PORT}`,
-  NEXT_PUBLIC_WHITEBOARD_ENGINE: 'excalidraw',
   // Wystawia window.__excalidrawAPI dla asercji w testach (excalidraw-board.tsx).
   NEXT_PUBLIC_E2E: '1',
   // Supabase Realtime nie polaczy sie z zaslepka - testy tego nie sprawdzaja,

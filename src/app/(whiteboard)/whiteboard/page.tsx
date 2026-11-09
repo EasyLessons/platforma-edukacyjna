@@ -1,23 +1,9 @@
 /**
- * ============================================================================
- * PLIK: src/app/tablica/page.tsx - FINAL VERSION
- * ============================================================================
- *
- * 🎯 SCALENIE:
- * - Oryginalny layout (przycisk powrotu, logo, tooltip)
- * - BoardRealtimeProvider (synchronizacja)
- * - boardId z query params
- *
- * IMPORTUJE Z:
- * - next/navigation (useRouter, useSearchParams)
- * - next/image (Image)
- * - ./whiteboard/WhiteboardCanvas (główny komponent tablicy)
- * - ../context/BoardRealtimeContext (synchronizacja realtime)
- *
- * PRZEZNACZENIE:
- * Strona /tablica z pełnoekranową tablicą, synchronizacją realtime,
- * i przyciskiem powrotu do dashboardu.
- * ============================================================================
+ * Strona /whiteboard?boardId=<id>[&workspace=<id>][&arkusz=<folder>] - tablica zalogowanego
+ * użytkownika na Excalidraw (board-engine). Strona składa: sidebar tablic, panel ustawień,
+ * modal udostępniania i `ExcalidrawWhiteboard` (nagłówek, panele, sync Yjs są w środku).
+ * Bez `boardId` (albo z nieliczbowym) - powrót do /dashboard; `/whiteboard` zawsze wymaga
+ * logowania (middleware), demo bez konta jest pod `/demo/<id>`.
  */
 
 'use client';
@@ -25,13 +11,9 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 
-import WhiteboardCanvas from '@/_new/features/whiteboard/components/canvas/whiteboard-canvas';
-import { BoardRealtimeProvider } from '../../context/BoardRealtimeContext';
-import { VoiceChatProvider } from '@/_new/features/voice-chat';
 import { CallButton, DailyCallProvider, isDailyVoice } from '@/_new/features/voice-call';
 import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
-import { BoardHeader } from '@/_new/features/whiteboard/components/layout/board-header';
 import { ShareLinkModal } from '@/_new/features/workspace/components/shareLinkModal';
 import { BoardSettingsPanel } from '@/_new/features/whiteboard/components/panels/board-settings-panel';
 import { WhiteboardBoardSidebar } from '@/_new/features/whiteboard/components/layout/whiteboard-board-sidebar';
@@ -44,7 +26,6 @@ import { fetchBoardSettings } from '@/_new/features/whiteboard/api/whiteboardApi
 import { usePrewarmWhiteboardSync } from '@/_new/features/whiteboard/yjs/prewarm-sync';
 import { clearBoardCache } from '@/_new/lib/board-cache/board-cache';
 import { createLogger } from '@/_new/lib/logger';
-import { isExcalidrawEngine } from '@/_new/features/board-engine';
 import type { TopRightExtra } from '@/_new/features/board-engine';
 import { ExcalidrawWhiteboard } from '@/_new/features/board-engine/components/excalidraw-whiteboard';
 import { sheetByFolder } from '@/_new/features/board-engine/templates/catalog';
@@ -70,10 +51,9 @@ export function TablicaContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [boardId, setBoardId] = useState<string | null>(null);
+  const [missingBoardId, setMissingBoardId] = useState(false);
   const [arkuszPath, setArkuszPath] = useState<string | null>(null);
   const [boardName, setBoardName] = useState<string>('Moja tablica');
-  const [boardIcon, setBoardIcon] = useState<string>('PenTool');
-  const [boardBgColor, setBoardBgColor] = useState<string>('gray-500');
   const [userRole, setUserRole] = useState<'owner' | 'editor' | 'viewer' | null>(null);
   const [accessDenied, setAccessDenied] = useState(false);
   const [workspaceId, setWorkspaceId] = useState<number | null>(() => {
@@ -96,7 +76,13 @@ export function TablicaContent() {
 
   // Pobierz boardId i arkusz z URL query params
   useEffect(() => {
-    const id = searchParams.get('boardId') || 'demo-board';
+    const id = searchParams.get('boardId');
+    // Bez tablicy nie ma czego pokazać - wracamy do dashboardu (dawniej otwierał się relikt 'demo-board').
+    if (!id || !/^\d+$/.test(id)) {
+      setMissingBoardId(true);
+      router.replace('/dashboard');
+      return;
+    }
     const arkusz = searchParams.get('arkusz');
     const workspaceParam = searchParams.get('workspace');
 
@@ -123,8 +109,6 @@ export function TablicaContent() {
         const board = await fetchBoardById(numericId);
         if (board) {
           setBoardName(board.name);
-          setBoardIcon(board.icon || 'PenTool');
-          setBoardBgColor(board.bg_color || 'gray-500');
           setWorkspaceId(board.workspace_id);
           setElementLimit(board.element_limit ?? null);
           // Wczytaj ustawienia tablicy (z domyslnymi wartosciami gdy null)
@@ -161,7 +145,7 @@ export function TablicaContent() {
     };
 
     loadBoardData();
-  }, [searchParams]);
+  }, [searchParams, router]);
 
   // Pobierz rolę użytkownika po załadowaniu workspace_id
   useEffect(() => {
@@ -227,6 +211,25 @@ export function TablicaContent() {
     };
   }, [workspaceId]);
 
+  if (missingBoardId) {
+    return (
+      <div className="w-screen h-screen flex items-center justify-center bg-white">
+        <div className="text-center max-w-sm px-4">
+          <h2 className="text-xl font-bold text-gray-800 mb-2">Nie wybrano tablicy</h2>
+          <p className="text-gray-600 mb-6">
+            Otwórz tablicę z dashboardu - za chwilę Cię tam przeniesiemy.
+          </p>
+          <button
+            onClick={() => router.push('/dashboard')}
+            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold transition-colors"
+          >
+            Przejdź do dashboardu
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Loading state
   if (!boardId) {
     return (
@@ -258,20 +261,8 @@ export function TablicaContent() {
     );
   }
 
-  const canvas = (
-    <WhiteboardCanvas
-      boardId={boardId ?? ''}
-      arkuszPath={arkuszPath}
-      userRole={userRole || 'editor'}
-      boardSettings={boardSettings}
-      toolbarLeftOffset={0}
-      isSidebarOpen={sidebar.isOpen}
-    />
-  );
-
-  const board = isExcalidrawEngine ? (
-    // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Własny nagłówek,
-    // toolbar i kontrolki 1:1 ze starym silnikiem; rozmowa (Daily) w nagłówku.
+  const board = (
+    // Tablica Excalidraw z własnym nagłówkiem, panelami i kontrolkami; rozmowa (Daily) w nagłówku.
     <ExcalidrawWhiteboard
       boardId={boardId}
       boardName={boardName}
@@ -279,10 +270,8 @@ export function TablicaContent() {
       userRole={userRole || 'editor'}
       isSidebarOpen={sidebar.isOpen}
       onSidebarToggle={sidebar.toggle}
-      onSettingsClick={boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
-      onShareClick={
-        boardId !== 'demo-board' && userRole === 'owner' ? () => setShowShareModal(true) : undefined
-      }
+      onSettingsClick={() => setShowBoardSettings(true)}
+      onShareClick={userRole === 'owner' ? () => setShowShareModal(true) : undefined}
       gridVisible={boardSettings.grid_visible}
       smartSearchVisible={boardSettings.smartsearch_visible}
       aiEnabled={boardSettings.ai_enabled}
@@ -297,20 +286,9 @@ export function TablicaContent() {
         router.replace(`/whiteboard?${params.toString()}`);
       }}
     />
-  ) : (
-    /* REALTIME PROVIDER - Opakowuje WhiteboardCanvas */
-    <BoardRealtimeProvider boardId={boardId ?? ''}>
-      {isDailyVoice ? (
-        canvas
-      ) : (
-        /* VOICE CHAT PROVIDER - stary czat P2P (NEXT_PUBLIC_VOICE_PROVIDER=legacy) */
-        <VoiceChatProvider boardId={boardId ?? ''}>{canvas}</VoiceChatProvider>
-      )}
-    </BoardRealtimeProvider>
   );
 
-  // Rozmowa Daily tylko dla prawdziwej tablicy (liczbowe id) - 'demo-board' jej nie ma.
-  const callBoardId = /^\d+$/.test(boardId) ? Number(boardId) : null;
+  const callBoardId = Number(boardId);
 
   return (
     <div
@@ -328,7 +306,7 @@ export function TablicaContent() {
           workspaceId={workspaceId}
           activeBoardId={boardId}
           isOpen={sidebar.isOpen}
-          onSettingsClick={boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
+          onSettingsClick={() => setShowBoardSettings(true)}
           onClose={sidebar.close}
           onHoverLeave={sidebar.closeFromHoverLeave}
         />
@@ -347,7 +325,7 @@ export function TablicaContent() {
         }}
       >
         {/* Panel ustawień tablicy */}
-        {showBoardSettings && boardId && boardId !== 'demo-board' && (
+        {showBoardSettings && (
           <BoardSettingsPanel
             boardId={parseInt(boardId, 10)}
             workspaceId={workspaceId}
@@ -358,28 +336,7 @@ export function TablicaContent() {
           />
         )}
 
-        {/* Nagłówek z logo, togglem i ustawieniami (ukryty przy otwartym sidebarze i na silniku Excalidraw) */}
-        {!sidebar.isOpen && !isExcalidrawEngine && (
-          <BoardHeader
-            boardName={boardName}
-            boardIcon={boardIcon}
-            boardBgColor={boardBgColor}
-            boardId={boardId ?? ''}
-            workspaceId={workspaceId}
-            isSidebarOpen={sidebar.isOpen}
-            onSidebarToggle={sidebar.toggle}
-            onSettingsClick={
-              boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined
-            }
-            onShareClick={
-              boardId !== 'demo-board' && userRole === 'owner'
-                ? () => setShowShareModal(true)
-                : undefined
-            }
-          />
-        )}
-
-        {workspaceId && boardId && boardId !== 'demo-board' && (
+        {workspaceId && (
           <ShareLinkModal
             isOpen={showShareModal}
             onClose={() => setShowShareModal(false)}

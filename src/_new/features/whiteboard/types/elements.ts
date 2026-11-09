@@ -5,12 +5,9 @@
  * Każdy typ to jeden rodzaj obiektu który można narysować/wstawić na tablicę.
  * DrawingElement = union wszystkich typów (jeden element to jedno z poniższych).
  *
- * UŻYWANE PRZEZ:
- * - elements/use-elements.ts    (zarządzanie stanem tablicy)
- * - elements/rendering/         (rysowanie na canvas)
- * - selection/use-selection.ts  (zaznaczanie)
- * - api/elements-api.ts         (zapis/odczyt z bazy)
- * - realtime/use-realtime.ts    (synchronizacja)
+ * Po usunięciu starego silnika (etap F) typy żyją dla zapisanych szablonów użytkownika
+ * (`elements_data` w tabeli assets: types/assets.ts, utils/asset-helpers.ts) i notatki
+ * Markdown (`MarkdownNote` w board-engine/elements/note.tsx).
  * ============================================================================
  */
 

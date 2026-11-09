@@ -1,5 +1,5 @@
 /**
- * E2E tablicy na Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw) na pełnym stosie:
+ * E2E tablicy na Excalidraw na pełnym stosie:
  * backend (seed) + whiteboard-sync z autoryzacją + frontend.
  *
  * Dwie przeglądarki (osobne konteksty, dwóch użytkowników z jednego workspace'u) na tej

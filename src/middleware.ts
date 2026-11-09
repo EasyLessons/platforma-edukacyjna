@@ -6,7 +6,7 @@
  *
  * Chronione trasy:
  * - /dashboard - wymaga logowania
- * - /tablica - wymaga logowania (normalny użytkownik) LUB tryb demo
+ * - /whiteboard - wymaga logowania (tablica demo bez konta jest pod /demo/*, poza matcherem)
  *
  * Logika:
  * - Sprawdza czy jest token w cookies
@@ -27,17 +27,8 @@ export function middleware(request: NextRequest) {
   const protectedPaths = ['/dashboard', '/whiteboard'];
   const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
 
-  // Jeśli użytkownik próbuje wejść na chronioną trasę bez tokenu
+  // Jeśli użytkownik próbuje wejść na chronioną trasę bez tokenu - redirect do logowania
   if (isProtectedPath && !token) {
-    // Sprawdź czy to nie tryb demo dla tablicy
-    const isDemoMode = request.cookies.get('demo_mode')?.value === 'true';
-
-    if (pathname === '/whiteboard' && isDemoMode) {
-      // Przepuść - tryb demo
-      return NextResponse.next();
-    }
-
-    // Redirect do logowania
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
