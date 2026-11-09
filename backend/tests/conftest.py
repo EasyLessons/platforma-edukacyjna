@@ -78,6 +78,16 @@ def event_loop():
 
 
 @pytest.fixture(autouse=True)
+def reset_redis_degradation():
+    """Tryb awaryjny Redis (core/redis_client.py) to stan na proces - kazdy test startuje bez niego."""
+    from core import redis_client as redis_client_module
+
+    redis_client_module.reset_degradation()
+    yield
+    redis_client_module.reset_degradation()
+
+
+@pytest.fixture(autouse=True)
 def storage_bucket_check_state():
     """
     core/storage.py pamieta na proces, czy bucket prywatny ma `public: false`. Kazdy test

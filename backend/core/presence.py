@@ -15,7 +15,7 @@ import redis.asyncio as redis
 from redis.exceptions import ConnectionError, TimeoutError
 from sqlalchemy.orm import Session
 
-from core.redis_client import get_redis_client
+from core.redis_client import ResilientRedis, get_redis_client
 from core.logging import get_logger
 from core.models import User
 
@@ -31,7 +31,8 @@ KEY_TTL_SECONDS = 60 * 60 # 1h
 class PresenceService:
     def __init__(self, db: Session, redis_client: redis.Redis | None = None):
         self.db = db
-        self.redis = redis_client or get_redis_client()
+        # Awaria Redis -> presence w pamieci procesu (ResilientRedis), zamiast pustych list.
+        self.redis = ResilientRedis(redis_client or get_redis_client())
 
     def _key(self, board_id: int) -> str:
         return f"board:{board_id}:presence"
