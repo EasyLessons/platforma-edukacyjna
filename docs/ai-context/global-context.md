@@ -13,7 +13,7 @@ Jesteś moim AI Mentorem i Lead Developerem. Ja jestem studentem 3. roku informa
 
 Pełna, szczegółowa mapa stacku (z uzasadnieniami) jest w `docs/architecture/stack.md` — tu tylko skrót:
 
-- **Frontend:** Next.js (App Router, Route Groups), React 19, TypeScript, TanStack Query (dane z API), Zustand (stan globalny UI), Tailwind CSS, KaTeX (wzory matematyczne), Yjs (model tablicy — za flagą `NEXT_PUBLIC_WHITEBOARD_YJS`).
+- **Frontend:** Next.js (App Router, Route Groups), React 19, TypeScript, TanStack Query (dane z API), Zustand (stan globalny UI), Tailwind CSS, KaTeX (wzory matematyczne), Yjs/Hocuspocus (model i synchronizacja tablicy w obu silnikach), Excalidraw jako silnik tablicy za flagą `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw` (stary własny silnik domyślny bez flagi, do usunięcia w etapie F).
 - **Backend/Baza:** FastAPI (Python) + SQLAlchemy/Alembic + PostgreSQL (Neon, serverless) + Redis (presence, rate limit). Osobny serwis `whiteboard-sync/` (Node, Hocuspocus) synchronizuje dokumenty Yjs tablicy i deleguje auth/persystencję do FastAPI. **Supabase jest używany do Realtime (Broadcast + Presence) i Storage (obrazy tablicy) — NIE do autoryzacji.** Autoryzacja to własny system: JWT + cookie-first + rotacja refresh tokenów, opisany w `docs/architecture/auth.md`.
 - Stan lokalny (UI): `useState`. Stan globalny: `Zustand` — kategorycznie unikamy prop drillingu, używamy selektorów do subskrypcji (albo `getState()` w hot-paths), żeby uniknąć zbędnych re-renderów.
 - Optymalizacja struktur danych: `Map`/`rbush` (R-tree) tam gdzie liczy się szybkie wyszukiwanie zamiast liniowego przeglądania — patrz `docs/architecture/stack.md`.

@@ -10,10 +10,10 @@ Jedno miejsce prawdy o architekturze projektu. Jeśli zaczynasz tu pracę (czło
 6. **`docs/architecture/dashboard.md`** — funkcje i budowa panelu użytkownika.
 7. **`docs/architecture/pipelines.md`** — jak dane przepływają przez system dla każdej ważnej operacji (logowanie, sync tablicy, powiadomienia, AI chat, voice chat, SmartSearch).
 8. **`docs/architecture/ci-cd.md`** — jak pracujemy z `main` (branch → PR → CI → merge), co sprawdza `ci.yml`, jak to odpalić lokalnie przed pushem, co robić przy zablokowanym pushu przez sekret scanning.
-9. **`docs/ai-context/whiteboard/`** — osobny, szczegółowy zestaw dokumentów o silniku tablicy (`canvas-architecture.md`, `how-to-add-tool.md`, `use-canvas-wheel-spec.md`) — zaglądaj tu dopiero przy pracy konkretnie nad tablicą.
-10. **`docs/testing.md`** — jak wygląda pokrycie testami (backend + frontend).
-11. **`docs/migration-status.md`** — co z migracji na architekturę feature-based zostało zrobione, co zostaje do zrobienia. Sprawdź to **zanim** zaczniesz zmieniać coś w `src/app/context/*` albo w folderze `src/_new`.
-12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (na razie: subskrybent).
+9. **`docs/ai-context/whiteboard/`** — osobny, szczegółowy zestaw dokumentów o **starym** silniku tablicy (`canvas-architecture.md`, `how-to-add-tool.md`, `use-canvas-wheel-spec.md`; `features/whiteboard`, domyślny bez flagi, do usunięcia w etapie F). Silnik Excalidraw (`features/board-engine`, flaga `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`) jest opisany w `stack.md`, `pipelines.md` §2c–2d i `ADR-silnik-tablicy.md`.
+10. **`docs/testing.md`** — jak wygląda pokrycie testami (backend, frontend, `whiteboard-sync`) i jak uruchomić testy E2E (Playwright, tablica na Excalidraw na pełnym stosie).
+11. **`docs/migration-status.md`** — stan migracji na architekturę feature-based i silnik Excalidraw: co JEST, co zostało (etap F, rename `_new`). Sprawdź to **zanim** zaczniesz zmieniać coś w `src/app/context/*` albo w folderze `src/_new`.
+12. **`docs/roadmap.md`** — zaplanowane funkcje, które jeszcze nie mają kodu (płatności Stripe, etap F, infrastruktura płatna, usunięcie konta, pomysły).
 13. **`docs/known-issues.md`** — realne buble znalezione w czasie pracy/testów (nie mylić z migracją ani roadmapą), z priorytetem i analizą przyczyny.
 14. **`docs/architecture/REFAKTOR-PLAN.md`** — zatwierdzony plan refaktoru struktury (docelowe drzewo, etapy jako małe PR-y, kolejność względem pracy równoległej, decyzje). Czytaj przed każdym PR-em przenoszącym pliki.
 15. **`docs/architecture/WARSTWY-PROJEKT.md`** — projekt warstw tablicy (na wierzch / na spód / wyżej / niżej): gdzie siedzi kolejność elementów (`_index` w Yjs), model, API, UI, lista zmian w plikach Yjs do uzgodnienia z Bartkiem, szacunek.

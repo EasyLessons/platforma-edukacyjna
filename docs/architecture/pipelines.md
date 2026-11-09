@@ -18,23 +18,19 @@ Pełny opis stanów i rotacji tokenów: `docs/architecture/auth.md`.
 
 ## 2. Synchronizacja tablicy (realtime, client-to-client)
 
+Elementy tablicy w **obu** silnikach idą przez Yjs/Hocuspocus (pkt 2b) — dawnej ścieżki Supabase Broadcast dla elementów (`useElementSync`, `use-elements`, `elements-api`, tabela `board_elements`) już nie ma w kodzie. Supabase Realtime zostało na tablicy tylko dla presence **starego silnika** (`features/whiteboard`, domyślny bez flagi `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`):
+
 ```
-User A rysuje na Canvas
-  → WhiteboardEngine (facade, src/_new/features/whiteboard/engine) wykonuje Command
-  → element dodany lokalnie (optymistycznie, natychmiastowy feedback)
-  → BoardRealtimeContext (src/app/context/BoardRealtimeContext.tsx) wysyła Broadcast
-    przez Supabase (kanał "board:{board_id}")
-  → User B/C na tej samej tablicy odbierają event przez Supabase Realtime
-  → element dodawany do ich lokalnego stanu (bez przeładowania strony)
-  → osobno: zmiana persystowana do Postgresa przez backend/api/v1/whiteboard
-    (żeby przetrwała reload/nowego usera dołączającego później)
+stary silnik: kanał Supabase "board:{board_id}" (src/app/context/BoardRealtimeContext.tsx
+  + hooki features/whiteboard/realtime/*): Presence = kto jest online, Broadcast = kursory,
+  "kto pisze", viewport/follow. Elementy NIE jadą tym kanałem.
+Excalidraw (features/board-engine): kursory i lista osób przez awareness Hocuspocusa
+  (yjs/awareness-collaborators.ts) — Supabase nieużywane na tablicy.
 ```
 
-Presence (kto jest online na tablicy, kursory innych userów) — ten sam kanał Supabase, mechanizm Presence zamiast Broadcast.
+`BoardRealtimeContext` i `realtime/*` znikają w etapie F (`migration-status.md`).
 
-Powyższe to ścieżka **legacy** (aktywna, gdy `NEXT_PUBLIC_WHITEBOARD_YJS` nie jest `true`). Logika broadcastu elementów siedzi w `src/_new/features/whiteboard/realtime/useElementSync.ts`, stan w `hooks/use-elements.ts`, REST w `api/elements-api.ts`; `BoardRealtimeContext` (390 linii, `src/app/context`) tylko spina hooki z kanałem.
-
-### 2b. Synchronizacja tablicy — ścieżka Yjs (za flagą `NEXT_PUBLIC_WHITEBOARD_YJS=true`)
+### 2b. Synchronizacja tablicy — Yjs/Hocuspocus (oba silniki)
 
 ```
 User A rysuje na Canvas
@@ -48,7 +44,7 @@ User A rysuje na Canvas
   → Database.store (debounce Hocuspocusa): POST /api/v1/whiteboard/{id}/doc → snapshot do Postgresa
 ```
 
-Presence/kursory/typing/follow nadal idą przez Supabase (pkt 2) — Yjs zastępuje tylko synchronizację i persystencję elementów. Undo/redo w tej ścieżce to `Y.UndoManager`. Migracja danych `board_elements → board_documents` i wyłączenie ścieżki legacy: gałąź `feature/whiteboard-yjs`.
+Schemat powyżej to stary silnik (`hooks/use-yjs-board.ts`, undo/redo przez `Y.UndoManager`); w Excalidraw ten sam provider i serwis obsługuje `yjs/use-board-connection.ts` + `excalidraw-binding.ts` (scena Excalidraw ↔ `Y.Map` `excalidraw-elements`), a serwer dodatkowo egzekwuje limit elementów planu (`whiteboard-sync/src/element-limit.ts`, `plan-subskrypcje.md`). Presence: pkt 2. Tabela `board_elements` została usunięta (migracja `d315e28cb69c`) — `board_documents` jest jedynym źródłem elementów.
 
 #### Kopia lokalna (IndexedDB) i edycja offline
 
