@@ -5,7 +5,7 @@ from fastapi import Request
 from core.config import get_settings
 from core.exceptions import AppException
 from redis.exceptions import RedisError
-from core.redis_client import get_redis_client
+from core.redis_client import ResilientRedis, get_redis_client
 
 from core.logging import get_logger
 
@@ -112,9 +112,11 @@ async def enforce_rate_limit(
     Jeden licznik `limit` / `window_seconds` dla dowolnego podmiotu (np. "user:5", "ip:1.2.3.4")
     - do wywołania z kodu endpointu PO autoryzacji (zależność `rate_limit` liczy tylko IP/body).
     Przekroczenie -> 429 RATE_LIMITED. `RedisError` NIE jest tu łapany: wołający decyduje,
-    czy awaria Redis przepuszcza żądanie, czy je odrzuca.
+    czy awaria Redis przepuszcza żądanie, czy je odrzuca. Bez `redis_client` licznik idzie
+    przez ResilientRedis (awaria Redis = licznik w pamięci procesu); bezpiecznik rozmów
+    podaje surowego klienta, bo chce fail-closed.
     """
-    redis_client = redis_client or get_redis_client()
+    redis_client = redis_client or ResilientRedis(get_redis_client())
     key = f"ratelimit:{scope}:{subject}"
     current = await redis_client.incr(key)
     if current == 1 or await redis_client.ttl(key) == -1:
@@ -139,12 +141,15 @@ def rate_limit(
     dla danego `scope`, liczony osobno per IP i (opcjonalnie) per pole `identifier_field`
     z JSON body requestu.
 
-    `fail_open=False` (domyślnie, endpointy logowania/rejestracji): awaria Redis -> 503.
-    `fail_open=True` (np. /refresh, /logout): awaria Redis -> żądanie przechodzi bez limitu,
-    żeby padnięcie Redis nie odcinało zalogowanych użytkowników od odświeżania sesji.
+    Awaria połączenia z Redis NIE blokuje żądań: klient ResilientRedis (core/redis_client.py)
+    liczy wtedy limit w pamięci procesu i loguje WARNING (raz na okno ponowienia). Poniższe
+    `except RedisError` zostaje na błędy, których pamięć nie obejdzie (np. ResponseError
+    READONLY/OOM z samego Redis):
+    `fail_open=False` (domyślnie, endpointy logowania/rejestracji): taki błąd -> 503.
+    `fail_open=True` (np. /refresh, /logout): żądanie przechodzi bez limitu.
     """
     async def dependency(request: Request):
-        redis_client = get_redis_client()
+        redis_client = ResilientRedis(get_redis_client())
         keys = [f"ratelimit:{scope}:ip:{get_client_ip(request)}"]
 
         if identifier_field:
