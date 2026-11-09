@@ -5,7 +5,6 @@
  * wylacznie to, co widzi uzytkownik w warstwie nad plotnem.
  */
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const pushMock = vi.fn();
@@ -53,27 +52,14 @@ describe('Strona demo', () => {
     );
   });
 
-  it('pokazuje to samo logo co zwykla tablica (LogoEasyLesson.webp)', () => {
-    render(<DemoBoardPage />);
+  it('nie renderuje wlasnego naglowka - logo i powrot na landing daje ExcalidrawWhiteboard', () => {
+    // Od #123 naglowek (logo -> "/", osoby online) jest czescia ExcalidrawWhiteboard/ExcalidrawHeader
+    // (test: components/excalidraw-header.test.tsx). Strona demo ma tylko plotno.
+    const { container } = render(<DemoBoardPage />);
 
-    // Ten sam alt i ta sama grafika co w BoardHeader — demo uzywa BoardLogoButton.
-    const logo = screen.getByAltText('EasyLesson Logo');
-    expect(logo.getAttribute('src')).toContain('LogoEasyLesson.webp');
-  });
-
-  it('klikniecie logo prowadzi na strone glowna', async () => {
-    const user = userEvent.setup();
-    render(<DemoBoardPage />);
-
-    await user.click(screen.getByRole('button', { name: /easylesson logo/i }));
-    expect(pushMock).toHaveBeenCalledWith('/');
-  });
-
-  it('przycisk logo ma kursor raczki', () => {
-    render(<DemoBoardPage />);
-
-    const button = screen.getByRole('button', { name: /easylesson logo/i });
-    expect(button.style.cursor).toBe('pointer');
+    expect(screen.queryByAltText('EasyLesson Logo')).not.toBeInTheDocument();
+    expect(container.querySelectorAll('button')).toHaveLength(0);
+    expect(screen.getByTestId('excalidraw-board')).toBeInTheDocument();
   });
 
   it('nie pokazuje juz plakietki o trybie goscia nad smart search barem', () => {
