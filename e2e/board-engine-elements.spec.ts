@@ -3,7 +3,15 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { E2E_USERS, closeBoard, liveElements, makePdf, openBoardAs } from './helpers';
+import {
+  E2E_USERS,
+  clickToolbarAction,
+  closeBoard,
+  liveElements,
+  makePdf,
+  openBoardAs,
+  openToolbarMore,
+} from './helpers';
 
 test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i po F5', async ({
   browser,
@@ -13,7 +21,7 @@ test('notatka Markdown + KaTeX: utworzenie, edycja, widoczna u drugiej osoby i p
   const before = new Set((await liveElements(a)).map((e) => e.id));
 
   // Przycisk "Notatka" wstawia notatkę i od razu otwiera edycję
-  await a.getByTestId('element-insert-note').filter({ visible: true }).click();
+  await clickToolbarAction(a, 'element-insert-note');
   const editor = a.locator('[data-testid="board-note"] textarea');
   await expect(editor).toBeVisible();
   await editor.fill('## Twierdzenie Pitagorasa\n\n$a^2 + b^2 = c^2$');
@@ -56,7 +64,7 @@ test('tabela: utworzenie, dodanie wiersza, widoczna u drugiej osoby i po F5', as
     (await liveElements(page)).filter((e) => e.customData?.kind === 'table-cell');
   const before = (await tableCells(a)).length;
 
-  await a.getByTestId('element-insert-table').filter({ visible: true }).click();
+  await clickToolbarAction(a, 'element-insert-table');
   await expect.poll(async () => (await tableCells(a)).length).toBe(before + 9);
 
   // Mini-pasek tabeli (tabela zaznaczona po wstawieniu): + wiersz
@@ -83,6 +91,7 @@ test('PDF: strony jako obrazy, widoczne u drugiej osoby i po F5; zły plik = kom
     (await liveElements(page)).filter((e) => e.customData?.kind === 'pdf-page');
   const before = new Set((await pdfPages(a)).map((e) => e.id));
 
+  await openToolbarMore(a);
   await expect(a.getByTestId('element-insert-pdf').filter({ visible: true })).toHaveCount(1);
   await a.getByTestId('pdf-file-input').setInputFiles({
     name: 'zadania.pdf',
@@ -128,6 +137,8 @@ test('PDF: strony jako obrazy, widoczne u drugiej osoby i po F5; zły plik = kom
 
 test('viewer: bez przycisków notatki, tabeli i PDF', async ({ browser }) => {
   const v = await openBoardAs(browser, E2E_USERS.viewer);
+  // Także po otwarciu menu "Więcej" (niskie okno) - viewer ma tam tylko kalkulator.
+  await openToolbarMore(v);
   await expect(v.getByTestId('element-insert-note')).toHaveCount(0);
   await expect(v.getByTestId('element-insert-table')).toHaveCount(0);
   await expect(v.getByTestId('element-insert-pdf')).toHaveCount(0);
