@@ -19,6 +19,8 @@ export const UPLOAD_FAILURE_MESSAGES: Record<UploadFailure, string> = {
   unsupported: 'Ten format obrazu nie jest obsługiwany (PNG, JPG, WEBP, GIF) - nie został dodany.',
   svg: 'Pliki SVG nie są obsługiwane na tablicy - dodaj obraz jako PNG lub JPG.',
   quota: 'Ta tablica osiągnęła limit obrazów - obraz nie został dodany.',
+  storage:
+    'Przestrzeń wykorzystała limit miejsca na pliki - obraz nie został dodany. Usuń niepotrzebne tablice albo poproś właściciela o Premium.',
   forbidden: 'Nie masz uprawnień do dodawania obrazów na tej tablicy.',
   failed: 'Nie udało się wgrać obrazu - spróbuj ponownie.',
 };

@@ -79,12 +79,14 @@ class TestPlanLookup:
         assert free.max_own_workspaces == 2
         assert free.max_boards_per_workspace == 3
         assert free.max_elements_per_board == 1000
+        assert free.max_storage_bytes == 100 * 1024 * 1024  # decyzja 12.10.2026: Free 100 MB
 
     def test_limity_premium_bez_ograniczen(self):
         premium = PLAN_LIMITS["premium"]
         assert premium.max_own_workspaces is None
         assert premium.max_boards_per_workspace is None
         assert premium.max_elements_per_board is None
+        assert premium.max_storage_bytes == 5 * 1024 * 1024 * 1024  # Premium 5 GB
 
 
 # -- przestrzenie ------------------------------------------------------------
