@@ -156,7 +156,8 @@ z PR #106 (300 plików / 100 MB na tablicę, licznik w Redis — zostaje jako dr
 `backend/api/v1/storage_quota/cleanup.py`, decyzje Patryka z 12.10.2026. Pętla w `lifespan`
 (`main.py`) sprawdza co godzinę, czy minęły 24 h od ostatniego przebiegu (raport w Redis
 `storage_cleanup:last_report`, więc restart procesu nie uruchamia go od nowa), pierwszy start 10 min po
-uruchomieniu. Jeden przebieg naraz (blokada `storage_cleanup:lock`). Kroki, każdy w osobnym
+uruchomieniu. Jeden przebieg naraz (blokada `storage_cleanup:lock`); gdy Redis nie odpowiada, przebieg jest
+pomijany (`skipped`), bo bez wspólnej blokady nic nie powinno kasować. Kroki, każdy w osobnym
 `try/except`:
 
 1. **Rejestr = bucket** — pliki z `board-files` bez wiersza są dopisywane (właściciel z przestrzeni;
@@ -178,8 +179,8 @@ listowanie Storage nigdy nie znaczy „plików nie ma". Wspólne szablony, pliki
 (`board-images`) i dokumenty Yjs nie są ruszane. Za „stare pliki" uznajemy tylko sieroty i pliki
 usuniętych tablic — plik z żywej tablicy nie jest kasowany z powodu wieku.
 
-Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENABLED` (domyślnie `true`;
-`false` wyłącza pętlę), `STORAGE_CLEANUP_INTERVAL_HOURS` (24), `STORAGE_CLEANUP_INITIAL_DELAY_MINUTES` (10).
+Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENABLED` (domyślnie **`false`** —
+pętla jest wyłączona do czasu przeglądu `--dry-run` na produkcji, decyzja Patryka 09.11.2026; `true` włącza), `STORAGE_CLEANUP_INTERVAL_HOURS` (24), `STORAGE_CLEANUP_INITIAL_DELAY_MINUTES` (10).
 Ręcznie: `python scripts/storage_cleanup.py --dry-run` (z `backend/`) — raport JSON bez żadnego zapisu;
 bez `--dry-run` robi to samo co pętla. Pierwszy przebieg na produkcji: najpierw `--dry-run`.
 

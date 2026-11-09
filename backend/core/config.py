@@ -128,8 +128,9 @@ class Settings(BaseSettings):
 
     # === SPRZATANIE STORAGE (api/v1/storage_quota/cleanup.py) ===
     # Cykliczny job: rejestr plikow, sieroty, pliki usunietych tablic (30 dni), awatary-sieroty,
-    # stare powiadomienia/zaproszenia. false = wylaczony (reczny przebieg: scripts/storage_cleanup.py).
-    storage_cleanup_enabled: bool = True
+    # stare powiadomienia/zaproszenia. Domyslnie WYLACZONY (decyzja Patryka 09.11.2026) do czasu
+    # przegladu `scripts/storage_cleanup.py --dry-run` na produkcji; true = petla w lifespan.
+    storage_cleanup_enabled: bool = False
     # Co ile godzin najwyzej jeden przebieg (restart procesu go nie przyspiesza).
     storage_cleanup_interval_hours: int = 24
     # Po ilu minutach od startu procesu petla zaczyna sprawdzac, czy pora na przebieg.
