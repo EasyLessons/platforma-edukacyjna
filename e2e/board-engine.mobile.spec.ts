@@ -4,7 +4,7 @@
  */
 
 import { test, expect } from '@playwright/test';
-import { E2E_USERS, liveElements, login, openBoard } from './helpers';
+import { E2E_USERS, liveElements, login, openBoard, selectTool } from './helpers';
 
 test('rysowanie palcem tworzy element freedraw', async ({ page, context }) => {
   await login(page, E2E_USERS.owner);
@@ -12,10 +12,7 @@ test('rysowanie palcem tworzy element freedraw', async ({ page, context }) => {
 
   const before = new Set((await liveElements(page)).map((e) => e.id));
   // Na telefonie bez skrótów klawiszowych - narzędzie z paska.
-  await page
-    .getByTitle(/^Rysuj/)
-    .first()
-    .click();
+  await selectTool(page, /^Pisak/);
 
   const cdp = await context.newCDPSession(page);
   const box = (await page.locator('canvas.excalidraw__canvas.interactive').boundingBox())!;

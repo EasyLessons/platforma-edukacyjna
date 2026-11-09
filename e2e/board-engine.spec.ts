@@ -143,7 +143,7 @@ test('kształt ma domyślne lekkie wypełnienie i klik w środek go zaznacza', a
 
   // Odznacz (Escape), potem klik w środek prostokąta narzędziem zaznaczania
   await page.keyboard.press('Escape');
-  await selectTool(page, /^Zaznaczenie/);
+  await selectTool(page, /^Kursor/);
   const mid = await toScreen(page, rect.x + rect.width / 2, rect.y + rect.height / 2);
   await page.mouse.click(mid.x, mid.y);
   await expect
@@ -153,7 +153,7 @@ test('kształt ma domyślne lekkie wypełnienie i klik w środek go zaznacza', a
     .toEqual([rect.id]);
 
   // Pióro po prostokącie nie dziedziczy wypełnienia
-  await selectTool(page, /^Rysuj/);
+  await selectTool(page, /^Pisak/);
   await expect
     .poll(() =>
       page.evaluate(() => window.__boardEngine!.api.getAppState().currentItemBackgroundColor)

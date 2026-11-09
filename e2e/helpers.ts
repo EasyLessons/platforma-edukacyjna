@@ -141,9 +141,22 @@ export async function drag(
   await page.mouse.up();
 }
 
-/** Wybiera narzędzie z paska Excalidraw po `title` (np. /^Prostokąt/). */
+/**
+ * Wybiera narzędzie z własnego pionowego paska EasyLesson (excalidraw-vertical-toolbar.tsx)
+ * po etykiecie dostępności, np. /^Kursor/, /^Pisak/, /^Tekst/. Kształty (/^Prostokąt/, /^Elipsa/,
+ * /^Romb/, /^Strzałka/, /^Linia/) siedzą w rozwijanym przycisku - helper otwiera menu i klika pozycję.
+ * Natywny pasek Excalidraw jest ukryty (display: none), więc nie ma go w drzewie dostępności.
+ */
 export async function selectTool(page: Page, title: RegExp) {
-  await page.getByTitle(title).first().click();
+  const toolbar = page.getByTestId('excalidraw-vertical-toolbar');
+  const button = toolbar.getByRole('button', { name: title });
+  if ((await button.count()) > 0) {
+    await button.first().click();
+    return;
+  }
+  // Strzałka "▾" otwiera menu kształtów niezależnie od aktywnego narzędzia.
+  await toolbar.getByTestId('vertical-toolbar-shapes-menu').click();
+  await toolbar.getByRole('button', { name: title }).click();
 }
 
 /** Rysuje prostokąt w punkcie sceny i zwraca nowy element. */
