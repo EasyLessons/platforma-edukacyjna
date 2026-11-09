@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 
+const CONTACT_TO_EMAIL_DEFAULT = 'kontakt@easylesson.app';
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -15,6 +17,9 @@ export async function POST(request: Request) {
     }
 
     const apiKey = process.env.RESEND_API_KEY;
+    // Skrzynka odbiorcza formularza: env CONTACT_TO_EMAIL (Vercel), domyślnie wspólny adres
+    // kontaktowy z landingu i stron prawnych.
+    const recipient = process.env.CONTACT_TO_EMAIL || CONTACT_TO_EMAIL_DEFAULT;
 
     // Wysyłka z użyciem endpointu Resend przez zapytanie fetch
     const response = await fetch('https://api.resend.com/emails', {
@@ -26,7 +31,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         // Gdy korzystamy z klucza testowego lub niezarejestrowanej domeny "onboarding@resend.dev" zazwyczaj jest wymuszony
         from: 'Acme <onboarding@resend.dev>',
-        to: ['easylesson@interia.pl'], // Odbiorca wybrany przez użytkownika
+        to: [recipient],
         subject: `[EasyLesson Kontakt] Nowa wiadomość od: ${name}`,
         html: `
           <h3>Otrzymano nową wiadomość z formularza kontaktowego Działu Sprzedaży</h3>

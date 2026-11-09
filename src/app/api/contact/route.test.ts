@@ -65,9 +65,23 @@ describe('POST /api/contact — poprawne dane', () => {
     const [url, options] = mockFetch.mock.calls[0] as [string, RequestInit];
     expect(url).toBe('https://api.resend.com/emails');
     const body = JSON.parse(options.body as string);
-    expect(body.to).toContain('easylesson@interia.pl');
+    expect(body.to).toEqual(['kontakt@easylesson.app']);
     expect(body.html).toContain('Jan Kowalski');
     expect(body.html).toContain('Zapytanie o ofertę');
+  });
+});
+
+describe('POST /api/contact — odbiorca z env', () => {
+  it('CONTACT_TO_EMAIL nadpisuje domyślną skrzynkę', async () => {
+    vi.stubEnv('CONTACT_TO_EMAIL', 'inbox@example.com');
+    try {
+      const res = await POST(makeRequest({ name: 'Jan', email: 'jan@example.com', message: 'test' }));
+      expect(res.status).toBe(200);
+      const body = JSON.parse((mockFetch.mock.calls[0] as [string, RequestInit])[1].body as string);
+      expect(body.to).toEqual(['inbox@example.com']);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 
