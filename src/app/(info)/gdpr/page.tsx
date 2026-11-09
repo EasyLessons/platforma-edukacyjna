@@ -66,7 +66,7 @@ export default function RodoPage() {
             <h2>6. Kontakt w sprawach ochrony danych</h2>
             <p>
               We wszelkich sprawach związanych z danymi osobowymi i ich ochroną możesz skontaktować
-              się z nami pisząc na adres e-mail: <strong>kontakt@easylesson.pl</strong> lub
+              się z nami pisząc na adres e-mail: <strong>kontakt@easylesson.app</strong> lub
               korzystając z naszego <a href="/contact">formularza kontaktowego</a>.
             </p>
 
