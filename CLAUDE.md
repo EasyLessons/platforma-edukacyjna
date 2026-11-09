@@ -29,11 +29,9 @@ Dwie warstwy (pelny opis: `docs/architecture/frontend-structure.md`):
 
 - `src/app/` - WYLACZNIE routing Next.js (App Router, route groups `(public)`,
   `(auth)`, `(dashboard)`, `(whiteboard)`, `(info)`, `api/`). Strony skladaja
-  komponenty z `src/_new`. Wyjatek: `src/app/context/*` to legacy do migracji
-  (BoardRealtimeContext, VoiceChatContext) - patrz `docs/migration-status.md`
-  ZANIM tam cos zmienisz.
-- `src/_new/` - cala logika: `features/<nazwa>/` (auth, board, demo,
-  notifications, whiteboard, workspace), `lib/` (api client, auth/tokenService,
+  komponenty z `src/_new`. `src/app/context` nie istnieje (usuniete w etapie F).
+- `src/_new/` - cala logika: `features/<nazwa>/` (auth, board, board-engine = tablica
+  Excalidraw, demo, notifications, voice-call, whiteboard = panele i yjs, workspace), `lib/` (api client, auth/tokenService,
   errors), `shared/` (hooki, typy, UI reuzywalne).
 
 Aliasy z `tsconfig.json`: `@/*` -> `src/*`, `@new/*` -> `src/_new/*`.

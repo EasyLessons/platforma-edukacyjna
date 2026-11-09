@@ -1,6 +1,6 @@
 # Testy w systemie EasyLesson
 
-**Stan:** 10.11.2026 (`release/baseline`)
+**Stan:** 10.11.2026 (gałąź `feat/usun-stary-silnik`, po etapie F)
 **Zakres:** backend (Python/pytest) + frontend (TypeScript/Vitest) + `whiteboard-sync` (Vitest) + E2E (Playwright)
 
 ---
@@ -57,11 +57,10 @@ src/
     demo/          _tests/demo-page.test.tsx
     notifications/ api
     plans/         components (plan-usage-badge, upgrade-modal), hooks (use-plan), utils (plan-limit-error)
-    voice-call/    daily-call-provider.test.tsx
-    voice-chat/    VoiceChatContext.{test,flows.test,mobile.test,ice-restart.test}.tsx, constants.test.ts
-    whiteboard/    commands/_tests, elements/math-eval, handlers, navigation, selection, hooks
-                   (use-yjs-board, use-whiteboard-ui-metrics), yjs (board-doc, prewarm-sync,
-                   use-yjs-local-cache, use-yjs-sync), components/toolbar/_tests
+    voice-call/    api/callApi.test.ts, daily-call-provider.test.tsx, mediaSupport.test.ts
+    whiteboard/    elements/math-eval, hooks/use-whiteboard-ui-metrics, utils/asset-helpers,
+                   components/panels/saved-assets-panel, components/toolbar/_tests/math-chatbot-demo,
+                   yjs (prewarm-sync, use-yjs-local-cache, use-yjs-sync)
     workspace/     api, hooks/_tests
   _new/lib/
     api/           client.test.ts, client.request-id.test.ts, client.success-false.test.ts, request-id.test.ts
@@ -90,8 +89,8 @@ e2e/
 | ------------------- | -------------------------------- | ------------------------------------ |
 | Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze, model Y.Doc |
 | Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
-| Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo, panele i elementy board-engine na prawdziwym Excalidraw (`*.excalidraw.test.tsx`) |
-| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, role, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage, szablony, limit elementów, demo bez konta, rozmowa Daily bez klucza, nagłówki bezpieczeństwa (CSP bez naruszeń) |
+| Komponentowy        | Vitest + Testing Library (jsdom) | rozmowa Daily (mock daily-js), demo, panele i elementy board-engine na prawdziwym Excalidraw (`*.excalidraw.test.tsx`) |
+| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw: współpraca dwóch osób, viewer, role, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage, szablony, limit elementów, demo bez konta, rozmowa Daily bez klucza, nagłówki bezpieczeństwa (CSP bez naruszeń) |
 
 ---
 
@@ -159,7 +158,7 @@ npx vitest run src/app/api/chat/route.test.ts
 
 ## E2E (Playwright) - tablica na Excalidraw
 
-`e2e/*.spec.ts` + `playwright.config.ts`. Testują tablicę z `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw` na pełnym
+`e2e/*.spec.ts` + `playwright.config.ts`. Testują tablicę na pełnym
 stosie: backend (seed `backend/scripts/seed_e2e.py`: właściciel, edytor i viewer w jednym workspace), prawdziwy
 `whiteboard-sync` z autoryzacją, frontend. Serwery startuje Playwright (`webServer`), bazę i Redisa - Docker.
 Stan aplikacji czytają przez `window.__boardEngine` (wystawiane tylko przy `NEXT_PUBLIC_E2E=1`).
@@ -200,14 +199,13 @@ docker compose -f docker-compose.e2e.yml down -v   # sprzątanie
 
 Katalogi z kodem i zerem testów — kolejność wg ryzyka:
 
-1. `src/_new/features/whiteboard/realtime/` (presence, kursory, typing starego silnika przez Supabase) i `src/app/context/BoardRealtimeContext.tsx` — legacy, znikają w etapie F; nie dopisywać testów.
-2. `src/_new/features/whiteboard/{tools,engine,stores,api}/` — stary silnik, jak wyżej.
-3. Wszystkie `components/` w `auth`, `board`, `workspace`, `notifications`; `shared/ui`, `shared/hooks`.
-4. `src/_new/features/dashboard/components/` poza testem mobilnego sidebara (m.in. scenariusz z `known-issues.md` #4 — odświeżanie list bez F5 — nie ma testu).
+1. `src/_new/features/whiteboard/{api,components/layout,components/smartsearch}/` i `board-engine/components/excalidraw-board.tsx` (sam Excalidraw — tylko E2E).
+2. Wszystkie `components/` w `auth`, `board`, `workspace`, `notifications`; `shared/ui`, `shared/hooks`.
+3. `src/_new/features/dashboard/components/` poza testem mobilnego sidebara (m.in. scenariusz z `known-issues.md` #4 — odświeżanie list bez F5 — nie ma testu).
 
 Ma testy (zmiana od 21.09): `src/_new/lib/api/` (klient axios: interceptor 401 → refresh, `success:false`, `X-Request-ID`), `whiteboard-sync/` (6 plików + joby CI `sync-typecheck`/`sync-test`), `features/board-engine`, `features/plans`.
 
-Backend bez testów routera: `whiteboard/storage.py` i `POST /{id}/upload-image` (legacy, etap F). `assets/`, `onboarding/`, `share_links/router.py`, `whiteboard/router.py` (`/doc`, `/access`, `/files`, `/call`) mają testy.
+Backend: `assets/`, `onboarding/`, `share_links/router.py`, `whiteboard/router.py` (`/doc`, `/access`, `/files`, `/call`) mają testy.
 
 `vitest.config.ts` → `coverage.include` obejmuje `src/_new/features/**` i `src/_new/lib/**` (bez `_mock/`).
 
@@ -215,7 +213,7 @@ Backend bez testów routera: `whiteboard/storage.py` i `POST /{id}/upload-image`
 
 ## Znane ograniczenia
 
-- E2E pokrywają tylko tablicę na Excalidraw (za flagą); stary silnik, logowanie przez Google, dashboard i stary czat głosowy nie mają testów E2E. Rozmowa na Daily (`e2e/voice-call*.spec.ts`) jest sprawdzana bez klucza (503 `VOICE_NOT_CONFIGURED` → komunikat „Rozmowa chwilowo niedostępna.”, brak ramki; owner i viewer) i z atrapą odpowiedzi (`page.route`) — prawdziwego połączenia z Daily testy nie nawiązują; to zostaje testem ręcznym na dwóch urządzeniach.
-- Synchronizacja tablicy po WebSocket jest testowana tylko po stronie serwera (`whiteboard-sync/test/*` na prawdziwym Hocuspocusie z atrapą backendu) i w E2E (dwie przeglądarki); hooki klienta (`use-yjs-sync`, `use-board-connection`) mają testy jednostkowe z mockiem providera; presence starego silnika przez Supabase Realtime — bez testów (legacy).
+- E2E pokrywają tablicę na Excalidraw; logowanie przez Google i dashboard nie mają testów E2E. Rozmowa na Daily (`e2e/voice-call*.spec.ts`) jest sprawdzana bez klucza (503 `VOICE_NOT_CONFIGURED` → komunikat „Rozmowa chwilowo niedostępna.”, brak ramki; owner i viewer) i z atrapą odpowiedzi (`page.route`) — prawdziwego połączenia z Daily testy nie nawiązują; to zostaje testem ręcznym na dwóch urządzeniach.
+- Synchronizacja tablicy po WebSocket jest testowana tylko po stronie serwera (`whiteboard-sync/test/*` na prawdziwym Hocuspocusie z atrapą backendu) i w E2E (dwie przeglądarki); hooki klienta (`use-yjs-sync`, `use-board-connection`) mają testy jednostkowe z mockiem providera.
 - `pytest-asyncio` 0.21.1 ma bug z `@pytest_asyncio.fixture` w trybie STRICT — testy integracyjne backendowe używają synchronicznego `TestClient` zamiast async httpx.
 - Lokalnie na Windows `prettier --check` może zgłaszać setki plików przez `core.autocrlf=true` (CRLF) — CI na Linuksie jest miarodajne.

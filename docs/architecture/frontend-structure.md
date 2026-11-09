@@ -6,9 +6,7 @@ Stan obecny (nie historia zmian — historia scalona tu i usunięta jako osobne 
 
 `src/app` ma odpowiadać wyłącznie za routing Next.js (które URL-e istnieją, jaki layout mają) i **składać** strony z komponentów zaimportowanych z `src/_new`. Cała logika biznesowa, hooki, komunikacja z API i większość komponentów UI żyje w `src/_new/features/*` (patrz `docs/architecture/stack.md`, sekcja "Struktura feature-based").
 
-Jedyny wyjątek, czyli kod, który wciąż żyje w `src/app` zamiast w `src/_new`:
-
-- `src/app/context/BoardRealtimeContext.tsx` — Provider presence/kursorów/typing/viewportu **starego silnika** przez Supabase Realtime (elementy tablicy idą przez Yjs, nie tędy). Logika jest w hookach `src/_new/features/whiteboard/realtime/`; w `app/context` został Provider spinający hooki z kanałem. Nie przenosimy go (dawny PR-C1 z `REFAKTOR-PLAN.md`) — znika razem ze starym silnikiem w etapie F (`migration-status.md`). Tablica Excalidraw (`features/board-engine`) i demo go nie używają (kursory przez awareness Hocuspocusa).
+Wyjątków już nie ma: `src/app/context/` nie istnieje (ostatni plik, `BoardRealtimeContext.tsx`, zniknął w etapie F razem ze starym silnikiem tablicy).
 
 Zrobione we wrześniu 2026 (PR #47–#56): `AuthContext` → `src/_new/lib/auth`, klient Supabase → `src/_new/lib/supabase/client.ts` (folder `src/lib` nie istnieje), voice chat → `features/voice-chat`, komponenty panelu/konta/landingu → `features/{dashboard,account,landing}`, logika `/api/chat` → `src/_new/server/chat`. Strony w `src/app` importują wyłącznie przez barrele `index.ts` tych feature'ów.
 
@@ -36,7 +34,7 @@ src/app/
 │   ├── join/[token]/             (dołączenie przez link udostępniania workspace'u)
 │
 ├── (whiteboard)/               ← fullscreen, bez header/footer
-│   ├── whiteboard/               (tablica zalogowanego usera; ?boardId= [&arkusz=]; wybiera silnik wg NEXT_PUBLIC_WHITEBOARD_ENGINE)
+│   ├── whiteboard/               (tablica zalogowanego usera na Excalidraw; ?boardId= [&arkusz=]; bez boardId → /dashboard)
 │   └── demo/[sessionId]/         (tablica demo bez konta — feature `demo`, zawsze Excalidraw + whiteboard-sync; pipelines.md 2d)
 │
 ├── (info)/                     ← dokumentacja i regulaminy (MDX), sidebar
@@ -45,8 +43,6 @@ src/app/
 ├── api/                         ← Next.js Route Handlers (nie FastAPI!)
 │   ├── chat/                     (cienki handler; logika w src/_new/server/chat, patrz pipelines.md)
 │   └── contact/                  (formularz kontaktowy)
-│
-└── context/                     ← tylko BoardRealtimeContext (stary silnik) — znika w etapie F, patrz wyżej
 ```
 
 Każda grupa ma dokładnie jeden powód do zmiany layoutu (Single Responsibility na poziomie layoutu). Header dla zalogowanych i niezalogowanych to **jeden** komponent (`Header.tsx`) — sam decyduje przez `useAuth()` co wyrenderować.
@@ -59,13 +55,13 @@ src/_new/
 │   ├── account/        (panel konta: Sidebar, ProfileSection; components/_mock/ = makiety bez backendu, known-issues #5)
 │   ├── auth/           (formularze logowania/rejestracji, hooki useLogin/useRegister, Google OAuth button, TermsNotice z informacją o regulaminie)
 │   ├── board/          (lista boardów, tworzenie/edycja, karty boardów)
-│   ├── board-engine/   (tablica na Excalidraw, za flagą NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw — opis w stack.md)
+│   ├── board-engine/   (tablica na Excalidraw — jedyny silnik; opis w stack.md)
 │   │   ├── components/  (excalidraw-whiteboard, excalidraw-board, excalidraw-header, -vertical-toolbar, -zoom-controls, function-panel, excalidraw-theme.css)
-│   │   ├── config/      (engine-flag.ts — wybór silnika; default-fill.ts)
+│   │   ├── config/      (default-fill.ts)
 │   │   ├── elements/    (note — notatka MD/KaTeX jako embeddable, table + table-toolbar, pdf + pdf-import, element-buttons)
 │   │   ├── files/       (board-file-api, board-file-sync, excalidraw-file-sync — obrazy do bucketu board-files; shared-files — szablony `tpl:`; data-url)
 │   │   ├── math/        (function-element, function-plot — wykres f(x) jako SVG)
-│   │   ├── panels/      (board-panels — kalkulator, SmartSearch, Tutor AI; insert-resources)
+│   │   ├── panels/      (board-panels — kalkulator, SmartSearch, Tutor AI (komponenty z features/whiteboard); insert-resources)
 │   │   ├── templates/   (catalog — arkusze CKE; insert-sheet, use-sheet-insert)
 │   │   └── yjs/         (use-board-connection, excalidraw-binding — scena ↔ Y.Map, awareness-collaborators, use-element-limit)
 │   ├── dashboard/      (układ panelu: sidebar workspace'ów, sekcje boardów, szablony, nagłówek z popupami)
@@ -73,23 +69,14 @@ src/_new/
 │   ├── landing/        (strona marketingowa: sections/, navigation/ (Header, Footer, mega-menus), product/)
 │   ├── notifications/  (dzwoneczek powiadomień, hook useNotifications)
 │   ├── plans/          (plany Free/Premium: usePlan/useEntitlements, PlanUsageBadge, UpgradeModal, plan-limit-error; docs/plan-subskrypcje.md)
-│   ├── voice-call/     (rozmowa na Daily Prebuilt: DailyCallProvider, CallButton, okno rozmowy, flaga NEXT_PUBLIC_VOICE_PROVIDER)
-│   ├── voice-chat/     (stary czat WebRTC - tylko tryb legacy: VoiceChatProvider, hooki WebRTC/sygnalizacji, iceRestart, components/)
-│   ├── whiteboard/     (STARY silnik tablicy — domyślny bez flagi, do usunięcia w etapie F; część modułów reużywa board-engine, lista w migration-status.md)
-│   │   ├── api/         (whiteboardApi — ustawienia, upload-image legacy; assets-api)
-│   │   ├── commands/    (Command pattern: create/update/delete, composite)
-│   │   ├── components/  (canvas/, layout/, panels/, smartsearch/, toolbar/ — SmartSearch, kalkulator, czat AI i MarkdownNoteView są używane też przez board-engine)
-│   │   ├── elements/    (rendering, kompresja obrazów, math-eval, tabele)
-│   │   ├── engine/      (WhiteboardEngine — fasada)
-│   │   ├── handlers/    (rendering per typ elementu)
-│   │   ├── hooks/       (use-viewport, use-selection, use-realtime, use-yjs-board, use-clipboard, use-whiteboard-ui-metrics, ...)
-│   │   ├── navigation/  (viewport-math, spatial-index/rbush)
-│   │   ├── realtime/    (hooki Supabase Realtime: kanał, presence, kursory, typing, viewport — bez sync elementów)
-│   │   ├── selection/   (snap)
-│   │   ├── stores/      (tool-store — Zustand)
-│   │   ├── tools/       (rejestr narzędzi: *.tool.tsx adaptery + ToolHostContext)
-│   │   ├── types/, utils/
-│   │   └── yjs/         (board-doc — model Y.Doc, use-yjs-sync — Hocuspocus provider, sync-url, use-yjs-local-cache — IndexedDB, prewarm-sync; używane przez OBA silniki)
+│   ├── voice-call/     (rozmowa na Daily Prebuilt: DailyCallProvider, CallButton, okno rozmowy, mediaSupport)
+│   ├── whiteboard/     (moduły współdzielone z board-engine - nie silnik; własny silnik canvasowy usunięty w etapie F)
+│   │   ├── api/         (whiteboardApi - ustawienia tablicy; assets-api - zapisane szablony użytkownika)
+│   │   ├── components/  (layout/ sidebar tablic, panels/ ustawienia + zapisane szablony, smartsearch/, toolbar/ kalkulator, Tutor AI, MarkdownNoteView)
+│   │   ├── elements/    (math-eval - parser wyrażeń dla wykresów f(x))
+│   │   ├── hooks/       (use-whiteboard-sidebar, use-whiteboard-ui-metrics)
+│   │   ├── types/, utils/ (typy elementów zapisanych szablonów i MarkdownNote; asset-helpers - miniatury)
+│   │   └── yjs/         (use-yjs-sync - Hocuspocus provider z odświeżaniem tokenu, use-yjs-local-cache - IndexedDB, sync-url, prewarm-sync)
 │   └── workspace/      (sidebar workspace'ów, zaproszenia, członkowie, linki udostępniania)
 ├── lib/
 │   ├── api/            (klient axios + typy odpowiedzi API, request-id)
@@ -101,8 +88,7 @@ src/_new/
 │   ├── query-provider.tsx (TanStack Query provider)
 │   └── utils.ts        (cn)
 ├── server/             # logika Route Handlerów Next (server-only, bez React)
-│   ├── chat/           (rate-limit, response-cache, prompt, gemini, auth dla /api/chat)
-│   └── turn/           (get-ice-servers: poświadczenia TURN z Xirsys dla /api/turn)
+│   └── chat/           (rate-limit, response-cache, prompt, gemini, auth dla /api/chat)
 └── shared/
     ├── hooks/, types/, ui/ (komponenty reużywalne: przyciski, modale, tooltip, avatar)
 ```
@@ -111,20 +97,19 @@ Aliasy importu (`tsconfig.json`): `@/*` → `src/*`, `@new/*` → `src/_new/*`. 
 
 ## Logowanie
 
-Zamiast `console.log` (eslint `no-console` = warning) każdy plik robi `const log = createLogger('<feature>/<plik>')` z `src/_new/lib/logger.ts` i loguje przez `log.debug/info/warn/error`. `debug`/`info` wychodzą tylko w developmencie (w `production` i `test` są wyciszone, chyba że `NEXT_PUBLIC_DEBUG_LOGS=1`), `warn`/`error` zawsze — z prefiksem `[scope]`. Ten sam moduł działa w przeglądarce i w Node (`src/_new/server`, Route Handlery). Do logów nie trafiają tokeny, e-maile ani treść tablicy — tylko id, stany i liczniki. Wyjątek: `features/whiteboard/realtime/logger.ts` (mini-logger starego silnika) znika w etapie F razem z `realtime/`.
+Zamiast `console.log` (eslint `no-console` = warning) każdy plik robi `const log = createLogger('<feature>/<plik>')` z `src/_new/lib/logger.ts` i loguje przez `log.debug/info/warn/error`. `debug`/`info` wychodzą tylko w developmencie (w `production` i `test` są wyciszone, chyba że `NEXT_PUBLIC_DEBUG_LOGS=1`), `warn`/`error` zawsze — z prefiksem `[scope]`. Ten sam moduł działa w przeglądarce i w Node (`src/_new/server`, Route Handlery). Do logów nie trafiają tokeny, e-maile ani treść tablicy — tylko id, stany i liczniki.
 
 ## Reguła nawigacji dla zmian
 
 Chcesz zmienić **jak wygląda/routuje się strona** → szukaj w `src/app`.
 Chcesz zmienić **jak coś działa** (logika, dane, stan) → szukaj w `src/_new/features/<nazwa-funkcji>`.
 Chcesz zmienić **coś współdzielonego między funkcjami** (przycisk, modal, hook) → `src/_new/shared`.
-Trafiłeś na `src/app/context/BoardRealtimeContext.tsx` albo `features/whiteboard/realtime/*` → stary silnik, znika w etapie F — nie rozbudowuj.
-Zmieniasz logikę Route Handlera (`/api/chat`, `/api/turn`) → `src/_new/server/{chat,turn}`, nie `src/app/api`.
-Pracujesz nad tablicą → sprawdź najpierw flagę `NEXT_PUBLIC_WHITEBOARD_ENGINE` (`features/board-engine/config/engine-flag.ts`): `excalidraw` = `features/board-engine`, inaczej stary silnik `features/whiteboard`. Synchronizacja elementów w obu idzie przez Yjs/Hocuspocus (`pipelines.md` §2b), presence/kursory: awareness (Excalidraw) albo Supabase (`realtime/`, stary silnik).
+Zmieniasz logikę Route Handlera (`/api/chat`) → `src/_new/server/chat`, nie `src/app/api`.
+Pracujesz nad tablicą → `features/board-engine` (Excalidraw + Yjs/Hocuspocus, `pipelines.md` §2); panele, sidebar, ustawienia i warstwa Yjs/REST współdzielone leżą w `features/whiteboard`.
 
 ## Granice importów
 
-Zasada: `app → _new/features → _new/{shared,lib,server}`. Kod w `_new` nie importuje z `src/app`; route group nie importuje z innej route group; `shared`/`lib` nie zależą od `features`. Pilnuje `npm run depcruise` (dependency-cruiser, job `frontend-arch` w CI, konfiguracja `.dependency-cruiser.cjs`). Jawnie wpisany wyjątek w `.dependency-cruiser.cjs`: `features/whiteboard → src/app/context/BoardRealtimeContext.tsx` (stary silnik, znika w etapie F).
+Zasada: `app → _new/features → _new/{shared,lib,server}`. Kod w `_new` nie importuje z `src/app`; route group nie importuje z innej route group; `shared`/`lib` nie zależą od `features`. Pilnuje `npm run depcruise` (dependency-cruiser, job `frontend-arch` w CI, konfiguracja `.dependency-cruiser.cjs`). Bez wyjątków w `.dependency-cruiser.cjs` (dawny wyjątek dla `BoardRealtimeContext` zniknął w etapie F).
 
 ## Limit rozmiaru pliku
 

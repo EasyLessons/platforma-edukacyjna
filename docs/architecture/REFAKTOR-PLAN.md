@@ -4,6 +4,9 @@
 **Baza:** `origin/main` = `437999c` (merge PR #41). Plan powstał po ponownym `git fetch`
 tuż przed pisaniem; PR #40 i #41 są już w `main`, PR #39 wciąż otwarty.
 **Status:** propozycja do recenzji Patryka. W tej sesji nie zmieniono ani jednej linii kodu.
+**Aktualizacja 11.2026 (etap F, gałąź `feat/usun-stary-silnik`):** stary silnik tablicy, `BoardRealtimeContext`,
+ścieżka legacy Yjs (`use-yjs-board`/`board-doc`) i stary czat WebRTC zostały usunięte - "strefa zakazu" z §2 i
+Faza C (C1-C7) są nieaktualne; `src/app/context` nie istnieje. Aktualny opis struktury: `frontend-structure.md`.
 **Zasada nadrzędna:** małe PR-y, każdy zielony na CI, każdy z jasnym "jak sprawdzić".
 Duże przenosiny robimy przez `git mv`, żeby review pokazywał rename, nie +/- całego pliku.
 
