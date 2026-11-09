@@ -100,7 +100,7 @@ export default function PricingSection() {
   return (
     <section
       className={`${jakartaSans.className} w-full bg-[#0f0f0f] py-14 sm:py-16 lg:py-20`}
-      id="pakiet-premium"
+      id="pricing"
     >
       <div className="w-full px-4 sm:px-6 lg:px-10 xl:px-14 2xl:px-20">
         <div className="mx-auto w-full max-w-[1920px]">
