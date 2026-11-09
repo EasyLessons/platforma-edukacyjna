@@ -226,5 +226,4 @@ adresu Storage. Zwraca:
 
 - Limity techniczne Premium (10 000 elementów, rozmiar snapshotu/update, pula Storage, fair use,
   dzienny limit AI) - liczby do zmierzenia; limit miejsca na pliki i sprzątanie (dopisek 12.10).
-- Scenariusz e2e „1001. element odrzucony, gumka działa" (wymaga drugiej tablicy w seedzie).
 - Płatności (Stripe), nadawanie planu z UI.
