@@ -11,7 +11,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState, useEffect } from 'react';
 
-import { CallButton, DailyCallProvider, isDailyVoice } from '@/_new/features/voice-call';
+import { CallButton, DailyCallProvider } from '@/_new/features/voice-call';
 import { fetchBoardById } from '@/_new/features/board/api/boardApi';
 import { getMyRole } from '@/_new/features/workspace/api/memberApi';
 import { ShareLinkModal } from '@/_new/features/workspace/components/shareLinkModal';
@@ -277,7 +277,7 @@ export function TablicaContent() {
       aiEnabled={boardSettings.ai_enabled}
       toolbarVisible={boardSettings.toolbar_visible}
       elementLimit={elementLimit}
-      topRightExtra={isDailyVoice ? renderCallButton : undefined}
+      topRightExtra={renderCallButton}
       sheetTemplateId={sheetByFolder(arkuszPath)?.id}
       onSheetInserted={() => {
         // Arkusz jest już w dokumencie tablicy - parametr z dashboardu nie jest potrzebny (F5, link)
@@ -346,11 +346,7 @@ export function TablicaContent() {
           />
         )}
 
-        {isDailyVoice ? (
-          <DailyCallProvider boardId={callBoardId}>{board}</DailyCallProvider>
-        ) : (
-          board
-        )}
+        <DailyCallProvider boardId={callBoardId}>{board}</DailyCallProvider>
       </div>
     </div>
   );
