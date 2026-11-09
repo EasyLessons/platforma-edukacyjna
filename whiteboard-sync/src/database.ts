@@ -14,12 +14,15 @@
  * `store` NIGDY nie rzuca: Hocuspocus 2.15 rzuca błąd zapisu dalej z miejsca, którego nikt nie
  * czeka (unhandled rejection = koniec procesu w Node 20) - po wyczerpaniu prób tylko logujemy.
  *
+ * Tablica demo (`demo-<id>`, demo.ts): nie czytamy ani nie zapisujemy NIC - dokument żyje tylko w pamięci.
+ *
  * Odczyt: nieudany rzuca (powód `server-unavailable`, klient ponawia połączenie). Pusty dokument
  * zamiast prawdziwego nadpisałby potem bazę przy pierwszym zapisie.
  */
 
 import { Database } from '@hocuspocus/extension-database';
 import type { AuthContext } from './auth';
+import { isDemoDocument } from './demo';
 
 export const SERVICE_TOKEN_HEADER = 'X-Sync-Service-Token';
 const DEFAULT_READ_RETRY_DELAYS_MS = [1_000, 3_000];
@@ -100,6 +103,7 @@ export function createDatabaseHandlers({
 
   return {
     fetch: async ({ documentName, context }: { documentName: string; context: unknown }) => {
+      if (isDemoDocument(documentName)) return null;
       let res: Response;
       try {
         res = await request(
@@ -127,6 +131,7 @@ export function createDatabaseHandlers({
       state: Uint8Array;
       context: unknown;
     }) => {
+      if (isDemoDocument(documentName)) return;
       // Licznik globalny, nie per tablica - po usunięciu wpisu numer nie może się powtórzyć.
       const generation = ++storeCounter;
       storeGeneration.set(documentName, generation);
