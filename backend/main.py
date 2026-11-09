@@ -21,6 +21,7 @@ from core.request_id import RequestIdMiddleware
 
 from api.v1.router import get_v1_router
 from api.v1.storage_quota.cleanup import cleanup_loop
+from api.v1.health.router import health_live
 
 # Logging setup
 log_level = "DEBUG" if os.getenv("ENV", "production") == "development" else "INFO"
@@ -169,6 +170,11 @@ async def global_exception_handler(request, exc: Exception):
 
 # Include routers
 app.include_router(get_v1_router())
+
+# Aliasy liveness pod zewnetrzny ping (UptimeRobot, Render health check): to samo co
+# /api/v1/health/live - sam proces, bez DB i Redis. Poza schematem OpenAPI.
+app.add_api_route("/health", health_live, methods=["GET"], include_in_schema=False)
+app.add_api_route("/healthz", health_live, methods=["GET"], include_in_schema=False)
 
 # Endpoint root '/'
 @app.get("/")

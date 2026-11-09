@@ -140,7 +140,7 @@ def user_rate_limit(scope: str, limit: int, window_seconds: int):
     async def dependency(current_user: User = Depends(get_current_user)) -> None:
         key = f"ratelimit:{scope}:user:{current_user.id}"
         try:
-            redis = redis_client_module.get_redis_client()
+            redis = redis_client_module.get_resilient_redis_client()
             current = await redis.incr(key)
             # TTL przy kazdym zadaniu: licznik bez wygasniecia blokowalby konto na stale.
             if current == 1 or await redis.ttl(key) == -1:
@@ -161,7 +161,7 @@ def user_rate_limit(scope: str, limit: int, window_seconds: int):
 
 async def _check_board_quota(board_id: int) -> None:
     try:
-        count, size = await redis_client_module.get_redis_client().mget(*_usage_keys(board_id))
+        count, size = await redis_client_module.get_resilient_redis_client().mget(*_usage_keys(board_id))
     except RedisError:
         logger.exception("Błąd Redis przy sprawdzaniu quoty plików tablicy")
         return
@@ -176,7 +176,7 @@ async def _check_board_quota(board_id: int) -> None:
 async def _record_board_usage(board_id: int, size: int) -> None:
     count_key, bytes_key = _usage_keys(board_id)
     try:
-        redis = redis_client_module.get_redis_client()
+        redis = redis_client_module.get_resilient_redis_client()
         await redis.incr(count_key)
         await redis.incrby(bytes_key, size)
     except RedisError:
