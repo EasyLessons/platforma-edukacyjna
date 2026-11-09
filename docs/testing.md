@@ -67,7 +67,7 @@ src/
 | Jednostkowy         | pytest / Vitest                  | serwisy, hooki, narzędzia pomocnicze, model Y.Doc |
 | Integracyjny (HTTP) | FastAPI TestClient / Vitest node | routery REST, trasy Next.js API      |
 | Komponentowy        | Vitest + Testing Library (jsdom) | voice chat (mocki kanału i RTCPeerConnection), układ mobilny, demo |
-| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage |
+| E2E                 | Playwright (`e2e/`)              | tablica na Excalidraw za flagą: współpraca dwóch osób, viewer, f(x), eksport PNG, dotyk, fonty bez CDN, obrazy w Storage, nagłówki bezpieczeństwa (CSP bez naruszeń) |
 
 ---
 
@@ -145,6 +145,11 @@ Role: `e2e/roles.spec.ts` (editor nie tworzy tablicy i dostaje 403 na zaproszeni
 Limit elementów planu Free: `e2e/board-engine-limit.spec.ts` (własna tablica tworzona przez API i usuwana na końcu;
 800 elementów -> ostrzeżenie „800/1000", 1000 -> blokada narzędzi rysujących, 1001. element - z UI i z obejściem UI -
 nie zostaje u obu osób, po usunięciu elementu można znów dodawać).
+Nagłówki bezpieczeństwa (SEC-16): `e2e/security-headers.spec.ts` - odpowiedź `/login` (CSP, HSTS, Permissions-Policy,
+X-Frame-Options, bez X-XSS-Protection) i API (nosniff, `no-store` na `/api/v1/auth/*`), a na tablicy (rysowanie, notatka KaTeX,
+PDF, obraz, f(x), Tutor AI, kalkulator) i w demo zero zdarzeń `securitypolicyviolation` i zero „Refused to …” w konsoli.
+Lokalnie frontend e2e to `next dev`, więc CSP ma dodatkowo `'unsafe-eval'` (React Refresh); w CI (`next build`) sprawdzana jest
+CSP produkcyjna bez niego. Źródło nagłówków: `src/_new/lib/security-headers.ts`.
 
 ```bash
 docker compose -f docker-compose.e2e.yml up -d     # Postgres :55432 + Redis :56379
