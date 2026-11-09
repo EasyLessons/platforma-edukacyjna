@@ -5,14 +5,13 @@
  */
 
 import { test, expect, type Page } from '@playwright/test';
-import { E2E_USERS, closeBoard, liveElements, openBoardAs } from './helpers';
+import { E2E_USERS, clickToolbarAction, closeBoard, liveElements, openBoardAs } from './helpers';
 
 test('kalkulator: otwarcie z przycisku, liczenie, zamknięcie', async ({ browser }) => {
   const page = await openBoardAs(browser, E2E_USERS.owner);
   const before = (await liveElements(page)).length;
 
-  const toggle = page.getByTestId('panel-toggle-calculator').filter({ visible: true });
-  await toggle.click();
+  await clickToolbarAction(page, 'panel-toggle-calculator');
   const panel = page.getByTestId('panel-calculator');
   await expect(panel).toBeVisible();
 
@@ -26,7 +25,7 @@ test('kalkulator: otwarcie z przycisku, liczenie, zamknięcie', async ({ browser
   expect((await liveElements(page)).length).toBe(before);
 
   // Ten sam przycisk zamyka panel
-  await toggle.click();
+  await clickToolbarAction(page, 'panel-toggle-calculator');
   await expect(panel).toHaveCount(0);
 
   await closeBoard(page);
@@ -113,7 +112,7 @@ test('viewer: kalkulator i Tutor AI (bez wstawiania), bez panelu wzorów', async
     .poll(() => v.evaluate(() => window.__boardEngine!.api.getAppState().viewModeEnabled))
     .toBe(true);
 
-  await v.getByTestId('panel-toggle-calculator').filter({ visible: true }).click();
+  await clickToolbarAction(v, 'panel-toggle-calculator');
   await expect(v.getByTestId('panel-calculator')).toBeVisible();
   await expect(v.getByTestId('panel-toggle-search')).toHaveCount(0);
 

@@ -159,6 +159,23 @@ export async function selectTool(page: Page, title: RegExp) {
   await toolbar.getByRole('button', { name: title }).click();
 }
 
+/**
+ * W oknie niższym niż 760 px (Playwright "Desktop Chrome" = 1280x720) pasek chowa notatkę,
+ * tabelę, PDF, kalkulator i szablony do menu "Więcej" (vertical-toolbar-more). Otwiera je,
+ * jeśli jest; na wysokim ekranie nic nie robi.
+ */
+export async function openToolbarMore(page: Page) {
+  const more = page.getByTestId('vertical-toolbar-more').filter({ visible: true });
+  if ((await more.count()) > 0) await more.click();
+}
+
+/** Klika akcję z paska po data-testid (np. element-insert-note, panel-toggle-calculator), także z menu "Więcej". */
+export async function clickToolbarAction(page: Page, testId: string) {
+  const direct = page.getByTestId(testId).filter({ visible: true });
+  if ((await direct.count()) === 0) await openToolbarMore(page);
+  await page.getByTestId(testId).filter({ visible: true }).click();
+}
+
 /** Rysuje prostokąt w punkcie sceny i zwraca nowy element. */
 export async function drawRect(page: Page, sx: number, sy: number, w = 120, h = 80) {
   const before = new Set((await liveElements(page)).map((e) => e.id));
