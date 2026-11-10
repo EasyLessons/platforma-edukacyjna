@@ -310,7 +310,7 @@ export default function PolitykaPrywatnosciPage() {
               Polska
               <br />
               <br />
-              E-mail: <strong>kontakt@easylesson.pl</strong>
+              E-mail: <strong>kontakt@easylesson.app</strong>
             </div>
 
             <p className="text-sm mt-10 text-gray-400">

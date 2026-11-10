@@ -135,13 +135,14 @@ class TestSessionEndpointsLimits:
 
     @pytest.mark.asyncio
     async def test_fail_closed_is_still_the_default(self, monkeypatch):
+        """Błąd z samego Redis (nie połączenia - tego nie obejdzie pamięć) -> domyślnie 503."""
         from unittest.mock import MagicMock
 
         from core.exceptions import AppException
 
         class BrokenRedis:
             async def incr(self, key):
-                raise RedisConnectionError("connection refused")
+                raise RedisResponseError("READONLY You can't write against a read only replica.")
 
         monkeypatch.setattr(rl, "get_redis_client", lambda: BrokenRedis())
         request = MagicMock()

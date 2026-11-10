@@ -2,6 +2,7 @@
 MAIN.PY - Entry point aplikacji
 """
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,8 +18,11 @@ from core.exceptions import AppException, ValidationError, AuthenticationError, 
 from core.responses import ApiResponse
 from core.request_context import REQUEST_ID_HEADER, get_request_id
 from core.request_id import RequestIdMiddleware
+from core.security_headers import SecurityHeadersMiddleware
 
 from api.v1.router import get_v1_router
+from api.v1.storage_quota.cleanup import cleanup_loop
+from api.v1.health.router import health_live
 
 # Logging setup
 log_level = "DEBUG" if os.getenv("ENV", "production") == "development" else "INFO"
@@ -29,7 +33,11 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     logger.info("Education Platform API started ...")
+    # Sprzatanie Storage / powiadomien / zaproszen (STORAGE_CLEANUP_ENABLED=false wylacza).
+    cleanup_task = asyncio.create_task(cleanup_loop()) if get_settings().storage_cleanup_enabled else None
     yield
+    if cleanup_task:
+        cleanup_task.cancel()
     logger.info("... Education Platform API stopped")
 
 # App
@@ -50,6 +58,10 @@ app.add_middleware(CORSMiddleware, **cors_policy.middleware_kwargs())
 
 # X-Request-ID: czyta/generuje id zadania, oddaje w naglowku, loguje http.request
 app.add_middleware(RequestIdMiddleware)
+
+# Naglowki bezpieczenstwa (SEC-16): nosniff, Referrer-Policy, X-Frame-Options, no-store na
+# /api/v1/auth/*. Na zewnatrz CORS, zeby dostawaly je tez odpowiedzi na preflight.
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Schemat (X-Forwarded-Proto) i adres klienta w logach zza proxy (SEC-06). Render terminuje
 # TLS przed uvicornem. Middleware jest w kodzie (a nie tylko we flagach uvicorna w Procfile),
@@ -163,6 +175,11 @@ async def global_exception_handler(request, exc: Exception):
 
 # Include routers
 app.include_router(get_v1_router())
+
+# Aliasy liveness pod zewnetrzny ping (UptimeRobot, Render health check): to samo co
+# /api/v1/health/live - sam proces, bez DB i Redis. Poza schematem OpenAPI.
+app.add_api_route("/health", health_live, methods=["GET"], include_in_schema=False)
+app.add_api_route("/healthz", health_live, methods=["GET"], include_in_schema=False)
 
 # Endpoint root '/'
 @app.get("/")

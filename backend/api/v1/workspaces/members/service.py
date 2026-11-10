@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from core.models import WorkspaceMember
 from core.exceptions import NotFoundError, AppException
+from core.logging import get_logger
 from ..authorization import require_membership, require_owner
 from api.v1.auth.avatar_url import safe_avatar_url
 from api.v1.boards.service import reassign_boards_on_member_removal
@@ -12,6 +13,8 @@ from .schemas import (
     WorkspaceMemberResponse, WorkspaceMembersListResponse,
     MyRoleResponse, RemoveMemberResponse, UpdateMemberRoleResponse
 )
+
+logger = get_logger(__name__)
 
 
 class MemberService:
@@ -74,9 +77,10 @@ class MemberService:
             reassign_boards_on_member_removal(db, workspace_id, member_user_id, workspace.created_by)
             db.delete(membership)
             db.commit()
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise AppException(f"Błąd usuwania członka: {str(e)}", status_code=500)
+            logger.exception("Błąd usuwania członka")
+            raise AppException("Błąd usuwania członka", status_code=500)
         
         return RemoveMemberResponse(
             message=f"Użytkownik id:{member_user_id} został usunięty z workspace'a"
@@ -109,9 +113,10 @@ class MemberService:
         try:
             membership.role = new_role
             db.commit()
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise AppException(f"Błąd zmiany roli: {str(e)}", status_code=500)
+            logger.exception("Błąd zmiany roli")
+            raise AppException("Błąd zmiany roli", status_code=500)
 
         return UpdateMemberRoleResponse(
             message=f"Zmieniono rolę użytkownika id:{member_user_id} na '{new_role}'",

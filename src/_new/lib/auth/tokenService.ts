@@ -114,25 +114,25 @@ export async function refreshAccessToken(): Promise<string> {
 }
 
 /**
- * Ścieżki, z których NIE wolno przekierowywać na /login po nieudanym
- * odświeżeniu tokenu.
+ * Trasy wymagające zalogowania - ta sama lista co `matcher` w src/middleware.ts.
+ * Tylko z nich wolno przekierować na /login po nieudanym odświeżeniu tokenu.
+ */
+const PROTECTED_PREFIXES = ['/dashboard', '/whiteboard'];
+
+/**
+ * Ścieżka publiczna = każda poza chronionymi. AuthProvider (root layout) woła /auth/me na
+ * KAŻDEJ stronie, więc dla gościa bez konta 401 jest stanem normalnym na landingu,
+ * /register, /reset-password, /verify, /docs, stronach prawnych, /login i /demo - tam
+ * nie przekierowujemy (wcześniej lista publicznych miała tylko /login, /rejestracja, /auth,
+ * /demo i gość z landingu lądował na /login).
  *
- * Dwie różne przyczyny w jednej liście:
- *  - /login, /rejestracja, /auth — jesteśmy już w obszarze logowania,
- *    redirect zrobiłby pętlę,
- *  - /demo — tryb demo jest PUBLICZNY z założenia. Gość nie ma i nie ma mieć
- *    konta, więc 401 z /auth/me jest tam stanem normalnym, a nie błędem.
- *
- * UWAGA: tej listy używa też interceptor w lib/api/client.ts, żeby na tych
+ * UWAGA: tej funkcji używa też interceptor w lib/api/client.ts, żeby na tych
  * ścieżkach ODRZUCIĆ błąd zamiast zwracać promise, który nigdy się nie
  * rozwiązuje. Zmieniając ją, sprawdź oba miejsca.
  */
 export function isPublicPath(pathname: string): boolean {
-  return (
-    pathname === '/login' ||
-    pathname.startsWith('/rejestracja') ||
-    pathname.startsWith('/auth') ||
-    pathname.startsWith('/demo')
+  return !PROTECTED_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 }
 

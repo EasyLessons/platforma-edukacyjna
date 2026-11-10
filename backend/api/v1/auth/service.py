@@ -4,7 +4,7 @@ AUTH SERVICE - Cała logika autentykacji
 from sqlalchemy.orm import Session
 from core.logging import get_logger
 from core.config import get_settings
-from core.redis_client import get_redis_client
+from core.redis_client import ResilientRedis, get_redis_client
 from core.exceptions import (
     ConflictError, ValidationError, AuthenticationError,
     NotFoundError, AppException
@@ -43,7 +43,8 @@ class AuthService:
         self.db = db
         self.settings = get_settings()
         self.sessions = SessionService(db, self.settings)
-        self.redis = redis_client or get_redis_client()
+        # ResilientRedis: bez Redis kody i liczniki prob zyja w pamieci procesu (core/redis_client.py).
+        self.redis = ResilientRedis(redis_client or get_redis_client())
 
     def _email_verify_key(self, user_id: int) -> str:
         """Generuje klucz Redis dla kodu weryfikacji emaila"""
@@ -64,7 +65,7 @@ class AuthService:
             logger.warning(f"Wysyłka emaila nie powiodła się (to={email})")
 
     async def _store_verification_code(self, key: str, code: str) -> None:
-        """Zapisuje kod w Redis z TTL; przy błędzie połączenia rzuca 503."""
+        """Zapisuje kod w Redis z TTL (awaria Redis -> pamięć procesu); inny błąd -> 503."""
         ttl_seconds = self.settings.verification_code_expire_minutes * 60
         try:
             await self.redis.setex(key, ttl_seconds, code)
@@ -86,10 +87,10 @@ class AuthService:
         attempts_key = f"{key}:attempts"
         ttl_seconds = self.settings.verification_code_expire_minutes * 60
         try:
-            async with self.redis.pipeline(transaction=True) as pipe:
-                pipe.set(attempts_key, 0, ex=ttl_seconds, nx=True)
-                pipe.incr(attempts_key)
-                _, attempts = await pipe.execute()
+            # Bez pipeline: SET NX i INCR sa atomowe osobno, a tryb awaryjny ResilientRedis
+            # przelacza pojedyncze komendy, nie cale pipeline'y.
+            await self.redis.set(attempts_key, 0, ex=ttl_seconds, nx=True)
+            attempts = await self.redis.incr(attempts_key)
             if attempts > MAX_CODE_ATTEMPTS:
                 await self.redis.delete(key)
                 stored_code = None

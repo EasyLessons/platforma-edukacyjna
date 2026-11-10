@@ -10,6 +10,10 @@ Endpointy:
                                              krytyczny: kody weryfikacyjne, rate limit,
                                              presence - reszta API działa bez niego)
     GET /api/v1/health/live  - liveness: sam proces odpowiada, bez zależności, zawsze 200.
+    GET /health, GET /healthz - aliasy liveness (main.py) pod zewnętrzny ping, poza OpenAPI.
+
+    /health używa SUROWEGO klienta Redis (get_redis_client), nie ResilientRedis - ma widzieć
+    awarię i raportować "degraded", podczas gdy reszta API przechodzi na pamięć procesu.
 
 Kształt odpowiedzi /health (celowo BEZ wrappera ApiResponse - uptime monitory i
 orkiestratory oczekują płaskiego JSON-a):

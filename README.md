@@ -69,12 +69,14 @@ alembic upgrade head
 # Backend (every time, from backend/ with venv active)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend (new terminal, from project root)
+# Frontend (new terminal, from project root). Excalidraw board needs two build-time vars
+# in .env.local: NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw and
+# NEXT_PUBLIC_WHITEBOARD_SYNC_URL=ws://localhost:1234 (without them the legacy engine runs).
 npm install
 npm run dev
 
-# Whiteboard sync service (only when NEXT_PUBLIC_WHITEBOARD_YJS=true)
-cd whiteboard-sync && npm install && npm run dev
+# Whiteboard sync service (Yjs/Hocuspocus; required by the Excalidraw board and /demo)
+cd whiteboard-sync && npm install && npm run dev   # BACKEND_URL=http://localhost:8000, PORT=1234
 ```
 
 ### Checks before pushing (same as CI)

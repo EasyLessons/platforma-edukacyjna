@@ -110,7 +110,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/#pakiet-premium"
+                  href="/#pricing"
                   className="transition-colors hover:text-white"
                   style={{ color: '#C5C5C5' }}
                 >
@@ -191,7 +191,7 @@ const Footer = () => {
               </li>
               <li>
                 <Link
-                  href="/faq"
+                  href="/docs/faq"
                   className="transition-colors hover:text-white"
                   style={{ color: '#C5C5C5' }}
                 >

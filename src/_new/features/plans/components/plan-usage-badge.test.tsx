@@ -16,9 +16,10 @@ function planState(overrides: Partial<ReturnType<typeof usePlan>>) {
       max_own_workspaces: 2,
       max_boards_per_workspace: 3,
       max_elements_per_board: 1000,
+      max_storage_bytes: 104857600,
       ai_chat_daily: null,
     },
-    usage: { own_workspaces: 1, boards_by_workspace: { '7': 2 } },
+    usage: { own_workspaces: 1, boards_by_workspace: { '7': 2 }, storage_bytes: 0 },
     boardsIn: (id: number) => (({ 7: 2 }) as Record<number, number>)[id],
     isPremium: false,
     isLoaded: true,
@@ -57,7 +58,7 @@ describe('PlanUsageBadge', () => {
   it('przy osiągniętym limicie ma czerwony wariant', () => {
     mockedUsePlan.mockReturnValue(
       planState({
-        usage: { own_workspaces: 1, boards_by_workspace: { '7': 3 } },
+        usage: { own_workspaces: 1, boards_by_workspace: { '7': 3 }, storage_bytes: 0 },
         boardsIn: () => 3,
       })
     );
@@ -76,6 +77,7 @@ describe('PlanUsageBadge', () => {
           max_own_workspaces: null,
           max_boards_per_workspace: null,
           max_elements_per_board: null,
+          max_storage_bytes: null,
           ai_chat_daily: null,
         },
       })

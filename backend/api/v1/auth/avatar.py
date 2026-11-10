@@ -98,11 +98,11 @@ def _bad_upload(message: str = "Nieprawidłowe żądanie - wyślij plik w polu '
 async def avatar_rate_limit(current_user: User = Depends(get_current_user)) -> None:
     """
     Limit per UZYTKOWNIK (endpoint wymaga logowania, a IP za proxy bywa wspolne).
-    Awaria Redis -> 503 (fail-closed), tak jak w core/rate_limit.py.
+    Awaria polaczenia z Redis -> licznik w pamieci procesu (ResilientRedis); inny blad -> 503.
     """
     key = f"ratelimit:avatar_upload:user:{current_user.id}"
     try:
-        redis = redis_client_module.get_redis_client()
+        redis = redis_client_module.get_resilient_redis_client()
         current = await redis.incr(key)
         # TTL sprawdzamy przy kazdym zadaniu, nie tylko przy pierwszym: gdyby `expire`
         # nie doszlo po pierwszym `incr`, licznik bez wygasniecia blokowalby konto na stale.

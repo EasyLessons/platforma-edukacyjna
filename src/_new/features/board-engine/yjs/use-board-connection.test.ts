@@ -6,9 +6,14 @@ describe('isRemoteBoard', () => {
     expect(isRemoteBoard('42', 7)).toBe(true);
   });
 
-  it('demo, gość albo brak id -> tylko dokument lokalny', () => {
-    expect(isRemoteBoard('demo-abc', 7)).toBe(false);
+  it('brak zalogowanego użytkownika albo id tablicy -> tylko dokument lokalny', () => {
     expect(isRemoteBoard('42', null)).toBe(false);
     expect(isRemoteBoard('', 7)).toBe(false);
+    expect(isRemoteBoard('nie-liczba', 7)).toBe(false);
+  });
+
+  it('demo łączy się z serwerem bez konta (gość: userId = null)', () => {
+    expect(isRemoteBoard('demo-AbCdEfGhIjKlMnOpQrStUv', null)).toBe(true);
+    expect(isRemoteBoard('demo-abc', 7)).toBe(true);
   });
 });

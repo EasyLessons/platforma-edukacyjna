@@ -12,22 +12,28 @@ import dynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types';
 import { useAuth } from '@/_new/lib/auth';
-import { ACCESS_DENIED, SESSION_EXPIRED, useBoardConnection } from '../yjs/use-board-connection';
-import type { BoardUser, TopRightExtra } from './excalidraw-board';
-import { PanelLayer, PanelToggles, availablePanels, useBoardPanels } from '../panels/board-panels';
-import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
 import {
-  ElementButtons,
-  NOTE_BUTTON,
-  PDF_BUTTON,
-  TABLE_BUTTON,
-  type ElementButton,
-} from '../elements/element-buttons';
+  ACCESS_DENIED,
+  DEMO_EXPIRED,
+  SESSION_EXPIRED,
+  useBoardConnection,
+} from '../yjs/use-board-connection';
+import type { BoardUser, TopRightExtra } from './excalidraw-board';
+import { PanelLayer, availablePanels, useBoardPanels } from '../panels/board-panels';
+import { useNoteElements, insertNote, NEW_NOTE_CONTENT } from '../elements/note';
 import { PdfImport } from '../elements/pdf-import';
 import { insertTable } from '../elements/table';
 import { TableToolbar, useSelectedTable } from '../elements/table-toolbar';
 import { useSheetInsert } from '../templates/use-sheet-insert';
 import { useElementLimit } from '../yjs/use-element-limit';
+import { ExcalidrawHeader } from './excalidraw-header';
+import { ExcalidrawVerticalToolbar } from './excalidraw-vertical-toolbar';
+import { ExcalidrawZoomControls } from './excalidraw-zoom-controls';
+import {
+  useWhiteboardUiMetrics,
+  safeInset,
+} from '@/_new/features/whiteboard/hooks/use-whiteboard-ui-metrics';
+import { GraduationCap } from 'lucide-react';
 
 /** Narzedzia dostepne, gdy tablica osiagnela limit elementow (nic nie dodaja). */
 const TOOLS_ALLOWED_AT_LIMIT = new Set(['selection', 'lasso', 'eraser', 'hand', 'laser']);
@@ -55,25 +61,31 @@ export type BoardRole = 'owner' | 'editor' | 'viewer';
 export interface ExcalidrawWhiteboardProps {
   boardId: string;
   userRole: BoardRole;
+  boardName?: string;
+  workspaceId?: number | null;
   /** Tożsamość gościa (demo). Bez niej używany jest zalogowany użytkownik. */
   guest?: { id: number; username: string };
-  /**
-   * Ustawienia tablicy (panel ustawień): `grid_visible`, `smartsearch_visible`, `ai_enabled`.
-   * TODO(decyzja): `toolbar_visible` - pasek to pasek Excalidraw (własny pasek "nie teraz");
-   */
   gridVisible?: boolean;
   /** Panel "Wzory" (SmartSearch) - ustawienie tablicy `smartsearch_visible`. */
   smartSearchVisible?: boolean;
   /** Panel "Tutor AI" - ustawienie tablicy `ai_enabled`. */
   aiEnabled?: boolean;
-  /** Dodatkowy przycisk obok f(x) (strona podaje np. "Rozmowa"); demo go nie podaje. */
+  /** Własny pionowy pasek narzędzi - ustawienie tablicy `toolbar_visible`. */
+  toolbarVisible?: boolean;
+  /** Opcjonalna wsteczna kompatybilność. */
   topRightExtra?: TopRightExtra;
   /** Arkusz CKE do wstawienia raz po otwarciu (id z templates/catalog.ts; z `?arkusz=` dashboardu). */
   sheetTemplateId?: string | null;
   /** Arkusz jest na tablicy - strona usuwa `?arkusz=` z adresu. */
   onSheetInserted?: () => void;
-  /** Limit zywych elementow wg planu wlasciciela przestrzeni (null/brak = bez limitu, np. demo). */
+  /** Limit zywych elementow wg planu wlasciciela przestrzeni (null/brak = bez limitu); w demo stala z serwera demo. */
   elementLimit?: number | null;
+  // Nawigacja / akcje nagłówka:
+  isSidebarOpen?: boolean;
+  onSidebarToggle?: () => void;
+  onSettingsClick?: () => void;
+  onShareClick?: () => void;
+  onToggleHistory?: () => void;
 }
 
 export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
@@ -84,18 +96,27 @@ export function ExcalidrawWhiteboard(props: ExcalidrawWhiteboardProps) {
 function BoardSession({
   boardId,
   userRole,
+  boardName,
+  workspaceId,
   guest,
   gridVisible,
   smartSearchVisible = true,
   aiEnabled = true,
-  topRightExtra,
+  toolbarVisible = true,
   sheetTemplateId,
   onSheetInserted,
   elementLimit,
+  isSidebarOpen,
+  onSidebarToggle,
+  onSettingsClick,
+  onShareClick,
+  onToggleHistory,
 }: ExcalidrawWhiteboardProps) {
   const { user, loading: authLoading } = useAuth();
+  const metrics = useWhiteboardUiMetrics();
   const panels = useBoardPanels();
   const [api, setApi] = useState<ExcalidrawImperativeAPI | null>(null);
+  const [isFunctionPanelOpen, setIsFunctionPanelOpen] = useState(false);
   const readOnly = userRole === 'viewer';
   const available = useMemo(
     () => availablePanels({ readOnly, smartSearchVisible, aiEnabled }),
@@ -107,42 +128,44 @@ function BoardSession({
   const tableSelection = useSelectedTable(api, readOnly);
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const { startEditing } = notes;
-  // Wstawianie elementów (B2) - tylko z prawem edycji
-  const elementButtons = useMemo<ElementButton[]>(
-    () =>
-      readOnly
-        ? []
-        : [
-            {
-              ...NOTE_BUTTON,
-              onClick: () => {
-                if (api) void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
-              },
-            },
-            {
-              ...TABLE_BUTTON,
-              onClick: () => {
-                if (api) void insertTable(api);
-              },
-            },
-            { ...PDF_BUTTON, onClick: () => pdfInputRef.current?.click() },
-          ],
-    [readOnly, api, startEditing]
-  );
-  // Slot Excalidraw: przycisk strony (np. "Rozmowa") + wstawianie elementów + przełączniki paneli
-  const renderTopRight = useCallback<TopRightExtra>(
-    (placement) => (
-      <>
-        {topRightExtra?.(placement)}
-        <ElementButtons buttons={elementButtons} placement={placement} />
-        <PanelToggles panels={panels} available={available} placement={placement} />
-      </>
-    ),
-    [topRightExtra, elementButtons, panels, available]
-  );
+
+  // Akcje paska narzędzi
+  const handleInsertNote = useCallback(() => {
+    if (!api || readOnly) return;
+    void insertNote(api, NEW_NOTE_CONTENT).then(startEditing);
+  }, [api, readOnly, startEditing]);
+
+  const handleInsertTable = useCallback(() => {
+    if (!api || readOnly) return;
+    void insertTable(api);
+  }, [api, readOnly]);
+
+  const handleInsertPdf = useCallback(() => {
+    if (readOnly) return;
+    pdfInputRef.current?.click();
+  }, [readOnly]);
+
+  const handleToggleFunctionPanel = useCallback(() => {
+    setIsFunctionPanelOpen((prev) => !prev);
+  }, []);
+
+  const handleToggleCalculator = useCallback(() => {
+    panels.toggle('calculator');
+  }, [panels]);
+
+  const handleClearCanvas = useCallback(() => {
+    if (!api || readOnly) return;
+    if (
+      typeof window !== 'undefined' &&
+      window.confirm('Czy na pewno chcesz wyczyścić całą tablicę?')
+    ) {
+      api.resetScene();
+    }
+  }, [api, readOnly]);
+
   const connection = useBoardConnection({ boardId, userId: guest ? null : (user?.id ?? null) });
   const { authError, clearLocalCache } = connection;
-  const limit = useElementLimit(connection.doc, guest ? null : elementLimit);
+  const limit = useElementLimit(connection.doc, elementLimit);
   const atLimit = limit.level === 'full' && !readOnly;
 
   // Pelna tablica: narzedzia rysujace wracaja do zaznaczania (gumka, przesuwanie, edycja dzialaja).
@@ -158,6 +181,7 @@ function BoardSession({
     guard();
     return api.onChange(guard);
   }, [api, atLimit]);
+
   const sheetState = useSheetInsert({
     api,
     templateId: sheetTemplateId,
@@ -186,26 +210,100 @@ function BoardSession({
   }
 
   // Nakładka do pierwszej synchronizacji, chyba że jest co pokazać z kopii lokalnej.
+  // Demo (gość) nie czeka na serwer: tablica jest pusta albo dochodzi do niej synchronizacja w tle.
   const isWaitingForServer =
-    connection.isRemote && !connection.hasSynced && !connection.hasLocalContent && !authError;
+    connection.isRemote &&
+    !guest &&
+    !connection.hasSynced &&
+    !connection.hasLocalContent &&
+    !authError;
   const isOffline =
     connection.isRemote && !connection.isConnected && !isWaitingForServer && !authError;
 
   return (
-    <div className="relative h-full w-full" onDoubleClickCapture={notes.handleDoubleClickCapture}>
+    <div
+      className="relative h-full w-full overflow-hidden"
+      onDoubleClickCapture={notes.handleDoubleClickCapture}
+    >
+      {/* 1. Nagłówek 1:1 jak na starym silniku (karta lewa, centralny search, karta prawa) */}
+      <ExcalidrawHeader
+        boardId={boardId}
+        boardName={boardName}
+        workspaceId={workspaceId}
+        userRole={userRole}
+        isSidebarOpen={isSidebarOpen}
+        onSidebarToggle={onSidebarToggle}
+        onSettingsClick={onSettingsClick}
+        onShareClick={onShareClick}
+        panels={panels}
+        available={available}
+        guest={guest}
+        currentUser={user}
+        onToggleHistory={onToggleHistory}
+      />
+
+      {/* 2. Płótno Excalidraw */}
       <ExcalidrawBoard
         doc={connection.doc}
         awareness={connection.awareness}
         user={me}
         viewMode={readOnly}
         gridVisible={gridVisible}
-        topRightExtra={renderTopRight}
-        storageBoardId={connection.isRemote ? boardId : null}
+        // Pliki w Storage tylko dla prawdziwych tablic; w demo obrazy zostaja w dokumencie.
+        storageBoardId={connection.isRemote && !guest ? boardId : null}
         onApiReady={setApi}
         onSceneSynced={markSceneSynced}
         validateEmbeddable={notes.validateEmbeddable}
         renderEmbeddable={notes.renderEmbeddable}
+        isFunctionPanelOpen={isFunctionPanelOpen}
+        onFunctionPanelClose={() => setIsFunctionPanelOpen(false)}
       />
+
+      {/* 3. Własny pionowy pasek narzędzi (lewa strona); ustawienie tablicy "Toolbar" go chowa */}
+      {toolbarVisible && (
+        <ExcalidrawVerticalToolbar
+          api={api}
+          readOnly={readOnly}
+          isFunctionPanelOpen={isFunctionPanelOpen}
+          onToggleFunctionPanel={handleToggleFunctionPanel}
+          onInsertNote={handleInsertNote}
+          onInsertTable={handleInsertTable}
+          onInsertPdf={handleInsertPdf}
+          isCalculatorOpen={panels.isOpen('calculator')}
+          onToggleCalculator={handleToggleCalculator}
+          onClearCanvas={handleClearCanvas}
+        />
+      )}
+
+      {/* 4. Kontrolki zoom i reset widoku (lewy dolny róg) */}
+      <ExcalidrawZoomControls api={api} />
+
+      {/* 5. Pływający przycisk Tutor AI (prawy dolny róg) */}
+      {available.includes('chat') && !panels.isOpen('chat') && (
+        <div
+          className="fixed z-50 pointer-events-auto"
+          style={{
+            right: safeInset(metrics.isPhoneLayout ? 16 : 24, 'right'),
+            bottom: safeInset(metrics.isPhoneLayout ? 16 : 24, 'bottom'),
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => panels.toggle('chat')}
+            data-testid="panel-toggle-chat"
+            aria-label="Tutor AI"
+            title="Tutor AI"
+            className={`cursor-pointer font-semibold flex items-center justify-center gap-2 rounded-full border border-gray-300 bg-white text-gray-800 shadow-[0_4px_12px_rgba(0,0,0,0.12)] hover:bg-gray-50 hover:text-blue-600 transition-all active:scale-95 ${
+              metrics.isPhoneLayout ? 'h-11 w-11 px-0' : 'h-11 px-4'
+            }`}
+          >
+            <GraduationCap className="h-5 w-5 text-blue-600" />
+            {!metrics.isPhoneLayout && <span className="text-sm font-semibold">Tutor AI</span>}
+          </button>
+        </div>
+      )}
+
+      {/* 6. Panele EasyLesson: SmartSearch, CardViewer, Calculator, Tutor AI (MathChatbot) */}
       <PanelLayer
         panels={panels}
         available={available}
@@ -213,8 +311,14 @@ function BoardSession({
         readOnly={readOnly}
         demo={!!guest}
       />
+
+      {/* 8. Pasek narzędzi tabeli */}
       <TableToolbar api={api} selection={tableSelection} />
+
+      {/* 9. Ukryty input dla PDF */}
       {!readOnly && <PdfImport api={api} inputRef={pdfInputRef} />}
+
+      {/* 10. Statusy arkusza, limitu elementów i połączenia */}
       {(sheetState === 'loading' || sheetState === 'error') && (
         <div
           role="status"
@@ -250,7 +354,11 @@ function BoardSession({
             ? 'Nie masz już dostępu do tej tablicy.'
             : authError === SESSION_EXPIRED
               ? 'Sesja wygasła. Zaloguj się ponownie - zmiany są zapisywane na tym urządzeniu.'
-              : 'Brak połączenia - zmiany zapiszą się po powrocie sieci.'}
+              : authError === DEMO_EXPIRED
+                ? 'Sesja demo wygasła. Zacznij nową z strony głównej.'
+                : guest
+                  ? 'Brak połączenia z serwerem - tablica działa tylko u Ciebie.'
+                  : 'Brak połączenia - zmiany zapiszą się po powrocie sieci.'}
         </div>
       )}
     </div>

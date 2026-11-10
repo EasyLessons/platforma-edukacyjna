@@ -46,6 +46,7 @@ from sqlalchemy.pool import StaticPool
 from core.models import Base, User, Workspace, WorkspaceMember, Board, BoardUsers
 # Modele spoza core/models.py — import rejestruje tabelę w Base.metadata (create_all)
 import api.v1.plans.models  # noqa: F401  (user_plans)
+import api.v1.storage_quota.models  # noqa: F401  (board_files)
 from api.v1.auth.utils import hash_password
 
 SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
@@ -75,6 +76,16 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
+
+@pytest.fixture(autouse=True)
+def reset_redis_degradation():
+    """Tryb awaryjny Redis (core/redis_client.py) to stan na proces - kazdy test startuje bez niego."""
+    from core import redis_client as redis_client_module
+
+    redis_client_module.reset_degradation()
+    yield
+    redis_client_module.reset_degradation()
 
 
 @pytest.fixture(autouse=True)

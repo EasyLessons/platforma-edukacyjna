@@ -115,14 +115,3 @@ export async function POST(req: NextRequest) {
     return reply('Ups, coś poszło nie tak! 😅 Spróbuj ponownie.', 'internal_error', 500);
   }
 }
-
-export async function GET() {
-  return NextResponse.json({
-    status: 'ok',
-    service: 'Math Tutor AI',
-    model: CHAT_CONFIG.GEMINI_MODEL,
-    fallbackModel: CHAT_CONFIG.GEMINI_MODEL_FALLBACK,
-    cacheSize: responseCache.size,
-    activeUsers: rateLimiter.size,
-  });
-}

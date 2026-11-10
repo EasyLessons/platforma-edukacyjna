@@ -143,8 +143,8 @@ apiClient.interceptors.response.use(
         // Refresh odrzucony przez serwer - wyloguj.
         clearSession();
         logoutAndRedirect();
-        // Gdy logoutAndRedirect NIE przekieruje (ścieżka publiczna: /login,
-        // /rejestracja, /auth, /demo) — przepuść błąd, żeby wywołujący dostał
+        // Gdy logoutAndRedirect NIE przekieruje (ścieżka publiczna: wszystko poza
+        // /dashboard i /whiteboard, np. landing, /login, /register, /demo) — przepuść błąd, żeby wywołujący dostał
         // odrzucenie i mógł się z nim obsłużyć.
         //
         // Zwrócenie tu new Promise(() => {}) byłoby błędem: wywołanie nigdy by

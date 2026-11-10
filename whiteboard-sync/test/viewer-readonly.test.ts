@@ -23,9 +23,12 @@ beforeEach(async () => {
     editor: { status: 200, role: 'editor', can_edit: true },
     viewer: { status: 200, role: 'viewer', can_edit: false },
   });
-  port = 20000 + Math.floor(Math.random() * 20000);
+  // Port 0 = wolny port od systemu (losowy 20000-39999 trafial w zakresy zarezerwowane
+  // przez Windows/Hyper-V -> EACCES).
+  port = 0;
   server = new Hocuspocus({ port, quiet: true, onAuthenticate });
   await server.listen();
+  port = server.address.port;
 });
 
 afterEach(async () => {

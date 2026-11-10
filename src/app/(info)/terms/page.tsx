@@ -57,7 +57,7 @@ export default function RulesPage() {
               subskrypcji. Dokładne informacje na temat opłat oraz procedur anulacji można znaleźć
               na specjalnej podstronie{' '}
               <strong>
-                <a href="/#pakiet-premium">Cennik</a>
+                <a href="/#pricing">Cennik</a>
               </strong>
               .
             </p>

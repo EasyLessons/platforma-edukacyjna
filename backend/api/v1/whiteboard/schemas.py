@@ -1,7 +1,7 @@
 """Schemas dla modułu whiteboard (sesja tablicy)."""
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class OnlineUserInfo(BaseModel):
@@ -9,8 +9,7 @@ class OnlineUserInfo(BaseModel):
     username: str
     avatar_url: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OnlineStatusResponse(BaseModel):

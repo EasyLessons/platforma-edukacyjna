@@ -18,23 +18,19 @@ Pełny opis stanów i rotacji tokenów: `docs/architecture/auth.md`.
 
 ## 2. Synchronizacja tablicy (realtime, client-to-client)
 
+Elementy tablicy w **obu** silnikach idą przez Yjs/Hocuspocus (pkt 2b) — dawnej ścieżki Supabase Broadcast dla elementów (`useElementSync`, `use-elements`, `elements-api`, tabela `board_elements`) już nie ma w kodzie. Supabase Realtime zostało na tablicy tylko dla presence **starego silnika** (`features/whiteboard`, domyślny bez flagi `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`):
+
 ```
-User A rysuje na Canvas
-  → WhiteboardEngine (facade, src/_new/features/whiteboard/engine) wykonuje Command
-  → element dodany lokalnie (optymistycznie, natychmiastowy feedback)
-  → BoardRealtimeContext (src/app/context/BoardRealtimeContext.tsx) wysyła Broadcast
-    przez Supabase (kanał "board:{board_id}")
-  → User B/C na tej samej tablicy odbierają event przez Supabase Realtime
-  → element dodawany do ich lokalnego stanu (bez przeładowania strony)
-  → osobno: zmiana persystowana do Postgresa przez backend/api/v1/whiteboard
-    (żeby przetrwała reload/nowego usera dołączającego później)
+stary silnik: kanał Supabase "board:{board_id}" (src/app/context/BoardRealtimeContext.tsx
+  + hooki features/whiteboard/realtime/*): Presence = kto jest online, Broadcast = kursory,
+  "kto pisze", viewport/follow. Elementy NIE jadą tym kanałem.
+Excalidraw (features/board-engine): kursory i lista osób przez awareness Hocuspocusa
+  (yjs/awareness-collaborators.ts) — Supabase nieużywane na tablicy.
 ```
 
-Presence (kto jest online na tablicy, kursory innych userów) — ten sam kanał Supabase, mechanizm Presence zamiast Broadcast.
+`BoardRealtimeContext` i `realtime/*` znikają w etapie F (`migration-status.md`).
 
-Powyższe to ścieżka **legacy** (aktywna, gdy `NEXT_PUBLIC_WHITEBOARD_YJS` nie jest `true`). Logika broadcastu elementów siedzi w `src/_new/features/whiteboard/realtime/useElementSync.ts`, stan w `hooks/use-elements.ts`, REST w `api/elements-api.ts`; `BoardRealtimeContext` (390 linii, `src/app/context`) tylko spina hooki z kanałem.
-
-### 2b. Synchronizacja tablicy — ścieżka Yjs (za flagą `NEXT_PUBLIC_WHITEBOARD_YJS=true`)
+### 2b. Synchronizacja tablicy — Yjs/Hocuspocus (oba silniki)
 
 ```
 User A rysuje na Canvas
@@ -48,11 +44,11 @@ User A rysuje na Canvas
   → Database.store (debounce Hocuspocusa): POST /api/v1/whiteboard/{id}/doc → snapshot do Postgresa
 ```
 
-Presence/kursory/typing/follow nadal idą przez Supabase (pkt 2) — Yjs zastępuje tylko synchronizację i persystencję elementów. Undo/redo w tej ścieżce to `Y.UndoManager`. Migracja danych `board_elements → board_documents` i wyłączenie ścieżki legacy: gałąź `feature/whiteboard-yjs`.
+Schemat powyżej to stary silnik (`hooks/use-yjs-board.ts`, undo/redo przez `Y.UndoManager`); w Excalidraw ten sam provider i serwis obsługuje `yjs/use-board-connection.ts` + `excalidraw-binding.ts` (scena Excalidraw ↔ `Y.Map` `excalidraw-elements`), a serwer dodatkowo egzekwuje limit elementów planu (`whiteboard-sync/src/element-limit.ts`, `plan-subskrypcje.md`). Presence: pkt 2. Tabela `board_elements` została usunięta (migracja `d315e28cb69c`) — `board_documents` jest jedynym źródłem elementów.
 
 #### Kopia lokalna (IndexedDB) i edycja offline
 
-Każda prawdziwa tablica zalogowanego użytkownika ma kopię `Y.Doc` w IndexedDB przeglądarki (`y-indexeddb`), baza `easylesson-wb-v{CACHE_VERSION}-u{userId}-b{boardId}`. Demo i goście — bez kopii.
+Każda prawdziwa tablica zalogowanego użytkownika ma kopię `Y.Doc` w IndexedDB przeglądarki (`y-indexeddb`), baza `easylesson-wb-v{CACHE_VERSION}-u{userId}-b{boardId}`. Demo i goście — bez kopii (demo synchronizuje się z whiteboard-sync, ale nic nie zapisuje: patrz 2d).
 
 ```
 Wejście na tablicę
@@ -102,22 +98,54 @@ User B (także viewer) dostaje wpis z `ref`
 - **Storage niedostępny**: brak `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` albo bucketu nie da się utworzyć → `503 STORAGE_NOT_CONFIGURED`; front zapisuje wtedy obraz po staremu (dataURL w `Y.Doc`) i loguje błąd. Backend **nigdy** nie przełącza się na bucket publiczny. Wtedy trzeba ręcznie utworzyć prywatny bucket `board-files` (Supabase → Storage).
 - **Bucket istnieje, ale jest publiczny** (np. utworzony ręcznie): przed pierwszym uploadem w procesie backend pyta `GET /storage/v1/bucket/board-files` (`core/storage.py: _bucket_is_public`). `public: true` → log ERROR + ten sam `503 STORAGE_NOT_CONFIGURED` (ponowne sprawdzenie najwcześniej po 60 s, więc po przestawieniu bucketu na prywatny upload wraca bez restartu). `public: false` jest pamiętane do końca procesu. Gdy samego sprawdzenia nie da się wykonać (sieć, 5xx), upload **nie** jest blokowany, a sprawdzenie powtarza się przy następnym.
 - **Limity uploadu** (`whiteboard/files.py`, wszystko PRZED czytaniem ciała): 60/min na IP i 30/min na konto (`429 RATE_LIMITED`); najwyżej 4 uploady w toku w procesie (`503 UPLOAD_BUSY`) i 2 na konto (`429 TOO_MANY_UPLOADS`), oba z `Retry-After` — to ogranicza z góry szczyt pamięci (ok. 4 × 15 MB + jedno dekodowanie ~145 MB) i kolejkę przed semaforem dekodowania wspólnym z awatarami. Front wysyła najwyżej 2 obrazy naraz i traktuje 429/503 jako błąd przejściowy (ponowienia). Pobieranie: 600/min na konto. Limity w Redis są fail-open.
+- **Limit miejsca na konto** (plan właściciela przestrzeni: Free 100 MB, Premium 5 GB): `403 PLAN_LIMIT_STORAGE`. Sprawdzenie wstępne przed czytaniem ciała i autorytatywne po zapisie w Storage (rejestr `board_files` w bazie, `FOR UPDATE`); szczegóły w `docs/plan-subskrypcje.md`. Front pokazuje komunikat bez ponowień.
 - **Quota tablicy (miękka)**: 300 plików / 100 MB na tablicę → `409 BOARD_FILE_QUOTA_EXCEEDED` (komunikat na froncie, bez ponowień). Licznik siedzi w Redis (`board_files:{id}:count|bytes`), rośnie po udanym zapisie i znika przy usunięciu tablicy.
 - **SVG**: inline zostają tylko SVG wykresów f(x) (id pliku `fn-<hash>`). SVG wklejony przez użytkownika na tablicy z serwerem jest odrzucany z komunikatem (backend przyjmuje wyłącznie rastry); na tablicy demo/gościa zostaje inline jak dotąd.
 - **Wspólne pliki** (arkusze CKE, karty wzorów; `files/shared-files.ts`): id pliku `tpl:<ścieżka>` (`templates/...` albo `resources/...`, tylko `.webp`). Bez uploadu - w `Y.Doc` wpis `{ id, mimeType, created, ref: { v: 1, shared: "<ścieżka>" } }`, odbiorca pobiera obraz z adresu statycznego (CDN Vercela). Nie liczą się do quota tablicy i nie zostawiają sierot w Storage. Ścieżka od innych osób jest sprawdzana wzorcem (tylko nasze katalogi, bez `..`) i musi być zgodna z id pliku. Strony arkuszy generuje raz `scripts/build-templates.mjs` (katalog: `board-engine/templates/catalog.ts`).
-- **Usunięcie tablicy** kasuje folder `{board_id}/` w `board-files` (`boards/service.py` → `files.delete_board_files`, listowanie stronami po 1000).
+- **Usunięcie tablicy** oznacza jej wiersze w rejestrze `board_files` (`deleted_at`) — miejsce wraca do limitu konta od razu, a pliki w `board-files` znikają po 30 dniach (okres na pomyłkę), kasuje je job sprzątający (`storage_quota/cleanup.py`, po ponownym sprawdzeniu odwołań w snapshocie). Folder starego silnika (`board-images`) jest kasowany od razu jak dotąd.
 
 Znane ograniczenia:
 
-- **Sieroty**: plik skasowanego elementu zostaje w Storage do usunięcia tablicy (cofnięcie / tombstone mogą przywrócić element, więc plików nie kasujemy pojedynczo).
-- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` (ani `delete_board_folder` starego silnika) — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia ręcznie albo osobnym zadaniem (lista `board_id` przed kaskadą + `delete_board_files` dla każdej).
-- **Quota tablicy nie jest rozliczeniem**: po utracie danych Redis licznik startuje od zera, równoległe uploady mogą przekroczyć limit o kilka plików, a awaria Redis wyłącza limit. Nie ma limitu łącznego na konto ani workspace.
+- **Sieroty**: wpis pliku w `Y.Doc` nigdy nie jest usuwany z mapy `excalidraw-files`, więc plik skasowanego elementu nadal ma odwołanie i zostaje w Storage (cofnięcie / tombstone mogą przywrócić element). Job sprzątający rusza tylko pliki BEZ odwołania w snapshocie (np. upload, którego element nie trafił do dokumentu) po 7 dniach, i to z 30 dniami karencji.
+- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` (ani `delete_board_folder` starego silnika) — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia przez job sprzątający: usunięcie przestrzeni oznacza wiersze rejestru `board_files` jako `deleted_at` (przestają liczyć się do limitu miejsca konta), a po 30 dniach job kasuje pliki ze Storage.
+- **Quota tablicy nie jest rozliczeniem**: po utracie danych Redis licznik startuje od zera, równoległe uploady mogą przekroczyć limit o kilka plików, a awaria Redis wyłącza limit. Limit łączny na konto jest osobno, w bazie (patrz wyżej).
 - **Limit uploadów w toku jest na proces**: zakłada jeden proces backendu (to samo założenie co semafor dekodowania w `auth/avatar.py`); przy wielu workerach każdy miałby własny licznik.
 - **Flaga `public` bucketu jest sprawdzana raz na proces**: przestawienie działającego bucketu na publiczny zostanie wykryte dopiero po restarcie backendu.
 - **Zamknięcie karty przed końcem wysyłki** = obraz przepada (istniał tylko lokalnie, nie było go jeszcze w `Y.Doc`).
 - **Brak leniwej migracji**: stare wpisy z dataURL zostają w dokumencie; nowe obrazy idą już do Storage.
 - **Brak limitu rozmiaru snapshotu** po stronie `/doc` i `whiteboard-sync`; front tylko loguje ostrzeżenie, gdy plik inline > 200 KB.
 - Ruch obrazów idzie przez backend (proxy), nie bezpośrednio ze Storage; przeglądarka trzyma plik w prywatnym cache.
+
+### 2d. Tablica demo bez konta (`/demo/<id>`, Excalidraw)
+
+Przycisk „Wypróbuj demo" (HeroSection / HeroMobileSection) otwiera `/demo/<id>`, gdzie `<id>` to 22 znaki
+base64url ze 128 bitów (`createDemoSessionId`). Strona (`app/(whiteboard)/demo/[sessionId]/page.tsx`) renderuje
+wyłącznie `ExcalidrawWhiteboard` z tożsamością gościa (ujemne id, nick `Gosc-XXXX` w `sessionStorage`) — bez
+starego silnika i bez `BoardRealtimeContext`.
+
+```
+gość A: /demo/<id> → useBoardConnection (boardId = "demo-<id>") → HocuspocusProvider BEZ tokenu
+  → whiteboard-sync/src/auth.ts: dokument pasuje do ^demo-[A-Za-z0-9_-]{16,64}$ → demoSessions.admit() (demo.ts)
+     (bez pytania backendu; kontekst: canEdit, elementLimit = DEMO_ELEMENT_LIMIT, demo: true)
+  → database.ts: dla dokumentów demo fetch zwraca null, store nic nie robi (zero zapytań do backendu / bazy)
+gość B: ten sam link → ten sam dokument w pamięci serwera → kursory (awareness) i elementy na żywo
+```
+
+- **Nic nie jest zapisywane.** Dokument żyje w pamięci whiteboard-sync, dopóki ktoś jest połączony; po wyjściu
+  ostatniej osoby jest zwalniany, a link otwiera pustą tablicę. Przeglądarka też nie trzyma kopii (IndexedDB tylko
+  dla prawdziwych tablic), a obrazy zostają w dokumencie (`storageBoardId = null`, bez uploadu do Storage).
+- **Sesja wygasa.** Po `DEMO_SESSION_TTL_MINUTES` (domyślnie 180) od pierwszego wejścia `demoSessions.sweep`
+  (co 30 s, `index.ts`) rozłącza wszystkich, a powrót dostaje odmowę `demo-expired` (front: komunikat „Sesja demo
+  wygasła", bez ponawiania). Wpis wygasłej sesji jest pamiętany 24 h, potem id jest znów wolne.
+- **Ograniczenia nadużyć** (anonimowe wejście): najwyżej `DEMO_MAX_CONNECTIONS_PER_DOC` (10) osób w sesji i
+  `DEMO_MAX_SESSIONS` (200) równoległych sesji — nadmiar dostaje `demo-full` (front ponawia z odstępem); puste
+  sesje są zapominane po 10 min; liczba żywych elementów jest limitowana jak na planie Free
+  (`DEMO_ELEMENT_LIMIT`, 500; ten sam mechanizm tombstonów co `element-limit.ts`, front pokazuje ostrzeżenie —
+  stała `features/demo/demo-limits.ts` musi zgadzać się z serwerem).
+- **Gość nie czeka na serwer** (brak nakładki „Synchronizacja tablicy..."); gdy serwer jest niedostępny, tablica
+  działa lokalnie z komunikatem „tablica działa tylko u Ciebie".
+- Liczniki sesji siedzą w pamięci jednego procesu whiteboard-sync (jak reszta serwisu). Nie ma limitu rozmiaru
+  pojedynczej wiadomości ani limitu zapytań na IP — to zostaje po stronie brzegu (Render / Cloudflare).
 
 ## 3. Powiadomienia (np. zaproszenie do workspace'u)
 

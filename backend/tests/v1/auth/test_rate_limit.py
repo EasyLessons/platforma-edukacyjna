@@ -94,21 +94,23 @@ class TestRateLimitDependencyUnit:
         assert exc.value.status_code == 429
 
     @pytest.mark.asyncio
-    async def test_redis_connection_error_raises_503(self, monkeypatch):
-        """Awaria połączenia z Redis -> fail-closed, 503 REDIS_ERROR"""
+    async def test_redis_connection_error_falls_back_to_memory(self, monkeypatch):
+        """Awaria połączenia z Redis -> limit liczony w pamięci procesu (ResilientRedis), nie 503."""
 
         class BrokenRedis:
             async def incr(self, key):
                 raise RedisConnectionError("connection refused")
 
         monkeypatch.setattr(rl, "get_redis_client", lambda: BrokenRedis())
-        fn = rate_limit("test_scope", limit=5, window_seconds=60)
+        fn = rate_limit("test_scope", limit=2, window_seconds=60)
 
+        await fn(make_request("1.1.1.1", {}))
+        await fn(make_request("1.1.1.1", {}))
         with pytest.raises(AppException) as exc:
             await fn(make_request("1.1.1.1", {}))
 
-        assert exc.value.status_code == 503
-        assert exc.value.code == "REDIS_ERROR"
+        assert exc.value.status_code == 429
+        assert exc.value.code == "RATE_LIMITED"
 
 
 # ─── Testy end-to-end przez TestClient (potwierdzenie wpięcia w router) ────

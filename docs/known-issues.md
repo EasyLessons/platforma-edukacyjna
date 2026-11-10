@@ -4,7 +4,7 @@ Miejsce na realne buble znalezione w czasie pracy/testów (nie mylić z `docs/mi
 
 Format wpisu: co się dzieje, jak to odtworzyć, co naprawdę się dzieje pod spodem (root cause), jak groźne, opcje naprawy. Priorytet ustawiany ręcznie — wysoki/średni/niski.
 
-**Uwaga (21.09.2026):** wpisy #1–#3 dotyczą ścieżki **legacy** synchronizacji tablicy (Supabase Broadcast + `board_elements`). W ścieżce Yjs (`NEXT_PUBLIC_WHITEBOARD_YJS=true`, patrz `architecture/pipelines.md` §2b) te problemy nie występują z założenia (CRDT rozwiązuje konflikty, brak limitu 256 KB/wiadomość). Po wyłączeniu ścieżki legacy wpisy #1–#3 do usunięcia, nie do naprawy.
+**Uwaga (21.09.2026, uzupełniona 10.11.2026):** wpisy #1–#3 dotyczą dawnej ścieżki **legacy** synchronizacji elementów tablicy (Supabase Broadcast + `board_elements`). Na `release/baseline` tej ścieżki już nie ma: elementy w obu silnikach idą przez Yjs/Hocuspocus (`architecture/pipelines.md` §2b), tabela `board_elements` jest usunięta (migracja `d315e28cb69c`), a flaga `NEXT_PUBLIC_WHITEBOARD_YJS` nie istnieje w kodzie. Wpisy #1–#3 są więc historyczne (opisują kod, którego nie ma) i zostają do czasu **etapu F** (usunięcie starego silnika, `migration-status.md`) — wtedy do skasowania, nie do naprawy. Nowe wpisy od #8 niżej (audyt 10.11.2026).
 
 ---
 
@@ -289,6 +289,8 @@ Wysoki priorytet mimo że to "tylko" UI (bez utraty danych) — bo to dwie z naj
 
 Zweryfikowane: `npx tsc --noEmit` scoped na oba zmienione pliki — zero błędów. **Nie zweryfikowane jeszcze na żywo** (wymaga wdrożenia na produkcję — patrz uwaga o niewypchniętych commitach w tej samej sesji) — do przetestowania po `git push`: zaproś kogoś do workspace'u i sprawdź czy lista odświeża się bez F5 po akceptacji; utwórz tablicę z szablonu i sprawdź czy pojawia się na liście bez F5 po powrocie do dashboardu.
 
+**Stan 10.11.2026 (`release/baseline`):** obie poprawki są w kodzie — `src/_new/features/dashboard/components/header/DashboardHeader.tsx` woła `useWorkspaces()` i używa `refreshWorkspacesProp ?? refreshWorkspacesFallback` (linie 50–51), `src/_new/features/dashboard/components/TemplateSection.tsx` robi `queryClient.invalidateQueries({ queryKey: boardKeys.workspace(workspaceId) })` po utworzeniu tablicy (linia 207). Potwierdzenia na żywo (produkcja, dwie karty) nie ma w żadnym zapisie — wpis zostaje jako „naprawione w kodzie, niezweryfikowane ręcznie”; brak też testu automatycznego na ten scenariusz.
+
 ---
 
 ## 5. Makiety w panelu konta: adresy, płatności, bezpieczeństwo — bez backendu (niski priorytet, świadome)
@@ -307,9 +309,11 @@ Myli usera (może sądzić, że zapisał kartę/adres). Nie psuje niczego innego
 
 Zostają w folderze `_mock/` jako zalążek przyszłych sekcji konta (opis w `README.md` obok). Realna funkcja = endpointy + `api/` + hooki w `features/account` i usunięcie `_mock/`. Do tego czasu: nie rozbudowywać makiet.
 
-## 6. Warningi ESLint: zostało 52 (49 × `react-hooks/exhaustive-deps`, 2 × `no-console`, 1 nieużyty `eslint-disable`) (niski priorytet)
+## 6. Warningi ESLint: zostało 49 (niski priorytet)
 
 **Zgłoszone:** 22.09.2026, PR `chore/logger-no-console`.
+
+**Stan 10.11.2026 (`release/baseline`):** `npm run lint` = 0 błędów, **49 warningów** (było 52 we wrześniu). Rozkład per reguła i plik nie został przeliczony na nowo — poniższy podział pochodzi z 22.09 i jest orientacyjny; „strefa Bartka / gałąź `feature/whiteboard-yjs`” już nie obowiązuje (Yjs jest w `main`), a pliki starego silnika (`whiteboard-canvas.tsx`, `realtime/*`) znikają w etapie F, więc ich warningów nie ma sensu naprawiać osobno.
 
 ### Co się dzieje
 
@@ -330,7 +334,7 @@ Osobny PR per feature, każdy warning z uzasadnieniem: albo brakująca zależno�
 
 ### Co się dzieje
 
-Przeglądarki trzymają kopie tablic w IndexedDB (opis: `architecture/pipelines.md` §2b, „Kopia lokalna”). CRDT scala kopię klienta z serwerem przy każdym połączeniu, więc stan serwera nie jest już jedynym źródłem prawdy dla zmian, które klient ma lokalnie.
+Przeglądarki trzymają kopie tablic w IndexedDB (opis: `architecture/pipelines.md` §2b, „Kopia lokalna”). CRDT scala kopię klienta z serwerem przy każdym połączeniu, więc stan serwera nie jest już jedynym źródłem prawdy dla zmian, które klient ma lokalnie. Dotyczy **obu** silników — Excalidraw też używa `useYjsLocalCache` (`board-engine/yjs/use-board-connection.ts`), więc wpis zostaje po etapie F.
 
 ### Skutki
 
@@ -344,6 +348,101 @@ Przeglądarki trzymają kopie tablic w IndexedDB (opis: `architecture/pipelines.
 2. Wstrzymać whiteboard-sync (Render → Suspend), żeby dokument w pamięci Hocuspocusa nie nadpisał przywróconego.
 3. Przywrócić wiersz `board_documents`, wznowić whiteboard-sync.
 4. Otwarte w tym czasie karty nadal mają starą wersję w pamięci — jeśli to istotne, poprosić użytkowników tablicy o przeładowanie przed kontynuowaniem pracy.
+
+## 8. Stopka landingu: placeholderowy telefon, prawdopodobnie nieistniejące linki social (niski priorytet, treść)
+
+**Aktualizacja 10.11.2026 (release/baseline):** link `/faq` poprawiony na `/docs/faq` (commit `f9cf610`); `/api/contact` przepisany (commit `ebb75b7`): mail jako `text` z `reply_to` nadawcy, nadawca `EasyLesson <onboarding@resend.dev>`, limit per IP, honeypot — nadawca z własnej domeny wymaga weryfikacji domeny w Resend (Patryk). Telefon i linki social nadal do decyzji.
+
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`.
+
+### Co się dzieje
+
+`src/_new/features/landing/navigation/Footer.tsx`: `href="tel:+48123456789"` (linia 86) to numer-wypełniacz; linki social `https://youtube.com/@easylesson`, `https://instagram.com/easylesson`, `https://facebook.com/easylesson` (linie 39–64) prawdopodobnie nie prowadzą do istniejących profili (nie da się tego sprawdzić w kodzie — do potwierdzenia przez Patryka); link `href="/faq"` (linia 194) prowadzi do 404, bo FAQ jest pod `/docs/faq` (`src/app/(info)/docs/faq/page.tsx`). Adres e-mail `kontakt@easylesson.app` jest poprawny i spójny z `/contact`, stronami prawnymi i `UpgradeModal`. Pokrewne: formularz `/api/contact` (`src/app/api/contact/route.ts`) wysyła maile z nadawcą `Acme <onboarding@resend.dev>` (domyślny nadawca testowy Resend) i tytułem o „Dziale Sprzedaży” — do podmiany na zweryfikowaną domenę `easylesson.app`.
+
+### Jak groźne
+
+Użytkownik dzwoni donikąd albo trafia na 404 — psuje wiarygodność strony, nie dotyka danych.
+
+### Opcje
+
+Usunąć telefon (albo wstawić prawdziwy), usunąć linki do profili, które nie istnieją, zmienić `/faq` na `/docs/faq`. Zmiana czysto treściowa, bez ryzyka.
+
+## 9. `/whiteboard` bez `?boardId=` otwiera tablicę `demo-board` bez synchronizacji — relikt starego demo (niski priorytet, znika w etapie F)
+
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`.
+
+### Co się dzieje
+
+`src/app/(whiteboard)/whiteboard/page.tsx` linia 99: `const id = searchParams.get('boardId') || 'demo-board'`. Bez parametru strona renderuje tablicę o id `demo-board`: `whiteboard-sync` odrzuci taki dokument (nie pasuje do wzorca `demo-<16–64 znaki>` z `whiteboard-sync/src/demo.ts`, a `GET /whiteboard/{id}/access` wymaga liczbowego id), więc nic się nie synchronizuje ani nie zapisuje, a przyciski ustawień/udostępniania są ukryte warunkiem `boardId !== 'demo-board'`. `src/middleware.ts` (linie 33–36) dodatkowo przepuszcza niezalogowanego na `/whiteboard`, gdy ma cookie `demo_mode=true` — nic w kodzie tego cookie już nie ustawia (demo bez konta to `/demo/<id>`, `pipelines.md` §2d).
+
+### Jak groźne
+
+Mylące (pusta „tablica”, która nic nie zapisuje), ale wejście wymaga ręcznego wpisania adresu. Nie dotyka danych.
+
+### Opcje
+
+Zamiast fallbacku `demo-board`: przekierowanie na `/dashboard` (zalogowany) albo `/login`; usunięcie gałęzi `demo_mode` z middleware. Do zrobienia razem z etapem F (ten sam plik strony traci gałąź legacy).
+
+## 10. Telefon: nagłówek tablicy Excalidraw nie ma logo ani przycisku powrotu — w demo brak drogi na landing (NAPRAWIONE 10.11.2026)
+
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`. **Naprawione** tego samego dnia (commit `3a15d49`): w gałęzi phone lewa karta ma kompaktowy przycisk z logo (`data-testid="header-home-button"`, prowadzi do `homeHref`) obok przycisku sidebara. Zweryfikowane vitest + typecheck; bez osobnego testu e2e (do dopisania w `demo.spec.ts`/`board-engine.mobile.spec.ts`). Opis pierwotny poniżej.
+
+### Co się dzieje
+
+`src/_new/features/board-engine/components/excalidraw-header.tsx`, lewy górny róg (linie 155–168): przy `metrics.isPhoneLayout` renderowany jest wyłącznie przycisk sidebara (i tylko gdy strona poda `onSidebarToggle`); karta z logo i linkiem `homeHref` (`/` dla demo, panel dla zalogowanego — linie 80–81, 170–172) jest tylko w gałęzi desktop. Na `/demo/<id>` na telefonie nie ma więc żadnego elementu prowadzącego z powrotem na landing — zostaje gest „wstecz” przeglądarki.
+
+### Jak groźne
+
+Gość testujący demo z telefonu nie ma w aplikacji drogi do rejestracji/landingu; zalogowany ma sidebar, więc u niego to tylko brak logo.
+
+### Opcje
+
+W gałęzi phone dodać kompaktowy przycisk z logo/strzałką prowadzący do `homeHref` (obok przycisku sidebara, a w demo zamiast niego). Test: `e2e/board-engine.mobile.spec.ts` / `e2e/demo.spec.ts`.
+
+## 11. Strony prawne: różne nazwy podmiotu („EasyLesson.pl” vs „Easylesson Sp. z o.o.”) (średni priorytet, do potwierdzenia przez Patryka)
+
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`.
+
+### Co się dzieje
+
+`src/app/(info)/terms/page.tsx` linia 16 mówi o „Platformie Edukacyjnej **EasyLesson.pl**”, a `src/app/(info)/privacy-policy/page.tsx` (linie 16, 302) o administratorze „**Easylesson Sp. z o.o.**”. W kodzie nie ma źródła prawdy o podmiocie; wg `ADR-silnik-tablicy.md` §7 Patryk nie ma jeszcze działalności, więc spółka z o.o. w polityce prywatności jest najpewniej szablonem. Powiązane: SEC-17 w `docs/security/AUDYT-2026-09.md` (polityka nie wymienia procesorów: Gemini, Supabase, Resend, Daily).
+
+### Jak groźne
+
+Niespójne dane podmiotu w dokumentach prawnych; nie dotyka działania aplikacji.
+
+### Opcje
+
+Patryk ustala właściwą nazwę podmiotu i domenę; jedna poprawka w obu plikach (plus `terms-of-use`, `gdpr`, `cookies-policy` do przejrzenia pod tym kątem).
+
+## 12. Sekcja cennika na landingu obiecuje co innego niż robi produkt (średni priorytet, treść vs kod)
+
+**Zgłoszone:** 10.11.2026, audyt `release/baseline`.
+
+### Co się dzieje
+
+`src/_new/features/landing/sections/PricingSection.tsx`: trzy plany („Starter”, „Premium”, „Inteligentny Korepetytor” — linie 152–182), przyciski „Kup plan Premium” / „Kup plan AI Tutor” prowadzące do `/register?plan=...`, „3 aktywne tablice jednocześnie” (linia 14), „Przełączaj miesięcznie lub rocznie” (linia 119). Kod ma dwa plany `free`/`premium` bez płatności (`backend/api/v1/plans/limits.py`), a limity Free to 2 przestrzenie / 3 tablice **na przestrzeń** / 1000 elementów / 100 MB; parametr `?plan=` nie jest nigdzie obsługiwany (żadnego `searchParams.get('plan')` w `(auth)/register` ani `features/auth`); Premium nadaje się ręcznie SQL-em (`docs/plan-subskrypcje.md`). Te same linki `/register?plan=...` są też w `landing/navigation/mega-menus/PricingMegaMenu.tsx`.
+
+### Jak groźne
+
+Użytkownik klika „Kup” i trafia na zwykłą rejestrację; obietnice z landingu nie mają pokrycia. Nie dotyka danych.
+
+### Opcje
+
+Do czasu płatności (Stripe, `roadmap.md`): sekcja z dwoma planami (Free z realnymi limitami, Premium „wkrótce / napisz na kontakt@easylesson.app”) albo ukrycie cennika. Treść do decyzji Patryka.
+
+## Naprawione (10.11.2026, audyt przed BASELINE na `release/baseline`)
+
+Krótkie wpisy — pełny opis w komunikatach commitów.
+
+- **„Moje Szablony” na tablicy Excalidraw** otwierało `SavedAssetsPanel` starego silnika: przeciągnięcie zasobu nic nie robiło (Excalidraw nie obsługuje tego dropu), a nic na Excalidraw nie tworzyło zasobów. Przycisk i panel usunięte z tablicy (`3a15d49`); kod panelu zostaje do etapu F. Decyzja produktowa: czy zastąpić biblioteką Excalidraw (`UIOptions`/`updateLibrary`).
+- **„Test głosu” w menu ⋮ nagłówka** pokazywał fałszywy toast „Mikrofon działa prawidłowo” bez żadnego testu — usunięte (`3a15d49`).
+- **Ustawienie tablicy „Toolbar” (`toolbar_visible`) było ignorowane** na Excalidraw — teraz chowa własny pionowy pasek (`3a15d49`).
+- **Kotwica `/#pricing`** (menu użytkownika, nagłówek tablicy, Tutor AI) nie działała, bo sekcja cennika miała `id="pakiet-premium"` — id zmienione na `pricing`, stopka i regulamin zaktualizowane (`f9cf610`).
+- **Panel konta „Edytuj / Zapisz zmiany”** nic nie zapisywało (`TODO` w kodzie; `PUT /users/me` przyjmuje tylko `avatar_url`) — formularz usunięty, pola tylko do odczytu, etykieta „Nazwa użytkownika” (`98edabd`). Edycja nazwy = nowa funkcja (endpoint), decyzja produktowa.
+- **`/api/contact`** bez limitu, walidacji długości i z HTML-em od nadawcy w mailu (SEC-08) — patrz #8 (`ebb75b7`).
+- **Gość bez konta był wyrzucany z landingu na `/login`** (także `/register`, `/reset-password`, `/docs`, `/product`, strony prawne): `AuthProvider` w root layoucie woła `/auth/me`, 401 → nieudany refresh → `logoutAndRedirect`, a lista ścieżek publicznych znała tylko `/login`, `/rejestracja` (nieistniejąca trasa), `/auth`, `/demo`. Zalogowani tego nie widzieli. Teraz publiczne = wszystko poza `/dashboard` i `/whiteboard` (jak `matcher` w `middleware.ts`), e2e sprawdza `/`, `/register`, `/docs/faq` (`cd48f0b`).
+- **CSP blokowałaby wideo hero landingu** (`media-src` bez hosta R2 z `HeroSection.tsx`/`ProductHero.tsx`) — host dopisany, e2e landingu pod CSP (`204259b`).
 
 ## Zasada
 

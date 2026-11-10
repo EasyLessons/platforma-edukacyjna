@@ -13,7 +13,7 @@ export default function CookiePolicyPage() {
             <h2>1. Wstęp</h2>
             <p>
               Niniejsza Polityka dotyczy plików „cookies” (ciasteczek) i odnosi się do strony
-              internetowej <strong>easylesson.pl</strong>. Dokładamy wszelkich starań, by chronić
+              internetowej <strong>easylesson.app</strong>. Dokładamy wszelkich starań, by chronić
               prywatność naszych użytkowników oraz w pełni transparentnie informować o technologiach
               wykorzystywanych na naszych stronach.
             </p>
@@ -59,7 +59,7 @@ export default function CookiePolicyPage() {
             <p>
               W przypadku dodatkowych pytań dotyczących naszej Polityki Cookies, skontaktuj się z
               nami poprzez formularz na stronie <a href="/contact">Kontakt</a> lub na adres e-mail:{' '}
-              <strong>kontakt@easylesson.pl</strong>.
+              <strong>kontakt@easylesson.app</strong>.
             </p>
 
             <p className="text-sm mt-10 text-gray-400">Ostatnia aktualizacja: kwiecień 2026</p>

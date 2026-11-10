@@ -3,12 +3,16 @@ AUTH ROUTES - /api/v1/auth/*
 Endpointy dotyczące autentykacji i autoryzacji
 Wszystkie endpointy zwracają ApiResponse[T] z timestamp i metadata
 """
+from functools import lru_cache
+
 from fastapi import APIRouter, Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
+from core.config import get_settings
+from core.cors import CorsPolicy
 from core.database import get_db
 from core.responses import ApiResponse
-from core.exceptions import AuthenticationError
+from core.exceptions import AppException, AuthenticationError
 from core.logging import get_logger
 from core.rate_limit import rate_limit
 from .dependencies import get_current_user
@@ -28,6 +32,26 @@ from core.models import User
 
 router = APIRouter(tags=["Authentication"])
 logger = get_logger(__name__)
+
+
+@lru_cache(maxsize=1)
+def _cors_policy() -> CorsPolicy:
+    return CorsPolicy(get_settings())
+
+
+def reject_foreign_origin(request: Request) -> None:
+    """
+    SEC-18: /refresh i /logout dzialaja na HttpOnly cookie, wiec obca strona moglaby je
+    wywolac "za plecami" uzytkownika (przy COOKIE_SAMESITE=none - rotacja/uniewaznienie
+    cudzej sesji). Przegladarka ZAWSZE dodaje Origin do POST z innej strony, wiec odrzucamy
+    Origin spoza listy CORS. Brak naglowka = klient nie-przegladarkowy (curl, testy) -
+    nie ma wektora CSRF, przepuszczamy. Odpowiedz CORS i tak nie bylaby czytelna dla
+    obcej strony (SEC-04), ale tu zadanie nie dociera nawet do bazy.
+    """
+    origin = request.headers.get("origin")
+    if origin is not None and not _cors_policy().is_allowed_origin(origin):
+        raise AppException("Niedozwolony origin", code="FORBIDDEN_ORIGIN", status_code=403)
+
 
 def _set_refresh_cookie(response: Response, token: str, settings) -> None:
     """Ustawia HttpOnly refresh cookie na odpowiedzi."""
@@ -226,6 +250,7 @@ async def refresh(
     response: Response,
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit("refresh", limit=300, window_seconds=60, fail_open=True)),
+    __: None = Depends(reject_foreign_origin),
 ):
     """Odświeżenie sesji - wymaga ważnego refresh cookie"""
     refresh_token = request.cookies.get("refresh_token")
@@ -266,6 +291,7 @@ async def logout(
     response: Response,
     db: Session = Depends(get_db),
     _: None = Depends(rate_limit("logout", limit=60, window_seconds=60, fail_open=True)),
+    __: None = Depends(reject_foreign_origin),
 ):
     """Wylogowanie użytkownika - unieważnia refresh token i czyści cookie"""
     refresh_token = request.cookies.get("refresh_token")

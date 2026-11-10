@@ -27,8 +27,10 @@ export default function RootLayout({
         className={`${plusJakarta.className} ${plusJakarta.variable} ${playfair.variable} antialiased`}
       >
         <div id="google_translate_element" style={{ display: 'none' }}></div>
+        {/* Jawne https: adres bez schematu na http://localhost rozwiązywałby się do http://
+            i CSP (script-src https://translate.google.com) by go odrzuciła. */}
         <Script
-          src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+          src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
           strategy="afterInteractive"
         />
         <Script id="google-translate-init" strategy="afterInteractive">

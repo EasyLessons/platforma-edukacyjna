@@ -270,14 +270,23 @@ export function TablicaContent() {
   );
 
   const board = isExcalidrawEngine ? (
-    // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Arkusze i narzędzia
-    // matematyczne dochodzą w etapie B migracji; rozmowa (Daily) przez slot topRightExtra.
+    // Silnik Excalidraw (NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw). Własny nagłówek,
+    // toolbar i kontrolki 1:1 ze starym silnikiem; rozmowa (Daily) w nagłówku.
     <ExcalidrawWhiteboard
       boardId={boardId}
+      boardName={boardName}
+      workspaceId={workspaceId}
       userRole={userRole || 'editor'}
+      isSidebarOpen={sidebar.isOpen}
+      onSidebarToggle={sidebar.toggle}
+      onSettingsClick={boardId !== 'demo-board' ? () => setShowBoardSettings(true) : undefined}
+      onShareClick={
+        boardId !== 'demo-board' && userRole === 'owner' ? () => setShowShareModal(true) : undefined
+      }
       gridVisible={boardSettings.grid_visible}
       smartSearchVisible={boardSettings.smartsearch_visible}
       aiEnabled={boardSettings.ai_enabled}
+      toolbarVisible={boardSettings.toolbar_visible}
       elementLimit={elementLimit}
       topRightExtra={isDailyVoice ? renderCallButton : undefined}
       sheetTemplateId={sheetByFolder(arkuszPath)?.id}
@@ -349,8 +358,8 @@ export function TablicaContent() {
           />
         )}
 
-        {/* Nagłówek z logo, togglem i ustawieniami (ukryty przy otwartym sidebarze) */}
-        {!sidebar.isOpen && (
+        {/* Nagłówek z logo, togglem i ustawieniami (ukryty przy otwartym sidebarze i na silniku Excalidraw) */}
+        {!sidebar.isOpen && !isExcalidrawEngine && (
           <BoardHeader
             boardName={boardName}
             boardIcon={boardIcon}
