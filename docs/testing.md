@@ -9,10 +9,10 @@
 
 | Warstwa         | Narzędzie  | Pliki | Testy | Czas pełnego przebiegu |
 | --------------- | ---------- | ----- | ----- | ---------------------- |
-| backend         | pytest     | 53    | 1426  | kilka minut (SQLite in-memory + fakeredis) |
-| frontend        | vitest     | 96    | 1004  | ~45 s (jsdom)          |
-| whiteboard-sync | vitest     | 6     | —     | sekundy (atrapa backendu + prawdziwy Hocuspocus) |
-| E2E             | Playwright | 11    | 27    | minuty (pełny stos w Dockerze) |
+| backend         | pytest     | 55    | 1440  | kilka minut (SQLite in-memory + fakeredis) |
+| frontend        | vitest     | 97    | 1042  | ~45 s (jsdom)          |
+| whiteboard-sync | vitest     | 6     | 65    | sekundy (atrapa backendu + prawdziwy Hocuspocus) |
+| E2E             | Playwright | 12    | 31    | minuty (pełny stos w Dockerze) |
 
 Aktualizuj tę tabelę w PR, który zmienia liczbę plików testowych — nie "przy okazji".
 
