@@ -126,6 +126,10 @@ describe('buildContentSecurityPolicy', () => {
     expect(sources(csp, 'connect-src')).not.toContain('https://esm.sh');
   });
 
+  it('bez cdn.jsdelivr.net (pdf.js worker starego silnika, usunięty w etapie F)', () => {
+    expect(buildContentSecurityPolicy()).not.toContain('cdn.jsdelivr.net');
+  });
+
   it('media-src: wideo hero landingu z R2 (jeden konkretny bucket, bez wildcardu)', () => {
     const media = sources(buildContentSecurityPolicy(), 'media-src');
     expect(media).toEqual([
