@@ -35,9 +35,15 @@ def client(db_session):
 def refresh_cookie(db_session, test_user):
     import asyncio
 
-    _, token = asyncio.get_event_loop().run_until_complete(
-        AuthService(db_session).login_user(LoginData(login=test_user.username, password="testpassword"))
-    )
+    # Wlasna petla: asyncio.get_event_loop() zalezy od stanu po wczesniejszych testach
+    # (pytest-asyncio zostawia "brak biezacej petli") i w pelnym przebiegu rzucalo RuntimeError.
+    loop = asyncio.new_event_loop()
+    try:
+        _, token = loop.run_until_complete(
+            AuthService(db_session).login_user(LoginData(login=test_user.username, password="testpassword"))
+        )
+    finally:
+        loop.close()
     return token
 
 
