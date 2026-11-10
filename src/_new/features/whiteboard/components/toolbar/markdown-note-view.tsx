@@ -1,172 +1,19 @@
 ﻿/**
- * ============================================================================
- * PLIK: src/app/tablica/toolbar/MarkdownNoteTool.tsx
- * ============================================================================
+ * Widok notatki Markdown + KaTeX (react-markdown, remark-gfm, remark-math, rehype-katex).
  *
- * Narzędzie do tworzenia notatek Markdown na tablicy.
- * Przygotowane pod chatbota - będzie generował odpowiedzi w takich blokach.
- * ============================================================================
+ * Używany przez element `note` tablicy Excalidraw (board-engine/elements/note.tsx), który
+ * czyta z notatki tylko `content`. Narzędzie rysowania notatki starego silnika zostało usunięte
+ * w etapie F (docs/architecture/ADR-silnik-tablicy.md).
  */
 
 'use client';
 
 import React, { useState, useRef, useEffect, memo } from 'react';
-import { Point, ViewportTransform, MarkdownNote } from '@/_new/features/whiteboard/types';
-import { inverseTransformPoint } from '@/_new/features/whiteboard/navigation/viewport-math';
-import { useCanvasWheel } from '@/_new/features/whiteboard/hooks/use-canvas-wheel';
+import type { MarkdownNote } from '@/_new/features/whiteboard/types';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
-
-interface MarkdownNoteToolProps {
-  viewport: ViewportTransform;
-  canvasWidth: number;
-  canvasHeight: number;
-  onNoteCreate: (note: MarkdownNote) => void;
-  onViewportChange?: (viewport: ViewportTransform) => void;
-  isGestureActive?: boolean;
-}
-
-export function MarkdownNoteTool({
-  viewport,
-  canvasWidth,
-  canvasHeight,
-  onNoteCreate,
-  onViewportChange,
-  isGestureActive = false,
-}: MarkdownNoteToolProps) {
-  const [isCreating, setIsCreating] = useState(false);
-  const [startPoint, setStartPoint] = useState<Point | null>(null);
-  const [currentPoint, setCurrentPoint] = useState<Point | null>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isGestureActive && isCreating) {
-      setIsCreating(false);
-      setStartPoint(null);
-      setCurrentPoint(null);
-    }
-  }, [isGestureActive, isCreating]);
-
-  useCanvasWheel({ overlayRef, canvasWidth, canvasHeight, viewport, onViewportChange });
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isGestureActive) return;
-    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
-    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-
-    setIsCreating(true);
-    setStartPoint(worldPoint);
-    setCurrentPoint(worldPoint);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isCreating) return;
-
-    const rect = overlayRef.current?.getBoundingClientRect() ?? { left: 0, top: 0 };
-    const screenPoint = { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    const worldPoint = inverseTransformPoint(screenPoint, viewport, canvasWidth, canvasHeight);
-    setCurrentPoint(worldPoint);
-  };
-
-  const handleMouseUp = () => {
-    if (!isCreating || !startPoint || !currentPoint) {
-      setIsCreating(false);
-      return;
-    }
-
-    const minX = Math.min(startPoint.x, currentPoint.x);
-    const minY = Math.min(startPoint.y, currentPoint.y);
-    const width = Math.abs(currentPoint.x - startPoint.x);
-    const height = Math.abs(currentPoint.y - startPoint.y);
-
-    // Minimalna wielkość - jeśli za mały, nie twórz (wymaga przeciągnięcia)
-    if (width < 0.3 || height < 0.2) {
-      setIsCreating(false);
-      setStartPoint(null);
-      setCurrentPoint(null);
-      return;
-    }
-
-    const newNote: MarkdownNote = {
-      id: Date.now().toString(),
-      type: 'markdown',
-      x: minX,
-      y: minY,
-      width,
-      height,
-      content: '',
-      backgroundColor: 'rgba(255, 255, 255, 0.75)',
-      borderColor: 'rgba(229, 231, 235, 0.8)',
-    };
-    onNoteCreate(newNote);
-
-    setIsCreating(false);
-    setStartPoint(null);
-    setCurrentPoint(null);
-  };
-
-  // Renderuj preview prostokąta podczas tworzenia
-  const renderPreview = () => {
-    if (!isCreating || !startPoint || !currentPoint) return null;
-    if (canvasWidth <= 0 || canvasHeight <= 0) return null;
-
-    const minX = Math.min(startPoint.x, currentPoint.x);
-    const minY = Math.min(startPoint.y, currentPoint.y);
-    const width = Math.abs(currentPoint.x - startPoint.x);
-    const height = Math.abs(currentPoint.y - startPoint.y);
-
-    // Używaj tej samej formuły co transformPoint!
-    // scale = viewport.scale * 100 (100px = 1 jednostka)
-    const scale = viewport.scale * 100;
-    const centerX = canvasWidth / 2;
-    const centerY = canvasHeight / 2;
-
-    const screenX = (minX - viewport.x) * scale + centerX;
-    const screenY = (minY - viewport.y) * scale + centerY;
-    const screenWidth = width * scale;
-    const screenHeight = height * scale;
-
-    // Sprawdź czy wartości są poprawne
-    if (
-      !isFinite(screenX) ||
-      !isFinite(screenY) ||
-      !isFinite(screenWidth) ||
-      !isFinite(screenHeight)
-    ) {
-      return null;
-    }
-
-    return (
-      <div
-        className="absolute pointer-events-none border-2 border-dashed border-yellow-500 bg-yellow-50/30 rounded-lg z-40"
-        style={{
-          left: screenX,
-          top: screenY,
-          width: Math.max(0, screenWidth),
-          height: Math.max(0, screenHeight),
-        }}
-      />
-    );
-  };
-
-  return (
-    <div className="absolute inset-0 z-20" style={{ cursor: 'crosshair' }}>
-      <div
-        ref={overlayRef}
-        className="absolute inset-0 pointer-events-auto z-30"
-        style={{ touchAction: 'none' }}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-      />
-      {renderPreview()}
-    </div>
-  );
-}
 
 // Komponent do wyświetlania i edycji notatki Markdown (używany w renderowaniu)
 // PROSTA ARCHITEKTURA:

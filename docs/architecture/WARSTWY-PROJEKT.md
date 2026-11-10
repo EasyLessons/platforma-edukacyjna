@@ -1,7 +1,7 @@
 # Warstwy elementów tablicy (przenieś na wierzch / na spód / o jeden w górę / w dół) — projekt
 
 **Data:** 22.09.2026
-**Status:** projekt do uzgodnienia z Bartkiem. Sam dokument, zero kodu — każdy krok implementacji
+**Status (11.2026):** NIEAKTUALNY — dotyczy własnego silnika canvasowego usuniętego w etapie F; Excalidraw ma własną kolejność warstw. Zostawiony jako historia decyzji. Pierwotnie: projekt do uzgodnienia z Bartkiem. Sam dokument, zero kodu — każdy krok implementacji
 dotyka plików w strefie Yjs (`yjs/board-doc.ts`, `hooks/use-yjs-board.ts`, `engine/*`,
 `whiteboard-canvas.tsx`), więc nie da się tego zrobić obok jego gałęzi `feature/whiteboard-yjs`.
 **Zakres:** kolejność rysowania (z-order) elementów na tablicy, sterowana przez użytkownika.

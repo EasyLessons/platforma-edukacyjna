@@ -1,8 +1,8 @@
 """
 Supabase Storage - wspolne funkcje zapisu/kasowania plikow kluczem service_role.
 
-Wydzielone ze wzorca `api/v1/whiteboard/storage.py` (tamten plik zostaje bez zmian;
-docelowo moze korzystac z tego modulu - patrz docs/security/AUDYT-2026-09.md, PR 12).
+Jedyny modul Storage w backendzie (stary `api/v1/whiteboard/storage.py` z publicznym
+bucketem `board-images` zniknal w etapie F razem ze starym silnikiem tablicy).
 service_role omija polityki RLS bucketu, dlatego autoryzacje (kto i co moze zapisac)
 ZAWSZE sprawdza wolajacy, zanim tu trafi.
 

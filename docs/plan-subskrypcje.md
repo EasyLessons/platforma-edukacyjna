@@ -149,7 +149,7 @@ z PR #106 (300 plików / 100 MB na tablicę, licznik w Redis — zostaje jako dr
 - **Pliki sprzed migracji** nie mają wierszy w rejestrze, więc nie liczą się do limitu, dopóki job
   sprzątający (pierwszy przebieg) nie dopisze ich przy porównaniu bucketu z rejestrem.
 - **Nie liczą się:** wspólne szablony (arkusze CKE, karty wzorów — `tpl:` w `Y.Doc`, nie są w
-  Storage), awatary (`avatars`, 5 MB WEBP 512 px na konto) i stary silnik (`board-images`).
+  Storage), awatary (`avatars`, 5 MB WEBP 512 px na konto).
 - Front: `GET /plans/me` zwraca `limits.max_storage_bytes` i `usage.storage_bytes`; błąd uploadu
   `PLAN_LIMIT_STORAGE` pokazuje komunikat (`excalidraw-file-sync.ts`), a `UpgradeModal` zna ten kod.
 
@@ -177,8 +177,8 @@ pomijany (`skipped`), bo bez wspólnej blokady nic nie powinno kasować. Kroki, 
 
 Bezpieczniki: nic nie jest kasowane od razu (najpierw `deleted_at`, 30 dni na pomyłkę); krok, który
 oznaczyłby ponad połowę plików (min. 20), jest pomijany i trafia do `errors` raportu; nieudane
-listowanie Storage nigdy nie znaczy „plików nie ma". Wspólne szablony, pliki starego silnika
-(`board-images`) i dokumenty Yjs nie są ruszane. Za „stare pliki" uznajemy tylko sieroty i pliki
+listowanie Storage nigdy nie znaczy „plików nie ma". Wspólne szablony
+i dokumenty Yjs nie są ruszane. Za „stare pliki" uznajemy tylko sieroty i pliki
 usuniętych tablic — plik z żywej tablicy nie jest kasowany z powodu wieku.
 
 Konfiguracja (env, wartości domyślne w `core/config.py`): `STORAGE_CLEANUP_ENABLED` (domyślnie **`false`** —
@@ -194,8 +194,7 @@ adresu Storage. Zwraca:
 
 - `state` (`ok` / `warning` od 70% / `critical` od 90%) względem budżetu 1 GB planu Supabase Free
   i `hint` z przypomnieniem o Cloudflare R2 (10 GB free) zamiast Supabase Pro — **tylko opis, bez wdrożenia**,
-- `estimated_bytes` = większy z (rejestr, pomiar bucketu `board-files`) + pomiar bucketu `avatars`;
-  stary silnik (`board-images`) nie jest mierzony,
+- `estimated_bytes` = większy z (rejestr, pomiar bucketu `board-files`) + pomiar bucketu `avatars`,
 - rejestr: aktywne pliki i bajty oraz pliki czekające na skasowanie (30 dni karencji),
 - `top_accounts` (10 największych kont: plan, limit, procent), `accounts_over_limit`,
 - pomiar prawdziwego Storage i raport ostatniego przebiegu sprzątania (z Redis) — bez dodatkowych
@@ -214,8 +213,7 @@ adresu Storage. Zwraca:
   danych, ale nie rośnie. Limit siedzi w kontekście połączenia (zero stanu współdzielonego),
   więc zmiana planu działa po ponownym połączeniu.
 - `beforeHandleMessage` odrzucony: rzut zamyka połączenie, a wiadomości nie da się pominąć.
-- Nigdy `readOnly` z powodu planu. Stary silnik (klucz `elements`) bez limitu - limit działa
-  przy `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`.
+- Nigdy `readOnly` z powodu planu.
 - Obejście `POST /doc`: gdy `SYNC_SERVICE_TOKEN` jest ustawiony, zapis snapshotu z JWT dostaje 403
   (GET zostaje). **Klucz musi być ustawiony w backendzie ORAZ w whiteboard-sync** - inaczej zapisy
   sync spadają na token usera i dostają 403.

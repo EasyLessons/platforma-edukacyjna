@@ -16,35 +16,34 @@ UI (LoginForm, src/_new/features/auth/components/loginForm.tsx)
 
 Pełny opis stanów i rotacji tokenów: `docs/architecture/auth.md`.
 
-## 2. Synchronizacja tablicy (realtime, client-to-client)
+## 2. Synchronizacja tablicy (Excalidraw + Yjs/Hocuspocus)
 
-Elementy tablicy w **obu** silnikach idą przez Yjs/Hocuspocus (pkt 2b) — dawnej ścieżki Supabase Broadcast dla elementów (`useElementSync`, `use-elements`, `elements-api`, tabela `board_elements`) już nie ma w kodzie. Supabase Realtime zostało na tablicy tylko dla presence **starego silnika** (`features/whiteboard`, domyślny bez flagi `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`):
-
-```
-stary silnik: kanał Supabase "board:{board_id}" (src/app/context/BoardRealtimeContext.tsx
-  + hooki features/whiteboard/realtime/*): Presence = kto jest online, Broadcast = kursory,
-  "kto pisze", viewport/follow. Elementy NIE jadą tym kanałem.
-Excalidraw (features/board-engine): kursory i lista osób przez awareness Hocuspocusa
-  (yjs/awareness-collaborators.ts) — Supabase nieużywane na tablicy.
-```
-
-`BoardRealtimeContext` i `realtime/*` znikają w etapie F (`migration-status.md`).
-
-### 2b. Synchronizacja tablicy — Yjs/Hocuspocus (oba silniki)
+Jedyny silnik tablicy to Excalidraw (`src/_new/features/board-engine`, decyzja w `ADR-silnik-tablicy.md`;
+stary silnik canvasowy, `BoardRealtimeContext` i presence przez Supabase zostały usunięte w etapie F).
+Dawnej ścieżki Supabase Broadcast dla elementów (`useElementSync`, `use-elements`, `elements-api`, tabela
+`board_elements` - usunięta migracją `d315e28cb69c`) nie ma w kodzie.
 
 ```
-User A rysuje na Canvas
-  → WhiteboardEngine wykonuje Command → mutacja Y.Doc (hooks/use-yjs-board.ts → yjs/board-doc.ts)
-  → HocuspocusProvider (yjs/use-yjs-sync.ts) wysyła update CRDT po WebSocket
-    do serwisu whiteboard-sync (whiteboard-sync/src/index.ts, port 1234)
+User A rysuje w Excalidraw (components/excalidraw-board.tsx)
+  → onChange → ExcalidrawYjsBinding (yjs/excalidraw-binding.ts): każdy element jako JEDEN wpis
+    w Y.Map('excalidraw-elements') (czysty JSON), pliki w osobnej Y.Map
+  → HocuspocusProvider (yjs/use-board-connection.ts; odświeżanie tokenu jak w
+    features/whiteboard/yjs/use-yjs-sync.ts) wysyła update CRDT po WebSocket
+    do serwisu whiteboard-sync (whiteboard-sync/src/index.ts, adres z NEXT_PUBLIC_WHITEBOARD_SYNC_URL)
   → whiteboard-sync przy pierwszym połączeniu z dokumentem:
-      · onAuthenticate: GET /api/v1/whiteboard/{id}/access z tokenem usera (auth.ts)
+      · onAuthenticate: GET /api/v1/whiteboard/{id}/access z tokenem usera (auth.ts) → rola, readOnly dla viewera
       · Database.fetch: GET /api/v1/whiteboard/{id}/doc → snapshot z tabeli board_documents (database.ts)
-  → serwis rozsyła update do pozostałych klientów tego dokumentu (User B/C)
+  → serwis rozsyła update do pozostałych klientów tego dokumentu (User B/C); binding wkłada
+    zmiany do sceny Excalidraw (updateScene)
   → Database.store (debounce Hocuspocusa): POST /api/v1/whiteboard/{id}/doc → snapshot do Postgresa
 ```
 
-Schemat powyżej to stary silnik (`hooks/use-yjs-board.ts`, undo/redo przez `Y.UndoManager`); w Excalidraw ten sam provider i serwis obsługuje `yjs/use-board-connection.ts` + `excalidraw-binding.ts` (scena Excalidraw ↔ `Y.Map` `excalidraw-elements`), a serwer dodatkowo egzekwuje limit elementów planu (`whiteboard-sync/src/element-limit.ts`, `plan-subskrypcje.md`). Presence: pkt 2. Tabela `board_elements` została usunięta (migracja `d315e28cb69c`) — `board_documents` jest jedynym źródłem elementów.
+Kursory i lista osób na tablicy idą przez **awareness** Hocuspocusa (`yjs/awareness-collaborators.ts` →
+`collaborators` Excalidraw), nie przez Supabase. Undo/redo to historia Excalidraw. Serwer egzekwuje limit
+elementów planu (`whiteboard-sync/src/element-limit.ts`, `yjs/use-element-limit.ts`, `plan-subskrypcje.md`).
+`board_documents` jest jedynym źródłem elementów. Supabase Realtime zostało tylko dla powiadomień (pkt 3)
+i zmian ról (`postgres_changes` na `workspace_members` w stronie tablicy).
+
 
 #### Kopia lokalna (IndexedDB) i edycja offline
 
@@ -60,7 +59,7 @@ Wejście na tablicę
 ```
 
 - **Kolejność jest krytyczna**: provider wysyła na serwer każdą aktualizację, której nie jest źródłem. Połączony przed wczytaniem kopii wysyłałby całą kopię przy każdym wejściu.
-- **Treść z kopii jest widoczna od razu** (overlay tylko, gdy nie ma ani kopii, ani synchronizacji); edycja działa także bez połączenia. Status: `StatusIndicators` („Synchronizacja…”, „Offline”).
+- **Treść z kopii jest widoczna od razu** (overlay tylko, gdy nie ma ani kopii, ani synchronizacji); edycja działa także bez połączenia. Status offline pokazuje `excalidraw-whiteboard.tsx`.
 - **Rejestr i limity** (`src/_new/lib/board-cache/board-cache.ts`, localStorage, bez treści): 10 tablic (LRU) i 14 dni od ostatniego otwarcia; nigdy nie usuwamy bieżącej tablicy ani tablic `dirty` (lokalne zmiany niepotwierdzone przez serwer — `unsyncedChanges` providera).
 - **Czyszczenie**:
   - ręczne wylogowanie → wszystkie kopie (przy `dirty` najpierw ostrzeżenie),
@@ -69,10 +68,10 @@ Wejście na tablicę
   - odmowa dostępu (`access-denied` z whiteboard-sync albo 403/404 z `GET /boards/{id}`) → kopia tej tablicy.
 - **Brak sieci ≠ wylogowanie**: refresh bez odpowiedzi albo z 5xx rzuca `RefreshUnavailableError` (`lib/auth/refresh-error.ts`) — błąd sieci, sesja zostaje. Wylogowanie tylko przy odmowie serwera (4xx).
 - **Powody odmowy z whiteboard-sync** (`whiteboard-sync/src/auth.ts`): `token-expired` (refresh + ponowienie), `server-unavailable` (ponowienie z odstępem 2/5/10/30 s), `access-denied` (koniec + usunięcie kopii). Hocuspocus po odmowie rozłącza się na stałe — ponawia `useYjsSync`.
-- **Obrazy offline**: upload do Storage wymaga sieci → `ImageUploadOfflineError` i toast; reszta tablicy działa.
+- **Pliki offline**: upload do Storage (`board-engine/files`) wymaga sieci; reszta tablicy działa.
 - **`CACHE_VERSION`** (`board-cache.ts`) to wyłącznik awaryjny: podbicie + deploy = klienci usuwają stare kopie (patrz `known-issues.md` #7).
 
-### 2c. Obrazy tablicy — silnik Excalidraw (za flagą `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw`)
+### 2c. Obrazy tablicy (Excalidraw)
 
 Obraz wklejony lub wrzucony na tablicę Excalidraw **nie trafia do `Y.Doc` jako dataURL** (snapshot `board_documents` puchł) — plik leży w Supabase Storage, w dokumencie jest samo odwołanie. Stary silnik (`upload-image`, publiczny bucket `board-images`) działa jak dotąd.
 
@@ -102,12 +101,12 @@ User B (także viewer) dostaje wpis z `ref`
 - **Quota tablicy (miękka)**: 300 plików / 100 MB na tablicę → `409 BOARD_FILE_QUOTA_EXCEEDED` (komunikat na froncie, bez ponowień). Licznik siedzi w Redis (`board_files:{id}:count|bytes`), rośnie po udanym zapisie i znika przy usunięciu tablicy.
 - **SVG**: inline zostają tylko SVG wykresów f(x) (id pliku `fn-<hash>`). SVG wklejony przez użytkownika na tablicy z serwerem jest odrzucany z komunikatem (backend przyjmuje wyłącznie rastry); na tablicy demo/gościa zostaje inline jak dotąd.
 - **Wspólne pliki** (arkusze CKE, karty wzorów; `files/shared-files.ts`): id pliku `tpl:<ścieżka>` (`templates/...` albo `resources/...`, tylko `.webp`). Bez uploadu - w `Y.Doc` wpis `{ id, mimeType, created, ref: { v: 1, shared: "<ścieżka>" } }`, odbiorca pobiera obraz z adresu statycznego (CDN Vercela). Nie liczą się do quota tablicy i nie zostawiają sierot w Storage. Ścieżka od innych osób jest sprawdzana wzorcem (tylko nasze katalogi, bez `..`) i musi być zgodna z id pliku. Strony arkuszy generuje raz `scripts/build-templates.mjs` (katalog: `board-engine/templates/catalog.ts`).
-- **Usunięcie tablicy** oznacza jej wiersze w rejestrze `board_files` (`deleted_at`) — miejsce wraca do limitu konta od razu, a pliki w `board-files` znikają po 30 dniach (okres na pomyłkę), kasuje je job sprzątający (`storage_quota/cleanup.py`, po ponownym sprawdzeniu odwołań w snapshocie). Folder starego silnika (`board-images`) jest kasowany od razu jak dotąd.
+- **Usunięcie tablicy** oznacza jej wiersze w rejestrze `board_files` (`deleted_at`) — miejsce wraca do limitu konta od razu, a pliki w `board-files` znikają po 30 dniach (okres na pomyłkę), kasuje je job sprzątający (`storage_quota/cleanup.py`, po ponownym sprawdzeniu odwołań w snapshocie).
 
 Znane ograniczenia:
 
 - **Sieroty**: wpis pliku w `Y.Doc` nigdy nie jest usuwany z mapy `excalidraw-files`, więc plik skasowanego elementu nadal ma odwołanie i zostaje w Storage (cofnięcie / tombstone mogą przywrócić element). Job sprzątający rusza tylko pliki BEZ odwołania w snapshocie (np. upload, którego element nie trafił do dokumentu) po 7 dniach, i to z 30 dniami karencji.
-- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` (ani `delete_board_folder` starego silnika) — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia przez job sprzątający: usunięcie przestrzeni oznacza wiersze rejestru `board_files` jako `deleted_at` (przestają liczyć się do limitu miejsca konta), a po 30 dniach job kasuje pliki ze Storage.
+- **Sieroty po usunięciu całego workspace'u**: `DELETE /workspaces/{id}` kasuje tablice kaskadą w bazie i **nie** woła `delete_board_files` — foldery `{board_id}/` tych tablic zostają w `board-files`. Bucket jest prywatny, a `board_id` nie jest używane ponownie, więc pliki są niedostępne, ale zajmują miejsce; do sprzątnięcia przez job sprzątający: usunięcie przestrzeni oznacza wiersze rejestru `board_files` jako `deleted_at` (przestają liczyć się do limitu miejsca konta), a po 30 dniach job kasuje pliki ze Storage.
 - **Quota tablicy nie jest rozliczeniem**: po utracie danych Redis licznik startuje od zera, równoległe uploady mogą przekroczyć limit o kilka plików, a awaria Redis wyłącza limit. Limit łączny na konto jest osobno, w bazie (patrz wyżej).
 - **Limit uploadów w toku jest na proces**: zakłada jeden proces backendu (to samo założenie co semafor dekodowania w `auth/avatar.py`); przy wielu workerach każdy miałby własny licznik.
 - **Flaga `public` bucketu jest sprawdzana raz na proces**: przestawienie działającego bucketu na publiczny zostanie wykryte dopiero po restarcie backendu.
@@ -120,8 +119,7 @@ Znane ograniczenia:
 
 Przycisk „Wypróbuj demo" (HeroSection / HeroMobileSection) otwiera `/demo/<id>`, gdzie `<id>` to 22 znaki
 base64url ze 128 bitów (`createDemoSessionId`). Strona (`app/(whiteboard)/demo/[sessionId]/page.tsx`) renderuje
-wyłącznie `ExcalidrawWhiteboard` z tożsamością gościa (ujemne id, nick `Gosc-XXXX` w `sessionStorage`) — bez
-starego silnika i bez `BoardRealtimeContext`.
+wyłącznie `ExcalidrawWhiteboard` z tożsamością gościa (ujemne id, nick `Gosc-XXXX` w `sessionStorage`).
 
 ```
 gość A: /demo/<id> → useBoardConnection (boardId = "demo-<id>") → HocuspocusProvider BEZ tokenu
@@ -189,9 +187,9 @@ UI chatu (whiteboard, math-chatbot.tsx) → POST /api/chat z nagłówkiem Author
 
 **Ograniczenie architektoniczne do znajomości:** rate limiting i cache trzymane są w zwykłym `Map` w pamięci procesu Next.js. Działa poprawnie tylko dopóki appka działa na jednej, długo żyjącej instancji serwera. Jeśli kiedyś przejdziecie na wdrożenie serverless/edge (wiele instancji, cold starty) albo horizontal scaling — ten mechanizm przestanie działać poprawnie (każda instancja ma swoją osobną mapę) i trzeba będzie przenieść na współdzielony store (np. Redis). Nie problem dziś, ale ważne żeby wiedzieć zanim ktoś zmieni sposób hostingu.
 
-## 5. Rozmowa przy tablicy (Daily) i stary voice chat (WebRTC)
+## 5. Rozmowa przy tablicy (Daily)
 
-Dwie ścieżki, wybierane flagą `NEXT_PUBLIC_VOICE_PROVIDER` (`src/_new/features/voice-call/config/voice-provider.ts`): brak / `daily` = **Daily** (decyzja 02.10.2026, domyślna — backend w 5a, frontend w 5c), `legacy` = dotychczasowy własny WebRTC + Xirsys (5b, wyjście awaryjne; kod zostaje do osobnego PR-a usuwającego). Zmienna jest wklejana w buildzie — zmiana = redeploy na Vercelu.
+Jedyna ścieżka: **Daily** (decyzja 02.10.2026) — backend w 5a, frontend w 5c. Własny czat WebRTC + TURN Xirsys (`features/voice-chat`, Route Handler `/api/turn`, flaga `NEXT_PUBLIC_VOICE_PROVIDER=legacy`) został usunięty w etapie F razem ze starym silnikiem tablicy, w którym był montowany.
 
 ### 5a. Rozmowa przez Daily — backend
 
@@ -309,36 +307,14 @@ GET /api/v1/whiteboard/call/usage — tylko id z CALL_ADMIN_USER_IDS (domyślnie
 
 **Znane ograniczenia**: (1) Uczestnik jest rozłączany najpóźniej z `exp` pokoju z chwili swojego wejścia — po przedłużeniu pokoju klika „Rozmowa” ponownie; lekcja dłuższa niż `DAILY_ROOM_TTL_MINUTES` (90 min) wymaga kliknięcia „Rozmowa” przez nauczyciela w ostatnich 15 min albo większej wartości env. (2) Utrata danych Redis: budżety dzienne zaczynają od zera, a uczniowie nie dołączą, dopóki nauczyciel nie kliknie „Rozmowa” (przejęcie pokoju); próg miesięczny dalej działa (zużycie z Daily + pokoje z listy Daily), niepoliczone zostają tylko pokoje zakończone w ostatnich 30 min przed utratą. (3) Rezerwacja i zużycie tego samego pokoju liczą się podwójnie do końca karencji, więc blisko progu odmowa przychodzi wcześniej niż przy dokładnym liczeniu. (4) Budżet dzienny tworzącego po rozliczeniu opiera się na spotkaniach z Daily (założenie 2 wyżej); próg miesięczny od tego nie zależy. (5) Rozmiar: `call.py` przekracza 400 linii (przepływ tworzącego jest jedną transakcją na budżecie i rejestrze) — podział na moduł pokoju i moduł tworzącego jest kandydatem do refaktoru.
 
-### 5b. Własny WebRTC + Xirsys (legacy)
-
-```
-User dołącza do tablicy → VoiceChatProvider (src/_new/features/voice-chat/VoiceChatContext.tsx + hooki obok:
-  useVoiceSignaling — kanał i zdarzenia voice-*, useWebRTCConnections — RTCPeerConnection per user,
-  useVoiceDetection — wskaźnik "mówi", mediaSupport — wykrywanie braku wsparcia/HTTPS)
-  → sygnalizacja (wymiana SDP/ICE candidates) przez Supabase Broadcast (ten sam mechanizm co pkt 2)
-  → lista ICE: getIceServers() (features/voice-chat/constants.ts) → GET /api/turn z Authorization: Bearer <access token>
-      → Route Handler src/app/api/turn/route.ts (logika: src/_new/server/turn/get-ice-servers.ts)
-      → brak nagłówka Bearer = 401 od razu → token sprawdzany przez GET /api/v1/auth/me (fail-closed, jak /api/chat)
-      → rate limit per użytkownik (60/min, liczony PO autoryzacji)
-      → serwer woła Xirsys sekretem z env XIRSYS_* i oddaje STUN + krótkotrwałe poświadczenia TURN (Cache-Control: no-store)
-  → połączenie peer-to-peer między przeglądarkami po ustaleniu ścieżki przez Xirsys (TURN/STUN)
-  → audio leci bezpośrednio między klientami, nie przez backend
-```
-
-**Sekret Xirsys żyje tylko na serwerze (audyt SEC-05).** Przeglądarka nigdy nie woła API Xirsys ani nie zna `XIRSYS_IDENT/SECRET/CHANNEL` — dostaje wyłącznie poświadczenia TURN ważne ok. 60 s (klient trzyma je w pamięci 20 s, żeby seria `RTCPeerConnection` przy dołączaniu = jedno żądanie). Każdy problem po drodze (brak tokenu, 401/429/503, brak konfiguracji, awaria Xirsys) kończy się listą awaryjną STUN + publiczny OpenRelay — voice działa, tylko gorzej przez restrykcyjny NAT; szczegóły błędu Xirsys zostają w logu serwera. Tryb demo nie montuje `VoiceChatProvider`, więc nie korzysta z `/api/turn`. Przejściowo serwer czyta też stare `NEXT_PUBLIC_XIRSYS_*` (żaden kod kliencki już się do nich nie odwołuje, więc nie trafiają do bundla) — do usunięcia po rotacji sekretu.
-
-**Limit per użytkownik, nie per IP.** Klasa siedzi za jednym NAT-em, więc licznik per IP liczony przed autoryzacją pozwalałby niezalogowanemu z tej samej sieci (pętla żądań bez tokenu) odciąć wszystkim TURN. Żądania bez tokenu / ze złym tokenem nie zużywają niczyjego limitu i nie docierają do Xirsys.
-
-**Region TURN.** `global.xirsys.net` dobiera serwery TURN wg położenia wołającego, a wołającym jest funkcja serwerowa (na Vercel domyślnie `iad1`, USA), nie przeglądarka ucznia. Jeśli w odpowiedzi `/api/turn` hosty TURN nie są europejskie: ustaw region funkcji projektu na europejski (Vercel → Settings → Functions) albo `XIRSYS_API_HOST` na regionalny host Xirsys (akceptowane tylko `*.xirsys.net` / `*.xirsys.com`).
-
 ### 5c. Rozmowa przez Daily — frontend (`features/voice-call`)
 
 ```
-Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider boardId wokół OBU silników
-  (tylko liczbowe id tablicy; demo i gość nie mają providera, więc przycisk się nie renderuje)
-  → przycisk "Rozmowa" (CallButton): stary silnik - pasek online-users.tsx; Excalidraw - slot topRightExtra
-    w board-engine (prawy górny róg, na telefonie pływający przycisk nad stopką; także dla viewera)
-  → klik → test wsparcia przeglądarki (voice-chat/mediaSupport: https, mediaDevices, przeglądarka w aplikacji)
+Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider boardId wokół tablicy
+  (demo i gość nie mają providera, więc przycisk się nie renderuje)
+  → przycisk "Rozmowa" (CallButton) w slocie topRightExtra board-engine (prawy górny róg, na telefonie
+    pływający przycisk nad stopką; także dla viewera)
+  → klik → test wsparcia przeglądarki (voice-call/mediaSupport: https, mediaDevices, przeglądarka w aplikacji)
   → POST /api/v1/whiteboard/{id}/call (apiClient) → { room_url, token, expires_at }   (backend: 5a)
       front: room_url musi być https://<konto>.daily.co/... (callApi.isDailyRoomUrl) - inny adres = błąd, bez ramki
       odmowa → komunikat wg pola `code` (tabela niżej), bez ramki
@@ -371,9 +347,9 @@ Strona tablicy (src/app/(whiteboard)/whiteboard/page.tsx) → DailyCallProvider 
 | `VOICE_MONTHLY_LIMIT` (429) | Limit rozmów w tym miesiącu wyczerpany. | nie |
 | `VOICE_PROVIDER_LIMIT` (503), `VOICE_PROVIDER_ERROR` (502), `VOICE_PROVIDER_TIMEOUT` (504), `VOICE_GUARD_UNAVAILABLE` (503), `VOICE_USAGE_UNAVAILABLE` (503) | Rozmowa chwilowo niedostępna - spróbuj ponownie za chwilę. | tak |
 | 404 / 405, błąd sieci, nieznany kod, `AUTH_ERROR` 401, nieprawidłowa odpowiedź albo adres pokoju | Nie udało się połączyć z rozmową. Spróbuj ponownie. | tak |
-| (bez żądania) brak `mediaDevices` / https / przeglądarka w aplikacji | komunikat z `voice-chat/mediaSupport` | nie |
+| (bez żądania) brak `mediaDevices` / https / przeglądarka w aplikacji | komunikat z `voice-call/mediaSupport` | nie |
 
-**Stan po wdrożeniu, dopóki na Renderze nie ma `DAILY_API_KEY`:** przycisk „Rozmowa” w **obu** silnikach pokazuje „Rozmowa chwilowo niedostępna.” (503 `VOICE_NOT_CONFIGURED`), tablica działa normalnie. Stary czat wraca przez `NEXT_PUBLIC_VOICE_PROVIDER=legacy` na Vercelu + redeploy.
+**Stan po wdrożeniu, dopóki na Renderze nie ma `DAILY_API_KEY`:** przycisk „Rozmowa” pokazuje „Rozmowa chwilowo niedostępna.” (503 `VOICE_NOT_CONFIGURED`), tablica działa normalnie. Stary czat wraca przez `NEXT_PUBLIC_VOICE_PROVIDER=legacy` na Vercelu + redeploy.
 
 ## 6. SmartSearch (wyszukiwanie wzorów)
 

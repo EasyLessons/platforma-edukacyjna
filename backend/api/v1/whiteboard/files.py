@@ -21,7 +21,8 @@ Nigdy nie przelaczamy sie na bucket publiczny.
 Walidacja i limity jak przy awatarze (api/v1/auth/avatar.py): cialo czytane strumieniowo
 z twardym limitem 5 MB, typ rozpoznawany po TRESCI i obraz przekodowany do WEBP
 (core/image_sanitizer.py), jedno dekodowanie naraz w calym procesie (wspolny semafor).
-Stary endpoint `upload-image` (stary silnik, storage.py) zostaje bez zmian.
+Stary endpoint `upload-image` i publiczny bucket `board-images` starego silnika zostaly
+usuniete w etapie F (docs/architecture/ADR-silnik-tablicy.md).
 
 Ochrona przed zalaniem uploadami (kolejnosc = kolejnosc sprawdzania, wszystko PRZED
 czytaniem ciala):

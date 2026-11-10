@@ -122,8 +122,8 @@ jobs:
       - run: npx tsc --noEmit
 
   # E2E tablicy na Excalidraw (Playwright, e2e/): pelny stos - Postgres + Redis jako
-  # services, backend z seedem, prawdziwy whiteboard-sync z autoryzacja i frontend
-  # zbudowany z NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw. Serwery startuje sam
+  # services, backend z seedem, prawdziwy whiteboard-sync z autoryzacja i frontend.
+  # Serwery startuje sam
   # playwright.config.ts (webServer). Job nie jest (jeszcze) w wymaganych checkach
   # rulesetu - po kilku stabilnych przebiegach dodac go tam (docs/architecture/ci-cd.md).
   e2e-board-engine:

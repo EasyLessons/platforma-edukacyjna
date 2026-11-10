@@ -5,8 +5,8 @@
  *
  * Provider trzyma JEDNĄ instancję rozmowy na tablicę i renderuje (portalem do <body>)
  * pływające okno z ramką Daily oraz komunikaty. Przycisk "Rozmowa" (`CallButton`) może
- * stać w dowolnym miejscu drzewa - w starym silniku w pasku `online-users`, w Excalidraw
- * w prawym górnym rogu.
+ * stać w dowolnym miejscu drzewa - na tablicy Excalidraw w prawym górnym rogu (slot
+ * `topRightExtra`).
  *
  * Zasady, których pilnuje ten plik:
  *  - `@daily-co/daily-js` ładuje się dynamicznie dopiero po kliknięciu (nie trafia do
@@ -31,9 +31,8 @@ import { createPortal } from 'react-dom';
 import type { DailyCall } from '@daily-co/daily-js';
 
 import { createLogger } from '@/_new/lib/logger';
-// Ten sam test wsparcia przeglądarki co w starym czacie (http, przeglądarka w aplikacji,
-// brak mediaDevices). Przy usuwaniu `features/voice-chat` plik mediaSupport.ts przenieść tutaj.
-import { getVoiceSupportIssue } from '@/_new/features/voice-chat/mediaSupport';
+// Test wsparcia przeglądarki (http, przeglądarka w aplikacji, brak mediaDevices).
+import { getVoiceSupportIssue } from './mediaSupport';
 import { createBoardCall } from './api/callApi';
 import { DailyCallContext } from './call-context';
 import type { CallNotice, CallStatus, DailyCallContextValue } from './call-context';

@@ -22,7 +22,6 @@ import {
   touchBoardCache,
 } from '@/_new/lib/board-cache/board-cache';
 import { createLogger } from '@/_new/lib/logger';
-import { getElementsMap } from './board-doc';
 
 const log = createLogger('whiteboard/use-yjs-local-cache');
 
@@ -36,10 +35,8 @@ export interface UseYjsLocalCacheOptions {
 }
 
 export interface UseYjsLocalCacheResult {
-  /** Kopia lokalna wczytana albo pominięta - można łączyć provider. */
+  /** Kopia lokalna wczytana albo pominięta - można łączyć provider. Czy kopia ma treść, liczy wołający z własnej mapy Y.Doc. */
   isReady: boolean;
-  /** Kopia lokalna miała treść - można ją pokazać przed synchronizacją z serwerem. */
-  hasLocalContent: boolean;
   /** Flaga niewysłanych zmian w rejestrze (true - nie usuwać przy limicie i wylogowaniu wymuszonym). */
   setDirty: (dirty: boolean) => void;
   /** Usuwa kopię tej tablicy (odebrany dostęp). */
@@ -58,7 +55,6 @@ export function useYjsLocalCache({
 }: UseYjsLocalCacheOptions): UseYjsLocalCacheResult {
   const cacheable = isCacheableBoard(boardId, userId);
   const [loaded, setLoaded] = useState(false);
-  const [hasLocalContent, setHasLocalContent] = useState(false);
 
   const persistenceRef = useRef<IndexeddbPersistence | null>(null);
   const nameRef = useRef<string | null>(null);
@@ -84,21 +80,20 @@ export function useYjsLocalCache({
     persistenceRef.current = persistence;
 
     let settled = false;
-    const finish = (fromCache: boolean) => {
+    const finish = () => {
       if (settled) return;
       settled = true;
-      setHasLocalContent(fromCache && getElementsMap(doc).size > 0);
       setLoaded(true);
     };
 
     const timeout = setTimeout(() => {
       log.warn('IndexedDB nie odpowiada - tablica bez kopii lokalnej');
-      finish(false);
+      finish();
     }, LOCAL_CACHE_TIMEOUT_MS);
 
     void persistence.whenSynced.then(() => {
       clearTimeout(timeout);
-      finish(true);
+      finish();
     });
 
     const handleUpdate = (_update: Uint8Array, origin: unknown) => {
@@ -115,7 +110,6 @@ export function useYjsLocalCache({
       persistenceRef.current = null;
       nameRef.current = null;
       setLoaded(false);
-      setHasLocalContent(false);
     };
   }, [doc, boardId, userId, setDirty]);
 
@@ -128,5 +122,5 @@ export function useYjsLocalCache({
     );
   }, [boardId]);
 
-  return { isReady: !cacheable || loaded, hasLocalContent, setDirty, clear };
+  return { isReady: !cacheable || loaded, setDirty, clear };
 }

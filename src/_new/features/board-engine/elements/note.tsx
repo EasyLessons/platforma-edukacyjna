@@ -23,7 +23,7 @@ import type {
   ExcalidrawEmbeddableElement,
   NonDeleted,
 } from '@excalidraw/excalidraw/element/types';
-import { MarkdownNoteView } from '@/_new/features/whiteboard/components/toolbar/markdown-note-tool';
+import { MarkdownNoteView } from '@/_new/features/whiteboard/components/toolbar/markdown-note-view';
 import type { MarkdownNote } from '@/_new/features/whiteboard/types';
 import { viewportCenter } from '../panels/insert-resources';
 

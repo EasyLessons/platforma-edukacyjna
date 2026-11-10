@@ -3,7 +3,7 @@ Testy plikow tablicy (silnik Excalidraw) - api/v1/whiteboard/files.py
 POST /api/v1/whiteboard/{id}/files, GET /api/v1/whiteboard/{id}/files/{file_name}
 
 Supabase Storage jest atrapa w pamieci podpieta przez httpx.MockTransport (core/storage.py
-i stary whiteboard/storage.py uzywaja httpx.AsyncClient) - zaden test nie wychodzi do sieci.
+uzywa httpx.AsyncClient) - zaden test nie wychodzi do sieci.
 """
 import asyncio
 import io
@@ -945,49 +945,3 @@ class TestDeleteWithBoard:
         assert result["success"] is True
         assert db_session.query(Board).filter(Board.id == board_id).first() is None
 
-
-class TestLegacyUploadImage:
-    """Stary endpoint starego silnika: jedyna zmiana to blokada dla roli viewer."""
-
-    URL = "/api/v1/whiteboard/{board_id}/upload-image"
-
-    def test_viewer_403(self, client, db_session, test_user, test_user2, shared_workspace, fake_storage):
-        board = make_board(db_session, shared_workspace, test_user)
-        set_role(db_session, shared_workspace, test_user2, "viewer")
-
-        r = client.post(
-            self.URL.format(board_id=board.id), headers=auth_headers(test_user2.id),
-            files={"file": ("a.png", image_bytes(), "image/png")},
-        )
-
-        assert r.status_code == 403
-        assert r.json()["code"] == "FORBIDDEN"
-        assert fake_storage.requests == []
-
-    def test_nie_czlonek_nadal_404(self, client, test_board, test_user2, fake_storage):
-        r = client.post(
-            self.URL.format(board_id=test_board.id), headers=auth_headers(test_user2.id),
-            files={"file": ("a.png", image_bytes(), "image/png")},
-        )
-
-        assert r.status_code == 404
-
-    def test_editor_nadal_moze(self, client, db_session, test_user, test_user2, shared_workspace, monkeypatch):
-        import api.v1.whiteboard.service as service_module
-
-        seen = {}
-
-        async def fake_upload(board_id, file_bytes, content_type):
-            seen["args"] = (board_id, len(file_bytes), content_type)
-            return "https://example.invalid/obraz.png"
-
-        monkeypatch.setattr(service_module, "upload_board_image", fake_upload)
-        board = make_board(db_session, shared_workspace, test_user)
-
-        r = client.post(
-            self.URL.format(board_id=board.id), headers=auth_headers(test_user2.id),
-            files={"file": ("a.png", image_bytes(), "image/png")},
-        )
-
-        assert r.status_code == 200, r.text
-        assert seen["args"][0] == board.id

@@ -12,21 +12,21 @@ A real-time collaborative teaching platform built for online tutoring - a shared
 
 ## Features
 
-- **Shared whiteboard** - real-time collaborative drawing/writing with a full toolset (11 tools), undo/redo via a command-pattern history stack; sync is being migrated from Supabase Broadcast to a Yjs CRDT document served by a Hocuspocus service (`whiteboard-sync/`, behind `NEXT_PUBLIC_WHITEBOARD_YJS`)
+- **Shared whiteboard** - Excalidraw board with EasyLesson extras (Markdown/KaTeX notes, tables, PDF pages, function plots, exam sheets); synced as a Yjs CRDT document served by a Hocuspocus service (`whiteboard-sync/`)
 - **SmartSearch** - quick lookup and insertion of math/physics formulas, rendered with KaTeX
 - **AI Assistant** - chat assistant that can also accept images, with response caching and rate limiting
 - **Workspaces & boards** - organize lessons into workspaces, invite collaborators (named invites or share links) with role-based permissions (owner/editor)
 - **Demo board** - try the whiteboard without an account
 - **Real-time notifications** - invites, workspace membership changes, unread badges
-- **Voice chat** - WebRTC-based voice calls within a board
+- **Voice call** - Daily-powered voice calls within a board
 - **Authentication** - email/password with verification codes, Google OAuth, cookie-based sessions with refresh-token rotation
 
 ## Tech stack
 
-**Frontend:** Next.js (App Router), React 19, TypeScript, Tailwind CSS, TanStack Query, Zustand, Yjs, KaTeX, Vitest
+**Frontend:** Next.js (App Router), React 19, TypeScript, Tailwind CSS, TanStack Query, Excalidraw, Yjs, KaTeX, Vitest
 **Backend:** Python, FastAPI, SQLAlchemy, Alembic, PostgreSQL (Neon, serverless), Redis
-**Realtime:** Supabase Realtime (presence, notifications, voice signalling), Hocuspocus (`whiteboard-sync`, Yjs documents), WebRTC (Xirsys TURN)
-**Infra/Auth:** Docker, JWT, Google OAuth, Supabase Storage (board images), Resend (email), Gemini API (AI assistant)
+**Realtime:** Hocuspocus (`whiteboard-sync`, Yjs documents + awareness), Supabase Realtime (notifications), Daily (voice)
+**Infra/Auth:** Docker, JWT, Google OAuth, Supabase Storage (board files, avatars), Resend (email), Gemini API (AI assistant)
 **Tooling:** ESLint, Prettier, Husky, commitlint, dependency-cruiser
 
 Full architecture docs: start at [docs/README.md](docs/README.md).
@@ -69,9 +69,8 @@ alembic upgrade head
 # Backend (every time, from backend/ with venv active)
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
-# Frontend (new terminal, from project root). Excalidraw board needs two build-time vars
-# in .env.local: NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw and
-# NEXT_PUBLIC_WHITEBOARD_SYNC_URL=ws://localhost:1234 (without them the legacy engine runs).
+# Frontend (new terminal, from project root). The board needs NEXT_PUBLIC_WHITEBOARD_SYNC_URL
+# in .env.local (ws://localhost:1234 is the default when empty).
 npm install
 npm run dev
 

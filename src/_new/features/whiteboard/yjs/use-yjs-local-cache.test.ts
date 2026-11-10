@@ -46,7 +46,6 @@ import {
   markBoardCacheDirty,
   clearBoardCache,
 } from '@/_new/lib/board-cache/board-cache';
-import { getElementsMap } from './board-doc';
 import { useYjsLocalCache, LOCAL_CACHE_TIMEOUT_MS } from './use-yjs-local-cache';
 
 const NAME = 'easylesson-wb-v1-u11-b159';
@@ -57,11 +56,14 @@ function render(boardId = '159', userId: number | null = 11) {
   return { doc, ...hook };
 }
 
+/** Mapa elementów jak w board-engine (yjs/excalidraw-binding.ts) - hook jej nie zna, liczy się tylko origin zmiany. */
+const elements = (doc: Y.Doc) => doc.getMap('elements');
+
 /** Symulacja wczytania kopii z IndexedDB: element dodany z origin = persistence, potem "synced". */
 async function loadFromCache(doc: Y.Doc, withContent: boolean) {
   const persistence = persistences[0];
   if (withContent) {
-    doc.transact(() => getElementsMap(doc).set('a', new Y.Map()), persistence);
+    doc.transact(() => elements(doc).set('a', { id: 'a' }), persistence);
   }
   await act(async () => persistence.resolveSynced());
 }
@@ -102,16 +104,15 @@ describe('useYjsLocalCache - kiedy działa', () => {
     await loadFromCache(doc, true);
 
     expect(result.current.isReady).toBe(true);
-    expect(result.current.hasLocalContent).toBe(true);
+    expect(markBoardCacheDirty).not.toHaveBeenCalled();
   });
 
-  it('pusta kopia (pierwsze wejście): gotowe, bez treści', async () => {
+  it('pusta kopia (pierwsze wejście): gotowe', async () => {
     const { doc, result } = render();
 
     await loadFromCache(doc, false);
 
     expect(result.current.isReady).toBe(true);
-    expect(result.current.hasLocalContent).toBe(false);
   });
 
   it('IndexedDB nie odpowiada: po timeoucie gotowe bez kopii', () => {
@@ -121,7 +122,6 @@ describe('useYjsLocalCache - kiedy działa', () => {
     act(() => vi.advanceTimersByTime(LOCAL_CACHE_TIMEOUT_MS));
 
     expect(result.current.isReady).toBe(true);
-    expect(result.current.hasLocalContent).toBe(false);
   });
 });
 
@@ -130,8 +130,8 @@ describe('useYjsLocalCache - niewysłane zmiany (dirty)', () => {
     const { doc } = render();
     await loadFromCache(doc, false);
 
-    doc.transact(() => getElementsMap(doc).set('x', new Y.Map()), 11);
-    doc.transact(() => getElementsMap(doc).set('y', new Y.Map()), 11);
+    doc.transact(() => elements(doc).set('x', { id: 'x' }), 11);
+    doc.transact(() => elements(doc).set('y', { id: 'y' }), 11);
 
     expect(markBoardCacheDirty).toHaveBeenCalledTimes(1);
     expect(markBoardCacheDirty).toHaveBeenCalledWith(NAME, true);
@@ -142,7 +142,7 @@ describe('useYjsLocalCache - niewysłane zmiany (dirty)', () => {
     await loadFromCache(doc, true);
 
     const provider = new HocuspocusProvider({} as never);
-    doc.transact(() => getElementsMap(doc).set('remote', new Y.Map()), provider);
+    doc.transact(() => elements(doc).set('remote', { id: 'remote' }), provider);
 
     expect(markBoardCacheDirty).not.toHaveBeenCalled();
   });

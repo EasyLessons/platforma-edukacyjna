@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createBoard } from '@/_new/features/board/api/boardApi';
 import { boardKeys } from '@/_new/features/board/hooks/useBoard';
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
-import { isExcalidrawEngine } from '@/_new/features/board-engine';
 import { UpgradeModal, getPlanLimitCode, usePlan, type PlanLimitCode } from '@/_new/features/plans';
 import { sheetByFolder, sheetThumbnail } from '@/_new/features/board-engine/templates/catalog';
 
@@ -136,14 +135,11 @@ const TEMPLATE_CARDS: TemplateCard[] = [
 
 /**
  * Czy karta arkusza otwiera tablice z arkuszem: arkusz musi byc w katalogu szablonow
- * (strony w public/templates) i dziala tylko na tablicy Excalidraw. Stary silnik parametr
- * `?arkusz=` ignorowal (dawal pusta tablice) - przy wylaczonej fladze karta jest wyszarzona
- * z opisem (decyzja 12.10.2026, raport szablony).
+ * (strony w public/templates); inaczej karta jest wyszarzona z opisem.
  */
 function sheetUnavailableReason(folder: string | undefined): string | null {
   if (!folder) return null;
   if (!sheetByFolder(folder)) return 'Wkrotce';
-  if (!isExcalidrawEngine) return 'Dostepne w nowej tablicy';
   return null;
 }
 

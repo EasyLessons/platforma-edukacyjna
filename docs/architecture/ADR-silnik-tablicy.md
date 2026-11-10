@@ -467,5 +467,8 @@ Kod: `src/_new/features/board-engine/elements/`, przyciski wstawiania w slocie `
   9 arkuszy, 257 stron, **13 MB** w repo (PDF-y źródłowe `public/arkusze/` - 29 MB - zostają jako źródło generatora).
   Przy rozroście > ~100 MB: publiczny bucket `templates` zamiast repo.
 - Dashboard: karta arkusza -> nowa tablica z `?arkusz=<folder>` -> board-engine wstawia arkusz raz (strona pod stroną,
-  grupa), po synchronizacji sceny z serwerem; potem `?arkusz=` znika z adresu. Przy wyłączonej fladze Excalidraw karty
-  arkuszy są wyszarzone ("Dostępne w nowej tablicy") - stary silnik parametr ignorował.
+  grupa), po synchronizacji sceny z serwerem; potem `?arkusz=` znika z adresu.
+
+## Etap F - usunięcie starego silnika (11.2026, gałąź `feat/usun-stary-silnik`)
+
+Usunięte: `features/whiteboard/{components/canvas,tools,engine,handlers,selection,navigation,realtime,stores}`, stare narzędzia z `components/toolbar`, `board-header`, `use-yjs-board` + `yjs/board-doc` (model Y.Doc starego silnika), `src/app/context/BoardRealtimeContext.tsx`, flaga `NEXT_PUBLIC_WHITEBOARD_ENGINE` (`board-engine/config/engine-flag.ts`), relikt `demo-board` i ciasteczko `demo_mode`, backend `POST /whiteboard/{id}/upload-image` + `api/v1/whiteboard/storage.py` (publiczny bucket `board-images` - do ręcznego skasowania w Supabase), zależności `rbush`, `zustand`, `fractional-indexing`, dokumenty `docs/ai-context/whiteboard/*`. Razem z silnikiem zniknął stary czat WebRTC (`features/voice-chat`, `/api/turn`, `NEXT_PUBLIC_VOICE_PROVIDER`, `XIRSYS_*`) - był montowany tylko w ścieżce starego silnika. Zostało w `features/whiteboard`: panele (kalkulator, SmartSearch, Tutor AI, zapisane szablony, ustawienia), sidebar tablic, `use-whiteboard-ui-metrics`, `whiteboardApi` (ustawienia), `yjs/*` (sync, IndexedDB, prewarm), `math-eval`, `MarkdownNoteView` i typy elementów zapisanych szablonów (`assets`). Backend `POST /{id}/opened` + `GET /boards/online-users` + `core/presence.py` zostają (dashboard), ale Excalidraw nie woła `/opened` - do decyzji.

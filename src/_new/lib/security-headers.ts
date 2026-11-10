@@ -78,10 +78,6 @@ const DAILY_FRAMES = [
   'https://*.dailywebrtc.com',
   'https://*.dailywebrtc.net',
 ];
-// Stary silnik tablicy: pdf.js worker z CDN (features/whiteboard/components/canvas/
-// whiteboard-canvas.tsx:1854, toolbar/image-tool.tsx:142). Nowy silnik (board-engine/
-// elements/pdf.ts:92) bierze worker z własnego bundla. Usunąć razem ze starym silnikiem (etap F).
-const LEGACY_PDF_CDN = 'https://cdn.jsdelivr.net';
 // Wideo hero landingu i /product (<video src> w features/landing/sections/HeroSection.tsx:20,
 // product/ProductHero.tsx:12) - bucket R2, jeden konkretny host.
 const LANDING_VIDEO = 'https://pub-9f3b498e57d045a682d3009381570da0.r2.dev';
@@ -119,7 +115,6 @@ export function buildContentSecurityPolicy(env: SecurityHeadersEnv = {}): string
       GOOGLE_GSI,
       ...TRANSLATE_SCRIPTS,
       TRANSLATE_JSONP,
-      LEGACY_PDF_CDN,
     ],
     'style-src': ["'self'", "'unsafe-inline'", GOOGLE_GSI, ...TRANSLATE_SCRIPTS],
     // data:/blob: - płótno, eksport PNG, pliki Excalidraw (dataURL), miniatury SVG zasobów.
@@ -142,7 +137,6 @@ export function buildContentSecurityPolicy(env: SecurityHeadersEnv = {}): string
       ...supabase,
       GOOGLE_GSI,
       ...TRANSLATE_CONNECT,
-      LEGACY_PDF_CDN,
     ],
     'frame-src': [GOOGLE_GSI, ...DAILY_FRAMES],
     // pdf.js (board-engine/elements/pdf.ts:92) i Excalidraw (subset fontów) - workery z bundla/blob.

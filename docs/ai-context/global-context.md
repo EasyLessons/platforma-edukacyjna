@@ -13,22 +13,22 @@ Jesteś moim AI Mentorem i Lead Developerem. Ja jestem studentem 3. roku informa
 
 Pełna, szczegółowa mapa stacku (z uzasadnieniami) jest w `docs/architecture/stack.md` — tu tylko skrót:
 
-- **Frontend:** Next.js (App Router, Route Groups), React 19, TypeScript, TanStack Query (dane z API), Zustand (stan globalny UI), Tailwind CSS, KaTeX (wzory matematyczne), Yjs/Hocuspocus (model i synchronizacja tablicy w obu silnikach), Excalidraw jako silnik tablicy za flagą `NEXT_PUBLIC_WHITEBOARD_ENGINE=excalidraw` (stary własny silnik domyślny bez flagi, do usunięcia w etapie F).
+- **Frontend:** Next.js (App Router, Route Groups), React 19, TypeScript, TanStack Query (dane z API), Tailwind CSS, KaTeX (wzory matematyczne), Excalidraw jako silnik tablicy (`features/board-engine`) + Yjs/Hocuspocus (model i synchronizacja); własny silnik canvasowy usunięty w etapie F (11.2026).
 - **Backend/Baza:** FastAPI (Python) + SQLAlchemy/Alembic + PostgreSQL (Neon, serverless) + Redis (presence, rate limit). Osobny serwis `whiteboard-sync/` (Node, Hocuspocus) synchronizuje dokumenty Yjs tablicy i deleguje auth/persystencję do FastAPI. **Supabase jest używany do Realtime (Broadcast + Presence) i Storage (obrazy tablicy) — NIE do autoryzacji.** Autoryzacja to własny system: JWT + cookie-first + rotacja refresh tokenów, opisany w `docs/architecture/auth.md`.
-- Stan lokalny (UI): `useState`. Stan globalny: `Zustand` — kategorycznie unikamy prop drillingu, używamy selektorów do subskrypcji (albo `getState()` w hot-paths), żeby uniknąć zbędnych re-renderów.
+- Stan lokalny (UI): `useState`; dane z API przez TanStack Query; stan tablicy w `Y.Doc` (Yjs). Unikamy prop drillingu — współdzielone rzeczy idą do hooka/kontekstu feature'a.
 - Optymalizacja struktur danych: `Map`/`rbush` (R-tree) tam gdzie liczy się szybkie wyszukiwanie zamiast liniowego przeglądania — patrz `docs/architecture/stack.md`.
 
 # 3. Stan projektu (co zostało zrobione)
 
 Szczegółowa, aktualizowana lista w `docs/migration-status.md` — tu tylko streszczenie:
 
-Zakończony "Wielki Refaktor" tablicy edukacyjnej (Whiteboard) — wycięty monolityczny plik na rzecz warstwowej architektury: Command (undo/redo), Fasada (`WhiteboardEngine`), Strategia + Open/Closed (rejestr narzędzi, dodanie narzędzia = jeden plik `*.tool.tsx`). Pełny opis: `docs/ai-context/whiteboard/canvas-architecture.md`.
+Tablica przeniesiona na Excalidraw (`src/_new/features/board-engine`, ADR `docs/architecture/ADR-silnik-tablicy.md`); własny silnik canvasowy usunięty w etapie F (11.2026).
 
 Zbudowany Dashboard (workspace'y, boardy, zaproszenia, ulubione) — działa na FastAPI + Postgres, nie na Supabase. Opis: `docs/architecture/dashboard.md`.
 
-Auth (logowanie/rejestracja/Google OAuth/reset hasła) w architekturze feature-based (`src/_new/features/auth`), Provider sesji w `src/_new/lib/auth`. Tablica ma drugi model danych oparty o Yjs/Hocuspocus (za flagą), migracja z `board_elements` w toku — opis w `docs/architecture/stack.md` i `pipelines.md` §2b.
+Auth (logowanie/rejestracja/Google OAuth/reset hasła) w architekturze feature-based (`src/_new/features/auth`), Provider sesji w `src/_new/lib/auth`. Tablica synchronizuje się przez Yjs/Hocuspocus (`whiteboard-sync`) — opis w `docs/architecture/stack.md` i `pipelines.md` §2.
 
-**Nie jest zrobione:** `BoardRealtimeContext` (390 linii) i `VoiceChatContext` (646 linii + hooki w `voice-chat/`) nadal leżą w `src/app/context`; ok. 10 000 linii komponentów siedzi w `src/app` zamiast w feature'ach; nazwa `src/_new` wciąż obowiązuje. Kompletny plan i kolejność: `docs/architecture/REFAKTOR-PLAN.md`; stan "zrobione/nie": `docs/migration-status.md`.
+**Nie jest zrobione:** nazwa `src/_new` wciąż obowiązuje (rename = PR-D1). Kompletny plan i kolejność: `docs/architecture/REFAKTOR-PLAN.md`; stan "zrobione/nie": `docs/migration-status.md`.
 
 # 4. Następne cele
 
