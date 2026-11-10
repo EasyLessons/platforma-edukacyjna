@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { decodeToken, isTokenExpired, getTokenUserId, refreshAccessToken } from './tokenService';
+import {
+  decodeToken,
+  isTokenExpired,
+  getTokenUserId,
+  refreshAccessToken,
+  isPublicPath,
+  logoutAndRedirect,
+} from './tokenService';
 
 vi.mock('./tokenStore', () => ({
   getAccessToken: vi.fn(),
@@ -149,5 +156,43 @@ describe('refreshAccessToken', () => {
     await Promise.all([refreshAccessToken(), refreshAccessToken()]);
 
     expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('isPublicPath / logoutAndRedirect', () => {
+  // Gość bez konta (401 z /auth/me w AuthProvider) nie może być wyrzucany z landingu,
+  // rejestracji, poradników i stron prawnych - tylko z tras chronionych jak w middleware.ts.
+  it.each([
+    '/',
+    '/product',
+    '/register',
+    '/reset-password',
+    '/verify',
+    '/docs/faq',
+    '/terms',
+    '/contact',
+    '/login',
+    '/demo/abc',
+  ])('%s jest publiczna', (path) => {
+    expect(isPublicPath(path)).toBe(true);
+  });
+
+  it.each(['/dashboard', '/dashboard/settings', '/whiteboard'])('%s jest chroniona', (path) => {
+    expect(isPublicPath(path)).toBe(false);
+  });
+
+  it('na landingu nie przekierowuje, na /dashboard przekierowuje na /login', () => {
+    const original = window.location;
+    const fake = { pathname: '/', href: 'http://localhost/' };
+    Object.defineProperty(window, 'location', { value: fake, configurable: true });
+    try {
+      logoutAndRedirect();
+      expect(fake.href).toBe('http://localhost/');
+      fake.pathname = '/dashboard';
+      logoutAndRedirect();
+      expect(fake.href).toBe('/login');
+    } finally {
+      Object.defineProperty(window, 'location', { value: original, configurable: true });
+    }
   });
 });
