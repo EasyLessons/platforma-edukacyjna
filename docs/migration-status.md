@@ -27,7 +27,7 @@
 - **Rozmowa przez Daily** (`features/voice-call/`, `whiteboard/call.py`, `call_guard.py`, `call_usage.py`) — jedyny dostawca; stary czat WebRTC (`features/voice-chat/`, `/api/turn`, `NEXT_PUBLIC_VOICE_PROVIDER`) usunięty w etapie F.
 - **Etap F (11.2026, gałąź `feat/usun-stary-silnik`):** stary silnik canvasowy tablicy usunięty w całości (`features/whiteboard/{components/canvas,tools,engine,handlers,selection,navigation,realtime,stores}`, stare narzędzia z `components/toolbar`, `board-header`, `use-yjs-board`/`yjs/board-doc`, `src/app/context/BoardRealtimeContext.tsx`, flaga `NEXT_PUBLIC_WHITEBOARD_ENGINE`, relikt `demo-board` + cookie `demo_mode`, backend `POST /whiteboard/{id}/upload-image` + `whiteboard/storage.py` (bucket `board-images`), zależności `rbush`, `zustand`, `fractional-indexing`, `docs/ai-context/whiteboard/*`), razem ze starym czatem WebRTC. W `features/whiteboard` zostały: panele (kalkulator, SmartSearch, Tutor AI, zapisane szablony, ustawienia), sidebar tablic, `use-whiteboard-ui-metrics`, `whiteboardApi` (ustawienia), `yjs/*`, `math-eval`, `MarkdownNoteView`, typy zapisanych szablonów.
 - Auth: JWT wyłącznie przez `PyJWT`, `AuthContext` w `src/_new/lib/auth` (`architecture/auth.md`). Moduły backendu: `auth`, `boards`, `workspaces`, `notifications`, `whiteboard`, `assets`, `plans`, `storage_quota`, `onboarding`, `health`; `@app.on_event` zastąpione `lifespan`.
-- Testy (10.11.2026, po etapie F): vitest 78 plików / 776 testów, whiteboard-sync 6 plików / 65 testów, pytest 1423, e2e 27 (`docs/testing.md`).
+- Testy (10.11.2026, po etapie F): vitest 79 plików / 815 testów, whiteboard-sync 6 plików / 65 testów, pytest 1437, e2e 31 (po rebase na `release/baseline` z gałęzią SEC) (`docs/testing.md`).
 
 ## Do zrobienia — kod
 
