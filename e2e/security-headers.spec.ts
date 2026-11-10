@@ -34,6 +34,20 @@ declare global {
   }
 }
 
+/**
+ * Google przy wielu żądaniach z jednego IP (kolejne przebiegi e2e, szkolny NAT) przekierowuje
+ * skrypt Translate (layout.tsx) na stronę anty-botową www.google.com/sorry. CSP słusznie blokuje
+ * ten redirect (to HTML z captchą, nie skrypt) - widget wtedy się nie ładuje, aplikacja działa.
+ * Zdarzenie podaje adres sprzed redirectu (translate.google.com jest w script-src, więc
+ * naruszenie na nim = tylko redirect), konsola - adres /sorry. Inne naruszenia zostają.
+ */
+function isGoogleBotCheck(violation: string): boolean {
+  return (
+    violation.includes('https://www.google.com/sorry/') ||
+    violation.startsWith('script-src-elem <- https://translate.google.com/translate_a/element.js')
+  );
+}
+
 /** Rejestruje naruszenia CSP w przeglądarce (zdarzenie) i w konsoli; działa od następnej nawigacji. */
 async function watchCsp(page: Page): Promise<{ violations: () => Promise<string[]> }> {
   const fromConsole: string[] = [];
@@ -61,7 +75,7 @@ async function watchCsp(page: Page): Promise<{ violations: () => Promise<string[
   return {
     violations: async () => {
       const fromEvents = await page.evaluate(() => window.__cspViolations ?? []);
-      return [...fromEvents, ...fromConsole];
+      return [...fromEvents, ...fromConsole].filter((v) => !isGoogleBotCheck(v));
     },
   };
 }
@@ -271,7 +285,9 @@ test('demo /demo/<id> pod CSP: wejście bez konta, rysowanie i notatka KaTeX bez
   await context.close();
 });
 
-test('landing / i /product pod CSP: wideo hero z R2 bez naruszeń media-src', async ({ browser }) => {
+test('landing / i /product pod CSP (wideo hero z R2), gość zostaje na stronach publicznych', async ({
+  browser,
+}) => {
   const context = await browser.newContext();
   const page = await context.newPage();
   const csp = await watchCsp(page);
@@ -285,6 +301,18 @@ test('landing / i /product pod CSP: wideo hero z R2 bez naruszeń media-src', as
       const v = document.querySelector('video');
       return !!v && v.networkState !== HTMLMediaElement.NETWORK_EMPTY;
     });
+  }
+
+  // Gość bez konta zostaje na stronach publicznych (401 z /auth/me w AuthProvider nie
+  // przekierowuje na /login - wcześniej wyrzucało z landingu i /register).
+  for (const path of ['/', '/register', '/docs/faq']) {
+    const refreshed = page.waitForResponse((r) => r.url().includes('/api/v1/auth/refresh'));
+    await page.goto(path);
+    await refreshed;
+    // Przekierowanie (gdyby było) startuje zaraz po odpowiedzi refresh; networkidle nie nadejdzie
+    // (zapętlone wideo hero, HMR), więc krótka pauza zamiast niego.
+    await page.waitForTimeout(1500);
+    expect(new URL(page.url()).pathname).toBe(path);
   }
 
   expect(await csp.violations()).toEqual([]);

@@ -441,6 +441,8 @@ Krótkie wpisy — pełny opis w komunikatach commitów.
 - **Kotwica `/#pricing`** (menu użytkownika, nagłówek tablicy, Tutor AI) nie działała, bo sekcja cennika miała `id="pakiet-premium"` — id zmienione na `pricing`, stopka i regulamin zaktualizowane (`f9cf610`).
 - **Panel konta „Edytuj / Zapisz zmiany”** nic nie zapisywało (`TODO` w kodzie; `PUT /users/me` przyjmuje tylko `avatar_url`) — formularz usunięty, pola tylko do odczytu, etykieta „Nazwa użytkownika” (`98edabd`). Edycja nazwy = nowa funkcja (endpoint), decyzja produktowa.
 - **`/api/contact`** bez limitu, walidacji długości i z HTML-em od nadawcy w mailu (SEC-08) — patrz #8 (`ebb75b7`).
+- **Gość bez konta był wyrzucany z landingu na `/login`** (także `/register`, `/reset-password`, `/docs`, `/product`, strony prawne): `AuthProvider` w root layoucie woła `/auth/me`, 401 → nieudany refresh → `logoutAndRedirect`, a lista ścieżek publicznych znała tylko `/login`, `/rejestracja` (nieistniejąca trasa), `/auth`, `/demo`. Zalogowani tego nie widzieli. Teraz publiczne = wszystko poza `/dashboard` i `/whiteboard` (jak `matcher` w `middleware.ts`), e2e sprawdza `/`, `/register`, `/docs/faq` (`cd48f0b`).
+- **CSP blokowałaby wideo hero landingu** (`media-src` bez hosta R2 z `HeroSection.tsx`/`ProductHero.tsx`) — host dopisany, e2e landingu pod CSP (`204259b`).
 
 ## Zasada
 
