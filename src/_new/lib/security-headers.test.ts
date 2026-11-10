@@ -126,6 +126,15 @@ describe('buildContentSecurityPolicy', () => {
     expect(sources(csp, 'connect-src')).not.toContain('https://esm.sh');
   });
 
+  it('media-src: wideo hero landingu z R2 (jeden konkretny bucket, bez wildcardu)', () => {
+    const media = sources(buildContentSecurityPolicy(), 'media-src');
+    expect(media).toEqual([
+      "'self'",
+      'blob:',
+      'https://pub-9f3b498e57d045a682d3009381570da0.r2.dev',
+    ]);
+  });
+
   it('twarde dyrektywy: object-src none, frame-ancestors none, base-uri/form-action self', () => {
     const csp = buildContentSecurityPolicy();
     expect(sources(csp, 'object-src')).toEqual(["'none'"]);

@@ -270,3 +270,23 @@ test('demo /demo/<id> pod CSP: wejście bez konta, rysowanie i notatka KaTeX bez
   expect(await csp.violations()).toEqual([]);
   await context.close();
 });
+
+test('landing / i /product pod CSP: wideo hero z R2 bez naruszeń media-src', async ({ browser }) => {
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  const csp = await watchCsp(page);
+
+  for (const path of ['/', '/product']) {
+    await page.goto(path);
+    const video = page.locator('video').first();
+    await expect(video).toHaveAttribute('src', /r2\.dev/);
+    // CSP sprawdza src przy starcie ładowania - czekamy, aż przeglądarka spróbuje pobrać wideo.
+    await page.waitForFunction(() => {
+      const v = document.querySelector('video');
+      return !!v && v.networkState !== HTMLMediaElement.NETWORK_EMPTY;
+    });
+  }
+
+  expect(await csp.violations()).toEqual([]);
+  await context.close();
+});

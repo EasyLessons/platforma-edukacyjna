@@ -82,6 +82,9 @@ const DAILY_FRAMES = [
 // whiteboard-canvas.tsx:1854, toolbar/image-tool.tsx:142). Nowy silnik (board-engine/
 // elements/pdf.ts:92) bierze worker z własnego bundla. Usunąć razem ze starym silnikiem (etap F).
 const LEGACY_PDF_CDN = 'https://cdn.jsdelivr.net';
+// Wideo hero landingu i /product (<video src> w features/landing/sections/HeroSection.tsx:20,
+// product/ProductHero.tsx:12) - bucket R2, jeden konkretny host.
+const LANDING_VIDEO = 'https://pub-9f3b498e57d045a682d3009381570da0.r2.dev';
 // Miniatura szablonu "Matura" w dashboardzie (features/dashboard/components/TemplateSection.tsx:31).
 const TEMPLATE_IMAGES = 'https://cdn.galleries.smcloud.net';
 // Supabase: Realtime (wss) + Storage (obrazy tablic, awatary) - next.config.ts images.remotePatterns.
@@ -144,7 +147,7 @@ export function buildContentSecurityPolicy(env: SecurityHeadersEnv = {}): string
     'frame-src': [GOOGLE_GSI, ...DAILY_FRAMES],
     // pdf.js (board-engine/elements/pdf.ts:92) i Excalidraw (subset fontów) - workery z bundla/blob.
     'worker-src': ["'self'", 'blob:'],
-    'media-src': ["'self'", 'blob:'],
+    'media-src': ["'self'", 'blob:', LANDING_VIDEO],
     'object-src': ["'none'"],
     'base-uri': ["'self'"],
     'form-action': ["'self'"],
