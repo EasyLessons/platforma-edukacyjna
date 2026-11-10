@@ -18,6 +18,7 @@ from core.exceptions import AppException, ValidationError, AuthenticationError, 
 from core.responses import ApiResponse
 from core.request_context import REQUEST_ID_HEADER, get_request_id
 from core.request_id import RequestIdMiddleware
+from core.security_headers import SecurityHeadersMiddleware
 
 from api.v1.router import get_v1_router
 from api.v1.storage_quota.cleanup import cleanup_loop
@@ -57,6 +58,10 @@ app.add_middleware(CORSMiddleware, **cors_policy.middleware_kwargs())
 
 # X-Request-ID: czyta/generuje id zadania, oddaje w naglowku, loguje http.request
 app.add_middleware(RequestIdMiddleware)
+
+# Naglowki bezpieczenstwa (SEC-16): nosniff, Referrer-Policy, X-Frame-Options, no-store na
+# /api/v1/auth/*. Na zewnatrz CORS, zeby dostawaly je tez odpowiedzi na preflight.
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Schemat (X-Forwarded-Proto) i adres klienta w logach zza proxy (SEC-06). Render terminuje
 # TLS przed uvicornem. Middleware jest w kodzie (a nie tylko we flagach uvicorna w Procfile),

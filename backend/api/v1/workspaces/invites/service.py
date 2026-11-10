@@ -135,9 +135,10 @@ class InviteService:
             )
         except (NotFoundError, ConflictError, AppException):
             raise
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise AppException(f"Błąd tworzenia zaproszenia: {str(e)}", status_code=500)
+            logger.exception("Błąd tworzenia zaproszenia")
+            raise AppException("Błąd tworzenia zaproszenia", status_code=500)
 
     def search_invitable_users(
         self,
@@ -242,9 +243,10 @@ class InviteService:
             )
         except (NotFoundError, ConflictError, AppException):
             raise
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise AppException(f"Błąd dodawania: {str(e)}", status_code=500)
+            logger.exception("Błąd dodawania członka z zaproszenia")
+            raise AppException("Błąd dodawania", status_code=500)
 
     def reject_invite(self, invite_token: str, user_id: int) -> dict:
         """Odrzuca zaproszenie — usuwa je z bazy."""
@@ -263,6 +265,7 @@ class InviteService:
             db.delete(invite)
             db.commit()
             return {"message": "Zaproszenie odrzucone"}
-        except Exception as e:
+        except Exception:
             db.rollback()
-            raise AppException(f"Błąd odrzucania: {str(e)}", status_code=500)
+            logger.exception("Błąd odrzucania zaproszenia")
+            raise AppException("Błąd odrzucania", status_code=500)

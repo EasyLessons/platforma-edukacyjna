@@ -21,7 +21,8 @@ vi.mock('@google/generative-ai', () => {
 
 vi.mock('@/_new/server/chat/auth', () => ({ authenticateChatRequest: mockAuthenticate }));
 
-import { POST, GET } from './route';
+import * as route from './route';
+import { POST } from './route';
 
 const makeRequest = (body: unknown, ip = '127.0.0.1', token: string | null = 'valid-token') =>
   new Request('http://localhost/api/chat', {
@@ -37,13 +38,8 @@ const makeRequest = (body: unknown, ip = '127.0.0.1', token: string | null = 'va
 // ─── GET /api/chat ────────────────────────────────────────────────────────────
 
 describe('GET /api/chat', () => {
-  it('zwraca status ok ze statystykami serwisu', async () => {
-    const res = await GET();
-    expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.status).toBe('ok');
-    expect(typeof data.cacheSize).toBe('number');
-    expect(typeof data.activeUsers).toBe('number');
+  it('nie istnieje (SEC-22: bez wystawiania modelu, cacheSize i activeUsers bez tokenu)', () => {
+    expect('GET' in route).toBe(false);
   });
 });
 

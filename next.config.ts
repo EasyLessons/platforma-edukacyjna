@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import { buildSecurityHeaders } from './src/_new/lib/security-headers';
 
 const nextConfig: NextConfig = {
   turbopack: {
@@ -6,30 +7,20 @@ const nextConfig: NextConfig = {
   },
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // 🔒 SECURITY HEADERS
+  // 🔒 SECURITY HEADERS (SEC-16) - CSP, HSTS, Permissions-Policy
   // ═══════════════════════════════════════════════════════════════════════════
+  // Treść i lista hostów: src/_new/lib/security-headers.ts (z testem jednostkowym).
+  // Hosty backendu/sync są czytane z env w czasie builda (jak wszystkie NEXT_PUBLIC_*).
   async headers() {
     return [
       {
         source: '/(.*)',
-        headers: [
-          {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'DENY',
-          },
-          {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
-          },
-          {
-            key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin',
-          },
-        ],
+        headers: buildSecurityHeaders({
+          apiUrl: process.env.NEXT_PUBLIC_API_URL,
+          syncUrl: process.env.NEXT_PUBLIC_WHITEBOARD_SYNC_URL,
+          supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+          dev: process.env.NODE_ENV !== 'production',
+        }),
       },
     ];
   },
