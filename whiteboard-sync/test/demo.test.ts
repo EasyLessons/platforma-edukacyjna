@@ -232,7 +232,9 @@ describe('serwer z dwoma gośćmi', () => {
       { ...DEFAULT_DEMO_CONFIG, ttlMs: 60_000, maxConnectionsPerDoc: 2, elementLimit: 3 },
       () => clock
     );
-    port = 20000 + Math.floor(Math.random() * 20000);
+    // Port 0 = wolny port od systemu (losowy 20000-39999 trafial w zakresy zarezerwowane
+    // przez Windows/Hyper-V -> EACCES).
+    port = 0;
     server = new Hocuspocus({
       port,
       quiet: true,
@@ -243,6 +245,7 @@ describe('serwer z dwoma gośćmi', () => {
       ],
     });
     await server.listen();
+    port = server.address.port;
   });
 
   afterEach(async () => {
